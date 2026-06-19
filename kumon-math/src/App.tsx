@@ -7,13 +7,35 @@ import ProblemCard from './components/ProblemCard';
 import ProgressBar from './components/ProgressBar';
 import CountingHelper from './components/CountingHelper';
 import Shop from './components/Shop';
+import { playCorrect, playWrong, playStreak } from './utils/sounds';
 
 type AvatarMood = 'idle' | 'happy' | 'sad' | 'thinking';
 
+const CORRECT_MESSAGES = [
+  '와, 정답이야! 🎉',
+  '맞았어! 대단한데! ✨',
+  '야호! 딩동댕~ 🔔',
+  '천재다 천재! 🌟',
+  '완전 잘했어! 👏',
+  '오~ 맞혔네! 🎊',
+];
+
+const STREAK_MESSAGES: Record<number, string> = {
+  3: '3개 연속! 엄청나다! 🔥',
+  5: '5연속! 수학왕이야! 👑',
+  7: '7개 연속! 진짜 대박! 💥',
+  10: '10연속!!! 너 천재 아니야?! 🚀',
+};
+
+const WRONG_MESSAGES = [
+  '아이쿠, 틀렸어. 같이 해보자!',
+  '괜찮아, 다시 해보면 돼!',
+  '어렵지? 같이 세어볼까?',
+  '실수했구나! 함께 확인해보자!',
+];
+
 function generateProblem(level: number): Problem {
-  const addOnly: Operation[] = ['add'];
-  const mixed: Operation[] = ['add', 'subtract'];
-  const operations: Operation[] = level <= 12 ? addOnly : mixed;
+  const operations: Operation[] = level <= 12 ? ['add'] : ['add', 'subtract'];
   const operation = operations[Math.floor(Math.random() * operations.length)];
 
   let num1: number, num2: number;
@@ -75,28 +97,41 @@ export default function App() {
     if (answer === problem.answer) {
       setIsCorrect(true);
       setMood('happy');
-      const bonus = gameState.streak >= 2;
-      setFeedbackMsg(bonus ? `정답! 🎉 연속 보너스!` : '정답이에요! 🎉');
-      const earned = bonus ? 15 : 10;
+
+      const newStreak = gameState.streak + 1;
+      const streakMsg = STREAK_MESSAGES[newStreak];
+      const normalMsg = CORRECT_MESSAGES[Math.floor(Math.random() * CORRECT_MESSAGES.length)];
+      setFeedbackMsg(streakMsg || normalMsg);
+
+      const earned = 3 + (newStreak > 0 && newStreak % 5 === 0 ? 2 : 0);
       setPointsFlash(earned);
       setFlashKey(k => k + 1);
+
+      if (newStreak > 0 && newStreak % 5 === 0) {
+        playStreak();
+      } else {
+        playCorrect();
+      }
+
       onCorrect();
       setTimeout(() => {
         setPointsFlash(0);
         setFeedbackMsg('');
-        nextProblem(Math.min(gameState.level + (gameState.streak >= 4 ? 1 : 0), 20));
-      }, 1500);
+        nextProblem(Math.min(gameState.level + (newStreak >= 5 ? 1 : 0), 20));
+      }, 1600);
     } else {
       setIsCorrect(false);
       setMood('sad');
-      setFeedbackMsg(`아쉬워요! 정답은 ${problem.answer}이에요.`);
+      const msg = WRONG_MESSAGES[Math.floor(Math.random() * WRONG_MESSAGES.length)];
+      setFeedbackMsg(msg);
+      playWrong();
       onWrong();
       setTimeout(() => {
         setShowHelper(true);
         setIsCorrect(null);
         setMood('idle');
         setFeedbackMsg('');
-      }, 900);
+      }, 1000);
     }
   }, [problem, isCorrect, onCorrect, onWrong, gameState.streak, gameState.level, nextProblem]);
 
@@ -115,6 +150,7 @@ export default function App() {
       padding: '20px 16px 40px',
       fontFamily: "'Nunito', 'Noto Sans KR', sans-serif",
     }}>
+      {/* 상단 바 */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         width: '100%', maxWidth: 380, marginBottom: 20,
@@ -135,17 +171,16 @@ export default function App() {
         </button>
       </div>
 
-      <ProgressBar
-        level={gameState.level}
-        streak={gameState.streak}
-        points={gameState.points}
-      />
+      <ProgressBar level={gameState.level} streak={gameState.streak} points={gameState.points} />
 
+      {/* 아바타 영역 */}
       <div style={{
-        margin: '24px 0 16px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+        margin: '16px 0 12px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
       }}>
-        <Avatar items={items} mood={mood} size="large" />
+        <div className={mood === 'happy' ? 'avatar-bounce' : mood === 'sad' ? 'avatar-shake' : mood === 'thinking' ? 'avatar-pulse' : ''}>
+          <Avatar items={items} mood={mood} size="large" />
+        </div>
 
         {pointsFlash > 0 && (
           <div key={flashKey} style={{
@@ -165,25 +200,23 @@ export default function App() {
             borderRadius: 20,
             boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
             animation: 'fadeIn 0.3s ease',
+            textAlign: 'center',
+            maxWidth: 280,
           }}>
             {feedbackMsg}
           </div>
         )}
       </div>
 
-      <ProblemCard
-        problem={problem}
-        onSubmit={handleSubmit}
-        isCorrect={isCorrect}
-      />
+      <ProblemCard problem={problem} onSubmit={handleSubmit} isCorrect={isCorrect} />
 
       <div style={{
         marginTop: 20,
         display: 'flex', gap: 20,
         color: 'rgba(0,0,0,0.5)', fontSize: 14, fontWeight: 600,
       }}>
-        <span>✅ {gameState.totalCorrect}</span>
-        <span>❌ {gameState.totalWrong}</span>
+        <span>✅ {gameState.totalCorrect}개</span>
+        <span>❌ {gameState.totalWrong}개</span>
         <span>정답률: {gameState.totalCorrect + gameState.totalWrong > 0
           ? Math.round(gameState.totalCorrect / (gameState.totalCorrect + gameState.totalWrong) * 100)
           : 0}%</span>
