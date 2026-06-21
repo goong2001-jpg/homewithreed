@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>이블헌터 타이쿤 - 방치형 RPG</title>
+<style>
+  :root{
+    --bg:#0e1015; --panel:#181c25; --panel2:#20252f; --line:#2c3340;
+    --txt:#e6e9ef; --dim:#9aa3b2; --gold:#ffce54; --gem:#8e6cff;
+    --hp:#e74c3c; --acc:#46c2ff; --ok:#37d67a; --bad:#ff5b5b;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:14px; overflow:hidden;
+    display:flex; flex-direction:column; height:100dvh;
+    user-select:none;
+  }
+  #app{display:flex;flex-direction:column;height:100%;max-width:760px;margin:0 auto;width:100%;}
+
+  /* ===== Top bar ===== */
+  #topbar{
+    display:flex; flex-wrap:wrap; gap:6px; padding:8px 10px;
+    background:linear-gradient(180deg,#1b2030,#14171f);
+    border-bottom:1px solid var(--line); align-items:center;
+  }
+  .stat{
+    display:flex;align-items:center;gap:4px;background:var(--panel2);
+    padding:4px 9px;border-radius:20px;font-size:13px;font-weight:600;
+    border:1px solid var(--line); white-space:nowrap;
+  }
+  .stat .lab{color:var(--dim);font-weight:500;font-size:11px;}
+  .stat.gold .v{color:var(--gold);} .stat.gem .v{color:var(--gem);}
+  #diffBadge{margin-right:auto;font-weight:700;color:var(--acc);}
+
+  /* ===== Content ===== */
+  #content{flex:1;overflow-y:auto;position:relative;-webkit-overflow-scrolling:touch;}
+  .tab{display:none;padding:10px;}
+  .tab.active{display:block;}
+
+  /* ===== Tab bar ===== */
+  #tabbar{display:flex;background:#11141b;border-top:1px solid var(--line);}
+  .tbtn{
+    flex:1;background:none;border:none;color:var(--dim);padding:8px 2px 7px;
+    font-size:11px;cursor:pointer;display:flex;flex-direction:column;
+    align-items:center;gap:2px;transition:.15s;font-family:inherit;
+  }
+  .tbtn .ic{font-size:20px;}
+  .tbtn.active{color:var(--acc);background:#171c27;}
+
+  /* ===== Generic ===== */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;}
+  .panel h3{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:6px;}
+  .row{display:flex;gap:8px;align-items:center;}
+  .grid{display:grid;gap:8px;}
+  button.act{
+    background:linear-gradient(180deg,#2a86ff,#1c6ad6);color:#fff;border:none;
+    padding:8px 12px;border-radius:9px;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px;
+    transition:.12s;
+  }
+  button.act:hover{filter:brightness(1.1);}
+  button.act:active{transform:scale(.96);}
+  button.act:disabled{background:#39404d;color:#737b88;cursor:not-allowed;}
+  button.act.green{background:linear-gradient(180deg,#37d67a,#27a35d);}
+  button.act.gold{background:linear-gradient(180deg,#ffce54,#e0a92e);color:#3a2c00;}
+  button.act.purple{background:linear-gradient(180deg,#9e7bff,#7a52e0);}
+  button.act.red{background:linear-gradient(180deg,#ff6b6b,#d63b3b);}
+  button.act.sm{padding:5px 9px;font-size:12px;}
+  .muted{color:var(--dim);font-size:12px;}
+  .cost{font-size:11px;color:var(--dim);}
+  .cost b{color:var(--gold);font-weight:700;}
+
+  /* ===== Hunt ===== */
+  #battleWrap{background:#0b0d12;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:10px;}
+  #battleCanvas{display:block;width:100%;height:auto;background:radial-gradient(circle at 50% 20%,#1a2030,#0b0d12);}
+  .zoneTabs{display:flex;gap:6px;margin-bottom:10px;}
+  .zoneBtn{
+    flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:7px 4px;cursor:pointer;text-align:center;color:var(--txt);font-family:inherit;font-size:12px;font-weight:600;
+  }
+  .zoneBtn.sel{border-color:var(--acc);background:#1d2c3a;color:var(--acc);}
+  .zoneBtn.lock{opacity:.45;}
+  .zoneBtn small{display:block;color:var(--dim);font-weight:500;font-size:10px;}
+
+  /* ===== Hunter cards ===== */
+  .hcard{
+    background:var(--panel);border:2px solid #555;border-radius:12px;padding:9px;position:relative;overflow:hidden;
+  }
+  .hcard .htop{display:flex;align-items:center;gap:8px;}
+  .hemoji{font-size:26px;width:38px;text-align:center;}
+  .hname{font-weight:700;font-size:13px;}
+  .hgrade{font-size:11px;font-weight:700;}
+  .htrait{font-size:10px;color:var(--gem);background:#241d3a;padding:1px 6px;border-radius:10px;display:inline-block;margin-top:2px;}
+  .stars{color:var(--gold);font-size:11px;}
+  .hstats{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px;font-size:11px;color:var(--dim);margin:6px 0;}
+  .hstats b{color:var(--txt);float:right;}
+  .xpbar{height:5px;background:#0c0e13;border-radius:4px;overflow:hidden;margin:4px 0;}
+  .xpbar>i{display:block;height:100%;background:linear-gradient(90deg,#46c2ff,#2a86ff);}
+  .hbtns{display:flex;gap:5px;flex-wrap:wrap;}
+  /* grade colors 0..10 */
+  .g0{border-color:#6b7280;} .g1{border-color:#9aa3b2;}
+  .g2{border-color:#37d67a;} .g3{border-color:#27c46b;}
+  .g4{border-color:#46a0ff;} .g5{border-color:#2a86ff;}
+  .g6{border-color:#b06bff;} .g7{border-color:#9148ff;}
+  .g8{border-color:#ff9d3c;} .g9{border-color:#ff7a18;}
+  .g10{border-color:#ff4fd8;box-shadow:0 0 12px rgba(255,79,216,.55);
+       animation:rainbow 4s linear infinite;}
+  @keyframes rainbow{0%{box-shadow:0 0 12px #ff4f4f;}25%{box-shadow:0 0 12px #ffce54;}
+    50%{box-shadow:0 0 12px #37d67a;}75%{box-shadow:0 0 12px #46c2ff;}100%{box-shadow:0 0 12px #ff4fd8;}}
+  .deployedTag{position:absolute;top:6px;right:6px;font-size:10px;background:var(--ok);color:#06311a;padding:1px 6px;border-radius:8px;font-weight:700;}
+  .deadTag{position:absolute;top:6px;right:6px;font-size:10px;background:var(--bad);color:#fff;padding:1px 6px;border-radius:8px;font-weight:700;}
+
+  /* ===== Building ===== */
+  .bcard{display:flex;gap:10px;align-items:center;}
+  .bemoji{font-size:28px;width:40px;text-align:center;}
+  .binfo{flex:1;}
+  .binfo .bn{font-weight:700;}
+  .blv{color:var(--gold);font-weight:700;font-size:12px;}
+
+  /* ===== Toasts ===== */
+  #toasts{position:fixed;top:54px;left:50%;transform:translateX(-50%);z-index:50;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:92%;max-width:420px;}
+  .toast{background:rgba(20,24,33,.96);border:1px solid var(--line);border-left:4px solid var(--acc);
+    padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;animation:tin .3s ease;box-shadow:0 6px 20px rgba(0,0,0,.5);}
+  .toast.gold{border-left-color:var(--gold);} .toast.ok{border-left-color:var(--ok);}
+  .toast.gem{border-left-color:var(--gem);} .toast.bad{border-left-color:var(--bad);}
+  @keyframes tin{from{opacity:0;transform:translateY(-12px);}to{opacity:1;}}
+
+  /* ===== Modal ===== */
+  #modalBg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:60;display:none;align-items:center;justify-content:center;padding:16px;}
+  #modalBg.show{display:flex;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;max-width:380px;width:100%;text-align:center;animation:tin .25s;}
+  .modal h2{margin:0 0 10px;}
+  .gachaReveal{font-size:60px;margin:8px 0;animation:pop .5s;}
+  @keyframes pop{0%{transform:scale(0) rotate(-20deg);}70%{transform:scale(1.25);}100%{transform:scale(1);}}
+  .offlineList{text-align:left;margin:10px 0;font-size:13px;}
+  .offlineList div{padding:3px 0;border-bottom:1px solid var(--line);}
+
+  ::-webkit-scrollbar{width:7px;} ::-webkit-scrollbar-thumb{background:#333b48;border-radius:4px;}
+  @media(max-width:520px){ .stat{font-size:12px;padding:3px 7px;} .hemoji{font-size:22px;} }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <span id="diffBadge">난이도</span>
+    <span class="stat gold"><span class="lab">금</span><span class="v" id="tGold">0</span></span>
+    <span class="stat gem"><span class="lab">💎</span><span class="v" id="tGem">0</span></span>
+    <span class="stat"><span class="lab">🪵</span><span class="v" id="tWood">0</span></span>
+    <span class="stat"><span class="lab">⛏️</span><span class="v" id="tIron">0</span></span>
+    <span class="stat"><span class="lab">💠</span><span class="v" id="tMana">0</span></span>
+    <span class="stat"><span class="lab">👥</span><span class="v" id="tPop">0</span></span>
+  </div>
+
+  <div id="content">
+    <!-- HUNT -->
+    <div class="tab active" id="tab-hunt">
+      <div class="zoneTabs" id="zoneTabs"></div>
+      <div id="battleWrap"><canvas id="battleCanvas" width="700" height="280"></canvas></div>
+      <div class="panel" id="huntInfo"></div>
+    </div>
+    <!-- HUNTER -->
+    <div class="tab" id="tab-hunter"></div>
+    <!-- BUILD -->
+    <div class="tab" id="tab-build"></div>
+    <!-- RECRUIT -->
+    <div class="tab" id="tab-recruit"></div>
+    <!-- COLOSSEUM -->
+    <div class="tab" id="tab-colo"></div>
+    <!-- SETTINGS -->
+    <div class="tab" id="tab-set"></div>
+  </div>
+
+  <div id="tabbar">
+    <button class="tbtn active" data-action="tab" data-tab="hunt"><span class="ic">⚔️</span>사냥</button>
+    <button class="tbtn" data-action="tab" data-tab="hunter"><span class="ic">🦸</span>헌터</button>
+    <button class="tbtn" data-action="tab" data-tab="build"><span class="ic">🏗️</span>건설</button>
+    <button class="tbtn" data-action="tab" data-tab="recruit"><span class="ic">🎲</span>영입</button>
+    <button class="tbtn" data-action="tab" data-tab="colo"><span class="ic">🏟️</span>콜로</button>
+    <button class="tbtn" data-action="tab" data-tab="set"><span class="ic">⚙️</span>설정</button>
+  </div>
+</div>
+
+<div id="toasts"></div>
+<div id="modalBg"><div class="modal" id="modal"></div></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   이블헌터 타이쿤 — 단일 파일 방치형 RPG (외부 의존성 0)
+   ========================================================================= */
+
+/* ---------- 상수 / 데이터 ---------- */
+const SAVE_KEY = "evilhunter_tycoon_save_v1";
+const OFFLINE_CAP = 8*3600;        // 오프라인 보상 상한(초)
+const OFFLINE_EFF = 0.5;           // 오프라인 효율
+
+const JOBS = {
+  berserker:{name:"버서커", emoji:"⚔️", atk:1.45, def:0.7, hp:1.0, spd:1.0, crit:0.05},
+  paladin:  {name:"팔라딘", emoji:"🛡️", atk:0.8,  def:1.6, hp:1.7, spd:0.7, crit:0.03},
+  ranger:   {name:"레인져", emoji:"🏹", atk:1.0,  def:0.8, hp:0.9, spd:1.6, crit:0.22},
+  sorcerer: {name:"소서러", emoji:"🔮", atk:1.55, def:0.55,hp:0.7, spd:0.9, crit:0.08, aoe:true},
+};
+const JOB_KEYS = Object.keys(JOBS);
+
+const GRADES = ["노말","노말+","레어","레어+","슈페리어","슈페리어+","히로익","히로익+","레전더리","레전더리+","울티메이트"];
+const GRADE_WEIGHT = [40,22,15,9,6,3,2,1,1,0.6,0.4];
+
+const TRAITS = {
+  strong:     {name:"힘이 쎈",     desc:"공격력 +10%"},
+  swift:      {name:"날쌘돌이",     desc:"공속 +10%"},
+  rich:       {name:"부유한",       desc:"골드 획득 +20%"},
+  gambler:    {name:"타짜",         desc:"강화 성공률 +5%p"},
+  unbreakable:{name:"금강불괴",     desc:"받는 피해 -10%"},
+  sharp:      {name:"샤프한",       desc:"치명타율 +5%p"},
+  heroic:     {name:"영웅심리",     desc:"공격·공속 +7%"},
+  vital:      {name:"활력이 넘친",   desc:"체력 +10%"},
+  normal:     {name:"평범한",       desc:"효과 없음"},
+};
+const TRAIT_WEIGHT = {strong:10,swift:10,rich:8,gambler:7,unbreakable:8,sharp:8,heroic:4,vital:9,normal:18};
+
+const DIFFICULTIES = [
+  {name:"쉬움",   gate:{rb:0, n:0}, mon:1,    reward:1,   rare:1},
+  {name:"보통",   gate:{rb:2, n:2}, mon:2.5,  reward:2,   rare:1.3},
+  {name:"어려움", gate:{rb:3, n:3}, mon:6,    reward:4,   rare:1.7},
+  {name:"고수",   gate:{rb:5, n:3}, mon:15,   reward:8,   rare:2.2},
+  {name:"달인",   gate:{rb:8, n:4}, mon:40,   reward:16,  rare:3},
+  {name:"고행I",  gate:{rb:12,n:4}, mon:100,  reward:32,  rare:4},
+  {name:"고행II", gate:{rb:18,n:5}, mon:260,  reward:64,  rare:5.5},
+  {name:"고행III",gate:{rb:25,n:5}, mon:700,  reward:130, rare:7},
+];
+
+const MATERIALS = {
+  wood:{name:"별빛나무 조각", emoji:"🪵", value:2},
+  iron:{name:"철광석",       emoji:"⛏️", value:9},
+  mana:{name:"마정석",       emoji:"💎", value:45},
+};
+
+const ZONES = [
+  {name:"침략의 땅", emoji:"🌲", reqLevel:1,  hp:32,   atk:4,   gold:6,   exp:9,
+   mats:["wood"],          rareMats:["iron"], mon:["🐀","🐗","🦂","🕷️","🐍"]},
+  {name:"망자의 땅", emoji:"🏚️", reqLevel:30, hp:520,  atk:34,  gold:55,  exp:70,
+   mats:["wood","iron"],   rareMats:["mana"], mon:["💀","🧟","👻","🦇","🕸️"]},
+  {name:"파멸의 땅", emoji:"🌋", reqLevel:70, hp:9000, atk:240, gold:600, exp:650,
+   mats:["iron","mana"],   rareMats:["mana"], mon:["👹","🐉","😈","👺","☠️"]},
+];
+
+const BUILDINGS = {
+  townhall:  {name:"마을회관",     emoji:"🏛️", gold:200, mats:{wood:10},          desc:"다른 건물 레벨 상한"},
+  market:    {name:"거래소",       emoji:"🏪", gold:80,  mats:{wood:5},           desc:"재료 자동매입가 상승"},
+  sanctuary: {name:"부활의 성소",   emoji:"⛪", gold:120, mats:{wood:8,iron:3},    desc:"헌터 부활 가속"},
+  forge:     {name:"강화 제련소",   emoji:"🔨", gold:150, mats:{iron:5},           desc:"강화 성공률 +5%p/Lv"},
+  inn:       {name:"여관",         emoji:"🏨", gold:100, mats:{wood:6},           desc:"최대 인구 +1/Lv"},
+  hornblower:{name:"보스의 뿔피리", emoji:"📯", gold:500, mats:{iron:10,mana:2},   desc:"필드보스 소환 해금"},
+  colosseum: {name:"콜로세움",      emoji:"🏟️", gold:800, mats:{iron:15,mana:5},   desc:"PvP 모의전 해금"},
+};
+const BUILD_KEYS = Object.keys(BUILDINGS);
+
+const NAMES = ["아리","반","카이","레오","미라","조르","다인","테오","루나","가렌","이졸","녹스","벨라","시온","하루",
+  "펜릴","아셀","드레이","모건","유리","칼","렌","세라","오딘","프레이","록사","바엘","에코","제드","님","타로",
+  "리암","노바","스카","베인","코린","피아","글렌","로엔","무겐"];
+
+/* ---------- 유틸 ---------- */
+const $ = s=>document.querySelector(s);
+const rand = (a,b)=>a+Math.random()*(b-a);
+const irand = (a,b)=>Math.floor(rand(a,b+1));
+const pick = arr=>arr[Math.floor(Math.random()*arr.length)];
+function weightedPick(weights){
+  let total=0; for(const k in weights) total+=weights[k];
+  let r=Math.random()*total;
+  for(const k in weights){ r-=weights[k]; if(r<=0) return k; }
+  return Object.keys(weights)[0];
+}
+function weightedIndex(arr){
+  let total=arr.reduce((a,b)=>a+b,0), r=Math.random()*total;
+  for(let i=0;i<arr.length;i++){ r-=arr[i]; if(r<=0) return i; } return 0;
+}
+function fmt(n){
+  if(!isFinite(n)) return "0";
+  n=Math.floor(n);
+  if(n<1000) return ""+n;
+  const u=["","K","M","B","T","Qa","Qi","Sx","Sp"]; let i=0;
+  while(n>=1000 && i<u.length-1){ n/=1000; i++; }
+  return (n<10?n.toFixed(2):n<100?n.toFixed(1):Math.floor(n))+u[i];
+}
+function expToLevel(l){ return Math.floor(18*Math.pow(1.16,l-1)); }
+let _uid = 1;
+function uid(){ return _uid++; }
+
+/* ---------- 상태 ---------- */
+let state = null;
+
+function newHunter(opts={}){
+  const job = opts.job || pick(JOB_KEYS);
+  const grade = opts.grade!=null ? opts.grade : weightedIndex(GRADE_WEIGHT);
+  const trait = opts.trait || weightedPick(TRAIT_WEIGHT);
+  const h = {
+    id:uid(), name:pick(NAMES), job, grade, trait,
+    level:1, exp:0, rebirths:0,
+    hp:0, deployed:false, zone:0, alive:true, reviveAt:0,
+    atkTimer:Math.random(),
+  };
+  h.hp = maxHp(h);   // 생성 즉시 최대 체력으로 채움
+  return h;
+}
+
+function defaultState(){
+  const s = {
+    version:1,
+    gold:80, gems:5,
+    mats:{wood:0,iron:0,mana:0},
+    difficulty:0,
+    hunters:[],
+    buildings:{townhall:1,market:1,sanctuary:0,forge:0,inn:1,hornblower:0,colosseum:0},
+    currentZone:0,
+    recruitPool:[],
+    nextFreeRecruit:0,
+    recruitCount:0,
+    totalRebirths:0,
+    boss:null,
+    pvpCooldown:0,
+    rates:{gold:0,exp:0,wood:0,iron:0,mana:0},
+    zones:[],
+    lastActive:Date.now(),
+    lastSave:Date.now(),
+  };
+  for(let i=0;i<ZONES.length;i++) s.zones.push(makeZoneState(i,s));
+  // 시작 헌터
+  const h = newHunter({job:"berserker", grade:0, trait:"strong"});
+  h.deployed=true; h.zone=0;
+  s.hunters.push(h);
+  s.nextFreeRecruit = Date.now()+30000;
+  return s;
+}
+
+function makeZoneState(zi){
+  return {stage:0, kills:0, monster:null};
+}
+
+/* ---------- 파생 계산 ---------- */
+function diff(){ return DIFFICULTIES[state.difficulty]; }
+function townCap(){ return state.buildings.townhall; }
+function popCap(){ return 2 + state.buildings.inn; }
+
+function stats(h){
+  const job = JOBS[h.job];
+  const g = Math.pow(1.25, h.grade);
+  const lv = 1 + (h.level-1)*0.085;
+  const rb = Math.pow(1.15, h.rebirths);
+  let atk = 10*job.atk*g*lv*rb;
+  let def = 5 *job.def*g*lv*rb;
+  let hp  = 55*job.hp *g*lv*rb;
+  let spd = job.spd;
+  let crit= job.crit;
+  switch(h.trait){
+    case "strong": atk*=1.10; break;
+    case "swift":  spd*=1.10; break;
+    case "sharp":  crit+=0.05; break;
+    case "vital":  hp*=1.10; break;
+    case "heroic": atk*=1.07; spd*=1.07; break;
+  }
+  return {atk,def,hp:Math.floor(hp),spd,crit:Math.min(crit,0.9)};
+}
+function power(h){
+  const s=stats(h);
+  return s.atk*s.spd*(1+s.crit) + s.hp*0.12 + s.def*0.8;
+}
+function maxHp(h){ return stats(h).hp; }
+
+/* ---------- 난이도 해금 ---------- */
+function diffUnlocked(idx){
+  const g = DIFFICULTIES[idx].gate;
+  if(g.n===0) return true;
+  const cnt = state.hunters.filter(h=>h.rebirths>=g.rb).length;
+  return cnt>=g.n;
+}
+function highestUnlockedDiff(){
+  let hi=0; for(let i=0;i<DIFFICULTIES.length;i++) if(diffUnlocked(i)) hi=i;
+  return hi;
+}
+
+/* ---------- 전투 ---------- */
+function spawnMonster(zi){
+  const z=ZONES[zi], zs=state.zones[zi], d=diff();
+  const mult = Math.pow(1.16, zs.stage)*d.mon;
+  const hp = Math.floor(z.hp*mult);
+  zs.monster = {hp, maxHp:hp, atk:z.atk*mult*0.12, emoji:pick(z.mon), atkTimer:1.2, hitFx:0};
+}
+function deployedIn(zi){ return state.hunters.filter(h=>h.deployed && h.zone===zi); }
+
+let popups=[]; // {x,y,t,txt,color,vy} 현재 존만
+
+function gainExp(list, amount){
+  for(const h of list){
+    if(!h.alive) continue;
+    h.exp += amount;
+    let need = expToLevel(h.level);
+    while(h.exp>=need && h.level<100){
+      h.exp-=need; h.level++;
+      h.hp = maxHp(h);
+      need = expToLevel(h.level);
+      if(h.level===100) toast(`⭐ ${h.name} 100레벨! 환생 가능`, "gem");
+    }
+    if(h.level>=100) h.exp=Math.min(h.exp, expToLevel(100));
+  }
+}
+
+function reviveTime(){
+  const sc = state.buildings.sanctuary;
+  return Math.max(2, 22 - sc*2);
+}
+
+// 보상 분배
+function giveRewards(zi, mob){
+  const z=ZONES[zi], zs=state.zones[zi], d=diff();
+  const sMult = Math.pow(1.16, zs.stage)*d.reward;
+  // 골드 (부유한 특성 보너스: 해당 존 헌터 중 최댓값 적용)
+  let goldBonus=1;
+  for(const h of deployedIn(zi)) if(h.trait==="rich") goldBonus=Math.max(goldBonus,1.2);
+  const gold = z.gold*sMult*goldBonus;
+  state.gold += gold;
+  // 재료
+  const matType = Math.random()<0.18*d.rare ? pick(z.rareMats) : pick(z.mats);
+  const matAmt = Math.max(1, Math.floor(rand(1,3)*Math.sqrt(d.reward)));
+  state.mats[matType] += matAmt;
+  // 거래소 자동매입: 절반을 즉시 골드로
+  const sell = Math.floor(matAmt/2);
+  if(sell>0){
+    state.mats[matType]-=sell;
+    const price = MATERIALS[matType].value*(1+state.buildings.market*0.5);
+    state.gold += sell*price;
+  }
+  // 경험치
+  const exp = Math.floor(z.exp*sMult*0.5);
+  gainExp(deployedIn(zi), exp);
+
+  // 비율 추적(오프라인 정산용 EMA)
+  trackRate("gold", gold);
+  trackRate("exp", exp);
+  trackRate(matType, matAmt-sell);
+
+  zs.kills++;
+  if(zs.kills % 10 === 0) zs.stage++;
+}
+
+let _rateAcc={gold:0,exp:0,wood:0,iron:0,mana:0}, _rateT=0;
+function trackRate(k,v){ _rateAcc[k]=(_rateAcc[k]||0)+v; }
+function flushRates(dt){
+  _rateT+=dt;
+  if(_rateT>=1){
+    for(const k in state.rates){
+      const inst=_rateAcc[k]/_rateT;
+      state.rates[k]=state.rates[k]*0.8+inst*0.2;
+      _rateAcc[k]=0;
+    }
+    _rateT=0;
+  }
+}
+
+function combatTick(dt){
+  // 보스
+  if(state.boss) bossTick(dt);
+  for(let zi=0; zi<ZONES.length; zi++){
+    if(state.boss && state.boss.zone===zi) continue; // 보스전 중 일반 몹 정지
+    const list = deployedIn(zi).filter(h=>h.alive);
+    const zs=state.zones[zi];
+    // 부활 처리
+    for(const h of state.hunters){
+      if(h.deployed && !h.alive && Date.now()>=h.reviveAt){ h.alive=true; h.hp=maxHp(h); }
+    }
+    if(list.length===0){ continue; }
+    if(!zs.monster) spawnMonster(zi);
+    const mob=zs.monster;
+    if(mob.hitFx>0) mob.hitFx-=dt;
+    // 헌터 공격
+    for(const h of list){
+      const s=stats(h);
+      const interval = 1/s.spd;
+      h.atkTimer -= dt;
+      let guard=0;
+      while(h.atkTimer<=0 && guard<5){
+        guard++;
+        let dmg=s.atk;
+        const crit = Math.random()<s.crit;
+        if(crit) dmg*=2.1;
+        if(JOBS[h.job].aoe) dmg*=1.15;
+        dmg=Math.floor(dmg);
+        mob.hp-=dmg; mob.hitFx=0.12;
+        if(zi===state.currentZone) addPopup(dmg, crit, false);
+        h.atkTimer += interval;
+        if(mob.hp<=0) break;
+      }
+      if(mob.hp<=0) break;
+    }
+    // 몬스터 사망
+    if(mob.hp<=0){
+      giveRewards(zi, mob);
+      spawnMonster(zi);
+    } else {
+      // 몬스터 공격
+      mob.atkTimer-=dt;
+      if(mob.atkTimer<=0){
+        mob.atkTimer+=1.4;
+        const target=pick(list);
+        let dmg=Math.max(1, mob.atk - stats(target).def*0.5);
+        if(target.trait==="unbreakable") dmg*=0.9;
+        dmg=Math.floor(dmg);
+        target.hp-=dmg;
+        if(zi===state.currentZone) addPopup(dmg, false, true);
+        if(target.hp<=0){
+          target.alive=false;
+          target.reviveAt=Date.now()+reviveTime()*1000;
+        }
+      }
+    }
+  }
+}
+
+/* ---------- 보스 ---------- */
+function bossTick(dt){
+  const b=state.boss;
+  const left=b.endTime-Date.now();
+  if(left<=0){ toast("⏰ 필드보스 토벌 실패…", "bad"); state.boss=null; return; }
+  if(!b.enraged && left<=120000){ b.enraged=true; b.atk*=1.8; toast("😡 보스 광폭화!", "bad"); }
+  const list=deployedIn(b.zone).filter(h=>h.alive);
+  for(const h of state.hunters){
+    if(h.deployed && !h.alive && Date.now()>=h.reviveAt){ h.alive=true; h.hp=maxHp(h); }
+  }
+  if(list.length===0) return;
+  if(b.hitFx>0) b.hitFx-=dt;
+  for(const h of list){
+    const s=stats(h); const interval=1/s.spd; h.atkTimer-=dt; let g=0;
+    while(h.atkTimer<=0 && g<5){
+      g++;
+      let dmg=s.atk*(Math.random()<s.crit?2.1:1);
+      if(JOBS[h.job].aoe) dmg*=1.15;
+      dmg=Math.floor(dmg);
+      b.hp-=dmg; b.hitFx=0.12;
+      if(b.zone===state.currentZone) addPopup(dmg, false, false);
+      h.atkTimer+=interval;
+      if(b.hp<=0) break;
+    }
+    if(b.hp<=0) break;
+  }
+  if(b.hp<=0){
+    const gold=b.maxHp*0.5, gems=irand(3,8);
+    state.gold+=gold; state.gems+=gems;
+    state.mats.mana+=irand(5,15);
+    toast(`👑 보스 토벌! +${fmt(gold)}금 +${gems}💎`, "gold");
+    state.boss=null;
+    return;
+  }
+  b.atkTimer-=dt;
+  if(b.atkTimer<=0){
+    b.atkTimer+=1.0;
+    const t=pick(list);
+    let dmg=Math.max(1, b.atk-stats(t).def*0.5);
+    if(t.trait==="unbreakable") dmg*=0.9;
+    dmg=Math.floor(dmg);
+    t.hp-=dmg;
+    if(b.zone===state.currentZone) addPopup(dmg,false,true);
+    if(t.hp<=0){ t.alive=false; t.reviveAt=Date.now()+reviveTime()*1000; }
+  }
+}
+function summonBoss(){
+  if(state.buildings.hornblower<1) return toast("뿔피리가 필요합니다","bad");
+  if(state.boss) return toast("이미 보스가 활성화됨","bad");
+  const zi=state.currentZone, z=ZONES[zi], zs=state.zones[zi], d=diff();
+  const mult=Math.pow(1.16,zs.stage)*d.mon;
+  const hp=Math.floor(z.hp*mult*60);
+  state.boss={zone:zi, hp, maxHp:hp, atk:z.atk*mult*0.4, emoji:"👑",
+    endTime:Date.now()+600000, enraged:false, atkTimer:1, hitFx:0};
+  toast("📯 필드보스 등장! 제한시간 10분","gem");
+}
+
+/* ---------- 데미지 팝업 ---------- */
+function addPopup(dmg, crit, isMonster){
+  if(popups.length>40) return;
+  popups.push({
+    x: isMonster? rand(0.12,0.32) : rand(0.62,0.85),
+    y: rand(0.35,0.6), t:0,
+    txt:(crit?"⚡":"")+fmt(dmg),
+    color: isMonster? "#ff7a7a" : (crit?"#ffce54":"#ffffff"),
+    size: crit?22:16,
+  });
+}
+
+/* ---------- Canvas ---------- */
+const canvas=$("#battleCanvas"), ctx=canvas.getContext("2d");
+function resizeCanvas(){
+  const w=canvas.clientWidth||700;
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=w*dpr; canvas.height=(w*0.42)*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  canvas._w=w; canvas._h=w*0.42;
+}
+function drawBar(x,y,w,h,ratio,color){
+  ctx.fillStyle="#000a"; ctx.fillRect(x,y,w,h);
+  ctx.fillStyle=color; ctx.fillRect(x+1,y+1,(w-2)*Math.max(0,Math.min(1,ratio)),h-2);
+  ctx.strokeStyle="#0006"; ctx.strokeRect(x,y,w,h);
+}
+function renderCanvas(dt){
+  const W=canvas._w||700, H=canvas._h||300;
+  ctx.clearRect(0,0,W,H);
+  const zi=state.currentZone, z=ZONES[zi], zs=state.zones[zi];
+  // 배경 텍스트
+  ctx.font="11px sans-serif"; ctx.fillStyle="#4a5468"; ctx.textAlign="left";
+  ctx.fillText(`${z.emoji} ${z.name}  ·  스테이지 ${zs.stage+1}  ·  처치 ${zs.kills}`, 10, 18);
+
+  // 헌터들
+  const list=deployedIn(zi);
+  const hx=W*0.18;
+  list.slice(0,6).forEach((h,i)=>{
+    const col=i%2, rown=Math.floor(i/2);
+    const x=hx + col*40 - 20, y=H*0.42 + rown*42;
+    ctx.font="26px sans-serif"; ctx.textAlign="center";
+    ctx.globalAlpha = h.alive?1:0.25;
+    ctx.fillText(JOBS[h.job].emoji, x, y);
+    ctx.globalAlpha=1;
+    if(h.alive) drawBar(x-18,y+5,36,5, h.hp/maxHp(h), "#37d67a");
+    else { ctx.font="9px sans-serif"; ctx.fillStyle="#ff7a7a"; ctx.fillText("부활중", x, y+12); }
+  });
+  if(list.length===0){
+    ctx.font="13px sans-serif"; ctx.fillStyle="#6b7280"; ctx.textAlign="center";
+    ctx.fillText("배치된 헌터가 없습니다", W*0.25, H*0.5);
+  }
+
+  // 적 (보스 우선)
+  let mob = (state.boss && state.boss.zone===zi)? state.boss : zs.monster;
+  if(mob){
+    const ex=W*0.74, ey=H*0.5, big=(mob===state.boss);
+    const shake=mob.hitFx>0?rand(-3,3):0;
+    ctx.font=(big?60:46)+"px sans-serif"; ctx.textAlign="center";
+    ctx.fillText(mob.emoji, ex+shake, ey+(big?20:12));
+    drawBar(ex-60, ey-(big?55:42), 120, 8, mob.hp/mob.maxHp, big?"#b06bff":"#e74c3c");
+    ctx.font="10px sans-serif"; ctx.fillStyle="#cfd6e2";
+    ctx.fillText(fmt(mob.hp)+" / "+fmt(mob.maxHp), ex, ey-(big?60:48));
+    if(big){
+      const left=Math.max(0,state.boss.endTime-Date.now());
+      const m=Math.floor(left/60000), s=Math.floor(left/1000)%60;
+      ctx.fillStyle=state.boss.enraged?"#ff5b5b":"#ffce54";
+      ctx.font="bold 13px sans-serif";
+      ctx.fillText("⏱ "+m+":"+(s<10?"0":"")+s+(state.boss.enraged?" 광폭화!":""), ex, ey-72);
+    }
+  }
+
+  // 팝업
+  for(let i=popups.length-1;i>=0;i--){
+    const p=popups[i]; p.t+=dt;
+    const px=p.x*W, py=p.y*H - p.t*40;
+    ctx.globalAlpha=Math.max(0,1-p.t/1.1);
+    ctx.font="bold "+p.size+"px sans-serif"; ctx.fillStyle=p.color; ctx.textAlign="center";
+    ctx.fillText(p.txt, px, py);
+    ctx.globalAlpha=1;
+    if(p.t>1.1) popups.splice(i,1);
+  }
+}
+
+/* ---------- 토스트 ---------- */
+function toast(msg, type=""){
+  const el=document.createElement("div");
+  el.className="toast "+type; el.textContent=msg;
+  $("#toasts").appendChild(el);
+  setTimeout(()=>{ el.style.transition="opacity .4s"; el.style.opacity="0";
+    setTimeout(()=>el.remove(),400); }, 2200);
+}
+
+/* ---------- 모달 ---------- */
+function showModal(html){ $("#modal").innerHTML=html; $("#modalBg").classList.add("show"); }
+function closeModal(){ $("#modalBg").classList.remove("show"); }
+$("#modalBg").addEventListener("click", e=>{ if(e.target===$("#modalBg")) closeModal(); });
+
+/* ---------- 영입 ---------- */
+function recruitCostGold(){ return Math.floor(150*Math.pow(1.45, state.recruitCount)); }
+const RECRUIT_GEM=15;
+
+function doRecruit(h, premium){
+  if(state.hunters.length>=popCap()){ toast("인구가 가득 찼습니다 (여관 증축 필요)","bad"); return false; }
+  state.hunters.push(h);
+  state.recruitCount++;
+  const gradeName=GRADES[h.grade];
+  showModal(`<h2>🎉 영입 완료!</h2>
+    <div class="gachaReveal">${JOBS[h.job].emoji}</div>
+    <div style="font-weight:700;font-size:16px">${h.name}</div>
+    <div class="hgrade" style="color:${gradeColor(h.grade)}">${gradeName} ${JOBS[h.job].name}</div>
+    <div class="htrait" style="margin-top:6px">${TRAITS[h.trait].name} · ${TRAITS[h.trait].desc}</div>
+    <div style="margin-top:14px"><button class="act" onclick="closeModal();renderTab('recruit')">확인</button></div>`);
+  return true;
+}
+function recruitGold(){
+  const c=recruitCostGold();
+  if(state.gold<c) return toast("골드가 부족합니다","bad");
+  if(state.hunters.length>=popCap()) return toast("인구가 가득 찼습니다","bad");
+  state.gold-=c;
+  doRecruit(newHunter(), false);
+}
+function recruitGem(){
+  if(state.gems<RECRUIT_GEM) return toast("보석이 부족합니다","bad");
+  if(state.hunters.length>=popCap()) return toast("인구가 가득 찼습니다","bad");
+  state.gems-=RECRUIT_GEM;
+  // 보석 영입은 등급 가중치 상향
+  const w=GRADE_WEIGHT.map((x,i)=>x*(1+i*0.25));
+  doRecruit(newHunter({grade:weightedIndex(w)}), true);
+}
+function claimFree(idx){
+  const h=state.recruitPool[idx];
+  if(!h) return;
+  if(state.hunters.length>=popCap()) return toast("인구가 가득 찼습니다","bad");
+  state.recruitPool.splice(idx,1);
+  doRecruit(h,false);
+}
+function tickRecruitPool(){
+  if(Date.now()>=state.nextFreeRecruit && state.recruitPool.length<3){
+    state.recruitPool.push(newHunter());
+    state.nextFreeRecruit=Date.now()+120000;
+    toast("🆕 무료 영입 후보 도착!","ok");
+  }
+}
+
+/* ---------- 환생 / 강화 ---------- */
+function rebirth(h){
+  if(h.level<100) return;
+  h.level=1; h.exp=0; h.rebirths++; h.hp=maxHp(h);
+  state.totalRebirths++;
+  toast(`⭐ ${h.name} 환생! (환생 ${h.rebirths}회, 영구 +15%)`, "gem");
+  // 난이도 자동 해금 알림
+  const hi=highestUnlockedDiff();
+  if(hi>state.difficulty) toast(`🔓 난이도 [${DIFFICULTIES[hi].name}] 해금 가능!`,"gold");
+  renderTab("hunter");
+}
+function enhanceCost(h){
+  return {gold:Math.floor(120*Math.pow(1.8,h.grade)), mana:h.grade+1};
+}
+function enhanceChance(h){
+  let c=0.60 - h.grade*0.045 + state.buildings.forge*0.05;
+  if(h.trait==="gambler") c+=0.05;
+  return Math.max(0.05, Math.min(0.95,c));
+}
+function enhance(h){
+  if(h.grade>=10) return toast("이미 최고 등급","bad");
+  const c=enhanceCost(h);
+  if(state.gold<c.gold || state.mats.mana<c.mana) return toast("재화가 부족합니다","bad");
+  state.gold-=c.gold; state.mats.mana-=c.mana;
+  if(Math.random()<enhanceChance(h)){
+    h.grade++; h.hp=maxHp(h);
+    toast(`✨ 강화 성공! ${h.name} → ${GRADES[h.grade]}`,"gold");
+  } else {
+    toast(`💥 강화 실패…`,"bad");
+  }
+  renderTab("hunter");
+}
+
+/* ---------- 건설 ---------- */
+function buildCost(key){
+  const b=BUILDINGS[key], lv=state.buildings[key];
+  const gold=Math.floor(b.gold*Math.pow(1.6,lv));
+  const mats={}; for(const m in b.mats) mats[m]=Math.ceil(b.mats[m]*(lv+1));
+  return {gold,mats};
+}
+function canBuild(key){
+  if(key!=="townhall" && state.buildings[key]>=townCap()) return false;
+  const c=buildCost(key);
+  if(state.gold<c.gold) return false;
+  for(const m in c.mats) if(state.mats[m]<c.mats[m]) return false;
+  return true;
+}
+function build(key){
+  if(key!=="townhall" && state.buildings[key]>=townCap())
+    return toast("마을회관 레벨이 필요합니다","bad");
+  const c=buildCost(key);
+  if(state.gold<c.gold){ return toast("골드 부족","bad"); }
+  for(const m in c.mats) if(state.mats[m]<c.mats[m]) return toast("재료 부족","bad");
+  state.gold-=c.gold;
+  for(const m in c.mats) state.mats[m]-=c.mats[m];
+  state.buildings[key]++;
+  toast(`🏗️ ${BUILDINGS[key].name} Lv.${state.buildings[key]}`,"ok");
+  renderTab("build");
+}
+
+/* ---------- 콜로세움 ---------- */
+function pvp(){
+  if(state.buildings.colosseum<1) return toast("콜로세움이 필요합니다","bad");
+  if(Date.now()<state.pvpCooldown) return toast("재정비 중입니다","bad");
+  if(state.hunters.length===0) return toast("헌터가 없습니다","bad");
+  const champ=state.hunters.reduce((a,b)=>power(b)>power(a)?b:a);
+  const myP=power(champ);
+  const oppP=myP*rand(0.7,1.35);
+  state.pvpCooldown=Date.now()+45000;
+  const win=myP>=oppP;
+  if(win){
+    const gems=irand(2,5), gold=myP*8;
+    state.gems+=gems; state.gold+=gold;
+    toast(`🏆 모의전 승리! +${gems}💎 +${fmt(gold)}금`,"gold");
+  } else {
+    toast("⚔️ 모의전 패배… 다음 기회에","bad");
+  }
+  renderTab("colo");
+}
+
+/* ============================= 렌더링 ============================= */
+function gradeColor(g){
+  const c=["#9aa3b2","#cdd3dd","#37d67a","#27c46b","#46a0ff","#2a86ff","#b06bff","#9148ff","#ff9d3c","#ff7a18","#ff4fd8"];
+  return c[g];
+}
+
+function renderTop(){
+  $("#diffBadge").textContent="🎯 "+diff().name;
+  $("#tGold").textContent=fmt(state.gold);
+  $("#tGem").textContent=fmt(state.gems);
+  $("#tWood").textContent=fmt(state.mats.wood);
+  $("#tIron").textContent=fmt(state.mats.iron);
+  $("#tMana").textContent=fmt(state.mats.mana);
+  $("#tPop").textContent=state.hunters.length+"/"+popCap();
+}
+
+function renderZoneTabs(){
+  const wrap=$("#zoneTabs"); wrap.innerHTML="";
+  ZONES.forEach((z,i)=>{
+    const can = state.hunters.some(h=>h.level>=z.reqLevel) || i===0;
+    const b=document.createElement("div");
+    b.className="zoneBtn"+(i===state.currentZone?" sel":"")+(can?"":" lock");
+    b.innerHTML=`${z.emoji} ${z.name}<small>${can?("Lv."+z.reqLevel+"+"):("🔒 Lv."+z.reqLevel)}</small>`;
+    b.dataset.action="setzone"; b.dataset.zone=i;
+    wrap.appendChild(b);
+  });
+}
+
+function renderHuntInfo(){
+  const zi=state.currentZone, z=ZONES[zi];
+  const dlist=deployedIn(zi);
+  let diffBtns="";
+  const hi=highestUnlockedDiff();
+  DIFFICULTIES.forEach((d,i)=>{
+    const ok=diffUnlocked(i);
+    diffBtns+=`<button class="act sm ${i===state.difficulty?'gold':''}" data-action="setdiff" data-d="${i}" ${ok?'':'disabled'}>${ok?'':'🔒'}${d.name}</button>`;
+  });
+  const bossBtn = state.buildings.hornblower>=1 && !state.boss
+    ? `<button class="act purple sm" data-action="summon">📯 필드보스 소환</button>` : "";
+  $("#huntInfo").innerHTML=`
+    <h3>🗺️ ${z.name} <span class="muted">입장 Lv.${z.reqLevel}+</span></h3>
+    <div class="muted" style="margin-bottom:6px">배치 헌터: <b style="color:var(--txt)">${dlist.length}</b>명 ·
+       획득속도 ≈ ${fmt(state.rates.gold)}금/s</div>
+    <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">
+      <button class="act green sm" data-action="autodeploy">⚡ 최적 자동배치</button>
+      ${bossBtn}
+    </div>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:4px">난이도 선택 (환생 게이트 해금)</div>
+    <div class="row" style="flex-wrap:wrap;gap:5px">${diffBtns}</div>`;
+}
+
+function huntDeployDefaults(){
+  // 헌터의 zone을 현재 입장가능 최고 존으로 자동 정렬은 하지 않음. 단순 표시.
+}
+
+function autoDeploy(){
+  // 각 헌터를 자신이 입장 가능한 최고 레벨 존에 배치
+  let placed=0;
+  for(const h of state.hunters){
+    let best=0;
+    for(let i=0;i<ZONES.length;i++) if(h.level>=ZONES[i].reqLevel) best=i;
+    h.deployed=true; h.zone=best; placed++;
+  }
+  toast(`⚡ ${placed}명 자동 배치 완료`,"ok");
+}
+
+function hunterCard(h, context){
+  const s=stats(h);
+  const mh=maxHp(h);
+  const need=expToLevel(h.level);
+  const xpRatio=h.level>=100?1:h.exp/need;
+  const stars="⭐".repeat(Math.min(h.rebirths,10));
+  const ec=enhanceCost(h);
+  let badge="";
+  if(!h.alive) badge=`<span class="deadTag">부활중</span>`;
+  else if(h.deployed) badge=`<span class="deployedTag">출전 Z${h.zone+1}</span>`;
+  let btns="";
+  if(h.deployed) btns+=`<button class="act sm red" data-action="undeploy" data-id="${h.id}">대기</button>`;
+  else btns+=`<button class="act sm green" data-action="deploy" data-id="${h.id}">출전</button>`;
+  if(h.level>=100) btns+=`<button class="act sm purple" data-action="rebirth" data-id="${h.id}">⭐환생</button>`;
+  if(h.grade<10) btns+=`<button class="act sm gold" data-action="enhance" data-id="${h.id}">🔨강화 ${Math.round(enhanceChance(h)*100)}%</button>`;
+  return `<div class="hcard g${h.grade}">
+    ${badge}
+    <div class="htop">
+      <div class="hemoji">${JOBS[h.job].emoji}</div>
+      <div style="flex:1">
+        <div class="hname">${h.name} <span class="stars">${stars}</span></div>
+        <div class="hgrade" style="color:${gradeColor(h.grade)}">${GRADES[h.grade]} ${JOBS[h.job].name} · Lv.${h.level}</div>
+        <span class="htrait">${TRAITS[h.trait].name}: ${TRAITS[h.trait].desc}</span>
+      </div>
+    </div>
+    <div class="hstats">
+      <span>⚔️공격<b>${fmt(s.atk)}</b></span><span>🛡️방어<b>${fmt(s.def)}</b></span>
+      <span>❤️체력<b>${fmt(mh)}</b></span><span>⚡공속<b>${s.spd.toFixed(2)}</b></span>
+      <span>🎯치명<b>${Math.round(s.crit*100)}%</b></span><span>💪전투력<b>${fmt(power(h))}</b></span>
+    </div>
+    <div class="xpbar"><i style="width:${(xpRatio*100).toFixed(1)}%"></i></div>
+    <div class="cost" style="margin-bottom:5px">${h.level>=100?'<b style="color:var(--gem)">환생 가능!</b>':('경험치 '+fmt(h.exp)+'/'+fmt(need))} ${h.grade<10?` · 강화비 <b>${fmt(ec.gold)}</b>금 ${ec.mana}💠`:''}</div>
+    <div class="hbtns">${btns}</div>
+  </div>`;
+}
+
+function renderTab(name){
+  if(name==="hunt"){ renderZoneTabs(); renderHuntInfo(); return; }
+  if(name==="hunter"){
+    const sorted=[...state.hunters].sort((a,b)=>power(b)-power(a));
+    let html=`<div class="panel"><h3>🦸 헌터 (${state.hunters.length}/${popCap()})</h3>
+      <div class="muted">전투력 순 정렬 · 100레벨 도달 시 환생 가능 · 마정석으로 등급 강화</div></div>
+      <div class="grid" style="grid-template-columns:1fr">`;
+    if(sorted.length===0) html+=`<div class="muted">헌터가 없습니다. 영입 탭에서 영입하세요.</div>`;
+    for(const h of sorted) html+=hunterCard(h);
+    html+="</div>";
+    $("#tab-hunter").innerHTML=html;
+    return;
+  }
+  if(name==="build"){
+    let html=`<div class="panel"><h3>🏗️ 마을 건설</h3>
+      <div class="muted">마을회관 Lv.${townCap()} — 다른 건물은 이 레벨까지만 증축 가능</div></div><div class="grid">`;
+    for(const key of BUILD_KEYS){
+      const b=BUILDINGS[key], lv=state.buildings[key], c=buildCost(key);
+      const capped=(key!=="townhall" && lv>=townCap());
+      let matStr=Object.keys(c.mats).map(m=>`${MATERIALS[m].emoji}${c.mats[m]}`).join(" ");
+      const ok=canBuild(key);
+      html+=`<div class="panel bcard">
+        <div class="bemoji">${b.emoji}</div>
+        <div class="binfo">
+          <div class="bn">${b.name} <span class="blv">Lv.${lv}</span></div>
+          <div class="muted">${b.desc}</div>
+          <div class="cost">비용: <b>${fmt(c.gold)}</b>금 ${matStr}</div>
+        </div>
+        <button class="act sm" data-action="build" data-key="${key}" ${ok?'':'disabled'}>
+          ${capped?'🔒회관↑':'증축'}</button>
+      </div>`;
+    }
+    html+="</div>";
+    $("#tab-build").innerHTML=html;
+    return;
+  }
+  if(name==="recruit"){
+    const cg=recruitCostGold();
+    let pool="";
+    if(state.recruitPool.length===0){
+      const left=Math.max(0,Math.ceil((state.nextFreeRecruit-Date.now())/1000));
+      pool=`<div class="muted">다음 무료 후보까지 ${left}초…</div>`;
+    } else {
+      state.recruitPool.forEach((h,i)=>{
+        pool+=`<div class="panel bcard">
+          <div class="bemoji">${JOBS[h.job].emoji}</div>
+          <div class="binfo">
+            <div class="bn" style="color:${gradeColor(h.grade)}">${GRADES[h.grade]} ${JOBS[h.job].name}</div>
+            <span class="htrait">${TRAITS[h.trait].name}</span>
+          </div>
+          <button class="act sm green" data-action="claimfree" data-idx="${i}">영입</button>
+        </div>`;
+      });
+    }
+    $("#tab-recruit").innerHTML=`
+      <div class="panel"><h3>🎲 헌터 영입</h3>
+        <div class="muted">직업·등급·특성은 랜덤. 인구 한도(여관)를 넘으면 영입 불가.</div>
+      </div>
+      <div class="panel"><h3>🆕 무료 영입 대기열 (${state.recruitPool.length}/3)</h3>${pool}</div>
+      <div class="panel"><h3>⚡ 즉시 영입</h3>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <button class="act gold" data-action="recruitgold">골드 영입 (<b>${fmt(cg)}</b>금)</button>
+          <button class="act purple" data-action="recruitgem">💎 보석 영입 (${RECRUIT_GEM}💎·등급↑)</button>
+        </div>
+        <div class="muted" style="margin-top:6px">골드 영입은 누적될수록 비용이 오릅니다.</div>
+      </div>`;
+    return;
+  }
+  if(name==="colo"){
+    const unlocked=state.buildings.colosseum>=1;
+    const cd=Math.max(0,Math.ceil((state.pvpCooldown-Date.now())/1000));
+    let champ="";
+    if(state.hunters.length){
+      const c=state.hunters.reduce((a,b)=>power(b)>power(a)?b:a);
+      champ=`<div class="muted">대표 선수: ${JOBS[c.job].emoji} ${c.name} (전투력 ${fmt(power(c))})</div>`;
+    }
+    $("#tab-colo").innerHTML=`
+      <div class="panel"><h3>🏟️ 콜로세움 (PvP 모의전)</h3>
+        ${unlocked?`<div class="muted">가장 강한 헌터로 모의전. 승리 시 보석·골드 획득.</div>
+          ${champ}
+          <div style="margin-top:10px"><button class="act purple" data-action="pvp" ${cd>0?'disabled':''}>
+            ${cd>0?`재정비 ${cd}s`:'⚔️ 모의전 시작'}</button></div>`
+          :`<div class="muted">🔒 건설 탭에서 <b>콜로세움</b>을 건설하면 해금됩니다.</div>`}
+      </div>`;
+    return;
+  }
+  if(name==="set"){
+    const diffInfo=DIFFICULTIES.map((d,i)=>{
+      const ok=diffUnlocked(i);
+      const g=d.gate;
+      return `<div style="padding:3px 0;border-bottom:1px solid var(--line)">
+        ${ok?'✅':'🔒'} <b>${d.name}</b> <span class="muted">${g.n===0?'기본 해금':`${g.rb}환생 헌터 ${g.n}명`} · 보상×${d.reward}</span></div>`;
+    }).join("");
+    $("#tab-set").innerHTML=`
+      <div class="panel"><h3>📊 진행 정보</h3>
+        <div class="muted">총 환생 횟수: <b style="color:var(--gem)">${state.totalRebirths}</b> ·
+          헌터 ${state.hunters.length}명 · 최고해금 난이도: ${DIFFICULTIES[highestUnlockedDiff()].name}</div>
+      </div>
+      <div class="panel"><h3>🎯 난이도 해금 조건</h3>${diffInfo}</div>
+      <div class="panel"><h3>⚙️ 설정</h3>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <button class="act sm" data-action="save">💾 수동 저장</button>
+          <button class="act sm red" data-action="reset">🗑️ 데이터 초기화</button>
+        </div>
+        <div class="muted" style="margin-top:8px">진행은 10초마다 + 종료 시 자동 저장됩니다.
+          오프라인 보상은 최대 ${OFFLINE_CAP/3600}시간까지 정산됩니다.</div>
+      </div>
+      <div class="panel"><h3>ℹ️ 핵심 루프</h3>
+        <div class="muted">자동전투 → 골드·재료 → 거래소 자동매입 → 건설·영입·강화 → 100레벨 환생 → 환생수로 난이도 해금 → 더 강한 사냥터</div>
+      </div>`;
+    return;
+  }
+}
+
+let activeTab="hunt";
+function switchTab(name){
+  activeTab=name;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  $("#tab-"+name).classList.add("active");
+  document.querySelectorAll(".tbtn").forEach(b=>b.classList.toggle("active", b.dataset.tab===name));
+  renderTab(name);
+}
+
+/* ---------- 이벤트 위임 ---------- */
+document.addEventListener("click", e=>{
+  const t=e.target.closest("[data-action]");
+  if(!t) return;
+  const a=t.dataset.action;
+  const id=t.dataset.id?parseInt(t.dataset.id):null;
+  const h=id!=null? state.hunters.find(x=>x.id===id):null;
+  switch(a){
+    case "tab": switchTab(t.dataset.tab); break;
+    case "setzone": state.currentZone=parseInt(t.dataset.zone); renderTab("hunt"); break;
+    case "setdiff": {
+      const d=parseInt(t.dataset.d);
+      if(diffUnlocked(d)){ state.difficulty=d; toast("난이도 변경: "+DIFFICULTIES[d].name,"ok");
+        // 존 전투상태 리셋(스테이지 유지하되 몬스터 재생성)
+        state.zones.forEach(z=>z.monster=null);
+        renderTab("hunt");
+      }
+      break;
+    }
+    case "autodeploy": autoDeploy(); renderTab("hunt"); break;
+    case "summon": summonBoss(); break;
+    case "deploy": if(h){ h.deployed=true;
+      // 입장 가능한 최고 존
+      let best=0; for(let i=0;i<ZONES.length;i++) if(h.level>=ZONES[i].reqLevel) best=i;
+      h.zone=best; renderTab("hunter"); } break;
+    case "undeploy": if(h){ h.deployed=false; renderTab("hunter"); } break;
+    case "rebirth": if(h) rebirth(h); break;
+    case "enhance": if(h) enhance(h); break;
+    case "build": build(t.dataset.key); break;
+    case "claimfree": claimFree(parseInt(t.dataset.idx)); break;
+    case "recruitgold": recruitGold(); break;
+    case "recruitgem": recruitGem(); break;
+    case "pvp": pvp(); break;
+    case "save": saveGame(); toast("저장 완료","ok"); break;
+    case "reset": confirmReset(); break;
+  }
+});
+
+function confirmReset(){
+  showModal(`<h2>🗑️ 데이터 초기화</h2>
+    <p class="muted">모든 진행이 삭제됩니다. 되돌릴 수 없습니다.</p>
+    <div class="row" style="justify-content:center;gap:8px;margin-top:12px">
+      <button class="act" onclick="closeModal()">취소</button>
+      <button class="act red" onclick="doReset()">초기화</button>
+    </div>`);
+}
+window.doReset=function(){
+  localStorage.removeItem(SAVE_KEY);
+  state=defaultState();
+  closeModal();
+  switchTab("hunt");
+  toast("데이터가 초기화되었습니다","ok");
+};
+window.closeModal=closeModal;
+window.renderTab=renderTab;
+
+/* ---------- 저장 / 로드 ---------- */
+function saveGame(){
+  state.lastActive=Date.now();
+  state.lastSave=Date.now();
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }catch(e){}
+}
+function loadGame(){
+  let raw=null;
+  try{ raw=localStorage.getItem(SAVE_KEY); }catch(e){}
+  if(!raw){ state=defaultState(); return; }
+  try{
+    const s=JSON.parse(raw);
+    state=Object.assign(defaultState(), s);
+    // 무결성 보정
+    state.mats=Object.assign({wood:0,iron:0,mana:0}, s.mats||{});
+    state.rates=Object.assign({gold:0,exp:0,wood:0,iron:0,mana:0}, s.rates||{});
+    state.buildings=Object.assign({townhall:1,market:1,sanctuary:0,forge:0,inn:1,hornblower:0,colosseum:0}, s.buildings||{});
+    if(!Array.isArray(state.zones)||state.zones.length<ZONES.length){
+      state.zones=[]; for(let i=0;i<ZONES.length;i++) state.zones.push(makeZoneState(i));
+    }
+    state.zones.forEach(z=>z.monster=null);
+    // uid 카운터 복구
+    let maxId=0; for(const h of state.hunters) if(h.id>maxId) maxId=h.id;
+    _uid=maxId+1;
+    // 전투 필드 보정
+    for(const h of state.hunters){
+      if(h.hp==null||h.hp<=0||!h.alive) h.hp=maxHp(h);
+      if(h.alive==null) h.alive=true;
+      if(h.atkTimer==null) h.atkTimer=Math.random();
+    }
+    // 보스 만료 처리
+    if(state.boss && state.boss.endTime<Date.now()) state.boss=null;
+    offlineReward(s.lastActive||Date.now());
+  }catch(e){
+    console.warn("로드 실패, 새 게임", e);
+    state=defaultState();
+  }
+}
+
+function offlineReward(lastActive){
+  let elapsed=(Date.now()-lastActive)/1000;
+  if(elapsed<60) return; // 1분 미만 무시
+  elapsed=Math.min(elapsed, OFFLINE_CAP);
+  const r=state.rates;
+  if(r.gold<=0 && r.exp<=0) return;
+  const gold=r.gold*elapsed*OFFLINE_EFF;
+  const exp=r.exp*elapsed*OFFLINE_EFF;
+  const wood=r.wood*elapsed*OFFLINE_EFF;
+  const iron=r.iron*elapsed*OFFLINE_EFF;
+  const mana=r.mana*elapsed*OFFLINE_EFF;
+  state.gold+=gold;
+  state.mats.wood+=wood; state.mats.iron+=iron; state.mats.mana+=mana;
+  const deployed=state.hunters.filter(h=>h.deployed);
+  if(deployed.length) gainExp(deployed, exp);
+  const hrs=Math.floor(elapsed/3600), min=Math.floor((elapsed%3600)/60);
+  setTimeout(()=>{
+    showModal(`<h2>🌙 오프라인 보상</h2>
+      <div class="muted">${hrs}시간 ${min}분 동안의 자동 사냥 정산 (효율 ${OFFLINE_EFF*100}%)</div>
+      <div class="offlineList">
+        <div>💰 골드 <b style="float:right;color:var(--gold)">+${fmt(gold)}</b></div>
+        <div>🪵 별빛나무 <b style="float:right">+${fmt(wood)}</b></div>
+        <div>⛏️ 철광석 <b style="float:right">+${fmt(iron)}</b></div>
+        <div>💠 마정석 <b style="float:right">+${fmt(mana)}</b></div>
+        <div>✨ 경험치 <b style="float:right;color:var(--acc)">+${fmt(exp)}</b> (배치 헌터)</div>
+      </div>
+      <button class="act gold" onclick="closeModal()">수령하기</button>`);
+  },300);
+}
+
+/* ---------- 게임 루프 ---------- */
+let lastT=performance.now();
+let saveTimer=0, uiTimer=0;
+function loop(now){
+  let dt=(now-lastT)/1000; lastT=now;
+  if(dt>0.5) dt=0.5; // 탭 비활성 보호
+  if(state){
+    combatTick(dt);
+    flushRates(dt);
+    tickRecruitPool();
+    renderCanvas(dt);
+    renderTop();
+    // 동적 탭 주기 갱신
+    uiTimer+=dt;
+    if(uiTimer>=1){
+      uiTimer=0;
+      if(activeTab==="hunt") renderHuntInfo();
+      else if(activeTab==="recruit") renderTab("recruit");
+      else if(activeTab==="colo") renderTab("colo");
+      else if(activeTab==="hunter") renderTab("hunter");
+    }
+    saveTimer+=dt;
+    if(saveTimer>=10){ saveTimer=0; saveGame(); }
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ---------- 부트 ---------- */
+window.addEventListener("beforeunload", saveGame);
+window.addEventListener("resize", resizeCanvas);
+document.addEventListener("visibilitychange", ()=>{ if(document.hidden) saveGame(); });
+
+loadGame();
+resizeCanvas();
+switchTab("hunt");
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
