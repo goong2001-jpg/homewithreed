@@ -138,6 +138,11 @@
   .offlineList{text-align:left;margin:10px 0;font-size:13px;}
   .offlineList div{padding:3px 0;border-bottom:1px solid var(--line);}
 
+  /* ===== Art assets ===== */
+  .ico{width:16px;height:16px;object-fit:contain;vertical-align:middle;display:inline-block;}
+  .hsprite{width:38px;height:38px;object-fit:contain;vertical-align:middle;image-rendering:auto;}
+  .hcard.framed{border-color:transparent !important;box-shadow:none;background-repeat:no-repeat;background-position:center;background-size:100% 100%;}
+
   ::-webkit-scrollbar{width:7px;} ::-webkit-scrollbar-thumb{background:#333b48;border-radius:4px;}
   @media(max-width:520px){ .stat{font-size:12px;padding:3px 7px;} .hemoji{font-size:22px;} }
 </style>
@@ -146,11 +151,11 @@
 <div id="app">
   <div id="topbar">
     <span id="diffBadge">난이도</span>
-    <span class="stat gold"><span class="lab">금</span><span class="v" id="tGold">0</span></span>
-    <span class="stat gem"><span class="lab">💎</span><span class="v" id="tGem">0</span></span>
-    <span class="stat"><span class="lab">🪵</span><span class="v" id="tWood">0</span></span>
-    <span class="stat"><span class="lab">⛏️</span><span class="v" id="tIron">0</span></span>
-    <span class="stat"><span class="lab">💠</span><span class="v" id="tMana">0</span></span>
+    <span class="stat gold"><span class="lab" id="labGold">금</span><span class="v" id="tGold">0</span></span>
+    <span class="stat gem"><span class="lab" id="labGem">💎</span><span class="v" id="tGem">0</span></span>
+    <span class="stat"><span class="lab" id="labWood">🪵</span><span class="v" id="tWood">0</span></span>
+    <span class="stat"><span class="lab" id="labIron">⛏️</span><span class="v" id="tIron">0</span></span>
+    <span class="stat"><span class="lab" id="labMana">💠</span><span class="v" id="tMana">0</span></span>
     <span class="stat"><span class="lab">👥</span><span class="v" id="tPop">0</span></span>
   </div>
 
@@ -261,6 +266,40 @@ const BUILD_KEYS = Object.keys(BUILDINGS);
 const NAMES = ["아리","반","카이","레오","미라","조르","다인","테오","루나","가렌","이졸","녹스","벨라","시온","하루",
   "펜릴","아셀","드레이","모건","유리","칼","렌","세라","오딘","프레이","록사","바엘","에코","제드","님","타로",
   "리암","노바","스카","베인","코린","피아","글렌","로엔","무겐"];
+
+/* ---------- 아트(이미지) 시스템 ----------
+   빌드 스크립트(embed_art.js)가 아래 마커 사이에 data URI들을 주입합니다.
+   비어 있으면 자동으로 이모지/그라데이션으로 폴백되어 그대로 동작합니다.
+   키 목록:
+     배경:   zone0, zone1, zone2
+     헌터:   berserker, paladin, ranger, sorcerer
+     몬스터: z0_a,z0_b,z0_boss, z1_a,z1_b,z1_boss, z2_a,z2_b,z2_boss
+     프레임: f0,f1,f2,f3,f4,f5  (등급 0~10을 2단계씩 묶어 매핑)
+     아이콘: wood, iron, mana, gold, gem
+*/
+const ART_SRC = {
+/*__ART_START__*/
+/*__ART_END__*/
+};
+const IMG = {};
+function loadArt(){
+  for(const k in ART_SRC){
+    if(!ART_SRC[k]) continue;
+    const im = new Image();
+    im.src = ART_SRC[k];
+    IMG[k] = im;
+  }
+}
+function hasImg(k){ const im=IMG[k]; return !!(im && im.complete && im.naturalWidth>0); }
+function frameKey(grade){ return "f"+Math.min(Math.floor(grade/2),5); }
+function monArtFor(zi){ return "z"+zi+"_"+(Math.random()<0.5?"a":"b"); }
+function initIcons(){
+  const map={labGold:"gold",labGem:"gem",labWood:"wood",labIron:"iron",labMana:"mana"};
+  for(const id in map){
+    const k=map[id];
+    if(ART_SRC[k]){ const el=document.getElementById(id); if(el) el.innerHTML='<img class="ico" src="'+ART_SRC[k]+'">'; }
+  }
+}
 
 /* ---------- 유틸 ---------- */
 const $ = s=>document.querySelector(s);
@@ -386,7 +425,7 @@ function spawnMonster(zi){
   const z=ZONES[zi], zs=state.zones[zi], d=diff();
   const mult = Math.pow(1.16, zs.stage)*d.mon;
   const hp = Math.floor(z.hp*mult);
-  zs.monster = {hp, maxHp:hp, atk:z.atk*mult*0.12, emoji:pick(z.mon), atkTimer:1.2, hitFx:0};
+  zs.monster = {hp, maxHp:hp, atk:z.atk*mult*0.12, emoji:pick(z.mon), art:monArtFor(zi), atkTimer:1.2, hitFx:0};
 }
 function deployedIn(zi){ return state.hunters.filter(h=>h.deployed && h.zone===zi); }
 
@@ -605,8 +644,13 @@ function renderCanvas(dt){
   const W=canvas._w||700, H=canvas._h||300;
   ctx.clearRect(0,0,W,H);
   const zi=state.currentZone, z=ZONES[zi], zs=state.zones[zi];
-  // 배경 텍스트
-  ctx.font="11px sans-serif"; ctx.fillStyle="#4a5468"; ctx.textAlign="left";
+  // 배경 이미지(있으면) → 위에 어둑한 오버레이로 글자 가독성 확보
+  if(hasImg("zone"+zi)){
+    ctx.drawImage(IMG["zone"+zi], 0, 0, W, H);
+    ctx.fillStyle="rgba(8,10,16,0.28)"; ctx.fillRect(0,0,W,H);
+  }
+  // 상태 텍스트
+  ctx.font="bold 11px sans-serif"; ctx.fillStyle=hasImg("zone"+zi)?"#e6e9ef":"#4a5468"; ctx.textAlign="left";
   ctx.fillText(`${z.emoji} ${z.name}  ·  스테이지 ${zs.stage+1}  ·  처치 ${zs.kills}`, 10, 18);
 
   // 헌터들
@@ -615,9 +659,13 @@ function renderCanvas(dt){
   list.slice(0,6).forEach((h,i)=>{
     const col=i%2, rown=Math.floor(i/2);
     const x=hx + col*40 - 20, y=H*0.42 + rown*42;
-    ctx.font="26px sans-serif"; ctx.textAlign="center";
     ctx.globalAlpha = h.alive?1:0.25;
-    ctx.fillText(JOBS[h.job].emoji, x, y);
+    if(hasImg(h.job)){
+      const sz=40; ctx.drawImage(IMG[h.job], x-sz/2, y-sz+8, sz, sz);
+    } else {
+      ctx.font="26px sans-serif"; ctx.textAlign="center";
+      ctx.fillText(JOBS[h.job].emoji, x, y);
+    }
     ctx.globalAlpha=1;
     if(h.alive) drawBar(x-18,y+5,36,5, h.hp/maxHp(h), "#37d67a");
     else { ctx.font="9px sans-serif"; ctx.fillStyle="#ff7a7a"; ctx.fillText("부활중", x, y+12); }
@@ -632,8 +680,14 @@ function renderCanvas(dt){
   if(mob){
     const ex=W*0.74, ey=H*0.5, big=(mob===state.boss);
     const shake=mob.hitFx>0?rand(-3,3):0;
-    ctx.font=(big?60:46)+"px sans-serif"; ctx.textAlign="center";
-    ctx.fillText(mob.emoji, ex+shake, ey+(big?20:12));
+    const mk = big ? ("z"+zi+"_boss") : mob.art;
+    if(hasImg(mk)){
+      const sz=big?Math.min(H*0.7,120):Math.min(H*0.5,80);
+      ctx.drawImage(IMG[mk], ex-sz/2+shake, ey-sz/2+(big?8:6), sz, sz);
+    } else {
+      ctx.font=(big?60:46)+"px sans-serif"; ctx.textAlign="center";
+      ctx.fillText(mob.emoji, ex+shake, ey+(big?20:12));
+    }
     drawBar(ex-60, ey-(big?55:42), 120, 8, mob.hp/mob.maxHp, big?"#b06bff":"#e74c3c");
     ctx.font="10px sans-serif"; ctx.fillStyle="#cfd6e2";
     ctx.fillText(fmt(mob.hp)+" / "+fmt(mob.maxHp), ex, ey-(big?60:48));
@@ -880,10 +934,16 @@ function hunterCard(h, context){
   else btns+=`<button class="act sm green" data-action="deploy" data-id="${h.id}">출전</button>`;
   if(h.level>=100) btns+=`<button class="act sm purple" data-action="rebirth" data-id="${h.id}">⭐환생</button>`;
   if(h.grade<10) btns+=`<button class="act sm gold" data-action="enhance" data-id="${h.id}">🔨강화 ${Math.round(enhanceChance(h)*100)}%</button>`;
-  return `<div class="hcard g${h.grade}">
+  const fk=frameKey(h.grade);
+  const framed = !!ART_SRC[fk];
+  const cardStyle = framed ? ` style="background-image:url(${ART_SRC[fk]})"` : "";
+  const portrait = ART_SRC[h.job]
+    ? `<img class="hsprite" src="${ART_SRC[h.job]}" alt="">`
+    : JOBS[h.job].emoji;
+  return `<div class="hcard g${h.grade}${framed?' framed':''}"${cardStyle}>
     ${badge}
     <div class="htop">
-      <div class="hemoji">${JOBS[h.job].emoji}</div>
+      <div class="hemoji">${portrait}</div>
       <div style="flex:1">
         <div class="hname">${h.name} <span class="stars">${stars}</span></div>
         <div class="hgrade" style="color:${gradeColor(h.grade)}">${GRADES[h.grade]} ${JOBS[h.job].name} · Lv.${h.level}</div>
@@ -1181,6 +1241,8 @@ window.addEventListener("beforeunload", saveGame);
 window.addEventListener("resize", resizeCanvas);
 document.addEventListener("visibilitychange", ()=>{ if(document.hidden) saveGame(); });
 
+loadArt();
+initIcons();
 loadGame();
 resizeCanvas();
 switchTab("hunt");
