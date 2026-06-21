@@ -1,0 +1,33 @@
+[
+ {"cat":"bg","key":"zone0","id":"1_DYvNBZPekNpXSjRQXC6zCROBJa77vIy","name":"01_침략의땅_숲"},
+ {"cat":"bg","key":"zone1","id":"1Y44w-R_YoW_cR_A6g2G7zOl7zyBxRQsM","name":"02_망자의땅_폐허"},
+ {"cat":"bg","key":"zone2","id":"1tz6_w1k_6TdaBlr1PdfHr1IH6dTZtQ56","name":"03_파멸의땅_화산"},
+
+ {"cat":"hunter","key":"berserker","id":"18d0C8Gmigf8jk_YsXSzgW9QJnGK_nDuu","name":"01_버서커"},
+ {"cat":"hunter","key":"paladin","id":"1JppewPsr-xSDv3XnSJT_NtKGZQ17zmFM","name":"02_팔라딘"},
+ {"cat":"hunter","key":"ranger","id":"1UspWRJiJpea2m0V5xvls_yDV8GJBx2Df","name":"03_레인져"},
+ {"cat":"hunter","key":"sorcerer","id":"1kwfCKpuKAwuuo0nKI7k8ASeh426FzFyz","name":"04_소서러"},
+
+ {"cat":"mon","key":"z0_a","id":"1aXzzXQAkuTKlTrWC9Ngx2oNpbEfkIj33","name":"숲_01_고블린"},
+ {"cat":"mon","key":"z0_b","id":"1ynfKfaqmIr50LLHlM7yG3L6gkelhQIat","name":"숲_02_다이어울프"},
+ {"cat":"mon","key":"z0_boss","id":"1NBR51Xgh-6NsI8uMocRym9bMVlKQsAzF","name":"숲_03_보스_나무정령"},
+ {"cat":"mon","key":"z1_a","id":"1L8c4Togn-f1-eK29gvUOVbke4fyGp_Uh","name":"폐허_01_스켈레톤"},
+ {"cat":"mon","key":"z1_b","id":"1QB-nQVFEp0aH9y3_U5AihB1geeOYcL6B","name":"폐허_02_레이스"},
+ {"cat":"mon","key":"z1_boss","id":"15mQqYk7PKCyeOIp-4IdFxB9erXA5dCbQ","name":"폐허_03_보스_리치"},
+ {"cat":"mon","key":"z2_a","id":"11tLpfY6B0viev3Fz0v9YLMXZFik2nUKS","name":"화산_01_라바임프"},
+ {"cat":"mon","key":"z2_b","id":"11RpRBLKLACw_NmgHq0y9ypmKlH8lZ4AG","name":"화산_02_헬하운드"},
+ {"cat":"mon","key":"z2_boss","id":"1S6QlLx5aY_9E81jo2U6MpgfinuPY3A9g","name":"화산_03_보스_마그마골렘"},
+
+ {"cat":"frame","key":"f0","id":"1l79OWnxnFx0xINwe8ZOojecRxSti-ATt","name":"01_노말_회색"},
+ {"cat":"frame","key":"f1","id":"1VEo4hNJx630bhWLqn_0JzEk_ryywWA6u","name":"02_언커먼_초록"},
+ {"cat":"frame","key":"f2","id":"1tC9F_I-GdUbfJcOINiTOWlj3WF_H8n-S","name":"03_레어_파랑"},
+ {"cat":"frame","key":"f3","id":"1ku-xUZVfCRoxgiFlRBlBiStaQejLnuGQ","name":"04_에픽_보라"},
+ {"cat":"frame","key":"f4","id":"1SvH5JSXYBt16H3hHKXb0PnU9vC58aQZ4","name":"05_레전더리_주황"},
+ {"cat":"frame","key":"f5","id":"1YPpwQFMWpwVCtuN2-KKaZAJy9sBYUFHn","name":"06_울티메이트_무지개"},
+
+ {"cat":"icon","key":"wood","id":"1BZQQ483U2tEdYxpkvTXy3AzyLdlZqkKX","name":"01_나무"},
+ {"cat":"icon","key":"iron","id":"1ZnT90-IlBn8uftTYo7vLl1HcIy_EhJZI","name":"02_철광석"},
+ {"cat":"icon","key":"mana","id":"1Sry5NbzwogWRHWuSjIaWBRCDcP9VSAZS","name":"03_마정석"},
+ {"cat":"icon","key":"gold","id":"1-nK-K0llBU6k0PRBhLeGwB3LOQms-zVx","name":"04_골드"},
+ {"cat":"icon","key":"gem","id":"1NPPqiK7pf6TMPJ2KRZrcGo8U4M4LzjvT","name":"05_보석"}
+]
