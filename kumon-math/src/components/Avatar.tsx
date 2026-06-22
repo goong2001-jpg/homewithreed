@@ -195,7 +195,7 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
           style={{
             position: 'relative', zIndex: 1,
             width: W, height: H, objectFit: 'contain',
-            mixBlendMode: 'multiply',
+            
           }}
         />
       ) : (
