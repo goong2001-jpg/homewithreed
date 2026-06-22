@@ -28,7 +28,7 @@ const INITIAL_ITEMS: AvatarItem[] = [
   { id: 'diana_wings',    name: '요정 날개',   emoji: '🪽', category: 'special', price: 180, owned: false, equipped: false, unlockAt: 45,  image: 'diana_wings.png',    bgRemoval: 'green' },
   { id: 'diana_aura',     name: '반짝이 오라', emoji: '💫', category: 'special', price: 210, owned: false, equipped: false, unlockAt: 60,  image: 'diana_aura.png',     bgRemoval: 'black' },
   { id: 'diana_dress',    name: '드림 드레스', emoji: '👗', category: 'special', price: 250, owned: false, equipped: false, unlockAt: 80,  image: 'diana_dress.png',    bgRemoval: 'green' },
-  { id: 'diana_full',     name: '✨다이아 요정✨', emoji: '🧚', category: 'special', price: 350, owned: false, equipped: false, unlockAt: 100, image: 'diana_full.png', bgRemoval: 'white', fullImage: true },
+  { id: 'diana_full',     name: '✨다이아 요정✨', emoji: '🧚', category: 'special', price: 350, owned: false, equipped: false, unlockAt: 100, image: 'diana_full.png', bgRemoval: 'none', fullImage: true },
 ];
 
 const STORAGE_KEY = 'kumon_game_state';
