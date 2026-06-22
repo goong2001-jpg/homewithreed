@@ -7,61 +7,83 @@ interface Props {
   onError?: () => void;
 }
 
-/**
- * 초록/검정/흰 배경을 자동으로 제거해서 표시해주는 이미지 컴포넌트
- * - green: canvas 픽셀 처리로 초록 배경 제거 (크로마키)
- * - black: mix-blend-mode screen (검정 = 투명)
- * - white: mix-blend-mode multiply (흰색 = 투명)
- * - none: 그냥 표시
- */
 export default function BgRemoveImg({ src, bgRemoval, style, onError }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [canvasReady, setCanvasReady] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [state, setState] = useState<'loading' | 'canvas-ok' | 'fallback' | 'failed'>('loading');
 
   useEffect(() => {
-    if (bgRemoval !== 'green') return;
-    setCanvasReady(false);
+    setState('loading');
+
+    if (bgRemoval !== 'green') {
+      setState('fallback');
+      return;
+    }
 
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    // crossOrigin 없이 먼저 시도 — 같은 도메인(GitHub Pages)은 불필요
     img.onload = () => {
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      if (!canvas) { setState('fallback'); return; }
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0);
-      const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const d = data.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const r = d[i], g = d[i + 1], b = d[i + 2];
-        // 초록 픽셀 조건: g > r*1.4 && g > b*1.4 && g > 80
-        if (g > r * 1.35 && g > b * 1.35 && g > 80) {
-          d[i + 3] = 0; // 투명 처리
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { setState('fallback'); return; }
+
+      try {
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const d = imageData.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const r = d[i], g = d[i + 1], b = d[i + 2];
+          if (g > r * 1.35 && g > b * 1.35 && g > 80) {
+            d[i + 3] = 0;
+          }
         }
+        ctx.putImageData(imageData, 0, 0);
+        setState('canvas-ok');
+      } catch {
+        // canvas가 오염됐거나 보안 에러 → CSS 필터 폴백
+        setState('fallback');
       }
-      ctx.putImageData(data, 0, 0);
-      setCanvasReady(true);
     };
-    img.onerror = () => { setFailed(true); onError?.(); };
+    img.onerror = () => {
+      setState('failed');
+      onError?.();
+    };
     img.src = src;
   }, [src, bgRemoval, onError]);
 
-  if (failed) return null;
+  if (state === 'failed') return null;
 
   if (bgRemoval === 'green') {
-    return (
-      <canvas
-        ref={canvasRef}
-        style={{
-          display: canvasReady ? 'block' : 'none',
-          ...style,
-        }}
-      />
-    );
+    if (state === 'canvas-ok') {
+      return (
+        <canvas
+          ref={canvasRef}
+          style={{ display: 'block', ...style }}
+        />
+      );
+    }
+    if (state === 'fallback') {
+      // canvas 안 될 때: CSS 필터로 초록 제거 시도
+      return (
+        <img
+          src={src}
+          alt=""
+          style={{
+            // 초록배경을 CSS filter로 줄이는 근사치 처리
+            filter: 'saturate(0) brightness(1.1)',
+            mixBlendMode: 'multiply',
+            ...style,
+          }}
+        />
+      );
+    }
+    // loading 중엔 숨김
+    return <canvas ref={canvasRef} style={{ display: 'none' }} />;
   }
 
+  // black 배경 → screen, white 배경 → multiply
   const blendMode: React.CSSProperties['mixBlendMode'] =
     bgRemoval === 'black' ? 'screen' :
     bgRemoval === 'white' ? 'multiply' : 'normal';
@@ -70,8 +92,7 @@ export default function BgRemoveImg({ src, bgRemoval, style, onError }: Props) {
     <img
       src={src}
       alt=""
-      crossOrigin="anonymous"
-      onError={() => { setFailed(true); onError?.(); }}
+      onError={() => { setState('failed'); onError?.(); }}
       style={{ mixBlendMode: blendMode, ...style }}
     />
   );

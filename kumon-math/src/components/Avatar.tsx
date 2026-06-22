@@ -127,7 +127,6 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
   const outfit = equipped.find(i => i.category === 'outfit');
   const specials = equipped.filter(i => i.category === 'special');
   const fullAvatar = specials.find(i => i.fullImage);
-  // 전체 그림이 아닌 special 조각들(왕관/목걸이/날개 등)은 그림 레이어로 덧씌움
   const specialLayers = specials.filter(i => !i.fullImage && i.image);
 
   const isSmall = size === 'small';
@@ -136,9 +135,13 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
   const s = isSmall ? 0.54 : 1;
 
   const [fullFailed, setFullFailed] = useState(false);
+  const [baseFailed, setBaseFailed] = useState(false);
 
   const outfitColors = outfit ? (OUTFIT_COLORS[outfit.id] || OUTFIT_COLORS.default) : OUTFIT_COLORS.default;
   const hairColor = hat ? (HAIR_COLORS[hat.id] || '#4a3728') : '#4a3728';
+
+  // 기본 아바타 이미지 (아무것도 착용 안 했을 때 보여줄 기본 캐릭터)
+  const BASE_AVATAR = `${ASSET_BASE}diana_base.png`;
 
   // ✨ 전설의 아바타(다이아 요정) 착용 시: 그림 한 장으로 전체 교체
   if (fullAvatar && fullAvatar.image && !fullFailed) {
@@ -183,6 +186,19 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
         </div>
       )}
 
+      {/* 기본 캐릭터: diana_base.png 있으면 이미지, 없으면 SVG */}
+      {!baseFailed ? (
+        <img
+          src={BASE_AVATAR}
+          alt=""
+          onError={() => setBaseFailed(true)}
+          style={{
+            position: 'relative', zIndex: 1,
+            width: W, height: H, objectFit: 'contain',
+            mixBlendMode: 'multiply',
+          }}
+        />
+      ) : (
       <svg
         width={W} height={H}
         viewBox={`0 0 120 ${isSmall ? 175 : 175}`}
@@ -256,6 +272,7 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
           <text x={60*s} y={78*s} fontSize={isSmall ? 14 : 18} textAnchor="middle">{acc.emoji}</text>
         )}
       </svg>
+      )}
 
       {/* 💎 전설 조각 레이어 (왕관/목걸이/날개 등) — 그림이 있으면 아바타 위에 겹쳐 표시 */}
       {specialLayers.map(item => (
