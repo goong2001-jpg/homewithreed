@@ -17,10 +17,9 @@ interface Props {
 
 const CATEGORIES: { key: AvatarItem['category']; label: string; emoji: string }[] = [
   { key: 'special', label: '전설', emoji: '🧚' },
-  { key: 'hat', label: '모자', emoji: '🎩' },
-  { key: 'accessory', label: '장식', emoji: '💎' },
-  { key: 'outfit', label: '옷', emoji: '👗' },
+  { key: 'pet', label: '펫', emoji: '🐾' },
   { key: 'background', label: '배경', emoji: '🌈' },
+  { key: 'effect', label: '효과', emoji: '✨' },
 ];
 
 export default function Shop({ items, points, totalCorrect, onBuy, onEquip, onClose }: Props) {
