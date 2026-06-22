@@ -11,7 +11,7 @@ export interface AvatarItem {
   id: string;
   name: string;
   emoji: string;
-  category: 'hat' | 'accessory' | 'background' | 'outfit' | 'special';
+  category: 'hat' | 'accessory' | 'background' | 'outfit' | 'special' | 'pet' | 'effect';
   price: number;
   owned: boolean;
   equipped: boolean;
