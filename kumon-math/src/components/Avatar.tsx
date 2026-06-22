@@ -12,6 +12,15 @@ interface Props {
 
 const ASSET_BASE = `${process.env.PUBLIC_URL}/avatar/`;
 
+/** 배경 테마: 배경 아이템 id별 그라데이션 + 장식 이모지 */
+const BG_THEMES: Record<string, { grad: string; deco: string[] }> = {
+  bg_stars:   { grad: 'linear-gradient(160deg,#3a2c6e,#6b5bb5)', deco: ['⭐', '🌙', '✨', '⭐'] },
+  bg_flowers: { grad: 'linear-gradient(160deg,#ffd3e0,#c8f7c5)', deco: ['🌷', '🌸', '🌼', '🌷'] },
+  bg_ocean:   { grad: 'linear-gradient(160deg,#7ad7f0,#3a7bd5)', deco: ['🐠', '🫧', '🐚', '🐟'] },
+  bg_rainbow: { grad: 'linear-gradient(160deg,#ff9a9e,#fad0c4,#a18cd1)', deco: ['🌈', '☁️', '✨', '🌈'] },
+  bg_space:   { grad: 'linear-gradient(160deg,#0b1026,#3a2c6e)', deco: ['🪐', '⭐', '🚀', '✨'] },
+};
+
 /** 이미지가 있으면 배경 제거 후 표시, 없거나 로딩 실패 시 이모지로 자동 대체 */
 function AssetImg({ item, fontSize, imgStyle }: {
   item: AvatarItem; fontSize: number; imgStyle?: React.CSSProperties;
@@ -125,6 +134,8 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
   const hat = equipped.find(i => i.category === 'hat');
   const acc = equipped.find(i => i.category === 'accessory');
   const outfit = equipped.find(i => i.category === 'outfit');
+  const pet = equipped.find(i => i.category === 'pet');
+  const effect = equipped.find(i => i.category === 'effect');
   const specials = equipped.filter(i => i.category === 'special');
   const fullAvatar = specials.find(i => i.fullImage);
   const specialLayers = specials.filter(i => !i.fullImage && i.image);
@@ -143,24 +154,60 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
   // 기본 아바타 이미지 (아무것도 착용 안 했을 때 보여줄 기본 캐릭터)
   const BASE_AVATAR = `${ASSET_BASE}diana_base.png`;
 
+  // 🌈 배경 장면 (배경 아이템 착용 시 테마 그라데이션 + 장식 이모지)
+  const decoPos = [['8%', '10%'], ['72%', '15%'], ['15%', '70%'], ['78%', '63%']];
+  const bgTheme = bg ? BG_THEMES[bg.id] : undefined;
+  const bgScene = bg ? (
+    <div style={{
+      position: 'absolute', inset: 0, borderRadius: isSmall ? 12 : 20,
+      overflow: 'hidden', zIndex: 0,
+      background: bgTheme?.grad || 'linear-gradient(160deg,#ffecd2,#fcb69f)',
+    }}>
+      {(bgTheme?.deco || [bg.emoji]).map((e, i) => (
+        <span key={i} style={{
+          position: 'absolute', left: decoPos[i % 4][0], top: decoPos[i % 4][1],
+          fontSize: isSmall ? 13 : 20, opacity: 0.92,
+        }}>{e}</span>
+      ))}
+    </div>
+  ) : null;
+
+  // 🐾 펫 (아바타 옆에 따라다니는 친구)
+  const petEl = pet ? (
+    <div style={{
+      position: 'absolute', right: isSmall ? -2 : -4, bottom: isSmall ? -2 : 4,
+      zIndex: 5, fontSize: isSmall ? 22 : 40,
+      filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.25))',
+    }}>{pet.emoji}</div>
+  ) : null;
+
+  // ✨ 효과 (아바타 주위에 떠오르는 마법 이모지)
+  const fxEl = effect ? (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 6, pointerEvents: 'none', overflow: 'visible' }}>
+      <style>{`@keyframes avFxFloat{0%{transform:translateY(10px) scale(0.7);opacity:0}40%{opacity:1}100%{transform:translateY(-22px) scale(1.15);opacity:0}}`}</style>
+      {[0, 1, 2, 3, 4].map(i => (
+        <span key={i} style={{
+          position: 'absolute', left: `${8 + i * 19}%`, top: `${64 - (i % 3) * 16}%`,
+          fontSize: isSmall ? 12 : 18,
+          animation: `avFxFloat ${1.6 + (i % 3) * 0.4}s ease-in-out ${i * 0.3}s infinite`,
+        }}>{effect.emoji}</span>
+      ))}
+    </div>
+  ) : null;
+
   // ✨ 전설의 아바타(다이아 요정) 착용 시: 그림 한 장으로 전체 교체
   if (fullAvatar && fullAvatar.image && !fullFailed) {
     return (
       <div style={{ position: 'relative', width: W, height: H, flexShrink: 0 }}>
-        {bg && (
-          <div style={{
-            position: 'absolute', inset: 0, borderRadius: isSmall ? 12 : 20,
-            background: 'linear-gradient(160deg,#fbc2eb,#a6c1ee)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: isSmall ? 36 : 60, zIndex: 0,
-          }}>{bg.emoji}</div>
-        )}
+        {bgScene}
         <BgRemoveImg
           src={ASSET_BASE + fullAvatar.image}
           bgRemoval={fullAvatar.bgRemoval ?? 'none'}
           onError={() => setFullFailed(true)}
           style={{ position: 'relative', zIndex: 1, width: W, height: H, objectFit: 'contain' }}
         />
+        {petEl}
+        {fxEl}
       </div>
     );
   }
@@ -173,18 +220,7 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
       flexShrink: 0,
     }}>
       {/* 배경 */}
-      {bg && (
-        <div style={{
-          position: 'absolute', inset: 0,
-          borderRadius: isSmall ? 12 : 20,
-          background: 'linear-gradient(160deg,#ffecd2,#fcb69f)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: isSmall ? 36 : 60,
-          zIndex: 0,
-        }}>
-          {bg.emoji}
-        </div>
-      )}
+      {bgScene}
 
       {/* 기본 캐릭터: diana_base.png 있으면 이미지, 없으면 SVG */}
       {!baseFailed ? (
@@ -195,7 +231,6 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
           style={{
             position: 'relative', zIndex: 1,
             width: W, height: H, objectFit: 'contain',
-            
           }}
         />
       ) : (
@@ -288,6 +323,9 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
           />
         </div>
       ))}
+
+      {petEl}
+      {fxEl}
     </div>
   );
 }
