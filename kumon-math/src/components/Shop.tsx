@@ -6,26 +6,30 @@ import { playPurchase, playClick } from '../utils/sounds';
 interface Props {
   items: AvatarItem[];
   points: number;
+  totalCorrect: number;
   onBuy: (id: string) => void;
   onEquip: (id: string) => void;
   onClose: () => void;
 }
 
 const CATEGORIES: { key: AvatarItem['category']; label: string; emoji: string }[] = [
+  { key: 'special', label: '전설', emoji: '🧚' },
   { key: 'hat', label: '모자', emoji: '🎩' },
   { key: 'accessory', label: '장식', emoji: '💎' },
   { key: 'outfit', label: '옷', emoji: '👗' },
   { key: 'background', label: '배경', emoji: '🌈' },
 ];
 
-export default function Shop({ items, points, onBuy, onEquip, onClose }: Props) {
-  const [tab, setTab] = useState<AvatarItem['category']>('hat');
+export default function Shop({ items, points, totalCorrect, onBuy, onEquip, onClose }: Props) {
+  const [tab, setTab] = useState<AvatarItem['category']>('special');
   const [bought, setBought] = useState<string | null>(null);
 
   const filtered = items.filter(i => i.category === tab);
 
+  const isLocked = (item: AvatarItem) => !item.owned && item.unlockAt != null && totalCorrect < item.unlockAt;
+
   const handleBuy = (item: AvatarItem) => {
-    if (item.owned || points < item.price) return;
+    if (item.owned || points < item.price || isLocked(item)) return;
     onBuy(item.id);
     playPurchase();
     setBought(item.id);
@@ -85,27 +89,50 @@ export default function Shop({ items, points, onBuy, onEquip, onClose }: Props) 
           ))}
         </div>
 
+        {/* 전설 컬렉션 안내 배너 */}
+        {tab === 'special' && (
+          <div style={{
+            background: 'linear-gradient(135deg,#fbc2eb,#a6c1ee)',
+            borderRadius: 14, padding: '12px 14px', marginBottom: 14,
+            fontSize: 13, fontWeight: 700, color: '#5b3a7a', lineHeight: 1.5,
+          }}>
+            🧚 문제를 풀수록 한 조각씩 열려요!<br />
+            지금까지 푼 정답: <span style={{ color: '#e74c3c' }}>{totalCorrect}개</span>
+            {' · '}모두 모으면 <b>✨다이아 요정✨</b> 완성!
+          </div>
+        )}
+
         {/* 아이템 목록 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {filtered.map(item => {
             const canAfford = points >= item.price;
+            const locked = isLocked(item);
+            const remaining = item.unlockAt ? item.unlockAt - totalCorrect : 0;
             return (
               <div
                 key={item.id}
                 style={{
-                  background: item.equipped ? 'linear-gradient(135deg, #84fab0, #8fd3f4)' : 'white',
+                  background: item.equipped
+                    ? 'linear-gradient(135deg, #84fab0, #8fd3f4)'
+                    : locked ? '#eceaf3' : 'white',
                   borderRadius: 16, padding: 14, textAlign: 'center',
-                  border: item.equipped ? '3px solid #27ae60' : '2px solid transparent',
+                  border: item.equipped ? '3px solid #27ae60'
+                    : item.fullImage ? '3px solid #f5b301' : '2px solid transparent',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  opacity: !item.owned && !canAfford ? 0.55 : 1,
+                  opacity: locked ? 0.7 : (!item.owned && !canAfford ? 0.55 : 1),
                   transition: 'all 0.2s',
+                  position: 'relative',
                 }}
               >
-                <div style={{ fontSize: 38, marginBottom: 6 }}>
-                  {bought === item.id ? '🎉' : item.emoji}
+                <div style={{ fontSize: 38, marginBottom: 6, filter: locked ? 'grayscale(1)' : 'none' }}>
+                  {locked ? '🔒' : (bought === item.id ? '🎉' : item.emoji)}
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>{item.name}</div>
-                {item.owned ? (
+                {locked ? (
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#9b59b6', lineHeight: 1.3 }}>
+                    문제 {remaining}개 더 풀면<br />열려요! 💪
+                  </div>
+                ) : item.owned ? (
                   <button
                     onClick={() => { onEquip(item.id); playClick(); }}
                     style={{

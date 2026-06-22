@@ -15,6 +15,14 @@ const INITIAL_ITEMS: AvatarItem[] = [
   { id: 'outfit_superhero', name: '슈퍼히어로', emoji: '🦸', category: 'outfit', price: 220, owned: false, equipped: false },
   { id: 'outfit_princess', name: '공주 드레스', emoji: '👸', category: 'outfit', price: 260, owned: false, equipped: false },
   { id: 'outfit_unicorn', name: '유니콘 드레스', emoji: '🦄', category: 'outfit', price: 300, owned: false, equipped: false },
+
+  // 💎 전설의 컬렉션 — 문제를 풀수록 한 조각씩 열려요 (정답 개수로 해금)
+  { id: 'diana_crown', name: '보석 왕관', emoji: '👑', category: 'special', price: 120, owned: false, equipped: false, unlockAt: 15, image: 'diana_crown.png' },
+  { id: 'diana_necklace', name: '별빛 목걸이', emoji: '📿', category: 'special', price: 150, owned: false, equipped: false, unlockAt: 30, image: 'diana_necklace.png' },
+  { id: 'diana_wings', name: '요정 날개', emoji: '🪽', category: 'special', price: 180, owned: false, equipped: false, unlockAt: 45, image: 'diana_wings.png' },
+  { id: 'diana_aura', name: '반짝이 오라', emoji: '💫', category: 'special', price: 210, owned: false, equipped: false, unlockAt: 60, image: 'diana_aura.png' },
+  { id: 'diana_dress', name: '드림 드레스', emoji: '👗', category: 'special', price: 250, owned: false, equipped: false, unlockAt: 80, image: 'diana_dress.png' },
+  { id: 'diana_full', name: '✨다이아 요정✨', emoji: '🧚', category: 'special', price: 350, owned: false, equipped: false, unlockAt: 100, image: 'diana_full.png', fullImage: true },
 ];
 
 const STORAGE_KEY = 'kumon_game_state';
@@ -89,6 +97,8 @@ export function useGameState() {
       const item = prev.find(i => i.id === itemId);
       if (!item || item.owned) return prev;
       if (gameState.points < item.price) return prev;
+      // 아직 해금되지 않은 아이템은 구매 불가
+      if (item.unlockAt && gameState.totalCorrect < item.unlockAt) return prev;
       const updated = prev.map(i => i.id === itemId ? { ...i, owned: true } : i);
       setGameState(gs => {
         const next = { ...gs, points: gs.points - item.price, ownedItems: [...gs.ownedItems, itemId] };
@@ -97,7 +107,7 @@ export function useGameState() {
       });
       return updated;
     });
-  }, [gameState.points, save]);
+  }, [gameState.points, gameState.totalCorrect, save]);
 
   const equipItem = useCallback((itemId: string) => {
     setItems(prev => {

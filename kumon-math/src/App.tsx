@@ -235,6 +235,7 @@ export default function App() {
         <Shop
           items={items}
           points={gameState.points}
+          totalCorrect={gameState.totalCorrect}
           onBuy={buyItem}
           onEquip={equipItem}
           onClose={() => setShowShop(false)}

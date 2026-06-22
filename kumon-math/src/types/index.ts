@@ -11,10 +11,16 @@ export interface AvatarItem {
   id: string;
   name: string;
   emoji: string;
-  category: 'hat' | 'accessory' | 'background' | 'outfit';
+  category: 'hat' | 'accessory' | 'background' | 'outfit' | 'special';
   price: number;
   owned: boolean;
   equipped: boolean;
+  /** public/avatar/ 폴더의 이미지 파일명. 있으면 이모지 대신 그림으로 표시 */
+  image?: string;
+  /** 이 정답 개수 이상 풀어야 상점에 열림 (없으면 처음부터 구매 가능) */
+  unlockAt?: number;
+  /** true면 아바타 전체를 이 그림으로 교체 (전설의 아바타) */
+  fullImage?: boolean;
 }
 
 export interface GameState {

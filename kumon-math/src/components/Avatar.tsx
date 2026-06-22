@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AvatarItem } from '../types';
 
 type AvatarMood = 'idle' | 'happy' | 'sad' | 'thinking';
@@ -7,6 +7,26 @@ interface Props {
   items: AvatarItem[];
   mood: AvatarMood;
   size?: 'small' | 'large';
+}
+
+const ASSET_BASE = `${process.env.PUBLIC_URL}/avatar/`;
+
+/** 이미지가 있으면 그림으로, 없거나 로딩 실패하면 이모지로 자동 표시 */
+function AssetImg({ file, emoji, fontSize, imgStyle }: {
+  file?: string; emoji: string; fontSize: number; imgStyle?: React.CSSProperties;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (file && !failed) {
+    return (
+      <img
+        src={ASSET_BASE + file}
+        alt=""
+        onError={() => setFailed(true)}
+        style={{ display: 'block', ...imgStyle }}
+      />
+    );
+  }
+  return <span style={{ fontSize, lineHeight: 1 }}>{emoji}</span>;
 }
 
 function Face({ mood, scale = 1 }: { mood: AvatarMood; scale?: number }) {
@@ -104,14 +124,42 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
   const hat = equipped.find(i => i.category === 'hat');
   const acc = equipped.find(i => i.category === 'accessory');
   const outfit = equipped.find(i => i.category === 'outfit');
+  const specials = equipped.filter(i => i.category === 'special');
+  const fullAvatar = specials.find(i => i.fullImage);
+  // 전체 그림이 아닌 special 조각들(왕관/목걸이/날개 등)은 그림 레이어로 덧씌움
+  const specialLayers = specials.filter(i => !i.fullImage && i.image);
 
   const isSmall = size === 'small';
   const W = isSmall ? 70 : 130;
   const H = isSmall ? 95 : 175;
   const s = isSmall ? 0.54 : 1;
 
+  const [fullFailed, setFullFailed] = useState(false);
+
   const outfitColors = outfit ? (OUTFIT_COLORS[outfit.id] || OUTFIT_COLORS.default) : OUTFIT_COLORS.default;
   const hairColor = hat ? (HAIR_COLORS[hat.id] || '#4a3728') : '#4a3728';
+
+  // ✨ 전설의 아바타(다이아 요정) 착용 시: 그림 한 장으로 전체 교체
+  if (fullAvatar && fullAvatar.image && !fullFailed) {
+    return (
+      <div style={{ position: 'relative', width: W, height: H, flexShrink: 0 }}>
+        {bg && (
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: isSmall ? 12 : 20,
+            background: 'linear-gradient(160deg,#fbc2eb,#a6c1ee)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: isSmall ? 36 : 60, zIndex: 0,
+          }}>{bg.emoji}</div>
+        )}
+        <img
+          src={ASSET_BASE + fullAvatar.image}
+          alt=""
+          onError={() => setFullFailed(true)}
+          style={{ position: 'relative', zIndex: 1, width: W, height: H, objectFit: 'contain' }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -207,6 +255,22 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
           <text x={60*s} y={78*s} fontSize={isSmall ? 14 : 18} textAnchor="middle">{acc.emoji}</text>
         )}
       </svg>
+
+      {/* 💎 전설 조각 레이어 (왕관/목걸이/날개 등) — 그림이 있으면 아바타 위에 겹쳐 표시 */}
+      {specialLayers.map(item => (
+        <div key={item.id} style={{
+          position: 'absolute', inset: 0, zIndex: 2,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none',
+        }}>
+          <AssetImg
+            file={item.image}
+            emoji={item.emoji}
+            fontSize={isSmall ? 22 : 40}
+            imgStyle={{ width: W, height: H, objectFit: 'contain' }}
+          />
+        </div>
+      ))}
     </div>
   );
 }
