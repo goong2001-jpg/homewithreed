@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AvatarItem } from '../types';
+import BgRemoveImg from './BgRemoveImg';
 
 type AvatarMood = 'idle' | 'happy' | 'sad' | 'thinking';
 
@@ -11,22 +12,22 @@ interface Props {
 
 const ASSET_BASE = `${process.env.PUBLIC_URL}/avatar/`;
 
-/** 이미지가 있으면 그림으로, 없거나 로딩 실패하면 이모지로 자동 표시 */
-function AssetImg({ file, emoji, fontSize, imgStyle }: {
-  file?: string; emoji: string; fontSize: number; imgStyle?: React.CSSProperties;
+/** 이미지가 있으면 배경 제거 후 표시, 없거나 로딩 실패 시 이모지로 자동 대체 */
+function AssetImg({ item, fontSize, imgStyle }: {
+  item: AvatarItem; fontSize: number; imgStyle?: React.CSSProperties;
 }) {
   const [failed, setFailed] = useState(false);
-  if (file && !failed) {
+  if (item.image && !failed) {
     return (
-      <img
-        src={ASSET_BASE + file}
-        alt=""
+      <BgRemoveImg
+        src={ASSET_BASE + item.image}
+        bgRemoval={item.bgRemoval ?? 'none'}
         onError={() => setFailed(true)}
         style={{ display: 'block', ...imgStyle }}
       />
     );
   }
-  return <span style={{ fontSize, lineHeight: 1 }}>{emoji}</span>;
+  return <span style={{ fontSize, lineHeight: 1 }}>{item.emoji}</span>;
 }
 
 function Face({ mood, scale = 1 }: { mood: AvatarMood; scale?: number }) {
@@ -151,9 +152,9 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
             fontSize: isSmall ? 36 : 60, zIndex: 0,
           }}>{bg.emoji}</div>
         )}
-        <img
+        <BgRemoveImg
           src={ASSET_BASE + fullAvatar.image}
-          alt=""
+          bgRemoval={fullAvatar.bgRemoval ?? 'none'}
           onError={() => setFullFailed(true)}
           style={{ position: 'relative', zIndex: 1, width: W, height: H, objectFit: 'contain' }}
         />
@@ -264,8 +265,7 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
           pointerEvents: 'none',
         }}>
           <AssetImg
-            file={item.image}
-            emoji={item.emoji}
+            item={item}
             fontSize={isSmall ? 22 : 40}
             imgStyle={{ width: W, height: H, objectFit: 'contain' }}
           />

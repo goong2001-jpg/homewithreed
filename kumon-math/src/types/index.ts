@@ -19,7 +19,9 @@ export interface AvatarItem {
   image?: string;
   /** 이 정답 개수 이상 풀어야 상점에 열림 (없으면 처음부터 구매 가능) */
   unlockAt?: number;
-  /** true면 아바타 전체를 이 그림으로 교체 (전설의 아바타) */
+  /** 배경 제거 방식: 'none'=투명, 'white'=흰배경, 'black'=검정배경, 'green'=초록크로마키 */
+  bgRemoval?: 'none' | 'white' | 'black' | 'green';
+  /** true면 아바타 전체를 이 그림으로 교체 (전설의 완성 아바타) */
   fullImage?: boolean;
 }
 

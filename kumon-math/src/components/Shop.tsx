@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { AvatarItem } from '../types';
 import Avatar from './Avatar';
+import BgRemoveImg from './BgRemoveImg';
 import { playPurchase, playClick } from '../utils/sounds';
+
+const ASSET_BASE = `${process.env.PUBLIC_URL}/avatar/`;
 
 interface Props {
   items: AvatarItem[];
@@ -124,8 +127,16 @@ export default function Shop({ items, points, totalCorrect, onBuy, onEquip, onCl
                   position: 'relative',
                 }}
               >
-                <div style={{ fontSize: 38, marginBottom: 6, filter: locked ? 'grayscale(1)' : 'none' }}>
-                  {locked ? '🔒' : (bought === item.id ? '🎉' : item.emoji)}
+                <div style={{ height: 52, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', filter: locked ? 'grayscale(1) opacity(0.6)' : 'none' }}>
+                  {locked ? (
+                    <span style={{ fontSize: 38 }}>🔒</span>
+                  ) : bought === item.id ? (
+                    <span style={{ fontSize: 38 }}>🎉</span>
+                  ) : item.image ? (
+                    <BgRemoveImg src={ASSET_BASE + item.image} bgRemoval={item.bgRemoval ?? 'none'} style={{ width: 52, height: 52, objectFit: 'contain' }} />
+                  ) : (
+                    <span style={{ fontSize: 38 }}>{item.emoji}</span>
+                  )}
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>{item.name}</div>
                 {locked ? (
