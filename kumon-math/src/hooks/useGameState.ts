@@ -2,19 +2,25 @@ import { useState, useCallback } from 'react';
 import { GameState, AvatarItem } from '../types';
 
 const INITIAL_ITEMS: AvatarItem[] = [
-  { id: 'hat_flower', name: '꽃 머리띠', emoji: '🌸', category: 'hat', price: 60, owned: false, equipped: false },
-  { id: 'hat_star', name: '별 머리핀', emoji: '⭐', category: 'hat', price: 80, owned: false, equipped: false },
-  { id: 'hat_wizard', name: '마법사 모자', emoji: '🎩', category: 'hat', price: 100, owned: false, equipped: false },
-  { id: 'hat_crown', name: '황금 왕관', emoji: '👑', category: 'hat', price: 200, owned: false, equipped: false },
-  { id: 'acc_bow', name: '리본', emoji: '🎀', category: 'accessory', price: 50, owned: false, equipped: false },
-  { id: 'acc_necklace', name: '목걸이', emoji: '📿', category: 'accessory', price: 110, owned: false, equipped: false },
-  { id: 'acc_glasses', name: '하트 안경', emoji: '🥰', category: 'accessory', price: 130, owned: false, equipped: false },
-  { id: 'bg_stars', name: '별빛 배경', emoji: '✨', category: 'background', price: 140, owned: false, equipped: false },
-  { id: 'bg_flowers', name: '꽃밭 배경', emoji: '🌷', category: 'background', price: 170, owned: false, equipped: false },
-  { id: 'bg_rainbow', name: '무지개 배경', emoji: '🌈', category: 'background', price: 200, owned: false, equipped: false },
-  { id: 'outfit_superhero', name: '슈퍼히어로', emoji: '🦸', category: 'outfit', price: 220, owned: false, equipped: false },
-  { id: 'outfit_princess', name: '공주 드레스', emoji: '👸', category: 'outfit', price: 260, owned: false, equipped: false },
-  { id: 'outfit_unicorn', name: '유니콘 드레스', emoji: '🦄', category: 'outfit', price: 300, owned: false, equipped: false },
+  // 🐾 펫 — 요정 옆에 따라다니는 친구
+  { id: 'pet_rabbit',  name: '토끼',   emoji: '🐰', category: 'pet', price: 40,  owned: false, equipped: false, unlockAt: 3 },
+  { id: 'pet_cat',     name: '고양이', emoji: '🐱', category: 'pet', price: 60,  owned: false, equipped: false, unlockAt: 6 },
+  { id: 'pet_fox',     name: '여우',   emoji: '🦊', category: 'pet', price: 90,  owned: false, equipped: false, unlockAt: 12 },
+  { id: 'pet_unicorn', name: '유니콘', emoji: '🦄', category: 'pet', price: 120, owned: false, equipped: false, unlockAt: 20 },
+  { id: 'pet_dragon',  name: '아기용', emoji: '🐲', category: 'pet', price: 160, owned: false, equipped: false, unlockAt: 30 },
+
+  // 🌈 배경 — 화면 배경 장면이 통째로 바뀜
+  { id: 'bg_stars',   name: '별밤 하늘', emoji: '🌙', category: 'background', price: 50,  owned: false, equipped: false, unlockAt: 5 },
+  { id: 'bg_flowers', name: '꽃밭',     emoji: '🌷', category: 'background', price: 70,  owned: false, equipped: false, unlockAt: 10 },
+  { id: 'bg_ocean',   name: '바닷속',   emoji: '🐠', category: 'background', price: 100, owned: false, equipped: false, unlockAt: 18 },
+  { id: 'bg_rainbow', name: '무지개',   emoji: '🌈', category: 'background', price: 130, owned: false, equipped: false, unlockAt: 28 },
+  { id: 'bg_space',   name: '우주',     emoji: '🪐', category: 'background', price: 160, owned: false, equipped: false, unlockAt: 40 },
+
+  // ✨ 효과 — 아바타 주위에 반짝이는 마법 효과
+  { id: 'fx_sparkle', name: '반짝이',   emoji: '✨', category: 'effect', price: 45,  owned: false, equipped: false, unlockAt: 4 },
+  { id: 'fx_hearts',  name: '하트뿅뿅', emoji: '💕', category: 'effect', price: 75,  owned: false, equipped: false, unlockAt: 9 },
+  { id: 'fx_stars',   name: '별가루',   emoji: '🌟', category: 'effect', price: 110, owned: false, equipped: false, unlockAt: 16 },
+  { id: 'fx_bubbles', name: '비눗방울', emoji: '🫧', category: 'effect', price: 140, owned: false, equipped: false, unlockAt: 26 },
 
   // 💎 전설의 컬렉션 — 문제를 풀수록 한 조각씩 열려요 (정답 개수로 해금)
   { id: 'diana_crown',    name: '보석 왕관',    emoji: '👑', category: 'special', price: 120, owned: false, equipped: false, unlockAt: 15,  image: 'diana_crown.png',    bgRemoval: 'green' },
