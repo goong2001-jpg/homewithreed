@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>디아블로4 빌드 관리</title>
+<style>
+/* =========================================================
+   디아블로풍 다크 테마
+   - 짙은 차콜 배경 + 붉은 강조(#c0392b) + 황금 포인트(#d4af37)
+   - 외부 리소스 없이 순수 CSS만 사용
+   ========================================================= */
+:root{
+  --bg:#1a1614;            /* 가장 어두운 배경 */
+  --bg2:#221d1a;           /* 패널 배경 */
+  --bg3:#2c2520;           /* 카드 배경 */
+  --line:#3a302a;          /* 경계선 */
+  --red:#c0392b;           /* 붉은 강조 */
+  --red2:#e74c3c;          /* 밝은 붉은색 */
+  --gold:#d4af37;          /* 황금 포인트 */
+  --gold2:#f1c40f;         /* 밝은 황금 */
+  --txt:#e8e0d5;           /* 기본 글자색 */
+  --txt2:#a99e90;          /* 보조 글자색 */
+  --green:#27ae60;         /* 완료/성공 */
+  --radius:8px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--txt);
+  font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",sans-serif;
+  font-size:15px;
+  line-height:1.5;
+  /* 배경에 은은한 비네팅 */
+  background-image:radial-gradient(ellipse at top,#2a221d 0%,var(--bg) 70%);
+  min-height:100vh;
+}
+
+/* ---------- 헤더 ---------- */
+header{
+  background:linear-gradient(180deg,#2c1512,#1a1614);
+  border-bottom:2px solid var(--red);
+  padding:12px 16px;
+  position:sticky;top:0;z-index:50;
+  box-shadow:0 2px 12px rgba(0,0,0,.6);
+}
+header h1{
+  margin:0;font-size:20px;letter-spacing:1px;
+  color:var(--gold);
+  text-shadow:0 0 8px rgba(192,57,43,.6);
+  display:flex;align-items:center;gap:8px;
+}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+
+/* ---------- 버튼 ---------- */
+button{
+  font-family:inherit;font-size:14px;
+  background:var(--bg3);
+  color:var(--txt);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:10px 14px;          /* 터치 친화 크기 */
+  min-height:42px;
+  cursor:pointer;
+  transition:.15s;
+  user-select:none;
+}
+button:hover{background:#3a302a;border-color:var(--gold);}
+button:active{transform:scale(.97);}
+.btn-red{background:var(--red);border-color:var(--red2);color:#fff;font-weight:bold;}
+.btn-red:hover{background:var(--red2);}
+.btn-gold{background:linear-gradient(180deg,var(--gold2),var(--gold));border-color:#b8941f;color:#2a221d;font-weight:bold;}
+.btn-gold:hover{filter:brightness(1.1);}
+.btn-ghost{background:transparent;}
+.btn-sm{padding:6px 10px;min-height:34px;font-size:13px;}
+.btn-danger{color:var(--red2);}
+.btn-danger:hover{background:#3a1f1c;border-color:var(--red2);}
+
+/* ---------- 입력 ---------- */
+input,select,textarea{
+  font-family:inherit;font-size:14px;
+  background:#14110f;
+  color:var(--txt);
+  border:1px solid var(--line);
+  border-radius:6px;
+  padding:9px 10px;
+  width:100%;
+  min-height:40px;
+}
+input:focus,select:focus,textarea:focus{
+  outline:none;border-color:var(--gold);box-shadow:0 0 0 2px rgba(212,175,55,.2);
+}
+textarea{resize:vertical;min-height:80px;line-height:1.5;}
+label{font-size:13px;color:var(--txt2);display:block;margin-bottom:4px;}
+
+/* ---------- 레이아웃 ---------- */
+.layout{display:flex;gap:14px;padding:14px;align-items:flex-start;}
+.sidebar{
+  flex:0 0 300px;
+  background:var(--bg2);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:12px;
+  position:sticky;top:78px;
+  max-height:calc(100vh - 92px);
+  overflow-y:auto;
+}
+.detail{flex:1;min-width:0;}
+
+/* 모바일: 상하 스택 */
+@media(max-width:820px){
+  .layout{flex-direction:column;padding:10px;}
+  .sidebar{flex:none;width:100%;position:static;max-height:none;}
+}
+
+/* ---------- 빌드 목록 ---------- */
+.filters{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+.filters-row{display:flex;gap:8px;}
+.filters-row select{flex:1;}
+.build-list{display:flex;flex-direction:column;gap:8px;}
+.build-item{
+  background:var(--bg3);
+  border:1px solid var(--line);
+  border-left:4px solid var(--line);
+  border-radius:6px;
+  padding:10px;cursor:pointer;transition:.15s;
+}
+.build-item:hover{border-color:var(--gold);}
+.build-item.active{border-left-color:var(--red);background:#33231f;box-shadow:0 0 0 1px var(--red);}
+.build-item .bi-name{font-weight:bold;font-size:15px;color:var(--gold);}
+.build-item .bi-meta{font-size:12px;color:var(--txt2);margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;}
+.tag{background:#14110f;border:1px solid var(--line);border-radius:10px;padding:1px 8px;font-size:11px;}
+.tag.cls{color:var(--red2);border-color:var(--red);}
+.tag.season{color:var(--gold);border-color:#7a6420;}
+
+/* ---------- 섹션(상세) ---------- */
+.panel{
+  background:var(--bg2);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  margin-bottom:14px;
+  overflow:hidden;
+}
+.panel-head{
+  background:linear-gradient(180deg,#2c2520,#221d1a);
+  padding:11px 14px;
+  font-weight:bold;color:var(--gold);
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  cursor:pointer;
+}
+.panel-head .ph-title{display:flex;align-items:center;gap:8px;}
+.panel-body{padding:14px;}
+.panel.collapsed .panel-body{display:none;}
+.chevron{transition:.2s;color:var(--txt2);}
+.panel.collapsed .chevron{transform:rotate(-90deg);}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media(max-width:520px){.grid2{grid-template-columns:1fr;}}
+
+/* ---------- 스킬 행 ---------- */
+.skill-row{
+  display:grid;grid-template-columns:1fr auto 1fr auto;gap:8px;align-items:center;
+  background:var(--bg3);border:1px solid var(--line);border-radius:6px;
+  padding:8px;margin-bottom:8px;
+}
+@media(max-width:680px){
+  .skill-row{grid-template-columns:1fr auto;grid-template-areas:"name pts" "memo memo";}
+  .skill-row .sr-name{grid-area:name;} .skill-row .sr-pts{grid-area:pts;}
+  .skill-row .sr-memo{grid-area:memo;} .skill-row .sr-del{grid-area:pts;}
+}
+.pts-ctrl{display:flex;align-items:center;gap:4px;}
+.pts-ctrl button{min-width:38px;min-height:38px;padding:0;font-size:18px;font-weight:bold;}
+.pts-ctrl input{width:52px;text-align:center;padding:6px;}
+.pts-total{
+  margin-top:6px;font-weight:bold;color:var(--gold);
+  background:#14110f;border:1px solid #7a6420;border-radius:6px;
+  padding:8px 12px;display:inline-block;
+}
+
+/* ---------- 장비 슬롯 ---------- */
+.gear-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
+.gear-card{
+  background:var(--bg3);border:1px solid var(--line);border-radius:8px;padding:10px;
+  transition:.15s;
+}
+.gear-card.done{border-color:var(--green);background:#1c2a1f;box-shadow:0 0 0 1px var(--green);}
+.gear-card .gc-slot{font-weight:bold;color:var(--gold);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}
+.gear-card .gc-slot .done-mark{color:var(--green);font-size:18px;}
+.gear-card input,.gear-card textarea{margin-bottom:6px;font-size:13px;}
+.gc-foot{display:flex;align-items:center;gap:8px;justify-content:space-between;}
+.mw{display:flex;align-items:center;gap:4px;}
+.mw input{width:54px;text-align:center;}
+.chk{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;user-select:none;}
+.chk input{width:auto;min-height:auto;width:20px;height:20px;accent-color:var(--green);}
+
+/* ---------- 게이지(경험치 바 느낌) ---------- */
+.gauge{
+  background:#14110f;border:1px solid var(--line);border-radius:20px;height:22px;
+  overflow:hidden;position:relative;margin:8px 0;
+}
+.gauge .fill{
+  height:100%;
+  background:linear-gradient(90deg,var(--red),var(--gold2));
+  width:0;transition:width .4s ease;
+  box-shadow:0 0 10px rgba(212,175,55,.5) inset;
+}
+.gauge .label{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:bold;color:#fff;text-shadow:0 1px 2px #000;
+}
+
+/* ---------- 파밍 체크리스트 ---------- */
+.farm-row{display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--line);border-radius:6px;padding:8px;margin-bottom:6px;}
+.farm-row .fr-name{flex:1;}
+.farm-row.done .fr-name{text-decoration:line-through;color:var(--txt2);}
+
+/* ---------- 비교 모드 ---------- */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:680px){.compare-grid{grid-template-columns:1fr;}}
+.compare-col{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:12px;}
+.compare-col h3{margin:0 0 8px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px;}
+.cmp-list{font-size:13px;}
+.cmp-list .ci{display:flex;justify-content:space-between;border-bottom:1px dashed var(--line);padding:4px 0;}
+.cmp-sub{color:var(--red2);font-weight:bold;margin:10px 0 4px;font-size:13px;}
+
+/* ---------- 모달 ---------- */
+.modal-bg{
+  position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;
+  display:none;align-items:center;justify-content:center;padding:16px;
+}
+.modal-bg.show{display:flex;}
+.modal{
+  background:var(--bg2);border:1px solid var(--gold);border-radius:10px;
+  padding:18px;max-width:640px;width:100%;max-height:90vh;overflow-y:auto;
+  box-shadow:0 0 30px rgba(0,0,0,.8);
+}
+.modal h2{margin:0 0 12px;color:var(--gold);font-size:18px;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;}
+
+/* ---------- 토스트 알림 ---------- */
+#toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:var(--bg3);border:1px solid var(--gold);color:var(--txt);
+  padding:12px 20px;border-radius:8px;z-index:200;opacity:0;pointer-events:none;
+  transition:.3s;box-shadow:0 4px 20px rgba(0,0,0,.6);font-size:14px;
+}
+#toast.show{opacity:1;bottom:30px;}
+
+/* ---------- 기타 ---------- */
+.empty{text-align:center;color:var(--txt2);padding:40px 16px;}
+.section-add{margin-top:8px;}
+.row-flex{display:flex;gap:8px;align-items:center;}
+.muted{color:var(--txt2);font-size:13px;}
+.title-edit{font-size:20px;font-weight:bold;color:var(--gold);background:transparent;border:none;border-bottom:1px dashed var(--line);padding:4px 0;}
+.title-edit:focus{border-bottom-color:var(--gold);box-shadow:none;}
+.del-x{background:transparent;border:none;color:var(--red2);font-size:18px;min-height:auto;padding:4px 8px;}
+.del-x:hover{background:#3a1f1c;}
+.hidden{display:none!important;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚔️ 디아블로4 빌드 관리</h1>
+  <div class="header-actions">
+    <button class="btn-red" id="btnNew">➕ 새 빌드</button>
+    <button id="btnCompare">⚖️ 비교 모드</button>
+    <button id="btnExport">📤 내보내기</button>
+    <button id="btnImport">📥 가져오기</button>
+    <button class="btn-ghost btn-danger" id="btnReset">🗑️ 초기화</button>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- ===== 좌측: 빌드 목록 + 필터 ===== -->
+  <aside class="sidebar">
+    <div class="filters">
+      <input type="search" id="searchInput" placeholder="🔍 빌드 이름 검색">
+      <div class="filters-row">
+        <select id="filterClass"><option value="">전체 직업</option></select>
+        <select id="filterSeason"><option value="">전체 시즌</option></select>
+      </div>
+    </div>
+    <div class="build-list" id="buildList"></div>
+  </aside>
+
+  <!-- ===== 우측: 상세 편집 ===== -->
+  <main class="detail" id="detail">
+    <div class="empty">왼쪽에서 빌드를 선택하거나<br>새 빌드를 생성하세요. ⚔️</div>
+  </main>
+</div>
+
+<!-- ===== 모달(공용) ===== -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal" id="modalBox"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* =========================================================================
+   디아블로4 빌드 관리 - 순수 vanilla JS
+   - 데이터는 localStorage(키: D4_BUILDS_V1)에 저장
+   - 모든 저장/로드는 try-catch 로 보호
+   ========================================================================= */
+
+"use strict";
+
+// 저장소 키
+const STORE_KEY = "D4_BUILDS_V1";
+
+// 직업 목록(드롭다운)
+const CLASSES = ["바바리안","소서러","드루이드","로그","네크로맨서","스피릿본","팔라딘"];
+
+// 장비 슬롯 정의(고정 10슬롯) - {key, 라벨, 이모지}
+const GEAR_SLOTS = [
+  {key:"helm",   name:"투구",     icon:"🪖"},
+  {key:"chest",  name:"흉갑",     icon:"🛡️"},
+  {key:"gloves", name:"장갑",     icon:"🧤"},
+  {key:"pants",  name:"바지",     icon:"👖"},
+  {key:"boots",  name:"신발",     icon:"🥾"},
+  {key:"weapon", name:"무기",     icon:"⚔️"},
+  {key:"offhand",name:"보조무기", icon:"🗡️"},
+  {key:"amulet", name:"목걸이",   icon:"📿"},
+  {key:"ring1",  name:"반지1",    icon:"💍"},
+  {key:"ring2",  name:"반지2",    icon:"💍"},
+];
+
+// ---- 전역 상태 ----
+let state = {
+  builds: [],          // 빌드 배열
+  selectedId: null,    // 현재 선택된 빌드 id
+  search: "",
+  filterClass: "",
+  filterSeason: "",
+};
+
+/* =========================================================================
+   유틸
+   ========================================================================= */
+
+// 고유 id 생성
+function uid(){
+  return "b_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7);
+}
+
+// HTML 이스케이프(XSS/렌더 안전)
+function esc(s){
+  return String(s==null?"":s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+// 토스트 알림
+let toastTimer=null;
+function toast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove("show"),2200);
+}
+
+/* =========================================================================
+   저장 / 로드 (try-catch 에러 처리)
+   ========================================================================= */
+
+// localStorage 에 저장
+function save(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(state.builds));
+  }catch(e){
+    console.error("저장 실패:", e);
+    toast("⚠️ 저장에 실패했습니다(저장공간 확인).");
+  }
+}
+
+// localStorage 에서 로드 - 깨졌을 경우 빈 배열 반환
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return null;                 // 데이터 없음(첫 실행)
+    const data = JSON.parse(raw);
+    if(!Array.isArray(data)) throw new Error("형식 오류: 배열 아님");
+    return data;
+  }catch(e){
+    console.error("로드 실패(데이터 손상):", e);
+    toast("⚠️ 저장 데이터가 손상되었습니다. 초기화를 권장합니다.");
+    return null;
+  }
+}
+
+/* =========================================================================
+   빌드 객체 생성 / 정규화
+   ========================================================================= */
+
+// 빈 장비 슬롯 객체
+function emptyGear(){
+  const g={};
+  GEAR_SLOTS.forEach(s=>{
+    g[s.key]={ item:"", temper:"", masterwork:0, done:false };
+  });
+  return g;
+}
+
+// 새 빈 빌드 생성
+function newBuild(){
+  return {
+    id: uid(),
+    name: "새 빌드",
+    cls: CLASSES[0],
+    season: "",
+    skills: [],          // { 스킬명, 포인트, 메모 }
+    paragon: "",         // 패러곤 자유 메모
+    gear: emptyGear(),   // 슬롯별 장비
+    farming: [],         // { 항목명, 완료여부 }
+    notes: "",           // 노트
+  };
+}
+
+// 불러온 데이터의 누락 필드 보정(버전 호환)
+function normalize(b){
+  const base = newBuild();
+  const out = Object.assign(base, b);
+  out.skills = Array.isArray(b.skills)? b.skills.map(s=>({
+    name:s.name||"", points:Math.max(0,Math.min(5,Number(s.points)||0)), memo:s.memo||""
+  })) : [];
+  out.farming = Array.isArray(b.farming)? b.farming.map(f=>({
+    name:f.name||"", done:!!f.done
+  })) : [];
+  // 장비 슬롯 보정
+  const g = emptyGear();
+  if(b.gear && typeof b.gear==="object"){
+    GEAR_SLOTS.forEach(s=>{
+      const src=b.gear[s.key];
+      if(src) g[s.key]={
+        item:src.item||"", temper:src.temper||"",
+        masterwork:Math.max(0,Number(src.masterwork)||0), done:!!src.done
+      };
+    });
+  }
+  out.gear=g;
+  if(!out.id) out.id=uid();
+  return out;
+}
+
+/* =========================================================================
+   첫 실행 샘플 빌드(소환 네크로맨서)
+   ========================================================================= */
+function sampleBuild(){
+  const b = newBuild();
+  b.name = "소환 네크로 (예시)";
+  b.cls = "네크로맨서";
+  b.season = "S5";
+  b.skills = [
+    {name:"사령술사(스켈레톤 워리어)", points:5, memo:"기본 미니언 강화"},
+    {name:"골렘 소환", points:1, memo:"철골렘 - 강타 / 도발 active"},
+    {name:"시체 폭발", points:3, memo:"강화: 부패 / 보조: 곪은"},
+    {name:"부패의 일격", points:5, memo:"자원 생성기"},
+    {name:"군대 소환(궁극)", points:1, memo:"쿨마다 사용, 폭딜용"},
+    {name:"불사군단(키패시브)", points:1, memo:"미니언 피해 증가"},
+  ];
+  b.paragon = "보드: 시작 → 피의 시작 → 죽음의 정수\n글리프: 지배(미니언), 보호자, 핏빛\n핵심 노드 위주로 마법능력치 25 확보";
+  // 장비 예시 일부 채우기
+  b.gear.helm   ={ item:"고유: 데스리스 위저드(가능 시)", temper:"미니언 피해%", masterwork:4, done:true };
+  b.gear.weapon ={ item:"어스펙트: 폭발하는 송장", temper:"극대화 피해", masterwork:8, done:true };
+  b.gear.amulet ={ item:"어스펙트: 지배의(미니언)", temper:"이동속도", masterwork:5, done:false };
+  b.gear.ring1  ={ item:"어스펙트: 쇄도하는 송장", temper:"부패 피해", masterwork:0, done:false };
+  b.farming = [
+    {name:"군대 소환 점화 아스펙트 추출", done:true},
+    {name:"고유템 데스리스 위저드 파밍", done:false},
+    {name:"글리프 21레벨까지 강화", done:false},
+    {name:"마스터워킹 재료(에스파스) 모으기", done:false},
+  ];
+  b.notes = "■ 로테이션\n1) 군대 소환 → 2) 골렘 강타 → 3) 시체 폭발 난사\n\n■ 레벨링 순서\n부패의 일격 → 스켈레톤 → 시체 폭발 순으로 투자\n\n■ 스탯 우선순위\n지능 > 미니언 피해% > 극대화 피해 > 공격 속도";
+  return b;
+}
+
+/* =========================================================================
+   초기화 (앱 시작)
+   ========================================================================= */
+function init(){
+  const loaded = load();
+  if(loaded===null){
+    // 손상되었거나 첫 실행 → 빈 배열로 두되, 진짜 첫 실행이면 샘플 추가
+    if(localStorage.getItem(STORE_KEY)===null){
+      state.builds = [ normalize(sampleBuild()) ];  // 첫 실행 샘플
+      save();
+    }else{
+      state.builds = [];  // 손상된 경우
+    }
+  }else{
+    state.builds = loaded.map(normalize);
+  }
+  // 첫 빌드 선택
+  if(state.builds.length) state.selectedId = state.builds[0].id;
+
+  fillFilterDropdowns();
+  renderList();
+  renderDetail();
+  bindHeader();
+}
+
+// 현재 선택 빌드 반환
+function getSelected(){
+  return state.builds.find(b=>b.id===state.selectedId) || null;
+}
+
+/* =========================================================================
+   필터 드롭다운 채우기
+   ========================================================================= */
+function fillFilterDropdowns(){
+  const fc=document.getElementById("filterClass");
+  const fs=document.getElementById("filterSeason");
+  // 직업: 고정 목록
+  fc.innerHTML='<option value="">전체 직업</option>'+
+    CLASSES.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  // 시즌: 데이터에서 수집
+  const seasons=[...new Set(state.builds.map(b=>b.season).filter(Boolean))].sort();
+  fs.innerHTML='<option value="">전체 시즌</option>'+
+    seasons.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join("");
+  fc.value=state.filterClass; fs.value=state.filterSeason;
+}
+
+/* =========================================================================
+   좌측 목록 렌더
+   ========================================================================= */
+function renderList(){
+  const list=document.getElementById("buildList");
+  // 필터 적용
+  let arr=state.builds.filter(b=>{
+    if(state.filterClass && b.cls!==state.filterClass) return false;
+    if(state.filterSeason && b.season!==state.filterSeason) return false;
+    if(state.search && !b.name.toLowerCase().includes(state.search.toLowerCase())) return false;
+    return true;
+  });
+
+  if(!arr.length){
+    list.innerHTML='<div class="empty muted">조건에 맞는 빌드가 없습니다.</div>';
+    return;
+  }
+
+  list.innerHTML=arr.map(b=>{
+    const total=b.skills.reduce((s,x)=>s+(Number(x.points)||0),0);
+    const gearDone=b.gear ? GEAR_SLOTS.filter(s=>b.gear[s.key].done).length : 0;
+    return `<div class="build-item ${b.id===state.selectedId?'active':''}" data-id="${b.id}">
+      <div class="bi-name">${esc(b.name)}</div>
+      <div class="bi-meta">
+        <span class="tag cls">${esc(b.cls)}</span>
+        ${b.season?`<span class="tag season">${esc(b.season)}</span>`:""}
+        <span class="tag">🌟${total}p</span>
+        <span class="tag">🛡️${gearDone}/10</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  // 클릭 바인딩
+  list.querySelectorAll(".build-item").forEach(el=>{
+    el.addEventListener("click",()=>{
+      state.selectedId=el.dataset.id;
+      renderList(); renderDetail();
+      // 모바일에서 상세로 스크롤
+      if(window.innerWidth<=820){
+        document.getElementById("detail").scrollIntoView({behavior:"smooth"});
+      }
+    });
+  });
+}
+
+/* =========================================================================
+   우측 상세 렌더
+   ========================================================================= */
+function renderDetail(){
+  const root=document.getElementById("detail");
+  const b=getSelected();
+  if(!b){
+    root.innerHTML='<div class="empty">왼쪽에서 빌드를 선택하거나<br>새 빌드를 생성하세요. ⚔️</div>';
+    return;
+  }
+
+  const totalPts=b.skills.reduce((s,x)=>s+(Number(x.points)||0),0);
+  const gearDone=GEAR_SLOTS.filter(s=>b.gear[s.key].done).length;
+  const gearPct=Math.round(gearDone/GEAR_SLOTS.length*100);
+  const farmDone=b.farming.filter(f=>f.done).length;
+  const farmPct=b.farming.length? Math.round(farmDone/b.farming.length*100):0;
+
+  root.innerHTML=`
+  <!-- 상단: 빌드 기본정보 + 액션 -->
+  <div class="panel">
+    <div class="panel-body">
+      <div class="row-flex" style="justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <input class="title-edit" id="f_name" value="${esc(b.name)}" style="flex:1;min-width:180px;">
+        <div class="row-flex" style="gap:6px;">
+          <button class="btn-sm" id="btnDup">📋 복제</button>
+          <button class="btn-sm btn-danger" id="btnDel">🗑️ 삭제</button>
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:10px;">
+        <div>
+          <label>직업</label>
+          <select id="f_cls">${CLASSES.map(c=>`<option ${c===b.cls?"selected":""}>${esc(c)}</option>`).join("")}</select>
+        </div>
+        <div>
+          <label>시즌 태그 (예: S5, 영원)</label>
+          <input id="f_season" value="${esc(b.season)}" placeholder="시즌 입력">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 스킬트리 -->
+  ${panel("skills","🌳 스킬트리",`
+    <div id="skillRows"></div>
+    <button class="btn-sm section-add" id="btnAddSkill">➕ 스킬 추가</button>
+    <div style="margin-top:10px;"><span class="pts-total">🌟 총 ${totalPts}포인트</span></div>
+  `)}
+
+  <!-- 패러곤 -->
+  ${panel("paragon","🔷 패러곤",`
+    <label>보드 / 글리프 메모</label>
+    <textarea id="f_paragon" placeholder="보드 순서, 글리프, 핵심 노드 등을 자유롭게 메모">${esc(b.paragon)}</textarea>
+  `)}
+
+  <!-- 장비 -->
+  ${panel("gear",`🛡️ 장비 <span class="muted" style="font-weight:normal;">(완성 ${gearDone}/10)</span>`,`
+    <div class="gauge"><div class="fill" style="width:${gearPct}%"></div><div class="label">장비 완성도 ${gearPct}%</div></div>
+    <div class="gear-grid" id="gearGrid"></div>
+  `)}
+
+  <!-- 파밍 체크리스트 -->
+  ${panel("farming","📜 파밍 체크리스트",`
+    <div class="gauge"><div class="fill" style="width:${farmPct}%"></div><div class="label">완료율 ${farmPct}% (${farmDone}/${b.farming.length})</div></div>
+    <div id="farmRows"></div>
+    <div class="row-flex section-add">
+      <input id="newFarm" placeholder="새 파밍 항목 입력 후 추가">
+      <button class="btn-sm" id="btnAddFarm">➕ 추가</button>
+    </div>
+  `)}
+
+  <!-- 노트 -->
+  ${panel("notes","📝 노트 (로테이션·레벨링·스탯 우선순위)",`
+    <textarea id="f_notes" style="min-height:140px;" placeholder="로테이션, 레벨링 순서, 스탯 우선순위 등">${esc(b.notes)}</textarea>
+  `)}
+  `;
+
+  renderSkillRows(b);
+  renderGearGrid(b);
+  renderFarmRows(b);
+  bindDetail(b);
+  bindPanelToggles();
+}
+
+// 접이식 패널 HTML 헬퍼
+function panel(key,title,inner){
+  return `<div class="panel" data-panel="${key}">
+    <div class="panel-head"><span class="ph-title">${title}</span><span class="chevron">▼</span></div>
+    <div class="panel-body">${inner}</div>
+  </div>`;
+}
+
+/* ---- 스킬 행 렌더 ---- */
+function renderSkillRows(b){
+  const c=document.getElementById("skillRows");
+  if(!b.skills.length){
+    c.innerHTML='<div class="muted" style="margin-bottom:8px;">스킬을 추가하세요.</div>';
+    return;
+  }
+  c.innerHTML=b.skills.map((s,i)=>`
+    <div class="skill-row" data-i="${i}">
+      <input class="sr-name" data-k="name" value="${esc(s.name)}" placeholder="스킬명">
+      <div class="pts-ctrl sr-pts">
+        <button data-act="minus">−</button>
+        <input data-k="points" type="number" min="0" max="5" value="${Number(s.points)||0}">
+        <button data-act="plus">+</button>
+      </div>
+      <input class="sr-memo" data-k="memo" value="${esc(s.memo)}" placeholder="강화/궁극 메모">
+      <button class="del-x sr-del" data-act="del">✕</button>
+    </div>
+  `).join("");
+
+  // 이벤트 바인딩
+  c.querySelectorAll(".skill-row").forEach(row=>{
+    const i=Number(row.dataset.i);
+    row.querySelectorAll("[data-k]").forEach(inp=>{
+      inp.addEventListener("input",()=>{
+        const k=inp.dataset.k;
+        if(k==="points"){
+          let v=Math.max(0,Math.min(5,Number(inp.value)||0));
+          b.skills[i].points=v;
+          save(); updatePtsTotal(b); renderList();
+        }else{
+          b.skills[i][k]=inp.value; save();
+        }
+      });
+    });
+    row.querySelector('[data-act="minus"]').addEventListener("click",()=>{
+      b.skills[i].points=Math.max(0,(Number(b.skills[i].points)||0)-1);
+      save(); renderSkillRows(b); updatePtsTotal(b); renderList();
+    });
+    row.querySelector('[data-act="plus"]').addEventListener("click",()=>{
+      b.skills[i].points=Math.min(5,(Number(b.skills[i].points)||0)+1);
+      save(); renderSkillRows(b); updatePtsTotal(b); renderList();
+    });
+    row.querySelector('[data-act="del"]').addEventListener("click",()=>{
+      b.skills.splice(i,1); save(); renderSkillRows(b); updatePtsTotal(b); renderList();
+    });
+  });
+}
+
+// 총 포인트 표시 갱신
+function updatePtsTotal(b){
+  const total=b.skills.reduce((s,x)=>s+(Number(x.points)||0),0);
+  const el=document.querySelector(".pts-total");
+  if(el) el.textContent=`🌟 총 ${total}포인트`;
+}
+
+/* ---- 장비 그리드 렌더 ---- */
+function renderGearGrid(b){
+  const c=document.getElementById("gearGrid");
+  c.innerHTML=GEAR_SLOTS.map(s=>{
+    const g=b.gear[s.key];
+    return `<div class="gear-card ${g.done?'done':''}" data-slot="${s.key}">
+      <div class="gc-slot"><span>${s.icon} ${s.name}</span>${g.done?'<span class="done-mark">✅</span>':''}</div>
+      <input data-k="item" value="${esc(g.item)}" placeholder="고유템 / 어스펙트명">
+      <input data-k="temper" value="${esc(g.temper)}" placeholder="템퍼링 메모">
+      <div class="gc-foot">
+        <span class="mw"><span class="muted">MW</span><input data-k="masterwork" type="number" min="0" value="${Number(g.masterwork)||0}"></span>
+        <label class="chk"><input type="checkbox" data-k="done" ${g.done?"checked":""}> 완성</label>
+      </div>
+    </div>`;
+  }).join("");
+
+  c.querySelectorAll(".gear-card").forEach(card=>{
+    const slot=card.dataset.slot;
+    card.querySelectorAll("[data-k]").forEach(inp=>{
+      const k=inp.dataset.k;
+      const evt=(inp.type==="checkbox")?"change":"input";
+      inp.addEventListener(evt,()=>{
+        if(k==="done"){
+          b.gear[slot].done=inp.checked; save(); renderDetail(); renderList();
+        }else if(k==="masterwork"){
+          b.gear[slot].masterwork=Math.max(0,Number(inp.value)||0); save();
+        }else{
+          b.gear[slot][k]=inp.value; save();
+        }
+      });
+    });
+  });
+}
+
+/* ---- 파밍 행 렌더 ---- */
+function renderFarmRows(b){
+  const c=document.getElementById("farmRows");
+  if(!b.farming.length){
+    c.innerHTML='<div class="muted" style="margin:6px 0;">파밍 항목이 없습니다.</div>';
+    return;
+  }
+  c.innerHTML=b.farming.map((f,i)=>`
+    <div class="farm-row ${f.done?'done':''}" data-i="${i}">
+      <input type="checkbox" data-act="chk" ${f.done?"checked":""} style="width:22px;height:22px;accent-color:var(--green);">
+      <input class="fr-name" data-act="name" value="${esc(f.name)}">
+      <button class="del-x" data-act="del">✕</button>
+    </div>
+  `).join("");
+
+  c.querySelectorAll(".farm-row").forEach(row=>{
+    const i=Number(row.dataset.i);
+    row.querySelector('[data-act="chk"]').addEventListener("change",e=>{
+      b.farming[i].done=e.target.checked; save(); renderDetail(); renderList();
+    });
+    row.querySelector('[data-act="name"]').addEventListener("input",e=>{
+      b.farming[i].name=e.target.value; save();
+    });
+    row.querySelector('[data-act="del"]').addEventListener("click",()=>{
+      b.farming.splice(i,1); save(); renderDetail();
+    });
+  });
+}
+
+/* =========================================================================
+   상세 영역 이벤트 바인딩
+   ========================================================================= */
+function bindDetail(b){
+  // 이름
+  document.getElementById("f_name").addEventListener("input",e=>{
+    b.name=e.target.value; save(); renderList();
+  });
+  // 직업
+  document.getElementById("f_cls").addEventListener("change",e=>{
+    b.cls=e.target.value; save(); renderList();
+  });
+  // 시즌
+  document.getElementById("f_season").addEventListener("input",e=>{
+    b.season=e.target.value; save(); renderList();
+  });
+  document.getElementById("f_season").addEventListener("blur",()=>{
+    fillFilterDropdowns();   // 새 시즌 태그 드롭다운 반영
+  });
+  // 패러곤
+  document.getElementById("f_paragon").addEventListener("input",e=>{ b.paragon=e.target.value; save(); });
+  // 노트
+  document.getElementById("f_notes").addEventListener("input",e=>{ b.notes=e.target.value; save(); });
+
+  // 스킬 추가
+  document.getElementById("btnAddSkill").addEventListener("click",()=>{
+    b.skills.push({name:"",points:0,memo:""}); save(); renderSkillRows(b); updatePtsTotal(b);
+  });
+  // 파밍 추가
+  const addFarm=()=>{
+    const inp=document.getElementById("newFarm");
+    const v=inp.value.trim(); if(!v) return;
+    b.farming.push({name:v,done:false}); save(); renderDetail();
+  };
+  document.getElementById("btnAddFarm").addEventListener("click",addFarm);
+  document.getElementById("newFarm").addEventListener("keydown",e=>{ if(e.key==="Enter") addFarm(); });
+
+  // 복제
+  document.getElementById("btnDup").addEventListener("click",()=>{
+    const copy=normalize(JSON.parse(JSON.stringify(b)));
+    copy.id=uid(); copy.name=b.name+" (복사본)";
+    const idx=state.builds.findIndex(x=>x.id===b.id);
+    state.builds.splice(idx+1,0,copy);
+    state.selectedId=copy.id; save(); renderList(); renderDetail();
+    toast("빌드를 복제했습니다.");
+  });
+  // 삭제(확인)
+  document.getElementById("btnDel").addEventListener("click",()=>{
+    confirmModal(`"${b.name}" 빌드를 삭제할까요?`,"이 작업은 되돌릴 수 없습니다.",()=>{
+      state.builds=state.builds.filter(x=>x.id!==b.id);
+      state.selectedId=state.builds.length?state.builds[0].id:null;
+      save(); fillFilterDropdowns(); renderList(); renderDetail();
+      toast("빌드를 삭제했습니다.");
+    });
+  });
+}
+
+// 패널 접기/펼치기
+function bindPanelToggles(){
+  document.querySelectorAll(".panel-head").forEach(h=>{
+    h.addEventListener("click",()=>h.parentElement.classList.toggle("collapsed"));
+  });
+}
+
+/* =========================================================================
+   헤더 액션 바인딩
+   ========================================================================= */
+function bindHeader(){
+  // 새 빌드
+  document.getElementById("btnNew").addEventListener("click",()=>{
+    const b=newBuild();
+    state.builds.unshift(b); state.selectedId=b.id;
+    save(); renderList(); renderDetail();
+    document.getElementById("f_name").focus();
+    document.getElementById("f_name").select();
+  });
+  // 검색
+  document.getElementById("searchInput").addEventListener("input",e=>{
+    state.search=e.target.value; renderList();
+  });
+  // 필터
+  document.getElementById("filterClass").addEventListener("change",e=>{
+    state.filterClass=e.target.value; renderList();
+  });
+  document.getElementById("filterSeason").addEventListener("change",e=>{
+    state.filterSeason=e.target.value; renderList();
+  });
+  // 비교 / 내보내기 / 가져오기 / 초기화
+  document.getElementById("btnCompare").addEventListener("click",openCompare);
+  document.getElementById("btnExport").addEventListener("click",openExport);
+  document.getElementById("btnImport").addEventListener("click",openImport);
+  document.getElementById("btnReset").addEventListener("click",doReset);
+}
+
+/* =========================================================================
+   모달 헬퍼
+   ========================================================================= */
+function openModal(html){
+  document.getElementById("modalBox").innerHTML=html;
+  document.getElementById("modalBg").classList.add("show");
+}
+function closeModal(){
+  document.getElementById("modalBg").classList.remove("show");
+}
+// 배경 클릭 시 닫기
+document.getElementById("modalBg").addEventListener("click",e=>{
+  if(e.target.id==="modalBg") closeModal();
+});
+
+// 확인용 모달(콜백)
+function confirmModal(title,desc,onYes){
+  openModal(`
+    <h2>${esc(title)}</h2>
+    <p class="muted">${esc(desc)}</p>
+    <div class="modal-actions">
+      <button id="cmNo">취소</button>
+      <button class="btn-red" id="cmYes">확인</button>
+    </div>
+  `);
+  document.getElementById("cmNo").addEventListener("click",closeModal);
+  document.getElementById("cmYes").addEventListener("click",()=>{ closeModal(); onYes(); });
+}
+
+/* =========================================================================
+   비교 모드
+   ========================================================================= */
+function openCompare(){
+  if(state.builds.length<2){ toast("비교하려면 빌드가 2개 이상 필요합니다."); return; }
+  const opts=state.builds.map(b=>`<option value="${b.id}">${esc(b.name)} (${esc(b.cls)})</option>`).join("");
+  openModal(`
+    <h2>⚖️ 빌드 비교</h2>
+    <div class="grid2">
+      <div><label>빌드 A</label><select id="cmpA">${opts}</select></div>
+      <div><label>빌드 B</label><select id="cmpB">${opts}</select></div>
+    </div>
+    <div id="cmpResult" style="margin-top:14px;"></div>
+    <div class="modal-actions"><button id="cmpClose">닫기</button></div>
+  `);
+  const a=document.getElementById("cmpA"), bb=document.getElementById("cmpB");
+  a.selectedIndex=0; bb.selectedIndex=Math.min(1,state.builds.length-1);
+  const draw=()=>renderCompare(a.value,bb.value);
+  a.addEventListener("change",draw); bb.addEventListener("change",draw);
+  document.getElementById("cmpClose").addEventListener("click",closeModal);
+  draw();
+}
+
+function renderCompare(idA,idB){
+  const A=state.builds.find(b=>b.id===idA);
+  const B=state.builds.find(b=>b.id===idB);
+  const out=document.getElementById("cmpResult");
+  if(!A||!B){ out.innerHTML=""; return; }
+  out.innerHTML=`<div class="compare-grid">${col(A)}${col(B)}</div>`;
+
+  function col(b){
+    const total=b.skills.reduce((s,x)=>s+(Number(x.points)||0),0);
+    const skills=b.skills.length
+      ? b.skills.map(s=>`<div class="ci"><span>${esc(s.name||"(이름없음)")}</span><span>🌟${Number(s.points)||0}</span></div>`).join("")
+      : '<div class="muted">스킬 없음</div>';
+    const gear=GEAR_SLOTS.map(s=>{
+      const g=b.gear[s.key];
+      return `<div class="ci"><span>${s.icon} ${s.name}</span><span>${g.item?esc(g.item):'<span class="muted">-</span>'} ${g.done?"✅":""}</span></div>`;
+    }).join("");
+    return `<div class="compare-col">
+      <h3>${esc(b.name)}</h3>
+      <div class="muted">${esc(b.cls)} ${b.season?"· "+esc(b.season):""} · 총 🌟${total}p</div>
+      <div class="cmp-sub">스킬</div><div class="cmp-list">${skills}</div>
+      <div class="cmp-sub">장비</div><div class="cmp-list">${gear}</div>
+    </div>`;
+  }
+}
+
+/* =========================================================================
+   내보내기 (클립보드 복사 + 다운로드)
+   ========================================================================= */
+function openExport(){
+  const sel=getSelected();
+  openModal(`
+    <h2>📤 내보내기</h2>
+    <div class="row-flex" style="margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <label class="chk"><input type="radio" name="expScope" value="all" checked style="width:auto;"> 전체 빌드</label>
+      ${sel?`<label class="chk"><input type="radio" name="expScope" value="one" style="width:auto;"> 현재 빌드만 (${esc(sel.name)})</label>`:""}
+    </div>
+    <textarea id="expArea" style="min-height:200px;font-size:12px;" readonly></textarea>
+    <div class="modal-actions">
+      <button id="expCopy" class="btn-gold">📋 클립보드 복사</button>
+      <button id="expDownload">💾 다운로드</button>
+      <button id="expClose">닫기</button>
+    </div>
+  `);
+  const area=document.getElementById("expArea");
+  const refresh=()=>{
+    const scope=document.querySelector('input[name="expScope"]:checked').value;
+    const data=(scope==="one"&&sel)?[sel]:state.builds;
+    area.value=JSON.stringify(data,null,2);
+  };
+  document.querySelectorAll('input[name="expScope"]').forEach(r=>r.addEventListener("change",refresh));
+  refresh();
+
+  document.getElementById("expCopy").addEventListener("click",async()=>{
+    try{
+      await navigator.clipboard.writeText(area.value);
+      toast("✅ 클립보드에 복사했습니다.");
+    }catch(e){
+      // 폴백: 선택 후 execCommand
+      area.select();
+      try{ document.execCommand("copy"); toast("✅ 복사했습니다."); }
+      catch(_){ toast("⚠️ 복사 실패. 직접 선택해 복사하세요."); }
+    }
+  });
+  document.getElementById("expDownload").addEventListener("click",()=>{
+    const blob=new Blob([area.value],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    const ts=new Date().toISOString().slice(0,10);
+    a.href=url; a.download=`d4-builds-${ts}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast("💾 다운로드를 시작합니다.");
+  });
+  document.getElementById("expClose").addEventListener("click",closeModal);
+}
+
+/* =========================================================================
+   가져오기 (JSON 붙여넣기 복원)
+   ========================================================================= */
+function openImport(){
+  openModal(`
+    <h2>📥 가져오기</h2>
+    <p class="muted">내보낸 JSON을 붙여넣으세요. 기존 빌드에 <b>추가</b>되거나 <b>전체 교체</b>할 수 있습니다.</p>
+    <textarea id="impArea" style="min-height:200px;font-size:12px;" placeholder='[ { "name": "...", ... } ]'></textarea>
+    <div class="row-flex" style="margin-top:10px;gap:8px;flex-wrap:wrap;">
+      <label class="chk"><input type="radio" name="impMode" value="add" checked style="width:auto;"> 추가</label>
+      <label class="chk"><input type="radio" name="impMode" value="replace" style="width:auto;"> 전체 교체</label>
+    </div>
+    <div class="modal-actions">
+      <button id="impDo" class="btn-red">가져오기</button>
+      <button id="impClose">닫기</button>
+    </div>
+  `);
+  document.getElementById("impClose").addEventListener("click",closeModal);
+  document.getElementById("impDo").addEventListener("click",()=>{
+    const raw=document.getElementById("impArea").value.trim();
+    if(!raw){ toast("내용을 붙여넣으세요."); return; }
+    let data;
+    try{
+      data=JSON.parse(raw);
+    }catch(e){
+      toast("⚠️ JSON 파싱 실패. 형식을 확인하세요.");
+      return;
+    }
+    // 단일 객체도 허용
+    if(!Array.isArray(data)) data=[data];
+    // 정규화 + 새 id 부여(충돌 방지)
+    const imported=data.map(d=>{ const n=normalize(d); n.id=uid(); return n; });
+    if(!imported.length){ toast("가져올 빌드가 없습니다."); return; }
+    const mode=document.querySelector('input[name="impMode"]:checked').value;
+    if(mode==="replace"){
+      state.builds=imported;
+    }else{
+      state.builds=state.builds.concat(imported);
+    }
+    state.selectedId=imported[0].id;
+    save(); fillFilterDropdowns(); renderList(); renderDetail(); closeModal();
+    toast(`✅ ${imported.length}개 빌드를 가져왔습니다.`);
+  });
+}
+
+/* =========================================================================
+   초기화 (확인 팝업 필수)
+   ========================================================================= */
+function doReset(){
+  confirmModal("전체 데이터를 초기화할까요?","모든 빌드가 삭제되며 되돌릴 수 없습니다. 샘플 빌드가 다시 생성됩니다.",()=>{
+    try{
+      localStorage.removeItem(STORE_KEY);
+    }catch(e){ console.error(e); }
+    state.builds=[normalize(sampleBuild())];
+    state.selectedId=state.builds[0].id;
+    state.search=""; state.filterClass=""; state.filterSeason="";
+    document.getElementById("searchInput").value="";
+    save(); fillFilterDropdowns(); renderList(); renderDetail();
+    toast("초기화했습니다.");
+  });
+}
+
+// ESC 로 모달 닫기
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
+
+// 앱 시작
+init();
+</script>
+</body>
+</html>
