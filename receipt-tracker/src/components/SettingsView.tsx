@@ -1,17 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Transaction } from '../types';
 import { exportMonthToExcel } from '../utils/excelExport';
 
 interface Props {
+  apiKey: string;
+  onSaveApiKey: (key: string) => void;
   transactions: Transaction[];
   currentMonth: string;
   onBack: () => void;
 }
 
-export default function SettingsView({ transactions, currentMonth, onBack }: Props) {
+export default function SettingsView({ apiKey, onSaveApiKey, transactions, currentMonth, onBack }: Props) {
+  const [input, setInput] = useState(apiKey);
+  const [saved, setSaved] = useState(false);
+
+  function handleSave() {
+    onSaveApiKey(input.trim());
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
   const monthFiltered = transactions.filter(t => t.date.startsWith(currentMonth));
   const [y, m] = currentMonth.split('-');
   const monthLabel = `${y}년 ${m}월`;
+
+  const cardStyle: React.CSSProperties = {
+    background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f9fa', padding: '0 0 80px' }}>
@@ -31,7 +46,48 @@ export default function SettingsView({ transactions, currentMonth, onBack }: Pro
       </div>
 
       <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <div style={cardStyle}>
+          <h3 style={{ margin: '0 0 8px', fontSize: 15, color: '#333' }}>Gemini API 키</h3>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: '#888', lineHeight: 1.6 }}>
+            영수증 자동 인식에 사용됩니다. <b>무료</b>로 발급받을 수 있어요.
+            <br />발급: <span style={{ color: '#3498db' }}>aistudio.google.com</span> → Get API key
+          </p>
+          <input
+            type="password"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            placeholder="AIza..."
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              border: '1.5px solid #e0e0e0',
+              borderRadius: 8,
+              fontSize: 14,
+              boxSizing: 'border-box',
+              outline: 'none',
+            }}
+          />
+          <button
+            onClick={handleSave}
+            style={{
+              marginTop: 12,
+              width: '100%',
+              padding: '12px',
+              background: saved ? '#27ae60' : '#3498db',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'background 0.2s',
+            }}
+          >
+            {saved ? '저장되었습니다!' : '저장'}
+          </button>
+        </div>
+
+        <div style={cardStyle}>
           <h3 style={{ margin: '0 0 8px', fontSize: 15, color: '#333' }}>Excel 내보내기</h3>
           <p style={{ margin: '0 0 12px', fontSize: 13, color: '#888' }}>
             {monthLabel} 거래내역 {monthFiltered.length}건을 Excel 파일로 저장합니다.
@@ -55,17 +111,7 @@ export default function SettingsView({ transactions, currentMonth, onBack }: Pro
           </button>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 15, color: '#333' }}>영수증 인식 정보</h3>
-          <p style={{ margin: 0, fontSize: 13, color: '#888', lineHeight: 1.6 }}>
-            영수증 글자 인식은 브라우저 안에서 직접 처리됩니다 (Tesseract OCR).
-            <br />• 완전 무료 · API 키 불필요
-            <br />• 사진은 외부로 전송되지 않아요
-            <br />• 처음 한 번만 인식 데이터를 내려받아요
-          </p>
-        </div>
-
-        <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <div style={cardStyle}>
           <h3 style={{ margin: '0 0 8px', fontSize: 15, color: '#333' }}>데이터 저장</h3>
           <p style={{ margin: 0, fontSize: 13, color: '#888', lineHeight: 1.6 }}>
             모든 내역은 이 브라우저에만 저장됩니다.
