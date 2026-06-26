@@ -23,18 +23,30 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: npm
-          cache-dependency-path: kumon-math/package-lock.json
-      - name: Install dependencies
+
+      - name: Build kumon-math
         working-directory: kumon-math
-        run: npm ci
-      - name: Build
-        working-directory: kumon-math
-        run: npm run build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build receipt-tracker
+        working-directory: receipt-tracker
+        run: |
+          npm ci
+          npm run build
+
+      - name: Combine builds
+        run: |
+          mkdir -p site
+          cp -r kumon-math/build/. site/
+          mkdir -p site/receipt-tracker
+          cp -r receipt-tracker/build/. site/receipt-tracker/
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: kumon-math/build
+          path: site
 
   deploy:
     needs: build
