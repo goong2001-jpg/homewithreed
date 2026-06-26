@@ -14,7 +14,7 @@ export interface Transaction {
 }
 
 export interface AppSettings {
-  claudeApiKey: string;
+  geminiApiKey: string;
 }
 
 export interface ExtractedFields {
