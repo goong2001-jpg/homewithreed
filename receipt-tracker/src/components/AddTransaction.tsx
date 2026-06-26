@@ -1,49 +1,43 @@
 import React, { useState } from 'react';
 import { Transaction, ExtractedFields } from '../types';
-import { extractFromImage } from '../utils/claudeVision';
+import { ocrImage } from '../utils/ocrExtract';
 import ImageUploader from './ImageUploader';
 import TransactionForm from './TransactionForm';
 
 type Step = 'upload' | 'loading' | 'review';
 
 interface Props {
-  apiKey: string;
   onSave: (t: Transaction) => void;
   onCancel: () => void;
-  onNeedApiKey: () => void;
 }
 
-export default function AddTransaction({ apiKey, onSave, onCancel, onNeedApiKey }: Props) {
+export default function AddTransaction({ onSave, onCancel }: Props) {
   const [step, setStep] = useState<Step>('upload');
   const [extracted, setExtracted] = useState<ExtractedFields>({});
   const [error, setError] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
+  const [progress, setProgress] = useState(0);
 
   async function handleImage(dataUrl: string) {
     setPreviewUrl(dataUrl);
-
-    if (!apiKey) {
-      onNeedApiKey();
-      return;
-    }
-
     setStep('loading');
     setError('');
+    setProgress(0);
 
     try {
-      const fields = await extractFromImage(dataUrl, apiKey);
+      const fields = await ocrImage(dataUrl, setProgress);
       setExtracted(fields);
       setStep('review');
     } catch (e: any) {
-      setError(e.message || 'AI 분석에 실패했습니다.');
+      setError(e.message || '글자 인식에 실패했습니다.');
       setExtracted({});
       setStep('review');
     }
   }
 
   function handleSkip() {
-    setStep('review');
     setExtracted({});
+    setStep('review');
   }
 
   return (
@@ -61,7 +55,7 @@ export default function AddTransaction({ apiKey, onSave, onCancel, onNeedApiKey 
       }}>
         <button onClick={onCancel} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 8px' }}>←</button>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
-          {step === 'upload' ? '영수증 업로드' : step === 'loading' ? 'AI 분석 중' : '내역 확인'}
+          {step === 'upload' ? '영수증 업로드' : step === 'loading' ? '영수증 인식 중' : '내역 확인'}
         </h2>
       </div>
 
@@ -87,20 +81,18 @@ export default function AddTransaction({ apiKey, onSave, onCancel, onNeedApiKey 
         )}
 
         {step === 'loading' && (
-          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <div style={{ textAlign: 'center', padding: '50px 20px' }}>
             {previewUrl && (
               <img src={previewUrl} alt="업로드 이미지" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 12, marginBottom: 24, objectFit: 'contain' }} />
             )}
-            <div style={{ fontSize: 36, marginBottom: 16 }}>🤖</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 8 }}>AI가 영수증을 분석 중이에요...</div>
-            <div style={{ fontSize: 13, color: '#888' }}>잠시만 기다려주세요</div>
-            <div style={{ marginTop: 24 }}>
-              <div style={{
-                width: 40, height: 40, border: '4px solid #e0e0e0',
-                borderTopColor: '#3498db', borderRadius: '50%',
-                animation: 'spin 0.8s linear infinite',
-                margin: '0 auto',
-              }} />
+            <div style={{ fontSize: 36, marginBottom: 16 }}>🔍</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 8 }}>영수증 글자를 읽고 있어요...</div>
+            <div style={{ fontSize: 13, color: '#888', marginBottom: 20 }}>처음엔 인식 데이터를 받느라 조금 걸려요</div>
+            <div style={{ maxWidth: 240, margin: '0 auto' }}>
+              <div style={{ height: 8, background: '#e8e8e8', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${progress}%`, background: '#3498db', borderRadius: 4, transition: 'width 0.3s' }} />
+              </div>
+              <div style={{ fontSize: 12, color: '#aaa', marginTop: 8 }}>{progress}%</div>
             </div>
           </div>
         )}
@@ -110,9 +102,13 @@ export default function AddTransaction({ apiKey, onSave, onCancel, onNeedApiKey 
             {previewUrl && (
               <img src={previewUrl} alt="업로드 이미지" style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 12, marginBottom: 16, objectFit: 'contain', display: 'block' }} />
             )}
-            {error && (
+            {error ? (
               <div style={{ padding: '10px 14px', background: '#fef9e7', borderRadius: 8, color: '#e67e22', fontSize: 13, marginBottom: 16 }}>
                 ⚠️ {error} — 직접 입력해주세요.
+              </div>
+            ) : previewUrl && (
+              <div style={{ padding: '10px 14px', background: '#eafaf1', borderRadius: 8, color: '#27ae60', fontSize: 13, marginBottom: 16 }}>
+                ✅ 인식 완료! 내용을 확인하고 필요하면 수정해주세요.
               </div>
             )}
             <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -125,12 +121,6 @@ export default function AddTransaction({ apiKey, onSave, onCancel, onNeedApiKey 
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }

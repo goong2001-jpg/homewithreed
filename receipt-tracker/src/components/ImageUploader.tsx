@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { resizeImage } from '../utils/claudeVision';
+import { resizeImage } from '../utils/image';
 
 interface Props {
   onImage: (dataUrl: string) => void;
