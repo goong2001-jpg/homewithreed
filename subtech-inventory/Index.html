@@ -112,7 +112,7 @@
   <div class="addline" onclick="addLine()">＋ 다른 입수 박스 추가</div>
   <div class="total"><div class="t1" id="totLbl">입고 합계</div><div class="t2" id="totVal">0<small> 개</small></div></div>
   <div class="pick"><span class="k">보관 위치</span>
-    <select id="locSel"><option>1층</option><option>2층</option><option>창고</option><option>B동</option></select></div>
+    <select id="locSel"></select></div>
   <div class="pick"><span class="k">담당자</span><select id="staffSel"></select></div>
   <div class="pick"><span class="k">메모</span><input id="memoInput" placeholder="선택 입력"></div>
   <button class="savebtn in" id="saveBtn" onclick="doSave()">＋ 입고 저장</button>
@@ -154,8 +154,10 @@ google.script.run.withSuccessHandler(onBoot).withFailureHandler(onErr).bootstrap
 
 function onBoot(d) {
   DATA = d;
-  var sel = document.getElementById('staffSel');
-  sel.innerHTML = (d.staff.length ? d.staff : ['담당자']).map(function(s){return '<option>'+esc(s)+'</option>';}).join('');
+  var staffSel = document.getElementById('staffSel');
+  staffSel.innerHTML = (d.staff && d.staff.length ? d.staff : ['담당자']).map(function(s){return '<option>'+esc(s)+'</option>';}).join('');
+  var locSel = document.getElementById('locSel');
+  locSel.innerHTML = (d.locations && d.locations.length ? d.locations : ['1층','2층']).map(function(s){return '<option>'+esc(s)+'</option>';}).join('');
   renderSearch();
 }
 function onErr(e){ document.getElementById('searchList').innerHTML = '<div class="loading">오류: '+esc(e.message)+'</div>'; }

@@ -10,10 +10,14 @@ var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
 
 // 탭 이름
-var TAB_MASTER = '품목마스터';
-var TAB_LOG    = '거래로그';
-var TAB_STOCK  = '현재고';
-var TAB_CONFIG = '설정';
+var TAB_MASTER   = '품목마스터';
+var TAB_LOG      = '거래로그';
+var TAB_STOCK    = '현재고';
+var TAB_CONFIG   = '설정';
+var TAB_LOCATION = '위치';
+
+// 위치 기본 목록 (위치 탭이 비어있을 때 채워짐)
+var DEFAULT_LOCATIONS = ['1층', '2층', 'A동', 'B동', '창고'];
 
 // ---------------------------------------------------------------------------
 // 메뉴 / 웹앱 진입점
@@ -51,15 +55,22 @@ function setup() {
   var log    = getOrCreateSheet_(ss, TAB_LOG);
   var stock  = getOrCreateSheet_(ss, TAB_STOCK);
   var config = getOrCreateSheet_(ss, TAB_CONFIG);
+  var locSh  = getOrCreateSheet_(ss, TAB_LOCATION);
 
   setHeaders_(master, ['품목ID', '품명', '분류', '기본박스입수', '안전재고', '비고']);
   setHeaders_(log,    ['일시', '품목ID', '품명', '분류', '위치', '구분',
                        '박스수', '박스당수량', '총개수', '증감수량', '담당자', '메모']);
   setHeaders_(config, ['담당자']);
+  setHeaders_(locSh,  ['위치']);
 
   // 담당자 기본값 (한 번만)
   if (config.getLastRow() < 2) {
     config.getRange(2, 1, 3, 1).setValues([['김반장'], ['이사원'], ['관리자']]);
+  }
+  // 위치 기본값 (한 번만): 1층, 2층, A동, B동, 창고
+  if (locSh.getLastRow() < 2) {
+    locSh.getRange(2, 1, DEFAULT_LOCATIONS.length, 1)
+         .setValues(DEFAULT_LOCATIONS.map(function (x) { return [x]; }));
   }
 
   importInitial_(master, log);
@@ -173,7 +184,16 @@ function bootstrap() {
     cf.getRange(2, 1, cf.getLastRow() - 1, 1).getValues()
       .forEach(function (r) { if (r[0]) staff.push('' + r[0]); });
   }
-  return { items: items, staff: staff };
+
+  var locs = [];
+  var locSh = ss.getSheetByName(TAB_LOCATION);
+  if (locSh && locSh.getLastRow() >= 2) {
+    locSh.getRange(2, 1, locSh.getLastRow() - 1, 1).getValues()
+      .forEach(function (r) { if (r[0]) locs.push('' + r[0]); });
+  }
+  if (!locs.length) locs = DEFAULT_LOCATIONS.slice();
+
+  return { items: items, staff: staff, locations: locs };
 }
 
 /** 거래로그에서 품목ID별 / 위치별 현재 수량을 합산 */
