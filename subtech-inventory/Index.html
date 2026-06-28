@@ -181,6 +181,7 @@
 
 <!-- 현재고 -->
 <div class="body hidden" id="viewStock">
+  <input class="search" id="stockSearch" placeholder="🔍 품명 검색" oninput="renderStock()" style="margin-bottom:10px">
   <div class="toolbar"><div class="filterbar" id="filterBar"></div><div class="sortbtn" id="sortBtn" onclick="toggleSort()">↓ 수량순</div></div>
   <div id="stockList"></div>
 </div>
@@ -320,7 +321,8 @@ function renderStock(){
   document.getElementById('sortBtn').textContent=sortMode==='qty'?'↓ 수량순':'ㄱ 이름순';
   var cats=['전체'].concat(DATA.items.map(function(i){return i.cat;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;}));
   document.getElementById('filterBar').innerHTML=cats.map(function(c){return '<div class="f '+(c===stockFilter?'on':'')+'" onclick="setFilter(\''+esc(c)+'\')">'+esc(c)+'</div>';}).join('');
-  var list=DATA.items.filter(function(it){return stockFilter==='전체'||it.cat===stockFilter;});
+  var sq=val('stockSearch').toLowerCase();
+  var list=DATA.items.filter(function(it){return (stockFilter==='전체'||it.cat===stockFilter)&&(!sq||(it.name+'').toLowerCase().indexOf(sq)>=0);});
   list.sort(sortMode==='qty'?function(a,b){return b.total-a.total;}:function(a,b){return (a.name+'').localeCompare(b.name+'','ko');});
   document.getElementById('stockList').innerHTML=list.length?list.map(function(it){
     var idx=DATA.items.indexOf(it), low=it.safe>0&&it.total<it.safe, color=catColor(it.cat);
