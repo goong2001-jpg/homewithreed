@@ -11,153 +11,97 @@
   .appbar .sub { font-size:12px; opacity:.85; margin-top:3px; }
   .body { padding:16px; }
   .hidden { display:none !important; }
-
   .search { width:100%; background:#fff; border:1.5px solid #dde3ec; border-radius:12px; padding:13px 14px; font-size:15px; outline:none; }
   .search:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
   .label { font-size:12px; font-weight:700; color:#6b7889; margin:18px 2px 8px; display:flex; justify-content:space-between; align-items:center; }
   .addnew { display:block; width:100%; text-align:center; color:#2563eb; font-size:14px; font-weight:700; padding:13px; border:1.5px dashed #b9ccf5; border-radius:12px; background:#fff; margin-top:12px; cursor:pointer; }
-
   .item { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:13px 14px; margin-bottom:9px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
-  .item:active { background:#f0f4ff; }
-  .item .nm { font-size:15px; font-weight:700; } .item .meta { font-size:11.5px; color:#8a97a8; margin-top:3px; }
+  .item:active { background:#f0f4ff; } .item .nm { font-size:15px; font-weight:700; } .item .meta { font-size:11.5px; color:#8a97a8; margin-top:3px; }
   .badge { font-size:11px; font-weight:800; padding:3px 9px; border-radius:7px; white-space:nowrap; }
-
   .itemhdr { display:flex; align-items:center; justify-content:space-between; background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:11px 14px; margin-bottom:12px; }
-  .itemhdr .ih-nm { font-size:17px; font-weight:900; }
-  .editlink { font-size:12px; font-weight:700; color:#2563eb; cursor:pointer; }
+  .itemhdr .ih-nm { font-size:17px; font-weight:900; } .editlink { font-size:12px; font-weight:700; color:#2563eb; cursor:pointer; }
   .renameBox { background:#fff; border:1.5px solid #cfe0ff; border-radius:12px; padding:12px; margin-bottom:12px; }
   .renameBox input { width:100%; border:1.5px solid #e6ebf2; border-radius:9px; padding:9px 11px; font-size:14px; margin-bottom:8px; outline:none; }
   .rbtns { display:flex; gap:8px; } .rbtns button { flex:1; padding:10px; border-radius:9px; font-weight:800; font-size:13px; border:none; cursor:pointer; }
   .rbtns .ok { background:#2563eb; color:#fff; } .rbtns .no { background:#eef1f5; color:#6b7889; }
-
-  .io { display:flex; gap:10px; }
-  .io button { flex:1; padding:14px 0; border-radius:12px; font-size:16px; font-weight:900; border:2px solid #e6ebf2; background:#fff; color:#b9c2cf; cursor:pointer; }
-  .io button.in.on { background:#16a34a; color:#fff; border-color:#16a34a; }
-  .io button.out.on { background:#dc2626; color:#fff; border-color:#dc2626; }
-
+  .io { display:flex; gap:10px; } .io button { flex:1; padding:14px 0; border-radius:12px; font-size:16px; font-weight:900; border:2px solid #e6ebf2; background:#fff; color:#b9c2cf; cursor:pointer; }
+  .io button.in.on { background:#16a34a; color:#fff; border-color:#16a34a; } .io button.out.on { background:#dc2626; color:#fff; border-color:#dc2626; }
   .boxrow { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:10px 12px; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
   .boxrow .field { flex:1; } .boxrow .field .k { font-size:10.5px; color:#8a97a8; font-weight:600; }
   .boxrow input { width:100%; border:none; outline:none; font-size:18px; font-weight:900; color:#1f2733; background:transparent; }
-  .boxrow .x { font-size:15px; font-weight:900; color:#b9c2cf; }
-  .boxrow .eq { font-size:11px; color:#8a97a8; text-align:right; min-width:62px; } .boxrow .eq b { display:block; font-size:14px; color:#16a34a; }
+  .boxrow .x { font-size:15px; font-weight:900; color:#b9c2cf; } .boxrow .eq { font-size:11px; color:#8a97a8; text-align:right; min-width:62px; } .boxrow .eq b { display:block; font-size:14px; color:#16a34a; }
   .boxrow .del { color:#cbd3de; font-size:18px; cursor:pointer; padding:0 2px; }
   .addline { text-align:center; color:#2563eb; font-size:13px; font-weight:700; padding:10px; border:1.5px dashed #b9ccf5; border-radius:12px; margin-bottom:14px; cursor:pointer; }
-
-  /* 입출고 미리보기 */
   .preview { background:#0f172a; color:#fff; border-radius:14px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; }
-  .preview .col { text-align:center; } .preview .p1 { font-size:11px; opacity:.7; margin-bottom:3px; }
-  .preview .pv { font-size:22px; font-weight:900; } .preview .pv small { font-size:12px; opacity:.7; }
-  .preview .arrow { font-size:20px; opacity:.6; }
-  .preview .pv.neg { color:#fca5a5; }
-  .deltaline { text-align:center; font-size:13px; font-weight:800; margin-top:8px; }
-  .deltaline.in { color:#16a34a; } .deltaline.out { color:#dc2626; }
+  .preview .col { text-align:center; } .preview .p1 { font-size:11px; opacity:.7; margin-bottom:3px; } .preview .pv { font-size:22px; font-weight:900; } .preview .arrow { font-size:20px; opacity:.6; } .preview .pv.neg { color:#fca5a5; }
+  .deltaline { text-align:center; font-size:13px; font-weight:800; margin-top:8px; } .deltaline.in { color:#16a34a; } .deltaline.out { color:#dc2626; }
   .warnline { text-align:center; font-size:12px; font-weight:700; color:#dc2626; margin-top:6px; }
-
   .hrow { display:flex; align-items:center; gap:8px; background:#fff; border:1px solid #eef1f5; border-radius:9px; padding:8px 11px; margin-bottom:6px; font-size:12.5px; }
-  .hrow .ht { font-weight:800; min-width:34px; } .hrow .hq { font-weight:900; min-width:54px; }
-  .hrow .hmeta { color:#8a97a8; flex:1; } .hrow .hd { color:#b9c2cf; font-size:11px; }
-
+  .hrow .ht { font-weight:800; min-width:34px; } .hrow .hq { font-weight:900; min-width:54px; } .hrow .hmeta { color:#8a97a8; flex:1; } .hrow .hd { color:#b9c2cf; font-size:11px; }
   .pick { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; margin-top:10px; }
   .pick .k { font-size:12px; color:#6b7889; font-weight:700; } .pick select, .pick input { border:none; outline:none; font-size:14px; font-weight:700; color:#1f2733; text-align:right; background:transparent; max-width:62%; }
   .delItem { text-align:center; color:#dc2626; font-size:13px; font-weight:700; margin:22px 0 4px; cursor:pointer; }
-
   .savebtn { position:fixed; bottom:74px; left:16px; right:16px; padding:16px; border-radius:14px; text-align:center; font-size:16px; font-weight:900; color:#fff; border:none; cursor:pointer; z-index:20; }
-  .savebtn.in { background:#16a34a; box-shadow:0 8px 20px rgba(22,163,74,.35); }
-  .savebtn.out { background:#dc2626; box-shadow:0 8px 20px rgba(220,38,38,.35); }
-  .savebtn.blue { background:#2563eb; box-shadow:0 8px 20px rgba(37,99,235,.35); }
-  .savebtn:disabled { opacity:.5; }
-
-  .done { text-align:center; padding-top:40px; }
-  .check { width:84px; height:84px; border-radius:50%; background:#16a34a; color:#fff; font-size:46px; display:flex; align-items:center; justify-content:center; margin:0 auto 14px; box-shadow:0 10px 26px rgba(22,163,74,.35); }
-  .done h2 { font-size:20px; } .res { background:#fff; border-radius:14px; padding:18px 22px; display:inline-block; margin-top:14px; box-shadow:0 4px 12px rgba(0,0,0,.05); }
-  .res .r1 { font-size:13px; color:#8a97a8; } .res .big { font-size:30px; font-weight:900; margin:6px 0; }
-  .res .r3 { font-size:13px; font-weight:700; } .res .r3.in { color:#16a34a; } .res .r3.out { color:#dc2626; }
-
+  .savebtn.in { background:#16a34a; box-shadow:0 8px 20px rgba(22,163,74,.35); } .savebtn.out { background:#dc2626; box-shadow:0 8px 20px rgba(220,38,38,.35); } .savebtn.blue { background:#2563eb; box-shadow:0 8px 20px rgba(37,99,235,.35); } .savebtn:disabled { opacity:.5; }
+  .done { text-align:center; padding-top:40px; } .check { width:84px; height:84px; border-radius:50%; background:#16a34a; color:#fff; font-size:46px; display:flex; align-items:center; justify-content:center; margin:0 auto 14px; box-shadow:0 10px 26px rgba(22,163,74,.35); }
+  .done h2 { font-size:20px; } .res { background:#fff; border-radius:14px; padding:18px 22px; display:inline-block; margin-top:14px; box-shadow:0 4px 12px rgba(0,0,0,.05); } .res .r1 { font-size:13px; color:#8a97a8; } .res .big { font-size:30px; font-weight:900; margin:6px 0; } .res .r3 { font-size:13px; font-weight:700; } .res .r3.in { color:#16a34a; } .res .r3.out { color:#dc2626; }
   .toolbar { display:flex; gap:7px; align-items:center; margin-bottom:10px; }
   .filterbar { display:flex; gap:7px; overflow-x:auto; padding-bottom:4px; flex:1; }
   .filterbar .f, .sortbtn { font-size:12px; font-weight:700; padding:6px 12px; border-radius:18px; background:#fff; border:1.5px solid #e6ebf2; color:#6b7889; white-space:nowrap; cursor:pointer; }
-  .filterbar .f.on { background:#1f2733; color:#fff; border-color:#1f2733; }
-  .sortbtn { background:#eef4ff; color:#2563eb; border-color:#cfe0ff; }
-  .srow { background:#fff; border:1.5px solid #eef1f5; border-radius:11px; padding:12px 13px 12px 14px; margin-bottom:8px; cursor:pointer; border-left-width:6px; }
-  .srow:active { background:#f0f4ff; }
-  .srow .top { display:flex; justify-content:space-between; align-items:center; gap:10px; }
-  .srow .nm2 { font-size:14.5px; font-weight:700; } .srow .q2 { font-size:22px; font-weight:900; white-space:nowrap; } .srow .q2 small { font-size:12px; color:#8a97a8; font-weight:700; } .srow .q2.low { color:#dc2626; }
-  .srow .b2 { font-size:11px; color:#8a97a8; margin-top:7px; }
-  .warn { font-size:10px; font-weight:700; color:#dc2626; background:#fee; padding:2px 7px; border-radius:6px; }
-
+  .filterbar .f.on { background:#1f2733; color:#fff; border-color:#1f2733; } .sortbtn { background:#eef4ff; color:#2563eb; border-color:#cfe0ff; }
+  .srow { background:#fff; border:1.5px solid #eef1f5; border-radius:11px; padding:12px 13px 12px 14px; margin-bottom:8px; cursor:pointer; border-left-width:6px; } .srow:active { background:#f0f4ff; }
+  .srow .top { display:flex; justify-content:space-between; align-items:center; gap:10px; } .srow .nm2 { font-size:14.5px; font-weight:700; } .srow .q2 { font-size:22px; font-weight:900; white-space:nowrap; } .srow .q2 small { font-size:12px; color:#8a97a8; font-weight:700; } .srow .q2.low { color:#dc2626; } .srow .b2 { font-size:11px; color:#8a97a8; margin-top:7px; } .warn { font-size:10px; font-weight:700; color:#dc2626; background:#fee; padding:2px 7px; border-radius:6px; }
+  /* 조립 */
+  .bcard { background:#fff; border:1.5px solid #eef1f5; border-radius:12px; padding:13px 14px; margin-bottom:10px; }
+  .bcard .btop { display:flex; justify-content:space-between; align-items:center; }
+  .bcard .bname { font-size:15px; font-weight:800; } .bcard .bnum { font-size:24px; font-weight:900; } .bcard .bnum.zero { color:#dc2626; } .bcard .bnum small { font-size:12px; color:#8a97a8; font-weight:700; }
+  .bcard .bneck { font-size:11.5px; color:#dc2626; font-weight:700; margin-top:4px; }
+  .bparts { margin-top:10px; border-top:1px dashed #eef1f5; padding-top:9px; }
+  .bpart { display:flex; justify-content:space-between; font-size:12px; padding:3px 0; } .bpart .pn { color:#37475a; } .bpart .pq { color:#8a97a8; } .bpart .pq b { color:#1f2733; } .bpart.lim .pn { color:#dc2626; font-weight:700; }
+  /* 리포트 */
+  .mrow { background:#fff; border:1.5px solid #eef1f5; border-radius:11px; padding:13px 14px; margin-bottom:8px; }
+  .mrow .ym { font-size:15px; font-weight:900; margin-bottom:8px; } .mrow .mline { display:flex; justify-content:space-between; font-size:13px; padding:2px 0; }
+  .mrow .min { color:#16a34a; font-weight:800; } .mrow .mout { color:#dc2626; font-weight:800; } .mrow .mnet { color:#1f2733; font-weight:900; border-top:1px dashed #eef1f5; margin-top:5px; padding-top:6px; }
   /* 메모 */
-  .memocard { background:#fff; border:1.5px solid #eef1f5; border-radius:12px; padding:13px 14px; margin-bottom:10px; }
-  .memocard .comp { font-size:16px; font-weight:900; } .memocard .mc-top { display:flex; justify-content:space-between; align-items:flex-start; }
-  .oxchips { display:flex; flex-wrap:wrap; gap:5px; margin-top:9px; }
-  .oxchip { font-size:11px; font-weight:800; padding:3px 9px; border-radius:7px; }
-  .oxchip.on { background:#eafaf0; color:#16a34a; } .oxchip.off { background:#fdecec; color:#dc2626; }
-  .kv { font-size:13px; margin-top:9px; } .kv b { color:#2563eb; }
-  .memocard .bd { font-size:13px; color:#37475a; margin-top:8px; white-space:pre-wrap; line-height:1.5; }
-  .mphotos { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
-  .mphoto { width:96px; } .mphoto .mplabel { font-size:10px; color:#8a97a8; font-weight:700; margin-bottom:3px; }
-  .mphoto img { width:96px; height:96px; object-fit:cover; border-radius:8px; border:1px solid #eef1f5; }
-  .memocard .foot { font-size:10.5px; color:#8a97a8; margin-top:11px; display:flex; justify-content:space-between; }
-  .memocard .act { color:#2563eb; font-weight:700; cursor:pointer; } .memocard .act.red { color:#dc2626; }
-
-  .field2 { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:11px 14px; margin-bottom:10px; }
-  .field2 .k2 { font-size:11px; font-weight:700; color:#6b7889; margin-bottom:4px; }
-  .field2 input, .field2 textarea { width:100%; border:none; outline:none; font-size:15px; color:#1f2733; resize:vertical; font-family:inherit; }
-  .oxrow { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:9px 14px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
-  .oxrow .oxk { font-size:14px; font-weight:700; } .oxbtns { display:flex; gap:6px; }
-  .oxb { width:46px; padding:7px 0; border-radius:8px; font-weight:900; font-size:14px; border:2px solid #e6ebf2; background:#fff; color:#b9c2cf; cursor:pointer; }
-  .oxb.o.on { background:#16a34a; color:#fff; border-color:#16a34a; } .oxb.x.on { background:#dc2626; color:#fff; border-color:#dc2626; }
-  .picsec { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:11px 14px; margin-bottom:10px; }
-  .picsec .k2 { font-size:12px; font-weight:700; color:#37475a; margin-bottom:8px; }
-  .picwrap { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .pthumb { position:relative; width:78px; height:78px; }
-  .pthumb img { width:78px; height:78px; object-fit:cover; border-radius:8px; border:1px solid #eef1f5; }
-  .pthumb .px { position:absolute; top:-7px; right:-7px; width:22px; height:22px; background:#dc2626; color:#fff; border-radius:50%; font-size:13px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .memocard { background:#fff; border:1.5px solid #eef1f5; border-radius:12px; padding:13px 14px; margin-bottom:10px; } .memocard .comp { font-size:16px; font-weight:900; } .memocard .mc-top { display:flex; justify-content:space-between; align-items:flex-start; }
+  .oxchips { display:flex; flex-wrap:wrap; gap:5px; margin-top:9px; } .oxchip { font-size:11px; font-weight:800; padding:3px 9px; border-radius:7px; } .oxchip.on { background:#eafaf0; color:#16a34a; } .oxchip.off { background:#fdecec; color:#dc2626; }
+  .kv { font-size:13px; margin-top:9px; } .kv b { color:#2563eb; } .memocard .bd { font-size:13px; color:#37475a; margin-top:8px; white-space:pre-wrap; line-height:1.5; }
+  .mphotos { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; } .mphoto { width:96px; } .mphoto .mplabel { font-size:10px; color:#8a97a8; font-weight:700; margin-bottom:3px; } .mphoto img { width:96px; height:96px; object-fit:cover; border-radius:8px; border:1px solid #eef1f5; }
+  .memocard .foot { font-size:10.5px; color:#8a97a8; margin-top:11px; display:flex; justify-content:space-between; } .memocard .act { color:#2563eb; font-weight:700; cursor:pointer; } .memocard .act.red { color:#dc2626; }
+  .field2 { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:11px 14px; margin-bottom:10px; } .field2 .k2 { font-size:11px; font-weight:700; color:#6b7889; margin-bottom:4px; } .field2 input, .field2 textarea { width:100%; border:none; outline:none; font-size:15px; color:#1f2733; resize:vertical; font-family:inherit; }
+  .oxrow { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:9px 14px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; } .oxrow .oxk { font-size:14px; font-weight:700; } .oxbtns { display:flex; gap:6px; }
+  .oxb { width:46px; padding:7px 0; border-radius:8px; font-weight:900; font-size:14px; border:2px solid #e6ebf2; background:#fff; color:#b9c2cf; cursor:pointer; } .oxb.o.on { background:#16a34a; color:#fff; border-color:#16a34a; } .oxb.x.on { background:#dc2626; color:#fff; border-color:#dc2626; }
+  .picsec { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:11px 14px; margin-bottom:10px; } .picsec .k2 { font-size:12px; font-weight:700; color:#37475a; margin-bottom:8px; } .picwrap { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .pthumb { position:relative; width:78px; height:78px; } .pthumb img { width:78px; height:78px; object-fit:cover; border-radius:8px; border:1px solid #eef1f5; } .pthumb .px { position:absolute; top:-7px; right:-7px; width:22px; height:22px; background:#dc2626; color:#fff; border-radius:50%; font-size:13px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
   .picadd { width:78px; height:78px; border:1.5px dashed #b9ccf5; border-radius:8px; color:#2563eb; font-size:26px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-
-  .nav { position:fixed; bottom:0; left:0; right:0; height:60px; border-top:1px solid #eef1f5; background:#fff; display:flex; z-index:30; }
-  .nav div { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:10px; color:#b9c2cf; font-weight:600; cursor:pointer; }
-  .nav div.on { color:#2563eb; } .nav .ic { font-size:18px; }
+  .nav { position:fixed; bottom:0; left:0; right:0; height:60px; border-top:1px solid #eef1f5; background:#fff; display:flex; z-index:30; } .nav div { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:10px; color:#b9c2cf; font-weight:600; cursor:pointer; } .nav div.on { color:#2563eb; } .nav .ic { font-size:18px; }
   .loading { text-align:center; color:#8a97a8; padding:40px; font-size:14px; }
 </style>
 </head>
 <body>
 
-<div class="appbar">
-  <div class="title"><span id="barIcon">📦</span> <span id="barTitle">써브텍 재고</span></div>
-  <div class="sub" id="barSub">입고 · 출고를 빠르게 기록하세요</div>
-</div>
+<div class="appbar"><div class="title"><span id="barIcon">📦</span> <span id="barTitle">써브텍 재고</span></div><div class="sub" id="barSub">입고 · 출고를 빠르게 기록하세요</div></div>
 
 <!-- 검색 -->
 <div class="body" id="viewSearch">
   <input class="search" id="searchInput" placeholder="🔍 품명 검색 (예: STT1.3)" oninput="renderSearch()">
-  <div class="label">품목</div>
-  <div id="searchList"><div class="loading">불러오는 중…</div></div>
+  <div class="label">품목</div><div id="searchList"><div class="loading">불러오는 중…</div></div>
   <button class="addnew" onclick="openNewItem()">＋ 새 품목 추가</button>
 </div>
 
 <!-- 입출고 -->
 <div class="body hidden" id="viewInput">
   <div class="itemhdr"><span><span class="ih-nm" id="ihName"></span> <span id="ihBadge"></span></span><span class="editlink" onclick="toggleRename()">✏️ 품명/분류 수정</span></div>
-  <div class="renameBox hidden" id="renameBox">
-    <input id="reName" placeholder="품명"><input id="reCat" placeholder="분류">
-    <div class="rbtns"><button class="ok" onclick="doRename()">저장</button><button class="no" onclick="toggleRename()">취소</button></div>
-  </div>
+  <div class="renameBox hidden" id="renameBox"><input id="reName" placeholder="품명"><input id="reCat" placeholder="분류"><div class="rbtns"><button class="ok" onclick="doRename()">저장</button><button class="no" onclick="toggleRename()">취소</button></div></div>
   <div class="io"><button class="in on" id="btnIn" onclick="setType('입고')">＋ 입고</button><button class="out" id="btnOut" onclick="setType('출고')">－ 출고</button></div>
   <div class="label">박스 구성 (입수가 달라도 줄을 추가하세요)</div>
-  <div id="boxRows"></div>
-  <div class="addline" onclick="addLine()">＋ 다른 입수 박스 추가</div>
-  <div class="preview">
-    <div class="col"><div class="p1">현재고</div><div class="pv" id="curVal">0</div></div>
-    <div class="arrow">→</div>
-    <div class="col"><div class="p1" id="resLbl">입고 후</div><div class="pv" id="resVal">0</div></div>
-  </div>
-  <div class="deltaline in" id="deltaLine"></div>
-  <div class="warnline hidden" id="warnLine">⚠️ 현재고보다 많이 출고하려고 해요</div>
+  <div id="boxRows"></div><div class="addline" onclick="addLine()">＋ 다른 입수 박스 추가</div>
+  <div class="preview"><div class="col"><div class="p1">현재고</div><div class="pv" id="curVal">0</div></div><div class="arrow">→</div><div class="col"><div class="p1" id="resLbl">입고 후</div><div class="pv" id="resVal">0</div></div></div>
+  <div class="deltaline in" id="deltaLine"></div><div class="warnline hidden" id="warnLine">⚠️ 현재고보다 많이 출고하려고 해요</div>
   <div class="pick"><span class="k">보관 위치</span><select id="locSel"></select></div>
   <div class="pick"><span class="k">담당자</span><select id="staffSel"></select></div>
   <div class="pick"><span class="k">메모</span><input id="memoInput" placeholder="선택 입력"></div>
-  <div class="label">최근 입출고 이력</div>
-  <div id="histList"><div class="loading">불러오는 중…</div></div>
+  <div class="label">최근 입출고 이력</div><div id="histList"><div class="loading">불러오는 중…</div></div>
   <div class="delItem" onclick="delCurItem()">🗑 이 품목 삭제 (중복/오입력 정리)</div>
   <button class="savebtn in" id="saveBtn" onclick="doSave()">＋ 입고 저장</button>
 </div>
@@ -172,19 +116,20 @@
 </div>
 
 <!-- 완료 -->
-<div class="body hidden" id="viewDone">
-  <div class="done"><div class="check">✓</div><h2 id="doneTitle">입고 저장 완료!</h2>
-    <div class="res"><div class="r1" id="doneItem"></div><div class="big" id="doneTotal"></div><div class="r3 in" id="doneDelta"></div></div>
-    <div style="margin-top:18px"><button class="addline" style="display:inline-block;padding:12px 28px" onclick="go('search')">새 품목 입력</button></div>
-  </div>
-</div>
+<div class="body hidden" id="viewDone"><div class="done"><div class="check">✓</div><h2 id="doneTitle">입고 저장 완료!</h2><div class="res"><div class="r1" id="doneItem"></div><div class="big" id="doneTotal"></div><div class="r3 in" id="doneDelta"></div></div><div style="margin-top:18px"><button class="addline" style="display:inline-block;padding:12px 28px" onclick="go('search')">새 품목 입력</button></div></div></div>
 
 <!-- 현재고 -->
 <div class="body hidden" id="viewStock">
   <input class="search" id="stockSearch" placeholder="🔍 품명 검색" oninput="renderStock()" style="margin-bottom:10px">
-  <div class="toolbar"><div class="filterbar" id="filterBar"></div><div class="sortbtn" id="sortBtn" onclick="toggleSort()">↓ 수량순</div></div>
+  <div class="toolbar"><div class="filterbar" id="filterBar"></div><div class="sortbtn" id="sortBtn" onclick="toggleSort()">↓ 수량순</div><div class="sortbtn" onclick="go('report')">📅 월별</div></div>
   <div id="stockList"></div>
 </div>
+
+<!-- 월별 리포트 -->
+<div class="body hidden" id="viewReport"><div id="reportList"><div class="loading">불러오는 중…</div></div></div>
+
+<!-- 조립 가능 -->
+<div class="body hidden" id="viewBuild"><div id="buildList"><div class="loading">불러오는 중…</div></div></div>
 
 <!-- 메모 -->
 <div class="body hidden" id="viewMemo">
@@ -201,6 +146,7 @@
   <div class="field2"><div class="k2">비고</div><textarea id="mNote" rows="3" placeholder="주의사항, 특이건 등"></textarea></div>
   <div class="picsec"><div class="k2">상호스티커 사진</div><div class="picwrap" id="picSticker"></div><input id="fSticker" type="file" accept="image/*" style="display:none" onchange="onPic('sticker',this)"></div>
   <div class="picsec"><div class="k2">명판 사진</div><div class="picwrap" id="picNameplate"></div><input id="fNameplate" type="file" accept="image/*" style="display:none" onchange="onPic('nameplate',this)"></div>
+  <div class="picsec"><div class="k2">날짜스티커 사진</div><div class="picwrap" id="picDateSticker"></div><input id="fDateSticker" type="file" accept="image/*" style="display:none" onchange="onPic('dateSticker',this)"></div>
   <div class="picsec"><div class="k2">추가 사진</div><div class="picwrap" id="picExtras"></div><input id="fExtras" type="file" accept="image/*" multiple style="display:none" onchange="onPic('extras',this)"></div>
   <button class="savebtn blue" id="mBtn" onclick="saveMemoForm()">＋ 메모 저장</button>
 </div>
@@ -208,6 +154,7 @@
 <div class="nav">
   <div id="navInput" class="on" onclick="go('search')"><span class="ic">➕</span>입출고</div>
   <div id="navStock" onclick="go('stock')"><span class="ic">📊</span>현재고</div>
+  <div id="navBuild" onclick="go('build')"><span class="ic">🧩</span>조립</div>
   <div id="navMemo" onclick="go('memo')"><span class="ic">📝</span>메모</div>
 </div>
 
@@ -227,25 +174,19 @@ function fill(id,arr){ document.getElementById(id).innerHTML=arr.map(function(s)
 function val(id){ return (document.getElementById(id).value||'').trim(); }
 function fmt(n){ return (Number(n)||0).toLocaleString(); }
 function esc(s){ return (''+s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-function catColor(cat){
-  if(!catColorMap){ catColorMap={}; DATA.items.map(function(i){return i.cat;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;}).sort().forEach(function(c,i){catColorMap[c]=CAT_PALETTE[i%CAT_PALETTE.length];}); }
-  return catColorMap[cat]||'#6b7889';
-}
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+function catColor(cat){ if(!catColorMap){ catColorMap={}; DATA.items.map(function(i){return i.cat;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;}).sort().forEach(function(c,i){catColorMap[c]=CAT_PALETTE[i%CAT_PALETTE.length];}); } return catColorMap[cat]||'#6b7889'; }
 function badge(cat){ var c=catColor(cat); return '<span class="badge" style="color:'+c+';background:'+c+'22">'+esc(cat||'-')+'</span>'; }
 
 // 검색
-function renderSearch(){
-  var q=val('searchInput').toLowerCase();
+function renderSearch(){ var q=val('searchInput').toLowerCase();
   var list=DATA.items.filter(function(it){return !q||(it.name+'').toLowerCase().indexOf(q)>=0;}).slice(0,80);
-  var el=document.getElementById('searchList');
-  el.innerHTML=list.length?list.map(function(it){var idx=DATA.items.indexOf(it);
+  document.getElementById('searchList').innerHTML=list.length?list.map(function(it){var idx=DATA.items.indexOf(it);
     return '<div class="item" onclick="select('+idx+')"><div><div class="nm">'+esc(it.name)+'</div><div class="meta">현재 '+fmt(it.total)+'개</div></div>'+badge(it.cat)+'</div>';
-  }).join(''):'<div class="loading">검색 결과가 없습니다.</div>';
-}
+  }).join(''):'<div class="loading">검색 결과가 없습니다.</div>'; }
 function select(i){ cur=DATA.items[i]; type='입고'; lines=[{boxes:'',per:String(cur.unit||'')}]; document.getElementById('renameBox').classList.add('hidden'); renderInput(); go('input');
   document.getElementById('histList').innerHTML='<div class="loading">불러오는 중…</div>';
-  google.script.run.withSuccessHandler(renderHistory).withFailureHandler(function(){renderHistory([]);}).getHistory(cur.id);
-}
+  google.script.run.withSuccessHandler(renderHistory).withFailureHandler(function(){renderHistory([]);}).getHistory(cur.id); }
 
 // 새 품목
 function openNewItem(){ ['niName','niCat','niUnit','niSafe'].forEach(function(id){document.getElementById(id).value='';});
@@ -254,16 +195,13 @@ function openNewItem(){ ['niName','niCat','niUnit','niSafe'].forEach(function(id
 function saveNewItem(){ var name=val('niName'); if(!name){alert('품명을 입력하세요.');return;}
   var b=document.getElementById('niBtn'); b.disabled=true; b.textContent='추가 중…';
   google.script.run.withSuccessHandler(function(it){ DATA.items.push(it); catColorMap=null; cur=it; type='입고'; lines=[{boxes:'',per:String(it.unit||'')}]; b.disabled=false; b.textContent='＋ 품목 추가'; renderInput(); renderHistory([]); go('input'); })
-    .withFailureHandler(function(e){alert(e.message); b.disabled=false; b.textContent='＋ 품목 추가';}).addItem({name:name,cat:val('niCat'),unit:val('niUnit'),safe:val('niSafe')});
-}
+    .withFailureHandler(function(e){alert(e.message); b.disabled=false; b.textContent='＋ 품목 추가';}).addItem({name:name,cat:val('niCat'),unit:val('niUnit'),safe:val('niSafe')}); }
 
 // 품명 수정
-function toggleRename(){ var box=document.getElementById('renameBox'); var h=box.classList.contains('hidden');
-  if(h){ document.getElementById('reName').value=cur.name; document.getElementById('reCat').value=cur.cat; } box.classList.toggle('hidden'); }
+function toggleRename(){ var box=document.getElementById('renameBox'); if(box.classList.contains('hidden')){ document.getElementById('reName').value=cur.name; document.getElementById('reCat').value=cur.cat; } box.classList.toggle('hidden'); }
 function doRename(){ var name=val('reName'); if(!name){alert('품명을 입력하세요.');return;}
   google.script.run.withSuccessHandler(function(r){ var old=cur.id; cur.id=r.id; cur.name=r.name; cur.cat=r.cat;
-    DATA.items.forEach(function(it){ if(it.id===old){it.id=r.id;it.name=r.name;it.cat=r.cat;} }); catColorMap=null;
-    document.getElementById('renameBox').classList.add('hidden'); renderInput();
+    DATA.items.forEach(function(it){ if(it.id===old){it.id=r.id;it.name=r.name;it.cat=r.cat;} }); catColorMap=null; document.getElementById('renameBox').classList.add('hidden'); renderInput();
   }).withFailureHandler(function(e){alert(e.message);}).renameItem(cur.id,name,val('reCat')); }
 
 // 입출고
@@ -274,45 +212,35 @@ function onInput(i,f,v){ lines[i][f]=v; updateTotal(); }
 function lineTotal(l){ return (Number(l.boxes)||0)*(Number(l.per)||0); }
 function grandTotal(){ return lines.reduce(function(s,l){return s+lineTotal(l);},0); }
 function renderInput(){
-  document.getElementById('barIcon').textContent='📦'; document.getElementById('barTitle').textContent=cur.name;
-  document.getElementById('barSub').textContent=cur.cat+' · 현재 '+fmt(cur.total)+'개';
+  document.getElementById('barIcon').textContent='📦'; document.getElementById('barTitle').textContent=cur.name; document.getElementById('barSub').textContent=cur.cat+' · 현재 '+fmt(cur.total)+'개';
   document.getElementById('ihName').textContent=cur.name; document.getElementById('ihBadge').innerHTML=badge(cur.cat);
   document.getElementById('btnIn').className='in '+(type==='입고'?'on':''); document.getElementById('btnOut').className='out '+(type==='출고'?'on':'');
   document.getElementById('boxRows').innerHTML=lines.map(function(l,i){
     return '<div class="boxrow"><div class="field"><div class="k">박스수</div><input type="number" inputmode="numeric" value="'+esc(l.boxes)+'" oninput="onInput('+i+',\'boxes\',this.value)"></div><div class="x">×</div><div class="field"><div class="k">박스당 수량</div><input type="number" inputmode="numeric" value="'+esc(l.per)+'" oninput="onInput('+i+',\'per\',this.value)"></div><div class="eq">합계<b>'+fmt(lineTotal(l))+'</b></div>'+(lines.length>1?'<span class="del" onclick="delLine('+i+')">✕</span>':'')+'</div>';
-  }).join('');
-  updateTotal();
+  }).join(''); updateTotal();
 }
 function updateTotal(){
   var t=grandTotal(), inMode=type==='입고', result=cur.total+(inMode?t:-t);
   document.querySelectorAll('#boxRows .eq b').forEach(function(b,i){ b.textContent=fmt(lineTotal(lines[i])); });
-  document.getElementById('curVal').textContent=fmt(cur.total);
-  document.getElementById('resLbl').textContent=inMode?'입고 후':'출고 후';
+  document.getElementById('curVal').textContent=fmt(cur.total); document.getElementById('resLbl').textContent=inMode?'입고 후':'출고 후';
   var rv=document.getElementById('resVal'); rv.textContent=fmt(result); rv.className='pv'+(result<0?' neg':'');
   var dl=document.getElementById('deltaLine'); dl.className='deltaline '+(inMode?'in':'out'); dl.textContent=(t>0?((inMode?'＋':'−')+fmt(t)+'개'):'');
   document.getElementById('warnLine').classList.toggle('hidden', !(!inMode && result<0));
   var btn=document.getElementById('saveBtn'); btn.className='savebtn '+(inMode?'in':'out'); btn.textContent=inMode?'＋ 입고 저장':'－ 출고 저장'; btn.disabled=t<=0;
 }
-function renderHistory(rows){
-  document.getElementById('histList').innerHTML=rows.length?rows.map(function(h){
+function renderHistory(rows){ document.getElementById('histList').innerHTML=rows.length?rows.map(function(h){
     var inMode=h.delta>=0, color=h.type==='출고'?'#dc2626':(h.type==='기초'?'#8a97a8':'#16a34a');
     return '<div class="hrow"><span class="ht" style="color:'+color+'">'+esc(h.type)+'</span><span class="hq" style="color:'+color+'">'+(inMode?'＋':'−')+fmt(Math.abs(h.delta))+'</span><span class="hmeta">'+esc(h.loc||'')+(h.staff?(' · '+esc(h.staff)):'')+'</span><span class="hd">'+esc(h.date)+'</span></div>';
-  }).join(''):'<div style="color:#8a97a8;font-size:12px;padding:6px 2px">기록 없음</div>';
-}
+  }).join(''):'<div style="color:#8a97a8;font-size:12px;padding:6px 2px">기록 없음</div>'; }
 function doSave(){ var btn=document.getElementById('saveBtn'); btn.disabled=true; btn.textContent='저장 중…'; var delta=grandTotal();
   google.script.run.withSuccessHandler(function(res){onSaved(res,delta);}).withFailureHandler(function(e){alert('저장 실패: '+e.message); updateTotal();})
-    .save({id:cur.id,name:cur.name,cat:cur.cat,type:type,loc:val('locSel'),staff:val('staffSel'),memo:val('memoInput'),lines:lines});
-}
+    .save({id:cur.id,name:cur.name,cat:cur.cat,type:type,loc:val('locSel'),staff:val('staffSel'),memo:val('memoInput'),lines:lines}); }
 function onSaved(res,delta){ cur.total=res.total; cur.locs=res.locs; var inMode=type==='입고';
-  document.getElementById('doneTitle').textContent=(inMode?'입고':'출고')+' 저장 완료!';
-  document.getElementById('doneItem').textContent=cur.name+' · '+cur.cat; document.getElementById('doneTotal').textContent=fmt(res.total)+'개';
+  document.getElementById('doneTitle').textContent=(inMode?'입고':'출고')+' 저장 완료!'; document.getElementById('doneItem').textContent=cur.name+' · '+cur.cat; document.getElementById('doneTotal').textContent=fmt(res.total)+'개';
   var dd=document.getElementById('doneDelta'); dd.className='r3 '+(inMode?'in':'out'); dd.textContent=(inMode?'＋':'−')+fmt(delta)+' '+(inMode?'입고':'출고')+' ('+val('staffSel')+')';
-  document.getElementById('memoInput').value=''; go('done');
-}
+  document.getElementById('memoInput').value=''; go('done'); }
 function delCurItem(){ if(!confirm('"'+cur.name+' ('+cur.cat+')" 품목과 모든 기록을 삭제할까요?\n되돌릴 수 없습니다.'))return;
-  google.script.run.withSuccessHandler(function(){ DATA.items=DATA.items.filter(function(it){return it.id!==cur.id;}); catColorMap=null; alert('삭제되었습니다.'); go('search'); })
-    .withFailureHandler(function(e){alert(e.message);}).deleteItem(cur.id);
-}
+  google.script.run.withSuccessHandler(function(){ DATA.items=DATA.items.filter(function(it){return it.id!==cur.id;}); catColorMap=null; alert('삭제되었습니다.'); go('search'); }).withFailureHandler(function(e){alert(e.message);}).deleteItem(cur.id); }
 
 // 현재고
 function toggleSort(){ sortMode=sortMode==='qty'?'name':'qty'; renderStock(); }
@@ -331,75 +259,96 @@ function renderStock(){
   }).join(''):'<div class="loading">품목이 없습니다.</div>';
 }
 
+// 월별 리포트
+function loadReport(){ document.getElementById('reportList').innerHTML='<div class="loading">불러오는 중…</div>';
+  google.script.run.withSuccessHandler(renderReport).withFailureHandler(function(e){document.getElementById('reportList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>';}).getMonthlyReport(); }
+function renderReport(arr){
+  document.getElementById('reportList').innerHTML=arr.length?arr.map(function(m){
+    return '<div class="mrow"><div class="ym">'+esc(m.ym)+'</div><div class="mline"><span>입고</span><span class="min">＋'+fmt(m.inQ)+'</span></div><div class="mline"><span>출고</span><span class="mout">−'+fmt(m.outQ)+'</span></div><div class="mline mnet"><span>순증감</span><span>'+(m.net>=0?'＋':'−')+fmt(Math.abs(m.net))+'</span></div></div>';
+  }).join(''):'<div class="loading">입출고 기록이 쌓이면 월별 집계가 표시됩니다.</div>';
+}
+
+// 조립 가능
+function loadBuild(){ document.getElementById('buildList').innerHTML='<div class="loading">불러오는 중…</div>';
+  google.script.run.withSuccessHandler(renderBuild).withFailureHandler(function(e){document.getElementById('buildList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>';}).getBuildable(); }
+function renderBuild(arr){
+  if(!arr.length){ document.getElementById('buildList').innerHTML='<div class="loading">BOM 탭에 완제품 레시피를 적으면<br>여기에 "조립 가능 수량"이 계산됩니다.<br><br>예) 완제품품명 STT1.3 · 완제품분류 완포<br>→ 부품 STT1.3(기판) 1개, STT1.3(케이스) 1개 …</div>'; return; }
+  document.getElementById('buildList').innerHTML=arr.map(function(b){
+    var parts=b.parts.map(function(p){ var lim=Math.floor(p.have/p.per)===b.buildable;
+      return '<div class="bpart'+(lim?' lim':'')+'"><span class="pn">'+esc(p.name)+(p.cat?(' ('+esc(p.cat)+')'):'')+'</span><span class="pq">보유 <b>'+fmt(p.have)+'</b> / 1개당 '+fmt(p.per)+' → '+fmt(p.can)+'개</span></div>';
+    }).join('');
+    return '<div class="bcard"><div class="btop"><span class="bname">'+esc(b.name)+' '+badge(b.cat)+'</span><span class="bnum'+(b.buildable<=0?' zero':'')+'">'+fmt(b.buildable)+'<small> 개 가능</small></span></div>'+
+      (b.bottleneck.length?'<div class="bneck">⛔ 병목: '+esc(b.bottleneck.join(', '))+'</div>':'')+'<div class="bparts">'+parts+'</div></div>';
+  }).join('');
+}
+
 // 메모
 function loadMemos(){ if(MEMOS!==null){renderMemos();return;} document.getElementById('memoList').innerHTML='<div class="loading">불러오는 중…</div>';
   google.script.run.withSuccessHandler(function(m){MEMOS=m;renderMemos();}).withFailureHandler(function(e){document.getElementById('memoList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>';}).getMemos(); }
 function memoPics(m){ var h='';
   function one(p,label){ if(!p||!p.thumb)return ''; return '<div class="mphoto"><div class="mplabel">'+label+'</div><a href="'+esc(p.url)+'" target="_blank"><img src="'+esc(p.thumb)+'" loading="lazy"></a></div>'; }
-  h+=one(m.sticker,'상호스티커'); h+=one(m.nameplate,'명판'); (m.extras||[]).forEach(function(p){h+=one(p,'추가');});
+  h+=one(m.stickerImg,'상호스티커'); h+=one(m.nameplateImg,'명판'); h+=one(m.dateStickerImg,'날짜스티커'); (m.extras||[]).forEach(function(p){h+=one(p,'추가');});
   return h?'<div class="mphotos">'+h+'</div>':''; }
-function renderMemos(){
-  var q=val('memoSearch').toLowerCase();
+function renderMemos(){ var q=val('memoSearch').toLowerCase();
   var list=(MEMOS||[]).filter(function(m){ return !q||[m.company,m.programName,m.note].join(' ').toLowerCase().indexOf(q)>=0; });
   document.getElementById('memoList').innerHTML=list.length?list.map(function(m){
     var chips=OXF.map(function(f){var v=m[f[0]]; if(!v)return ''; return '<span class="oxchip '+(v==='O'?'on':'off')+'">'+f[1]+' '+v+'</span>';}).filter(Boolean).join('');
     return '<div class="memocard"><div class="mc-top"><div class="comp">'+esc(m.company||'(업체미상)')+'</div><span class="act" onclick="editMemo('+m.row+')">수정</span></div>'+
-      (chips?'<div class="oxchips">'+chips+'</div>':'')+
-      (m.program==='O'&&m.programName?'<div class="kv"><b>프로그램</b> '+esc(m.programName)+'</div>':'')+
-      (m.note?'<div class="bd">'+esc(m.note)+'</div>':'')+ memoPics(m)+
+      (chips?'<div class="oxchips">'+chips+'</div>':'')+(m.program==='O'&&m.programName?'<div class="kv"><b>프로그램</b> '+esc(m.programName)+'</div>':'')+
+      (m.note?'<div class="bd">'+esc(m.note)+'</div>':'')+memoPics(m)+
       '<div class="foot"><span>'+esc(m.date)+(m.author?(' · '+esc(m.author)):'')+'</span><span class="act red" onclick="delMemo('+m.row+')">삭제</span></div></div>';
   }).join(''):'<div class="loading">메모가 없습니다. ＋ 새 메모로 추가하세요.</div>';
 }
-function openNewMemo(){ MF={extras:[]}; document.getElementById('mCompany').value=''; document.getElementById('mProgram').value=''; document.getElementById('mNote').value=''; renderOX(); renderPics(); go('memoForm'); }
+function openNewMemo(){ MF={extras:[]}; ['mCompany','mProgram','mNote'].forEach(function(id){document.getElementById(id).value='';}); renderOX(); renderPics(); go('memoForm'); }
 function editMemo(row){ var m=(MEMOS||[]).filter(function(x){return x.row===row;})[0]; if(!m)return;
   MF={row:row, plate:m.plate,bizSticker:m.bizSticker,dateSticker:m.dateSticker,caseO:m.caseO,program:m.program,
-      sticker:m.sticker?{id:m.sticker.id,thumb:m.sticker.thumb}:null, nameplate:m.nameplate?{id:m.nameplate.id,thumb:m.nameplate.thumb}:null,
-      extras:(m.extras||[]).map(function(p){return {id:p.id,thumb:p.thumb};})};
+      sticker:m.stickerImg?{id:m.stickerImg.id,thumb:m.stickerImg.thumb}:null, nameplate:m.nameplateImg?{id:m.nameplateImg.id,thumb:m.nameplateImg.thumb}:null,
+      dateStickerImg:m.dateStickerImg?{id:m.dateStickerImg.id,thumb:m.dateStickerImg.thumb}:null, extras:(m.extras||[]).map(function(p){return {id:p.id,thumb:p.thumb};})};
   document.getElementById('mCompany').value=m.company||''; document.getElementById('mProgram').value=m.programName||''; document.getElementById('mNote').value=m.note||'';
   renderOX(); renderPics(); go('memoForm'); }
-function renderOX(){
-  document.getElementById('oxRows').innerHTML=OXF.map(function(f){var v=MF[f[0]]||'';
+function renderOX(){ document.getElementById('oxRows').innerHTML=OXF.map(function(f){var v=MF[f[0]]||'';
     return '<div class="oxrow"><span class="oxk">'+f[1]+'</span><div class="oxbtns"><button class="oxb o '+(v==='O'?'on':'')+'" onclick="setOX(\''+f[0]+'\',\'O\')">O</button><button class="oxb x '+(v==='X'?'on':'')+'" onclick="setOX(\''+f[0]+'\',\'X\')">X</button></div></div>';
-  }).join('');
-  document.getElementById('progNameWrap').style.display=MF.program==='O'?'block':'none';
-}
+  }).join(''); document.getElementById('progNameWrap').style.display=MF.program==='O'?'block':'none'; }
 function setOX(k,v){ MF[k]=(MF[k]===v?'':v); renderOX(); }
 function picSrc(p){ return p.preview||p.thumb||''; }
-function renderPics(){ slot('picSticker', MF.sticker?[MF.sticker]:[], 'sticker', false); slot('picNameplate', MF.nameplate?[MF.nameplate]:[], 'nameplate', false); slot('picExtras', MF.extras||[], 'extras', true); }
+function renderPics(){ slot('picSticker', MF.sticker?[MF.sticker]:[], 'sticker'); slot('picNameplate', MF.nameplate?[MF.nameplate]:[], 'nameplate'); slot('picDateSticker', MF.dateStickerImg?[MF.dateStickerImg]:[], 'dateSticker'); slot('picExtras', MF.extras||[], 'extras', true); }
 function slot(elId, arr, name, multi){
   var html=arr.map(function(p,i){ return '<div class="pthumb"><img src="'+esc(picSrc(p))+'"><span class="px" onclick="removePic(\''+name+'\','+i+')">✕</span></div>'; }).join('');
-  if(multi || !arr.length) html+='<div class="picadd" onclick="document.getElementById(\'f'+name.charAt(0).toUpperCase()+name.slice(1)+'\').click()">＋</div>';
+  if(multi || !arr.length) html+='<div class="picadd" onclick="document.getElementById(\'f'+cap(name)+'\').click()">＋</div>';
   document.getElementById(elId).innerHTML=html;
 }
-function removePic(name,i){ if(name==='extras') MF.extras.splice(i,1); else MF[name]=null; renderPics(); }
+function mfKey(name){ return name==='dateSticker'?'dateStickerImg':name; }
+function removePic(name,i){ if(name==='extras') MF.extras.splice(i,1); else MF[mfKey(name)]=null; renderPics(); }
 function onPic(name,input){ var files=input.files; if(!files.length)return;
-  Array.prototype.forEach.call(files,function(f){ var r=new FileReader(); r.onload=function(){ var img={data:r.result.split(',')[1],mime:f.type,name:f.name,preview:r.result}; if(name==='extras'){MF.extras=MF.extras||[]; MF.extras.push(img);} else MF[name]=img; renderPics(); }; r.readAsDataURL(f); }); input.value=''; }
+  Array.prototype.forEach.call(files,function(f){ var r=new FileReader(); r.onload=function(){ var img={data:r.result.split(',')[1],mime:f.type,name:f.name,preview:r.result}; if(name==='extras'){MF.extras=MF.extras||[]; MF.extras.push(img);} else MF[mfKey(name)]=img; renderPics(); }; r.readAsDataURL(f); }); input.value=''; }
 function clean(p){ if(!p)return null; if(p.id)return {id:p.id}; return {data:p.data,mime:p.mime,name:p.name}; }
 function saveMemoForm(){ var c=val('mCompany'); if(!c){alert('업체명을 입력하세요.');return;}
   var b=document.getElementById('mBtn'); b.disabled=true; b.textContent='저장 중…';
   google.script.run.withSuccessHandler(function(){ MEMOS=null; b.disabled=false; b.textContent='＋ 메모 저장'; go('memo'); })
     .withFailureHandler(function(e){alert('저장 실패: '+e.message); b.disabled=false; b.textContent='＋ 메모 저장';})
     .saveMemo({ row:MF.row||'', company:c, plate:MF.plate||'', bizSticker:MF.bizSticker||'', dateSticker:MF.dateSticker||'', caseO:MF.caseO||'', program:MF.program||'',
-      programName:val('mProgram'), note:val('mNote'), author:val('staffSel'), sticker:clean(MF.sticker), nameplate:clean(MF.nameplate), extras:(MF.extras||[]).map(clean) });
-}
+      programName:val('mProgram'), note:val('mNote'), author:val('staffSel'),
+      sticker:clean(MF.sticker), nameplate:clean(MF.nameplate), dateSticker:clean(MF.dateStickerImg), extras:(MF.extras||[]).map(clean) }); }
 function delMemo(row){ if(!confirm('이 메모를 삭제할까요? (사진도 함께 삭제됩니다)'))return;
   google.script.run.withSuccessHandler(function(){MEMOS=null;loadMemos();}).withFailureHandler(function(e){alert(e.message);}).deleteMemo(row); }
 
 // 전환
 function go(v){
-  ['Search','Input','NewItem','Done','Stock','Memo','MemoForm'].forEach(function(n){document.getElementById('view'+n).classList.add('hidden');});
+  ['Search','Input','NewItem','Done','Stock','Report','Build','Memo','MemoForm'].forEach(function(n){document.getElementById('view'+n).classList.add('hidden');});
   document.getElementById('saveBtn').classList.add('hidden'); setNav(v);
   if(v==='search'){ show('Search'); resetBar(); renderSearch(); }
   if(v==='input'){ show('Input'); document.getElementById('saveBtn').classList.remove('hidden'); }
   if(v==='newItem'){ show('NewItem'); resetBar('📦','새 품목 추가','품목을 새로 등록합니다'); }
   if(v==='done'){ show('Done'); resetBar(); }
   if(v==='stock'){ show('Stock'); resetBar('📊','현재고','실시간 자동 집계'); renderStock(); }
+  if(v==='report'){ show('Report'); resetBar('📅','월별 리포트','입고·출고 월별 집계'); loadReport(); }
+  if(v==='build'){ show('Build'); resetBar('🧩','조립 가능 수량','부품 재고로 만들 수 있는 완제품'); loadBuild(); }
   if(v==='memo'){ show('Memo'); resetBar('📝','업체 메모','특이사항 기록·검색'); loadMemos(); }
   if(v==='memoForm'){ show('MemoForm'); resetBar('📝', MF.row?'메모 수정':'새 메모', '업체 사양 기록'); }
 }
 function show(n){ document.getElementById('view'+n).classList.remove('hidden'); }
 function setNav(v){ var g=(v==='search'||v==='input'||v==='newItem'||v==='done');
-  document.getElementById('navInput').className=g?'on':''; document.getElementById('navStock').className=v==='stock'?'on':''; document.getElementById('navMemo').className=(v==='memo'||v==='memoForm')?'on':''; }
+  document.getElementById('navInput').className=g?'on':''; document.getElementById('navStock').className=(v==='stock'||v==='report')?'on':''; document.getElementById('navBuild').className=v==='build'?'on':''; document.getElementById('navMemo').className=(v==='memo'||v==='memoForm')?'on':''; }
 function resetBar(ic,t,s){ document.getElementById('barIcon').textContent=ic||'📦'; document.getElementById('barTitle').textContent=t||'써브텍 재고'; document.getElementById('barSub').textContent=s||'입고 · 출고를 빠르게 기록하세요'; }
 </script>
 </body>
