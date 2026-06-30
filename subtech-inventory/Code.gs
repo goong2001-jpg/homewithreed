@@ -62,8 +62,9 @@ function setup() {
   bom.getRange('A1').setNote('완제품 1개를 만드는 데 필요한 부품을 한 줄씩 적으세요.\n예) STT1.3 | 완포 | STT1.3 | 기판 | 1');
 
   if (config.getLastRow() < 2) config.getRange(2, 1, 3, 1).setValues([['김반장'], ['이사원'], ['관리자']]);
-  if (locSh.getLastRow() < 2)
-    locSh.getRange(2, 1, DEFAULT_LOCATIONS.length, 1).setValues(DEFAULT_LOCATIONS.map(function (x) { return [x]; }));
+  // 위치: 기본 위치(A동1층 등)로 정리. 이후 위치 탭을 직접 수정하면 앱에 바로 반영됩니다.
+  if (locSh.getLastRow() > 1) locSh.getRange(2, 1, locSh.getLastRow() - 1, 1).clearContent();
+  locSh.getRange(2, 1, DEFAULT_LOCATIONS.length, 1).setValues(DEFAULT_LOCATIONS.map(function (x) { return [x]; }));
 
   importInitial_(master, log);
   importMemos_(memo);
@@ -241,9 +242,32 @@ function getHistory(id) {
   var v = log.getRange(2, 1, log.getLastRow() - 1, 11).getValues();
   for (var i = v.length - 1; i >= 0 && out.length < 20; i--) {
     if (v[i][1] !== id) continue;
-    out.push({ date: v[i][0] ? fmtDt_(v[i][0]) : '', type: v[i][5], loc: v[i][4], delta: Number(v[i][9]) || 0, staff: v[i][10] });
+    out.push({ row: i + 2, date: v[i][0] ? fmtDt_(v[i][0]) : '', type: v[i][5], loc: v[i][4],
+               boxes: Number(v[i][6]) || 0, delta: Number(v[i][9]) || 0, staff: v[i][10] });
   }
   return out;
+}
+
+/** 이력에서 거래 한 건 취소(삭제) → 재고 자동 원복 */
+function undoTransaction(row) {
+  var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
+  var r = log.getRange(row, 1, 1, 12).getValues()[0], id = r[1];
+  log.deleteRow(row);
+  var s = computeStock_()[id] || { total: 0, locs: {} };
+  return { ok: true, id: id, total: s.total, locs: s.locs };
+}
+
+/** 재고 조정(실사): 선택 위치의 재고를 target 값으로 맞춤 (차액만 기록) */
+function adjustStock(p) {
+  var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
+  var loc = p.loc || DEFAULT_LOCATIONS[0];
+  var st = computeStock_()[p.id], curLoc = st ? (st.locs[loc] || 0) : 0;
+  var target = Number(p.target) || 0, delta = target - curLoc;
+  if (delta !== 0)
+    log.getRange(log.getLastRow() + 1, 1, 1, 12).setValues([[new Date(), p.id, p.name, p.cat, loc, '조정',
+      '', '', Math.abs(delta), delta, p.staff || '', p.memo || ('실사조정 ' + curLoc + '→' + target)]]);
+  var s = computeStock_()[p.id] || { total: 0, locs: {} };
+  return { ok: true, total: s.total, locs: s.locs };
 }
 
 // ---------------------------------------------------------------------------
@@ -274,6 +298,32 @@ function getBuildable() {
   });
   out.sort(function (a, b) { return a.buildable - b.buildable; });
   return out;
+}
+
+/** 조립 레시피 저장(추가/수정): 완제품 1개당 필요한 부품 목록 */
+function saveBOM(p) {
+  var bom = SpreadsheetApp.getActive().getSheetByName(TAB_BOM);
+  var name = ('' + (p.name || '')).trim(), cat = ('' + (p.cat || '')).trim();
+  if (!name) throw new Error('완제품 품명을 입력하세요.');
+  var parts = (p.parts || []).filter(function (x) { return ('' + x.name).trim() && (Number(x.per) || 0) > 0; });
+  if (!parts.length) throw new Error('부품을 1개 이상 입력하세요.');
+  removeBomRows_(bom, [(p.origName || '') + '||' + (p.origCat || ''), name + '||' + cat]);
+  var rows = parts.map(function (x) { return [name, cat, ('' + x.name).trim(), ('' + x.cat).trim(), Number(x.per) || 1]; });
+  bom.getRange(bom.getLastRow() + 1, 1, rows.length, 5).setValues(rows);
+  return { ok: true };
+}
+function deleteBOM(name, cat) {
+  var bom = SpreadsheetApp.getActive().getSheetByName(TAB_BOM);
+  removeBomRows_(bom, [('' + name).trim() + '||' + ('' + cat).trim()]);
+  return { ok: true };
+}
+function removeBomRows_(bom, ids) {
+  if (!bom || bom.getLastRow() < 2) return;
+  var v = bom.getRange(2, 1, bom.getLastRow() - 1, 2).getValues();
+  for (var i = v.length - 1; i >= 0; i--) {
+    var id = ('' + v[i][0]).trim() + '||' + ('' + v[i][1]).trim();
+    if (ids.indexOf(id) >= 0) bom.deleteRow(i + 2);
+  }
 }
 
 // ---------------------------------------------------------------------------
