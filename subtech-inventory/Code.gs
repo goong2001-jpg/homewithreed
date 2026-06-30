@@ -28,8 +28,12 @@ var MEMO_HEADERS = ['일시', '업체', '명판', '상호스티커', '날짜스�
 // ---------------------------------------------------------------------------
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('📦 재고관리')
-    .addItem('① 초기 설정 / 기존 재고·사양 가져오기', 'setup')
-    .addSeparator().addItem('웹앱(폰 화면) 주소 보기', 'showUrl').addToUi();
+    .addItem('① 초기 설정 (탭/구조 생성)', 'setup')
+    .addItem('🧹 전체 재고 0으로 초기화', 'resetStock')
+    .addSeparator()
+    .addItem('(선택) 기존 써브텍에서 한 번 가져오기', 'importFromOld')
+    .addItem('웹앱(폰 화면) 주소 보기', 'showUrl')
+    .addToUi();
 }
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index').setTitle('써브텍 재고')
@@ -66,16 +70,41 @@ function setup() {
   if (locSh.getLastRow() > 1) locSh.getRange(2, 1, locSh.getLastRow() - 1, 1).clearContent();
   locSh.getRange(2, 1, DEFAULT_LOCATIONS.length, 1).setValues(DEFAULT_LOCATIONS.map(function (x) { return [x]; }));
 
-  importInitial_(master, log);
-  importMemos_(memo);
+  // ※ 재고 가져오기는 더 이상 자동으로 하지 않습니다(재실행 시 재고가 꼬이는 것 방지).
+  //    기존 써브텍에서 가져오려면 메뉴의 "(선택) 기존 써브텍에서 한 번 가져오기"를 사용하세요.
   buildStockView_(stock);
   buildMonthlyView_(report);
   getMemoFolder_();
   cleanupDefaultSheet_(ss);
 
-  SpreadsheetApp.getUi().alert('초기 설정 완료! 품목 ' + Math.max(0, master.getLastRow() - 1) + '건, 메모 ' +
-    Math.max(0, memo.getLastRow() - 1) + '건.\nBOM 탭에 완제품 조립 레시피를 채우면 "조립 가능 수량"이 계산됩니다.\n' +
-    '코드를 새로 붙여넣었다면 [배포 > 배포 관리 > 수정 > 새 버전 > 배포] 로 갱신하세요.');
+  SpreadsheetApp.getUi().alert('초기 설정 완료! (탭/구조 생성)\n' +
+    '재고는 그대로 두었습니다. 이 메뉴는 재실행해도 재고를 건드리지 않습니다.\n\n' +
+    '· 재고를 모두 0으로 비우려면: "🧹 전체 재고 0으로 초기화"\n' +
+    '· 코드를 새로 붙여넣었다면: [배포 > 배포 관리 > 수정 > 새 버전 > 배포]');
+}
+
+/** (선택) 기존 써브텍에서 재고+업체사양을 1회 가져오기 */
+function importFromOld() {
+  var ss = SpreadsheetApp.getActive(), ui = SpreadsheetApp.getUi();
+  var resp = ui.alert('기존 써브텍에서 가져오기',
+    '기존 써브텍의 현재 재고와 업체 사양표를 가져옵니다.\n' +
+    '(이미 입력한 입출고 기록은 유지되고, 기초재고만 다시 맞춥니다.)\n계속할까요?', ui.ButtonSet.YES_NO);
+  if (resp !== ui.Button.YES) return;
+  importInitial_(getOrCreateSheet_(ss, TAB_MASTER), getOrCreateSheet_(ss, TAB_LOG));
+  importMemos_(getOrCreateSheet_(ss, TAB_MEMO));
+  ui.alert('가져오기 완료!');
+}
+
+/** 전체 재고 0으로 초기화: 거래로그를 비움 (품목 목록·메모·BOM은 유지) */
+function resetStock() {
+  var ui = SpreadsheetApp.getUi();
+  var resp = ui.alert('전체 재고 0으로 초기화',
+    '거래로그를 모두 비워 모든 품목의 재고를 0으로 만듭니다.\n' +
+    '품목 목록·메모·BOM·위치는 그대로 유지됩니다.\n\n계속할까요?', ui.ButtonSet.YES_NO);
+  if (resp !== ui.Button.YES) return;
+  var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
+  if (log && log.getLastRow() > 1) log.deleteRows(2, log.getLastRow() - 1);
+  ui.alert('완료! 모든 재고가 0이 되었습니다.\n이제 입출고 화면에서 입고로 다시 입력하세요.');
 }
 
 function importInitial_(master, log) {
