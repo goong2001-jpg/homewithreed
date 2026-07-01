@@ -57,7 +57,8 @@ function setup() {
   var report = getOrCreateSheet_(ss, TAB_REPORT);
 
   setHeaders_(master, ['품목ID', '품명', '분류', '기본박스입수', '안전재고', '비고']);
-  setHeaders_(log,    ['일시', '품목ID', '품명', '분류', '위치', '구분', '박스수', '박스당수량', '총개수', '증감수량', '담당자', '메모']);
+  log.getRange(1, 1, 1, 13).setValues([['일시', '품목ID', '품명', '분류', '위치', '구분', '박스수', '박스당수량', '총개수', '증감수량', '담당자', '메모', '사진']]).setFontWeight('bold');
+  log.setFrozenRows(1);
   setHeaders_(config, ['담당자']);
   setHeaders_(locSh,  ['위치']);
   memo.getRange(1, 1, 1, MEMO_HEADERS.length).setValues([MEMO_HEADERS]).setFontWeight('bold'); // 항상 최신 헤더
@@ -224,13 +225,14 @@ function computeStock_() {
 function save(payload) {
   var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
   var now = new Date(), sign = payload.type === '출고' ? -1 : 1, rows = [];
+  var imgId = resolveImg_(payload.image);
   (payload.lines || []).forEach(function (ln) {
     var boxes = Number(ln.boxes) || 0, per = Number(ln.per) || 0, t = boxes * per;
     if (t <= 0) return;
-    rows.push([now, payload.id, payload.name, payload.cat, payload.loc || DEFAULT_LOCATIONS[0], payload.type, boxes, per, t, sign * t, payload.staff || '', payload.memo || '']);
+    rows.push([now, payload.id, payload.name, payload.cat, payload.loc || DEFAULT_LOCATIONS[0], payload.type, boxes, per, t, sign * t, payload.staff || '', payload.memo || '', imgId]);
   });
   if (!rows.length) throw new Error('수량을 입력하세요.');
-  log.getRange(log.getLastRow() + 1, 1, rows.length, 12).setValues(rows);
+  log.getRange(log.getLastRow() + 1, 1, rows.length, 13).setValues(rows);
   var s = computeStock_()[payload.id] || { total: 0, locs: {} };
   return { ok: true, total: s.total, locs: s.locs };
 }
@@ -268,11 +270,11 @@ function deleteItem(id) {
 function getHistory(id) {
   var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG), out = [];
   if (!log || log.getLastRow() < 2) return out;
-  var v = log.getRange(2, 1, log.getLastRow() - 1, 11).getValues();
+  var v = log.getRange(2, 1, log.getLastRow() - 1, 13).getValues();
   for (var i = v.length - 1; i >= 0 && out.length < 20; i--) {
     if (v[i][1] !== id) continue;
     out.push({ row: i + 2, date: v[i][0] ? fmtDt_(v[i][0]) : '', type: v[i][5], loc: v[i][4],
-               boxes: Number(v[i][6]) || 0, delta: Number(v[i][9]) || 0, staff: v[i][10] });
+               boxes: Number(v[i][6]) || 0, delta: Number(v[i][9]) || 0, staff: v[i][10], img: imgObj_(v[i][12]) });
   }
   return out;
 }
@@ -280,7 +282,8 @@ function getHistory(id) {
 /** 이력에서 거래 한 건 취소(삭제) → 재고 자동 원복 */
 function undoTransaction(row) {
   var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
-  var r = log.getRange(row, 1, 1, 12).getValues()[0], id = r[1];
+  var r = log.getRange(row, 1, 1, 13).getValues()[0], id = r[1];
+  if (r[12]) { try { DriveApp.getFileById(r[12]).setTrashed(true); } catch (e) {} }
   log.deleteRow(row);
   var s = computeStock_()[id] || { total: 0, locs: {} };
   return { ok: true, id: id, total: s.total, locs: s.locs };
@@ -293,8 +296,8 @@ function adjustStock(p) {
   var st = computeStock_()[p.id], curLoc = st ? (st.locs[loc] || 0) : 0;
   var target = Number(p.target) || 0, delta = target - curLoc;
   if (delta !== 0)
-    log.getRange(log.getLastRow() + 1, 1, 1, 12).setValues([[new Date(), p.id, p.name, p.cat, loc, '조정',
-      '', '', Math.abs(delta), delta, p.staff || '', p.memo || ('실사조정 ' + curLoc + '→' + target)]]);
+    log.getRange(log.getLastRow() + 1, 1, 1, 13).setValues([[new Date(), p.id, p.name, p.cat, loc, '조정',
+      '', '', Math.abs(delta), delta, p.staff || '', p.memo || ('실사조정 ' + curLoc + '→' + target), resolveImg_(p.image)]]);
   var s = computeStock_()[p.id] || { total: 0, locs: {} };
   return { ok: true, total: s.total, locs: s.locs };
 }
