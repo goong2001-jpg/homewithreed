@@ -225,11 +225,11 @@ function computeStock_() {
 function save(payload) {
   var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
   var now = new Date(), sign = payload.type === '출고' ? -1 : 1, rows = [];
-  var imgId = resolveImg_(payload.image);
+  var imgIds = resolveImgs_(payload.images);
   (payload.lines || []).forEach(function (ln) {
     var boxes = Number(ln.boxes) || 0, per = Number(ln.per) || 0, t = boxes * per;
     if (t <= 0) return;
-    rows.push([now, payload.id, payload.name, payload.cat, payload.loc || DEFAULT_LOCATIONS[0], payload.type, boxes, per, t, sign * t, payload.staff || '', payload.memo || '', imgId]);
+    rows.push([now, payload.id, payload.name, payload.cat, payload.loc || DEFAULT_LOCATIONS[0], payload.type, boxes, per, t, sign * t, payload.staff || '', payload.memo || '', imgIds]);
   });
   if (!rows.length) throw new Error('수량을 입력하세요.');
   log.getRange(log.getLastRow() + 1, 1, rows.length, 13).setValues(rows);
@@ -274,7 +274,7 @@ function getHistory(id) {
   for (var i = v.length - 1; i >= 0 && out.length < 20; i--) {
     if (v[i][1] !== id) continue;
     out.push({ row: i + 2, date: v[i][0] ? fmtDt_(v[i][0]) : '', type: v[i][5], loc: v[i][4],
-               boxes: Number(v[i][6]) || 0, delta: Number(v[i][9]) || 0, staff: v[i][10], img: imgObj_(v[i][12]) });
+               boxes: Number(v[i][6]) || 0, delta: Number(v[i][9]) || 0, staff: v[i][10], imgs: imgList_(v[i][12]) });
   }
   return out;
 }
@@ -283,7 +283,8 @@ function getHistory(id) {
 function undoTransaction(row) {
   var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
   var r = log.getRange(row, 1, 1, 13).getValues()[0], id = r[1];
-  if (r[12]) { try { DriveApp.getFileById(r[12]).setTrashed(true); } catch (e) {} }
+  ('' + r[12]).split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+    .forEach(function (fid) { try { DriveApp.getFileById(fid).setTrashed(true); } catch (e) {} });
   log.deleteRow(row);
   var s = computeStock_()[id] || { total: 0, locs: {} };
   return { ok: true, id: id, total: s.total, locs: s.locs };
@@ -297,7 +298,7 @@ function adjustStock(p) {
   var target = Number(p.target) || 0, delta = target - curLoc;
   if (delta !== 0)
     log.getRange(log.getLastRow() + 1, 1, 1, 13).setValues([[new Date(), p.id, p.name, p.cat, loc, '조정',
-      '', '', Math.abs(delta), delta, p.staff || '', p.memo || ('실사조정 ' + curLoc + '→' + target), resolveImg_(p.image)]]);
+      '', '', Math.abs(delta), delta, p.staff || '', p.memo || ('실사조정 ' + curLoc + '→' + target), resolveImgs_(p.images)]]);
   var s = computeStock_()[p.id] || { total: 0, locs: {} };
   return { ok: true, total: s.total, locs: s.locs };
 }
@@ -419,6 +420,8 @@ function deleteMemo(row) {
   sh.deleteRow(row); return { ok: true };
 }
 function resolveImg_(img) { if (!img) return ''; if (img.id) return img.id; if (img.data) return saveImage_(img.data, img.mime || 'image/jpeg', img.name || 'memo.jpg').id; return ''; }
+function resolveImgs_(arr) { return (arr || []).map(resolveImg_).filter(Boolean).join(','); }
+function imgList_(cell) { return ('' + cell).split(',').map(function (s) { return s.trim(); }).filter(Boolean).map(imgObj_).filter(Boolean); }
 function ox_(v) { return v === 'O' ? 'O' : (v === 'X' ? 'X' : ''); }
 function oxParse_(v) { v = ('' + v).trim(); if (!v) return ['', '']; var c = v.charAt(0).toUpperCase(); var base = c === 'O' ? 'O' : (c === 'X' ? 'X' : ''); var rest = base ? v.substring(1).trim() : v; return [base, rest]; }
 function saveImage_(base64, mime, name) {

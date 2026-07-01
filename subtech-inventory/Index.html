@@ -92,7 +92,7 @@
   <div class="pick"><span class="k">보관 위치</span><select id="locSel" onchange="updateTotal()"></select></div>
   <div class="pick"><span class="k">담당자</span><select id="staffSel"></select></div>
   <div class="pick"><span class="k">메모</span><input id="memoInput" placeholder="선택 입력"></div>
-  <div class="picsec" style="margin-top:10px"><div class="k2">📷 적재 위치 사진 (선택) — 어디에 뒀는지 찍어두세요</div><div class="picwrap" id="txPic"></div><input id="fTx" type="file" accept="image/*" style="display:none" onchange="onTxPic(this)"></div>
+  <div class="picsec" style="margin-top:10px"><div class="k2">📷 적재 위치 사진 (선택, 최대 5장) — 위치별로 찍어두세요</div><div class="picwrap" id="txPic"></div><input id="fTx" type="file" accept="image/*" multiple style="display:none" onchange="onTxPic(this)"></div>
   <div class="label">최근 입출고 이력</div><div id="lastPhoto"></div><div id="histList"><div class="loading">불러오는 중…</div></div>
   <div class="delItem" onclick="delCurItem()">🗑 이 품목 삭제 (중복/오입력 정리)</div>
   <button class="savebtn in" id="saveBtn" onclick="doSave()">＋ 입고 저장</button>
@@ -166,7 +166,7 @@
 <script>
 var DATA = { items: [], staff: [], locations: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
-var cur = null, type = '입고', lines = [{ boxes:'', per:'' }], txImg = null;
+var cur = null, type = '입고', lines = [{ boxes:'', per:'' }], txImgs = [];
 var stockFilter = '전체', sortMode = 'qty';
 var CAT_PALETTE = ['#2563eb','#d97706','#16a34a','#9333ea','#dc2626','#0891b2','#db2777','#65a30d','#ea580c','#4f46e5','#0d9488','#c026d3'];
 var catColorMap = null;
@@ -194,7 +194,7 @@ function renderSearch(){ var q=val('searchInput').toLowerCase();
   document.getElementById('searchList').innerHTML=list.length?list.map(function(it){var idx=DATA.items.indexOf(it); var bt=boxText(it.total,it.unit);
     return '<div class="item" onclick="select('+idx+')"><div><div class="nm">'+esc(it.name)+'</div><div class="meta">현재 '+fmt(it.total)+'개'+(bt?(' · '+bt):'')+'</div></div>'+badge(it.cat)+'</div>';
   }).join(''):'<div class="loading">검색 결과가 없습니다.</div>'; }
-function select(i){ cur=DATA.items[i]; type='입고'; lines=[{boxes:'',per:String(cur.unit||'')}]; txImg=null; document.getElementById('renameBox').classList.add('hidden'); document.getElementById('adjTarget').value=''; renderInput(); go('input'); loadHistory(); }
+function select(i){ cur=DATA.items[i]; type='입고'; lines=[{boxes:'',per:String(cur.unit||'')}]; txImgs=[]; document.getElementById('renameBox').classList.add('hidden'); document.getElementById('adjTarget').value=''; renderInput(); go('input'); loadHistory(); }
 function loadHistory(){ document.getElementById('histList').innerHTML='<div class="loading">불러오는 중…</div>';
   google.script.run.withSuccessHandler(renderHistory).withFailureHandler(function(){renderHistory([]);}).getHistory(cur.id); }
 
@@ -232,12 +232,13 @@ function renderInput(){
     return '<div class="boxrow"><div class="field"><div class="k">박스수</div><input type="number" inputmode="numeric" value="'+esc(l.boxes)+'" oninput="onInput('+i+',\'boxes\',this.value)"></div><div class="x">×</div><div class="field"><div class="k">박스당 수량</div><input type="number" inputmode="numeric" value="'+esc(l.per)+'" oninput="onInput('+i+',\'per\',this.value)"></div><div class="eq">합계<b>'+fmt(lineTotal(l))+'</b></div>'+(lines.length>1?'<span class="del" onclick="delLine('+i+')">✕</span>':'')+'</div>';
   }).join(''); renderTxPic(); updateTotal();
 }
-function renderTxPic(){ var arr=txImg?[txImg]:[];
-  var html=arr.map(function(p){return '<div class="pthumb"><img src="'+esc(p.preview||p.thumb||'')+'"><span class="px" onclick="removeTxPic()">✕</span></div>';}).join('');
-  if(!arr.length) html+='<div class="picadd" onclick="document.getElementById(\'fTx\').click()">＋</div>';
+function renderTxPic(){
+  var html=txImgs.map(function(p,i){return '<div class="pthumb"><img src="'+esc(p.preview||p.thumb||'')+'"><span class="px" onclick="removeTxPic('+i+')">✕</span></div>';}).join('');
+  if(txImgs.length<5) html+='<div class="picadd" onclick="document.getElementById(\'fTx\').click()">＋</div>';
   document.getElementById('txPic').innerHTML=html; }
-function removeTxPic(){ txImg=null; renderTxPic(); }
-function onTxPic(input){ var f=input.files[0]; if(!f)return; var r=new FileReader(); r.onload=function(){ txImg={data:r.result.split(',')[1],mime:f.type,name:f.name,preview:r.result}; renderTxPic(); }; r.readAsDataURL(f); input.value=''; }
+function removeTxPic(i){ txImgs.splice(i,1); renderTxPic(); }
+function onTxPic(input){ var files=input.files; if(!files.length)return;
+  Array.prototype.forEach.call(files,function(f){ if(txImgs.length>=5) return; var r=new FileReader(); r.onload=function(){ txImgs.push({data:r.result.split(',')[1],mime:f.type,name:f.name,preview:r.result}); renderTxPic(); }; r.readAsDataURL(f); }); input.value=''; }
 function updateTotal(){
   var loc=val('locSel');
   if(type==='조정'){
@@ -257,12 +258,12 @@ function updateTotal(){
   var btn=document.getElementById('saveBtn'); btn.className='savebtn '+(inMode?'in':'out'); btn.textContent=inMode?'＋ 입고 저장':'－ 출고 저장'; btn.disabled=t<=0;
 }
 function renderHistory(rows){
-  var last=null; for(var k=0;k<rows.length;k++){ if(rows[k].img&&rows[k].img.thumb){ last=rows[k].img; break; } }
-  document.getElementById('lastPhoto').innerHTML=last?('<div class="label">📍 최근 적재 사진</div><a href="'+esc(last.url)+'" target="_blank"><img src="'+esc(last.thumb)+'" style="width:100%;border-radius:12px;border:1px solid #eef1f5"></a>'):'';
+  var last=null; for(var k=0;k<rows.length;k++){ if(rows[k].imgs&&rows[k].imgs.length){ last=rows[k].imgs; break; } }
+  document.getElementById('lastPhoto').innerHTML=last?('<div class="label">📍 최근 적재 사진</div><div class="mphotos" style="margin-top:0">'+last.map(function(p){return '<a href="'+esc(p.url)+'" target="_blank"><img src="'+esc(p.thumb)+'" style="width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid #eef1f5"></a>';}).join('')+'</div>'):'';
   document.getElementById('histList').innerHTML=rows.length?rows.map(function(h){
     var inMode=h.delta>=0, color=h.type==='출고'?'#dc2626':(h.type==='기초'?'#8a97a8':(h.type==='조정'?'#2563eb':'#16a34a'));
     var bx=h.boxes>0?(' ('+fmt(h.boxes)+'박스)'):'';
-    var im=(h.img&&h.img.thumb)?('<a href="'+esc(h.img.url)+'" target="_blank"><img src="'+esc(h.img.thumb)+'" style="width:30px;height:30px;object-fit:cover;border-radius:6px;margin-left:4px;vertical-align:middle"></a>'):'';
+    var im=(h.imgs&&h.imgs.length)?h.imgs.map(function(p){return '<a href="'+esc(p.url)+'" target="_blank"><img src="'+esc(p.thumb)+'" style="width:30px;height:30px;object-fit:cover;border-radius:6px;margin-left:4px;vertical-align:middle"></a>';}).join(''):'';
     return '<div class="hrow"><span class="ht" style="color:'+color+'">'+esc(h.type)+'</span><span class="hq" style="color:'+color+'">'+(inMode?'＋':'−')+fmt(Math.abs(h.delta))+bx+'</span><span class="hmeta">'+esc(h.loc||'')+(h.staff?(' · '+esc(h.staff)):'')+'</span>'+im+'<span class="hd">'+esc(h.date)+'</span><span class="undo" onclick="undoTx('+h.row+')">취소</span></div>';
   }).join(''):'<div style="color:#8a97a8;font-size:12px;padding:6px 2px">기록 없음</div>'; }
 function undoTx(row){ if(!confirm('이 거래를 취소(삭제)할까요? 재고가 원복됩니다.'))return;
@@ -271,14 +272,14 @@ function undoTx(row){ if(!confirm('이 거래를 취소(삭제)할까요? 재고
 function doSave(){ var btn=document.getElementById('saveBtn'); btn.disabled=true; btn.textContent='저장 중…';
   if(type==='조정'){ var loc=val('locSel'); var curLoc=(cur.locs&&cur.locs[loc])||0; var target=Number(val('adjTarget'))||0; var delta=target-curLoc;
     google.script.run.withSuccessHandler(function(res){ syncCur(res); showDone('조정',delta,res.total); }).withFailureHandler(function(e){alert(e.message); updateTotal();})
-      .adjustStock({id:cur.id,name:cur.name,cat:cur.cat,loc:loc,target:target,staff:val('staffSel'),memo:val('memoInput'),image:clean(txImg)}); return; }
+      .adjustStock({id:cur.id,name:cur.name,cat:cur.cat,loc:loc,target:target,staff:val('staffSel'),memo:val('memoInput'),images:txImgs.map(clean)}); return; }
   var d=grandTotal();
   google.script.run.withSuccessHandler(function(res){ syncCur(res); showDone(type,d,res.total); }).withFailureHandler(function(e){alert('저장 실패: '+e.message); updateTotal();})
-    .save({id:cur.id,name:cur.name,cat:cur.cat,type:type,loc:val('locSel'),staff:val('staffSel'),memo:val('memoInput'),lines:lines,image:clean(txImg)}); }
+    .save({id:cur.id,name:cur.name,cat:cur.cat,type:type,loc:val('locSel'),staff:val('staffSel'),memo:val('memoInput'),lines:lines,images:txImgs.map(clean)}); }
 function syncCur(res){ cur.total=res.total; cur.locs=res.locs; var it=DATA.items.filter(function(x){return x.id===cur.id;})[0]; if(it){it.total=res.total;it.locs=res.locs;} }
 function showDone(kind,delta,total){ document.getElementById('doneTitle').textContent=kind+' 저장 완료!'; document.getElementById('doneItem').textContent=cur.name+' · '+cur.cat; document.getElementById('doneTotal').textContent=fmt(total)+'개';
   var pos=delta>=0, dd=document.getElementById('doneDelta'); dd.className='r3 '+(pos?'in':'out'); dd.textContent=(pos?'＋':'−')+fmt(Math.abs(delta))+' '+kind+' ('+val('staffSel')+')';
-  document.getElementById('memoInput').value=''; document.getElementById('adjTarget').value=''; txImg=null; go('done'); }
+  document.getElementById('memoInput').value=''; document.getElementById('adjTarget').value=''; txImgs=[]; go('done'); }
 function delCurItem(){ if(!confirm('"'+cur.name+' ('+cur.cat+')" 품목과 모든 기록을 삭제할까요?\n되돌릴 수 없습니다.'))return;
   google.script.run.withSuccessHandler(function(){ DATA.items=DATA.items.filter(function(it){return it.id!==cur.id;}); catColorMap=null; fillDatalists(); alert('삭제되었습니다.'); go('search'); }).withFailureHandler(function(e){alert(e.message);}).deleteItem(cur.id); }
 
