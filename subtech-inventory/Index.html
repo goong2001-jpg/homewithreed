@@ -52,7 +52,7 @@
   .kv { font-size:13px; margin-top:9px; } .kv b { color:#2563eb; } .memocard .bd { font-size:13px; color:#37475a; margin-top:8px; white-space:pre-wrap; line-height:1.5; }
   .mphotos { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; } .mphoto { width:96px; } .mphoto .mplabel { font-size:10px; color:#8a97a8; font-weight:700; margin-bottom:3px; } .mphoto img { width:96px; height:96px; object-fit:cover; border-radius:8px; border:1px solid #eef1f5; }
   .memocard .foot { font-size:10.5px; color:#8a97a8; margin-top:11px; display:flex; justify-content:space-between; } .memocard .act { color:#2563eb; font-weight:700; cursor:pointer; } .memocard .act.red { color:#dc2626; }
-  .field2 { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:11px 14px; margin-bottom:10px; } .field2 .k2 { font-size:11px; font-weight:700; color:#6b7889; margin-bottom:4px; } .field2 input, .field2 textarea { width:100%; border:none; outline:none; font-size:15px; color:#1f2733; resize:vertical; font-family:inherit; }
+  .field2 { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:11px 14px; margin-bottom:10px; } .field2 .k2 { font-size:11px; font-weight:700; color:#6b7889; margin-bottom:4px; } .field2 input, .field2 textarea, .selfull { width:100%; border:none; outline:none; font-size:15px; color:#1f2733; resize:vertical; font-family:inherit; } .selfull { font-weight:700; background:transparent; }
   .oxrow { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:9px 14px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; } .oxrow .oxk { font-size:14px; font-weight:700; } .oxbtns { display:flex; gap:6px; }
   .oxb { width:46px; padding:7px 0; border-radius:8px; font-weight:900; font-size:14px; border:2px solid #e6ebf2; background:#fff; color:#b9c2cf; cursor:pointer; } .oxb.o.on { background:#16a34a; color:#fff; border-color:#16a34a; } .oxb.x.on { background:#dc2626; color:#fff; border-color:#dc2626; }
   .picsec { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:11px 14px; margin-bottom:10px; } .picsec .k2 { font-size:12px; font-weight:700; color:#37475a; margin-bottom:8px; } .picwrap { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
@@ -128,8 +128,7 @@
 
 <!-- 조립 레시피 작성/수정 -->
 <div class="body hidden" id="viewBomForm">
-  <div class="field2"><div class="k2">완제품 품명 *</div><input id="bomName" list="allNames" placeholder="예: STT1.3"></div>
-  <div class="field2"><div class="k2">완제품 분류</div><input id="bomCat" list="allCats" placeholder="예: 완포"></div>
+  <div class="field2"><div class="k2">완제품 * (목록에서 선택)</div><select id="bomFinished" class="selfull"></select></div>
   <div class="label">필요 부품 (완제품 1개당)</div>
   <div id="bomParts"></div>
   <div class="addline" onclick="addBomPart()">＋ 부품 추가</div>
@@ -149,10 +148,10 @@
   <div id="oxRows"></div>
   <div class="field2" id="progNameWrap" style="display:none"><div class="k2">프로그램명</div><input id="mProgram" placeholder="예: SV11 전용 v2"></div>
   <div class="field2"><div class="k2">비고</div><textarea id="mNote" rows="3" placeholder="주의사항, 특이건 등"></textarea></div>
-  <div class="picsec"><div class="k2">상호스티커 사진</div><div class="picwrap" id="picSticker"></div><input id="fSticker" type="file" accept="image/*" style="display:none" onchange="onPic('sticker',this)"></div>
-  <div class="picsec"><div class="k2">명판 사진</div><div class="picwrap" id="picNameplate"></div><input id="fNameplate" type="file" accept="image/*" style="display:none" onchange="onPic('nameplate',this)"></div>
-  <div class="picsec"><div class="k2">날짜스티커 사진</div><div class="picwrap" id="picDateSticker"></div><input id="fDateSticker" type="file" accept="image/*" style="display:none" onchange="onPic('dateSticker',this)"></div>
-  <div class="picsec"><div class="k2">추가 사진</div><div class="picwrap" id="picExtras"></div><input id="fExtras" type="file" accept="image/*" multiple style="display:none" onchange="onPic('extras',this)"></div>
+  <div class="picsec"><div class="k2">상호스티커 사진 (최대 3장)</div><div class="picwrap" id="picSticker"></div><input id="fSticker" type="file" accept="image/*" multiple style="display:none" onchange="onPic('sticker',this)"></div>
+  <div class="picsec"><div class="k2">명판 사진 (최대 3장)</div><div class="picwrap" id="picNameplate"></div><input id="fNameplate" type="file" accept="image/*" multiple style="display:none" onchange="onPic('nameplate',this)"></div>
+  <div class="picsec"><div class="k2">날짜스티커 사진 (최대 3장)</div><div class="picwrap" id="picDateSticker"></div><input id="fDateSticker" type="file" accept="image/*" multiple style="display:none" onchange="onPic('dateSticker',this)"></div>
+  <div class="picsec"><div class="k2">추가 사진 (최대 5장)</div><div class="picwrap" id="picExtras"></div><input id="fExtras" type="file" accept="image/*" multiple style="display:none" onchange="onPic('extras',this)"></div>
   <button class="savebtn blue" id="mBtn" onclick="saveMemoForm()">＋ 메모 저장</button>
 </div>
 
@@ -191,7 +190,7 @@ function boxText(total,unit){ unit=Number(unit)||0; if(unit<=0) return ''; var f
 // 검색
 function renderSearch(){ var q=val('searchInput').toLowerCase();
   var list=DATA.items.filter(function(it){return !q||(it.name+'').toLowerCase().indexOf(q)>=0;}).slice(0,80);
-  document.getElementById('searchList').innerHTML=list.length?list.map(function(it){var idx=DATA.items.indexOf(it); var bt=boxText(it.total,it.unit);
+  document.getElementById('searchList').innerHTML=list.length?list.map(function(it){var idx=DATA.items.indexOf(it); var bt=(it.boxes>0)?(fmt(it.boxes)+'박스'):'';
     return '<div class="item" onclick="select('+idx+')"><div><div class="nm">'+esc(it.name)+'</div><div class="meta">현재 '+fmt(it.total)+'개'+(bt?(' · '+bt):'')+'</div></div>'+badge(it.cat)+'</div>';
   }).join(''):'<div class="loading">검색 결과가 없습니다.</div>'; }
 function select(i){ cur=DATA.items[i]; type='입고'; lines=[{boxes:'',per:String(cur.unit||'')}]; txImgs=[]; document.getElementById('renameBox').classList.add('hidden'); document.getElementById('adjTarget').value=''; renderInput(); go('input'); loadHistory(); }
@@ -220,7 +219,7 @@ function onInput(i,f,v){ lines[i][f]=v; updateTotal(); }
 function lineTotal(l){ return (Number(l.boxes)||0)*(Number(l.per)||0); }
 function grandTotal(){ return lines.reduce(function(s,l){return s+lineTotal(l);},0); }
 function renderInput(){
-  var bt=boxText(cur.total,cur.unit);
+  var bt=(cur.boxes>0)?(fmt(cur.boxes)+'박스'):'';
   document.getElementById('barIcon').textContent='📦'; document.getElementById('barTitle').textContent=cur.name; document.getElementById('barSub').textContent=cur.cat+' · 현재 '+fmt(cur.total)+'개'+(bt?(' · '+bt):'');
   document.getElementById('ihName').textContent=cur.name; document.getElementById('ihBadge').innerHTML=badge(cur.cat);
   document.getElementById('btnIn').className='in '+(type==='입고'?'on':''); document.getElementById('btnOut').className='out '+(type==='출고'?'on':''); document.getElementById('btnAdj').className='adj '+(type==='조정'?'on':'');
@@ -294,9 +293,10 @@ function renderStock(){
   var list=DATA.items.filter(function(it){return (stockFilter==='전체'||it.cat===stockFilter)&&(!sq||(it.name+'').toLowerCase().indexOf(sq)>=0);});
   list.sort(sortMode==='qty'?function(a,b){return b.total-a.total;}:function(a,b){return (a.name+'').localeCompare(b.name+'','ko');});
   document.getElementById('stockList').innerHTML=list.length?list.map(function(it){
-    var idx=DATA.items.indexOf(it), low=it.safe>0&&it.total<it.safe, color=catColor(it.cat), bt=boxText(it.total,it.unit);
+    var idx=DATA.items.indexOf(it), low=it.safe>0&&it.total<it.safe, color=catColor(it.cat);
+    var bxs=(it.boxes>0)?'<span class="bx">'+fmt(it.boxes)+'박스</span>':'';
     var locs=Object.keys(it.locs||{}).map(function(k){return k+' '+fmt(it.locs[k]);}).join(' · ')||'-';
-    return '<div class="srow" style="border-left-color:'+color+'" onclick="select('+idx+')"><div class="top"><span class="nm2">'+esc(it.name)+' '+badge(it.cat)+'</span><span class="q2'+(low?' low':'')+'">'+fmt(it.total)+'<small> 개</small>'+(bt?'<span class="bx">≈ '+bt+'</span>':'')+(low?' <span class="warn">안전재고↓</span>':'')+'</span></div><div class="b2">📍 '+esc(locs)+(it.safe>0?(' · 안전재고 '+fmt(it.safe)):'')+'</div></div>';
+    return '<div class="srow" style="border-left-color:'+color+'" onclick="select('+idx+')"><div class="top"><span class="nm2">'+esc(it.name)+' '+badge(it.cat)+'</span><span class="q2'+(low?' low':'')+'">'+fmt(it.total)+'<small> 개</small>'+bxs+(low?' <span class="warn">안전재고↓</span>':'')+'</span></div><div class="b2">📍 '+esc(locs)+(it.safe>0?(' · 안전재고 '+fmt(it.safe)):'')+'</div></div>';
   }).join(''):'<div class="loading">품목이 없습니다.</div>';
 }
 
@@ -316,34 +316,38 @@ function renderBuild(arr){ BUILDS=arr||[];
     var parts=b.parts.map(function(p){ var lim=Math.floor(p.have/p.per)===b.buildable;
       return '<div class="bpart'+(lim?' lim':'')+'"><span class="pn">'+esc(p.name)+(p.cat?(' ('+esc(p.cat)+')'):'')+'</span><span class="pq">보유 <b>'+fmt(p.have)+'</b> / 1개당 '+fmt(p.per)+' → '+fmt(p.can)+'개</span></div>';
     }).join('');
-    return '<div class="bcard"><div class="btop"><span class="bname">'+esc(b.name)+' '+badge(b.cat)+'</span><span class="bnum'+(b.buildable<=0?' zero':'')+'">'+fmt(b.buildable)+'<small> 개 가능</small></span></div>'+
+    return '<div class="bcard" onclick="editBom('+bi+')"><div class="btop"><span class="bname">'+esc(b.name)+' '+badge(b.cat)+'</span><span class="bnum'+(b.buildable<=0?' zero':'')+'">'+fmt(b.buildable)+'<small> 개 가능</small></span></div>'+
       (b.bottleneck.length?'<div class="bneck">⛔ 병목: '+esc(b.bottleneck.join(', '))+'</div>':'')+'<div class="bparts">'+parts+'</div>'+
-      '<div class="bact"><span class="e" onclick="editBom('+bi+')">수정</span><span class="d" onclick="deleteBom('+bi+')">삭제</span></div></div>';
+      '<div class="bact"><span class="e">✏️ 수정</span><span class="d" onclick="event.stopPropagation();deleteBom('+bi+')">🗑 삭제</span></div></div>';
   }).join('');
 }
-function openNewBom(){ BF={parts:[{name:'',cat:'',per:1}]}; document.getElementById('bomName').value=''; document.getElementById('bomCat').value=''; renderBomParts(); go('bomForm'); }
-function editBom(bi){ var b=BUILDS[bi]; if(!b)return; BF={origName:b.name,origCat:b.cat,parts:b.parts.map(function(p){return {name:p.name,cat:p.cat,per:p.per};})};
-  document.getElementById('bomName').value=b.name; document.getElementById('bomCat').value=b.cat; renderBomParts(); go('bomForm'); }
+function itemById(id){ return DATA.items.filter(function(x){return x.id===id;})[0]; }
+function itemOptions(sel){ return '<option value="">— 품목 선택 —</option>'+DATA.items.map(function(it){return '<option value="'+esc(it.id)+'"'+(it.id===sel?' selected':'')+'>'+esc(it.name)+' ('+esc(it.cat||'-')+')</option>';}).join(''); }
+function openNewBom(){ BF={parts:[{id:'',per:1}]}; document.getElementById('bomFinished').innerHTML=itemOptions(''); renderBomParts(); go('bomForm'); }
+function editBom(bi){ var b=BUILDS[bi]; if(!b)return; BF={origName:b.name,origCat:b.cat,parts:b.parts.map(function(p){return {id:p.name+'||'+p.cat,per:p.per};})};
+  document.getElementById('bomFinished').innerHTML=itemOptions(b.name+'||'+b.cat); renderBomParts(); go('bomForm'); }
 function deleteBom(bi){ var b=BUILDS[bi]; if(!b)return; if(!confirm('"'+b.name+'" 조립 레시피를 삭제할까요?'))return;
   google.script.run.withSuccessHandler(loadBuild).withFailureHandler(function(e){alert(e.message);}).deleteBOM(b.name,b.cat); }
-function addBomPart(){ BF.parts.push({name:'',cat:'',per:1}); renderBomParts(); }
-function delBomPart(i){ BF.parts.splice(i,1); if(!BF.parts.length) BF.parts=[{name:'',cat:'',per:1}]; renderBomParts(); }
+function addBomPart(){ BF.parts.push({id:'',per:1}); renderBomParts(); }
+function delBomPart(i){ BF.parts.splice(i,1); if(!BF.parts.length) BF.parts=[{id:'',per:1}]; renderBomParts(); }
 function onBomPart(i,f,v){ BF.parts[i][f]=v; }
 function renderBomParts(){ document.getElementById('bomParts').innerHTML=BF.parts.map(function(p,i){
-    return '<div class="boxrow"><div class="field"><div class="k">부품 품명</div><input list="allNames" value="'+esc(p.name)+'" oninput="onBomPart('+i+',\'name\',this.value)"></div><div class="field" style="max-width:78px"><div class="k">분류</div><input list="allCats" value="'+esc(p.cat)+'" oninput="onBomPart('+i+',\'cat\',this.value)"></div><div class="field" style="max-width:60px"><div class="k">1개당</div><input type="number" inputmode="numeric" value="'+esc(p.per)+'" oninput="onBomPart('+i+',\'per\',this.value)"></div><span class="del" onclick="delBomPart('+i+')">✕</span></div>';
+    return '<div class="boxrow"><div class="field"><div class="k">부품</div><select class="selfull" style="font-size:14px" onchange="onBomPart('+i+',\'id\',this.value)">'+itemOptions(p.id)+'</select></div><div class="field" style="max-width:64px"><div class="k">1개당</div><input type="number" inputmode="numeric" value="'+esc(p.per)+'" oninput="onBomPart('+i+',\'per\',this.value)"></div><span class="del" onclick="delBomPart('+i+')">✕</span></div>';
   }).join(''); }
-function saveBomForm(){ var name=val('bomName'); if(!name){alert('완제품 품명을 입력하세요.');return;}
+function saveBomForm(){ var fin=itemById(val('bomFinished')); if(!fin){alert('완제품을 선택하세요.');return;}
+  var parts=BF.parts.filter(function(p){return p.id&&(Number(p.per)||0)>0;}).map(function(p){var it=itemById(p.id);return {name:it.name,cat:it.cat,per:Number(p.per)||1};});
+  if(!parts.length){alert('부품을 1개 이상 선택하세요.');return;}
   var b=document.getElementById('bomBtn'); b.disabled=true; b.textContent='저장 중…';
   google.script.run.withSuccessHandler(function(){ b.disabled=false; b.textContent='＋ 레시피 저장'; loadBuild(); go('build'); })
     .withFailureHandler(function(e){alert(e.message); b.disabled=false; b.textContent='＋ 레시피 저장';})
-    .saveBOM({origName:BF.origName||'', origCat:BF.origCat||'', name:name, cat:val('bomCat'), parts:BF.parts}); }
+    .saveBOM({origName:BF.origName||'', origCat:BF.origCat||'', name:fin.name, cat:fin.cat, parts:parts}); }
 
 // 메모
 function loadMemos(){ if(MEMOS!==null){renderMemos();return;} document.getElementById('memoList').innerHTML='<div class="loading">불러오는 중…</div>';
   google.script.run.withSuccessHandler(function(m){MEMOS=m;renderMemos();}).withFailureHandler(function(e){document.getElementById('memoList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>';}).getMemos(); }
 function memoPics(m){ var h='';
   function one(p,label){ if(!p||!p.thumb)return ''; return '<div class="mphoto"><div class="mplabel">'+label+'</div><a href="'+esc(p.url)+'" target="_blank"><img src="'+esc(p.thumb)+'" loading="lazy"></a></div>'; }
-  h+=one(m.stickerImg,'상호스티커'); h+=one(m.nameplateImg,'명판'); h+=one(m.dateStickerImg,'날짜스티커'); (m.extras||[]).forEach(function(p){h+=one(p,'추가');});
+  (m.stickerImgs||[]).forEach(function(p){h+=one(p,'상호스티커');}); (m.nameplateImgs||[]).forEach(function(p){h+=one(p,'명판');}); (m.dateStickerImgs||[]).forEach(function(p){h+=one(p,'날짜스티커');}); (m.extras||[]).forEach(function(p){h+=one(p,'추가');});
   return h?'<div class="mphotos">'+h+'</div>':''; }
 function renderMemos(){ var q=val('memoSearch').toLowerCase();
   var list=(MEMOS||[]).filter(function(m){ return !q||[m.company,m.programName,m.note].join(' ').toLowerCase().indexOf(q)>=0; });
@@ -354,32 +358,32 @@ function renderMemos(){ var q=val('memoSearch').toLowerCase();
       (m.note?'<div class="bd">'+esc(m.note)+'</div>':'')+memoPics(m)+
       '<div class="foot"><span>'+esc(m.date)+(m.author?(' · '+esc(m.author)):'')+'</span><span class="act red" onclick="delMemo('+m.row+')">삭제</span></div></div>';
   }).join(''):'<div class="loading">메모가 없습니다. ＋ 새 메모로 추가하세요.</div>'; }
-function openNewMemo(){ MF={extras:[]}; ['mCompany','mProgram','mNote'].forEach(function(id){document.getElementById(id).value='';}); renderOX(); renderPics(); go('memoForm'); }
+function keepImg(p){ return {id:p.id,thumb:p.thumb}; }
+function openNewMemo(){ MF={stickers:[],nameplates:[],dateStickers:[],extras:[]}; ['mCompany','mProgram','mNote'].forEach(function(id){document.getElementById(id).value='';}); renderOX(); renderPics(); go('memoForm'); }
 function editMemo(row){ var m=(MEMOS||[]).filter(function(x){return x.row===row;})[0]; if(!m)return;
   MF={row:row, plate:m.plate,bizSticker:m.bizSticker,dateSticker:m.dateSticker,caseO:m.caseO,program:m.program,
-      sticker:m.stickerImg?{id:m.stickerImg.id,thumb:m.stickerImg.thumb}:null, nameplate:m.nameplateImg?{id:m.nameplateImg.id,thumb:m.nameplateImg.thumb}:null,
-      dateStickerImg:m.dateStickerImg?{id:m.dateStickerImg.id,thumb:m.dateStickerImg.thumb}:null, extras:(m.extras||[]).map(function(p){return {id:p.id,thumb:p.thumb};})};
+      stickers:(m.stickerImgs||[]).map(keepImg), nameplates:(m.nameplateImgs||[]).map(keepImg), dateStickers:(m.dateStickerImgs||[]).map(keepImg), extras:(m.extras||[]).map(keepImg)};
   document.getElementById('mCompany').value=m.company||''; document.getElementById('mProgram').value=m.programName||''; document.getElementById('mNote').value=m.note||''; renderOX(); renderPics(); go('memoForm'); }
 function renderOX(){ document.getElementById('oxRows').innerHTML=OXF.map(function(f){var v=MF[f[0]]||'';
     return '<div class="oxrow"><span class="oxk">'+f[1]+'</span><div class="oxbtns"><button class="oxb o '+(v==='O'?'on':'')+'" onclick="setOX(\''+f[0]+'\',\'O\')">O</button><button class="oxb x '+(v==='X'?'on':'')+'" onclick="setOX(\''+f[0]+'\',\'X\')">X</button></div></div>';
   }).join(''); document.getElementById('progNameWrap').style.display=MF.program==='O'?'block':'none'; }
 function setOX(k,v){ MF[k]=(MF[k]===v?'':v); renderOX(); }
 function picSrc(p){ return p.preview||p.thumb||''; }
-function renderPics(){ slot('picSticker', MF.sticker?[MF.sticker]:[], 'sticker'); slot('picNameplate', MF.nameplate?[MF.nameplate]:[], 'nameplate'); slot('picDateSticker', MF.dateStickerImg?[MF.dateStickerImg]:[], 'dateSticker'); slot('picExtras', MF.extras||[], 'extras', true); }
-function slot(elId, arr, name, multi){
+function renderPics(){ slot('picSticker', MF.stickers||[], 'sticker', 3); slot('picNameplate', MF.nameplates||[], 'nameplate', 3); slot('picDateSticker', MF.dateStickers||[], 'dateSticker', 3); slot('picExtras', MF.extras||[], 'extras', 5); }
+function slot(elId, arr, name, max){
   var html=arr.map(function(p,i){ return '<div class="pthumb"><img src="'+esc(picSrc(p))+'"><span class="px" onclick="removePic(\''+name+'\','+i+')">✕</span></div>'; }).join('');
-  if(multi || !arr.length) html+='<div class="picadd" onclick="document.getElementById(\'f'+cap(name)+'\').click()">＋</div>';
+  if(arr.length<max) html+='<div class="picadd" onclick="document.getElementById(\'f'+cap(name)+'\').click()">＋</div>';
   document.getElementById(elId).innerHTML=html; }
-function mfKey(name){ return name==='dateSticker'?'dateStickerImg':name; }
-function removePic(name,i){ if(name==='extras') MF.extras.splice(i,1); else MF[mfKey(name)]=null; renderPics(); }
-function onPic(name,input){ var files=input.files; if(!files.length)return;
-  Array.prototype.forEach.call(files,function(f){ var r=new FileReader(); r.onload=function(){ var img={data:r.result.split(',')[1],mime:f.type,name:f.name,preview:r.result}; if(name==='extras'){MF.extras=MF.extras||[]; MF.extras.push(img);} else MF[mfKey(name)]=img; renderPics(); }; r.readAsDataURL(f); }); input.value=''; }
+function mfKey(name){ return {sticker:'stickers',nameplate:'nameplates',dateSticker:'dateStickers',extras:'extras'}[name]; }
+function removePic(name,i){ MF[mfKey(name)].splice(i,1); renderPics(); }
+function onPic(name,input){ var files=input.files; if(!files.length)return; var key=mfKey(name);
+  Array.prototype.forEach.call(files,function(f){ var r=new FileReader(); r.onload=function(){ MF[key]=MF[key]||[]; MF[key].push({data:r.result.split(',')[1],mime:f.type,name:f.name,preview:r.result}); renderPics(); }; r.readAsDataURL(f); }); input.value=''; }
 function clean(p){ if(!p)return null; if(p.id)return {id:p.id}; return {data:p.data,mime:p.mime,name:p.name}; }
 function saveMemoForm(){ var c=val('mCompany'); if(!c){alert('업체명을 입력하세요.');return;}
   var b=document.getElementById('mBtn'); b.disabled=true; b.textContent='저장 중…';
   google.script.run.withSuccessHandler(function(){ MEMOS=null; b.disabled=false; b.textContent='＋ 메모 저장'; go('memo'); }).withFailureHandler(function(e){alert('저장 실패: '+e.message); b.disabled=false; b.textContent='＋ 메모 저장';})
     .saveMemo({ row:MF.row||'', company:c, plate:MF.plate||'', bizSticker:MF.bizSticker||'', dateSticker:MF.dateSticker||'', caseO:MF.caseO||'', program:MF.program||'', programName:val('mProgram'), note:val('mNote'), author:val('staffSel'),
-      sticker:clean(MF.sticker), nameplate:clean(MF.nameplate), dateSticker:clean(MF.dateStickerImg), extras:(MF.extras||[]).map(clean) }); }
+      stickers:(MF.stickers||[]).map(clean), nameplates:(MF.nameplates||[]).map(clean), dateStickers:(MF.dateStickers||[]).map(clean), extras:(MF.extras||[]).map(clean) }); }
 function delMemo(row){ if(!confirm('이 메모를 삭제할까요? (사진도 함께 삭제됩니다)'))return;
   google.script.run.withSuccessHandler(function(){MEMOS=null;loadMemos();}).withFailureHandler(function(e){alert(e.message);}).deleteMemo(row); }
 

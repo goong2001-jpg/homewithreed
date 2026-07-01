@@ -18,7 +18,7 @@ var TAB_MEMO     = '메모';
 var TAB_BOM      = 'BOM';
 var TAB_REPORT   = '월별리포트';
 
-var DEFAULT_LOCATIONS = ['A동1층', 'A동2층', 'A동3층', 'B동1층', '창고'];
+var DEFAULT_LOCATIONS = ['A동1층', 'A동2층', 'A동3층', 'B동1층', 'B동2층'];
 
 // 메모: 1일시 2업체 3명판 4상호스티커 5날짜스티커 6전용케이스 7프로그램 8프로그램명
 //       9비고 10상호스티커사진 11명판사진 12날짜스티커사진 13추가사진 14작성자
@@ -200,8 +200,8 @@ function bootstrap() {
   if (m && m.getLastRow() >= 2)
     m.getRange(2, 1, m.getLastRow() - 1, 5).getValues().forEach(function (r) {
       if (!r[0]) return;
-      var s = stock[r[0]] || { total: 0, locs: {} };
-      items.push({ id: r[0], name: r[1], cat: r[2], unit: r[3], safe: Number(r[4]) || 0, total: s.total, locs: s.locs });
+      var s = stock[r[0]] || { total: 0, boxes: 0, locs: {} };
+      items.push({ id: r[0], name: r[1], cat: r[2], unit: r[3], safe: Number(r[4]) || 0, total: s.total, boxes: s.boxes || 0, locs: s.locs });
     });
   var staff = [];
   if (cf && cf.getLastRow() >= 2) cf.getRange(2, 1, cf.getLastRow() - 1, 1).getValues().forEach(function (r) { if (r[0]) staff.push('' + r[0]); });
@@ -216,9 +216,9 @@ function computeStock_() {
   if (!log || log.getLastRow() < 2) return map;
   log.getRange(2, 1, log.getLastRow() - 1, 12).getValues().forEach(function (r) {
     var id = r[1]; if (!id) return;
-    var loc = r[4] || '기타', d = Number(r[9]) || 0;
-    if (!map[id]) map[id] = { total: 0, locs: {} };
-    map[id].total += d; map[id].locs[loc] = (map[id].locs[loc] || 0) + d;
+    var loc = r[4] || '기타', d = Number(r[9]) || 0, box = (Number(r[6]) || 0) * (d >= 0 ? 1 : -1);
+    if (!map[id]) map[id] = { total: 0, boxes: 0, locs: {} };
+    map[id].total += d; map[id].boxes += box; map[id].locs[loc] = (map[id].locs[loc] || 0) + d;
   });
   return map;
 }
@@ -389,10 +389,9 @@ function getMemos() {
   var v = sh.getRange(2, 1, sh.getLastRow() - 1, 14).getValues();
   for (var i = v.length - 1; i >= 0; i--) {
     var r = v[i]; if (!r[1] && !r[8]) continue;
-    var extras = ('' + r[12]).split(',').map(function (s) { return s.trim(); }).filter(Boolean).map(imgObj_).filter(Boolean);
     out.push({ row: i + 2, date: r[0] ? fmtDt2_(r[0]) : '', company: r[1], plate: r[2], bizSticker: r[3], dateSticker: r[4],
       caseO: r[5], program: r[6], programName: r[7], note: r[8],
-      stickerImg: imgObj_(r[9]), nameplateImg: imgObj_(r[10]), dateStickerImg: imgObj_(r[11]), extras: extras, author: r[13] });
+      stickerImgs: imgList_(r[9]), nameplateImgs: imgList_(r[10]), dateStickerImgs: imgList_(r[11]), extras: imgList_(r[12]), author: r[13] });
   }
   return out;
 }
@@ -400,22 +399,21 @@ function saveMemo(p) {
   var sh = SpreadsheetApp.getActive().getSheetByName(TAB_MEMO), oldIds = [];
   if (p.row) {
     var o = sh.getRange(p.row, 1, 1, 14).getValues()[0];
-    oldIds = [o[9], o[10], o[11]].concat(('' + o[12]).split(',')).map(function (s) { return ('' + s).trim(); }).filter(Boolean);
+    oldIds = [o[9], o[10], o[11], o[12]].join(',').split(',').map(function (s) { return ('' + s).trim(); }).filter(Boolean);
   }
-  var stickerId = resolveImg_(p.sticker), nameplateId = resolveImg_(p.nameplate), dateStickerId = resolveImg_(p.dateSticker);
-  var extraIds = (p.extras || []).map(resolveImg_).filter(Boolean);
-  var newIds = [stickerId, nameplateId, dateStickerId].concat(extraIds).filter(Boolean);
+  var stickerIds = resolveImgs_(p.stickers), nameplateIds = resolveImgs_(p.nameplates), dateStickerIds = resolveImgs_(p.dateStickers), extraIds = resolveImgs_(p.extras);
+  var newIds = (stickerIds + ',' + nameplateIds + ',' + dateStickerIds + ',' + extraIds).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
   oldIds.forEach(function (id) { if (id && newIds.indexOf(id) < 0) { try { DriveApp.getFileById(id).setTrashed(true); } catch (e) {} } });
   var dateVal = p.row ? (sh.getRange(p.row, 1).getValue() || new Date()) : new Date();
   var row = [dateVal, p.company || '', ox_(p.plate), ox_(p.bizSticker), ox_(p.dateSticker), ox_(p.caseO), ox_(p.program),
-             p.programName || '', p.note || '', stickerId, nameplateId, dateStickerId, extraIds.join(','), p.author || ''];
+             p.programName || '', p.note || '', stickerIds, nameplateIds, dateStickerIds, extraIds, p.author || ''];
   if (p.row) sh.getRange(p.row, 1, 1, 14).setValues([row]); else sh.appendRow(row);
   return { ok: true };
 }
 function deleteMemo(row) {
   var sh = SpreadsheetApp.getActive().getSheetByName(TAB_MEMO);
   var o = sh.getRange(row, 1, 1, 14).getValues()[0];
-  [o[9], o[10], o[11]].concat(('' + o[12]).split(',')).map(function (s) { return ('' + s).trim(); }).filter(Boolean)
+  [o[9], o[10], o[11], o[12]].join(',').split(',').map(function (s) { return ('' + s).trim(); }).filter(Boolean)
     .forEach(function (id) { try { DriveApp.getFileById(id).setTrashed(true); } catch (e) {} });
   sh.deleteRow(row); return { ok: true };
 }
