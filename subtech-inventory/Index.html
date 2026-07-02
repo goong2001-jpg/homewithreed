@@ -163,6 +163,7 @@
 </div>
 
 <script>
+var HTML_VERSION = 'v7'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var cur = null, type = '입고', lines = [{ boxes:'', per:'' }], txImgs = [];
@@ -172,7 +173,8 @@ var catColorMap = null;
 var OXF = [['plate','명판'],['bizSticker','상호스티커'],['dateSticker','날짜스티커'],['caseO','전용케이스'],['program','프로그램']];
 
 google.script.run.withSuccessHandler(onBoot).withFailureHandler(onErr).bootstrap();
-function onBoot(d){ DATA=d; fill('staffSel', d.staff&&d.staff.length?d.staff:['담당자']); fill('locSel', d.locations&&d.locations.length?d.locations:['A동1층']); catColorMap=null; fillDatalists(); renderSearch(); }
+function onBoot(d){ DATA=d; fill('staffSel', d.staff&&d.staff.length?d.staff:['담당자']); fill('locSel', d.locations&&d.locations.length?d.locations:['A동1층']); catColorMap=null; fillDatalists(); resetBar(); renderSearch();
+  if(d.version && d.version!==HTML_VERSION) alert('⚠️ 버전 불일치!\n화면(Index.html): '+HTML_VERSION+' / 서버(Code.gs): '+d.version+'\n두 파일을 모두 최신으로 교체한 뒤 [배포 관리 > 수정 > 새 버전 > 배포] 하세요.'); }
 function onErr(e){ document.getElementById('searchList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>'; }
 function fill(id,arr){ document.getElementById(id).innerHTML=arr.map(function(s){return '<option>'+esc(s)+'</option>';}).join(''); }
 function fillDatalists(){ var names=DATA.items.map(function(i){return i.name;}).filter(uniq); var cats=DATA.items.map(function(i){return i.cat;}).filter(function(v){return v;}).filter(uniq);
@@ -405,7 +407,7 @@ function go(v){
 function show(n){ document.getElementById('view'+n).classList.remove('hidden'); }
 function setNav(v){ var g=(v==='search'||v==='input'||v==='newItem'||v==='done');
   document.getElementById('navInput').className=g?'on':''; document.getElementById('navStock').className=(v==='stock'||v==='report')?'on':''; document.getElementById('navBuild').className=(v==='build'||v==='bomForm')?'on':''; document.getElementById('navMemo').className=(v==='memo'||v==='memoForm')?'on':''; }
-function resetBar(ic,t,s){ document.getElementById('barIcon').textContent=ic||'📦'; document.getElementById('barTitle').textContent=t||'써브텍 재고'; document.getElementById('barSub').textContent=s||'입고 · 출고를 빠르게 기록하세요'; }
+function resetBar(ic,t,s){ document.getElementById('barIcon').textContent=ic||'📦'; document.getElementById('barTitle').textContent=t||'써브텍 재고'; document.getElementById('barSub').textContent=s||('입고 · 출고를 빠르게 기록하세요 · '+HTML_VERSION); }
 </script>
 </body>
 </html>

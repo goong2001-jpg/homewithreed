@@ -6,6 +6,8 @@
  * - 메모(업체 사양), 조립 가능 수량(BOM), 월별 입출고 리포트 포함.
  */
 
+var APP_VERSION = 'v7'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
+
 var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
 
@@ -208,8 +210,16 @@ function bootstrap() {
   var locs = [];
   var locSh = ss.getSheetByName(TAB_LOCATION);
   if (locSh && locSh.getLastRow() >= 2) locSh.getRange(2, 1, locSh.getLastRow() - 1, 1).getValues().forEach(function (r) { if (r[0]) locs.push('' + r[0]); });
-  if (!locs.length) locs = DEFAULT_LOCATIONS.slice();
-  return { items: items, staff: staff, locations: locs };
+  // 옛 기본 위치 목록이 남아있으면 자동으로 새 목록으로 교체 (초기 설정 없이도 반영)
+  var OLD_SETS = ['1층,2층,A동,B동,창고', 'A동1층,A동2층,A동3층,B동1층,창고'];
+  if (!locs.length || OLD_SETS.indexOf(locs.join(',')) >= 0) {
+    locs = DEFAULT_LOCATIONS.slice();
+    if (locSh) {
+      if (locSh.getLastRow() > 1) locSh.getRange(2, 1, locSh.getLastRow() - 1, 1).clearContent();
+      locSh.getRange(2, 1, locs.length, 1).setValues(locs.map(function (x) { return [x]; }));
+    }
+  }
+  return { items: items, staff: staff, locations: locs, version: APP_VERSION };
 }
 function computeStock_() {
   var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG), map = {};
