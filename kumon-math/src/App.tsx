@@ -8,6 +8,7 @@ import ProblemCard from './components/ProblemCard';
 import ProgressBar from './components/ProgressBar';
 import DailyMission from './components/DailyMission';
 import CountingHelper from './components/CountingHelper';
+import CourseSelect from './components/CourseSelect';
 import Shop from './components/Shop';
 import { playCorrect, playWrong, playStreak } from './utils/sounds';
 
@@ -37,16 +38,17 @@ const WRONG_MESSAGES = [
 ];
 
 export default function App() {
-  const { gameState, items, onCorrect, onWrong, buyItem, equipItem } = useGameState();
+  const { gameState, items, onCorrect, onWrong, buyItem, equipItem, switchCourse } = useGameState();
   const [problem, setProblem] = useState<Problem>(() => generateProblem(gameState.courseId, gameState.level));
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [mood, setMood] = useState<AvatarMood>('idle');
   const [showHelper, setShowHelper] = useState(false);
   const [showShop, setShowShop] = useState(false);
+  const [showCourseSelect, setShowCourseSelect] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState('');
   const [pointsFlash, setPointsFlash] = useState(0);
   const [flashKey, setFlashKey] = useState(0);
-  const [promotion, setPromotion] = useState<{ id: string; name: string; emoji: string } | null>(null);
+  const [unlocked, setUnlocked] = useState<{ id: string; name: string; emoji: string } | null>(null);
 
   const course = getCourse(gameState.courseId);
 
@@ -84,8 +86,8 @@ export default function App() {
       setTimeout(() => {
         setPointsFlash(0);
         setFeedbackMsg('');
-        if (result.promotedTo) {
-          setPromotion(result.promotedTo);
+        if (result.unlockedCourse) {
+          setUnlocked(result.unlockedCourse);
         } else {
           nextProblem(result.courseId, result.nextLevel);
         }
@@ -142,6 +144,7 @@ export default function App() {
         points={gameState.points}
         courseName={course.name}
         courseEmoji={course.emoji}
+        onCourseClick={() => setShowCourseSelect(true)}
       />
 
       <DailyMission
@@ -220,8 +223,22 @@ export default function App() {
         />
       )}
 
-      {/* 🎓 코스 승급 축하 모달 */}
-      {promotion && (
+      {/* 📚 코스 고르기 모달 */}
+      {showCourseSelect && (
+        <CourseSelect
+          currentCourseId={gameState.courseId}
+          unlockedCourseIds={gameState.unlockedCourseIds}
+          courseLevels={gameState.courseLevels}
+          onSelect={(id) => {
+            switchCourse(id);
+            nextProblem(id, gameState.courseLevels[id] ?? 1);
+          }}
+          onClose={() => setShowCourseSelect(false)}
+        />
+      )}
+
+      {/* 🎉 새 코스 해금 모달 — 자동으로 넘어가지 않고 아이가 선택 */}
+      {unlocked && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -233,31 +250,51 @@ export default function App() {
             textAlign: 'center', boxShadow: '0 25px 80px rgba(0,0,0,0.4)',
             animation: 'fadeIn 0.4s ease',
           }}>
-            <div style={{ fontSize: 64, marginBottom: 8 }}>🎓</div>
+            <div style={{ fontSize: 64, marginBottom: 8 }}>🎉</div>
             <div style={{ fontSize: 24, fontWeight: 900, color: '#5b3a7a', marginBottom: 8 }}>
-              코스 승급!
+              새 코스가 열렸어!
             </div>
             <div style={{ fontSize: 17, fontWeight: 700, color: '#6b4a8a', marginBottom: 20, lineHeight: 1.5 }}>
-              정말 잘했어! 이제부터는<br />
-              <span style={{ fontSize: 22, color: '#e74c3c' }}>{promotion.emoji} {promotion.name}</span><br />
-              에 도전해보자!
+              정말 잘해서<br />
+              <span style={{ fontSize: 22, color: '#e74c3c' }}>{unlocked.emoji} {unlocked.name}</span><br />
+              코스가 열렸어! 지금 해볼래?
             </div>
-            <button
-              onClick={() => {
-                const p = promotion;
-                setPromotion(null);
-                playStreak();
-                nextProblem(p.id, 1);
-              }}
-              style={{
-                background: 'linear-gradient(135deg, #667eea, #764ba2)',
-                color: 'white', border: 'none', borderRadius: 14,
-                padding: '14px 36px', fontSize: 17, fontWeight: 800,
-                cursor: 'pointer', boxShadow: '0 6px 20px rgba(102,126,234,0.5)',
-              }}
-            >
-              새 코스 시작! 🚀
-            </button>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button
+                onClick={() => {
+                  const u = unlocked;
+                  setUnlocked(null);
+                  playStreak();
+                  switchCourse(u.id);
+                  nextProblem(u.id, 1);
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                  color: 'white', border: 'none', borderRadius: 14,
+                  padding: '14px 24px', fontSize: 16, fontWeight: 800,
+                  cursor: 'pointer', boxShadow: '0 6px 20px rgba(102,126,234,0.5)',
+                }}
+              >
+                지금 도전! 🚀
+              </button>
+              <button
+                onClick={() => {
+                  setUnlocked(null);
+                  nextProblem(gameState.courseId, gameState.level);
+                }}
+                style={{
+                  background: 'white',
+                  color: '#764ba2', border: '2px solid #764ba2', borderRadius: 14,
+                  padding: '14px 24px', fontSize: 16, fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                나중에 할래 😊
+              </button>
+            </div>
+            <div style={{ fontSize: 12, color: '#8a6aa8', marginTop: 14 }}>
+              위쪽 📚 코스 이름을 누르면 언제든 바꿀 수 있어요
+            </div>
           </div>
         </div>
       )}

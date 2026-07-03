@@ -53,6 +53,10 @@ export interface GameState {
   /** 미션 보상을 받은 날짜 (하루 1회 지급) */
   missionRewardDate: string;
   courseProgress: Record<string, CourseProgress>;
+  /** 열려 있는(선택 가능한) 코스 목록 */
+  unlockedCourseIds: string[];
+  /** 코스별 마지막 레벨 기억 — 코스를 오가도 이어서 하기 */
+  courseLevels: Record<string, number>;
 }
 
 /**

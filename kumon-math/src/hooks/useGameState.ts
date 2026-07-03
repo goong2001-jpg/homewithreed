@@ -37,9 +37,9 @@ const ITEMS_KEY = 'kumon_items';
 
 const DAILY_GOAL = 20;          // 오늘의 미션: 20문제 맞히기
 const MISSION_BONUS = 20;       // 미션 완료 보너스 ⭐
-const PROMOTE_WINDOW = 20;      // 승급 판정: 최근 20문제
-const PROMOTE_MIN_CORRECT = 18; // 그중 18개 이상 정답 (90%)
-const PROMOTE_MIN_LEVEL = 10;   // 코스 내 레벨 10 이상일 때만 승급
+const UNLOCK_WINDOW = 20;      // 다음 코스 해금 판정: 최근 20문제
+const UNLOCK_MIN_CORRECT = 18; // 그중 18개 이상 정답 (90%)
+const UNLOCK_MIN_LEVEL = 10;   // 코스 내 레벨 10 이상일 때만 해금
 
 function todayStr(): string {
   const d = new Date();
@@ -67,6 +67,8 @@ const DEFAULT_STATE: GameState = {
   attendanceStreak: 0,
   missionRewardDate: '',
   courseProgress: {},
+  unlockedCourseIds: ['add10', 'addsub20'],
+  courseLevels: {},
 };
 
 function loadState(): GameState {
@@ -77,6 +79,10 @@ function loadState(): GameState {
       const merged: GameState = { ...DEFAULT_STATE, ...JSON.parse(saved) };
       merged.dailyGoal = DAILY_GOAL;
       if (merged.lastPlayedDate !== todayStr()) merged.todaySolved = 0;
+      // 현재 하고 있는 코스는 항상 해금 목록에 포함 (자동 승급 시절 데이터 호환)
+      if (!merged.unlockedCourseIds.includes(merged.courseId)) {
+        merged.unlockedCourseIds = [...merged.unlockedCourseIds, merged.courseId];
+      }
       return merged;
     }
   } catch {}
@@ -111,7 +117,8 @@ function applyAttendance(prev: GameState): Pick<GameState, 'lastPlayedDate' | 'a
 export interface AnswerResult {
   earned: number;
   missionCompleted: boolean;
-  promotedTo: { id: string; name: string; emoji: string } | null;
+  /** 이번 정답으로 새로 열린 코스 (자동 이동하지 않음 — 선택은 아이/부모 몫) */
+  unlockedCourse: { id: string; name: string; emoji: string } | null;
   nextLevel: number;
   courseId: string;
 }
@@ -144,33 +151,25 @@ export function useGameState() {
       missionRewardDate = today;
     }
 
-    // 코스 진행 기록 + 승급 판정
+    // 코스 진행 기록 + 다음 코스 해금 판정 (코스는 바꾸지 않는다 — 선택식)
     const cp: CourseProgress = prev.courseProgress[prev.courseId] ?? { attempted: 0, correct: 0, recent: [] };
-    let recent = [...cp.recent, true].slice(-PROMOTE_WINDOW);
-    let level = newStreak >= 5 ? Math.min(prev.level + 1, 20) : prev.level;
-    let courseId = prev.courseId;
-    let promotedTo: AnswerResult['promotedTo'] = null;
+    const recent = [...cp.recent, true].slice(-UNLOCK_WINDOW);
+    const level = newStreak >= 5 ? Math.min(prev.level + 1, 20) : prev.level;
+    let unlockedCourse: AnswerResult['unlockedCourse'] = null;
+    let unlockedCourseIds = prev.unlockedCourseIds;
 
     const correctInRecent = recent.filter(Boolean).length;
     if (
-      recent.length >= PROMOTE_WINDOW &&
-      correctInRecent >= PROMOTE_MIN_CORRECT &&
-      level >= PROMOTE_MIN_LEVEL
+      recent.length >= UNLOCK_WINDOW &&
+      correctInRecent >= UNLOCK_MIN_CORRECT &&
+      level >= UNLOCK_MIN_LEVEL
     ) {
-      const next = getNextCourse(prev.courseId);
-      if (next) {
-        promotedTo = { id: next.id, name: next.name, emoji: next.emoji };
-        courseId = next.id;
-        level = 1;
-        recent = []; // 이전 코스 기록은 승급으로 마감
+      const nextCourse = getNextCourse(prev.courseId);
+      if (nextCourse && !unlockedCourseIds.includes(nextCourse.id)) {
+        unlockedCourse = { id: nextCourse.id, name: nextCourse.name, emoji: nextCourse.emoji };
+        unlockedCourseIds = [...unlockedCourseIds, nextCourse.id];
       }
     }
-
-    const courseProgress = {
-      ...prev.courseProgress,
-      [prev.courseId]: { attempted: cp.attempted + 1, correct: cp.correct + 1, recent: promotedTo ? cp.recent : recent },
-      ...(promotedTo ? { [courseId]: { attempted: 0, correct: 0, recent: [] } } : {}),
-    };
 
     const next: GameState = {
       ...prev,
@@ -178,23 +177,43 @@ export function useGameState() {
       points: prev.points + earned,
       streak: newStreak,
       level,
-      courseId,
       todaySolved,
       missionRewardDate,
       totalCorrect: prev.totalCorrect + 1,
-      courseProgress,
+      unlockedCourseIds,
+      courseLevels: { ...prev.courseLevels, [prev.courseId]: level },
+      courseProgress: {
+        ...prev.courseProgress,
+        [prev.courseId]: { attempted: cp.attempted + 1, correct: cp.correct + 1, recent },
+      },
     };
     setGameState(next);
     save(next, items);
 
-    return { earned, missionCompleted, promotedTo, nextLevel: level, courseId };
+    return { earned, missionCompleted, unlockedCourse, nextLevel: level, courseId: prev.courseId };
   }, [gameState, items, save]);
+
+  /** 해금된 코스로 이동 — 코스별 레벨은 기억해 두었다가 이어서 */
+  const switchCourse = useCallback((courseId: string) => {
+    setGameState(prev => {
+      if (courseId === prev.courseId || !prev.unlockedCourseIds.includes(courseId)) return prev;
+      const next: GameState = {
+        ...prev,
+        courseLevels: { ...prev.courseLevels, [prev.courseId]: prev.level },
+        courseId,
+        level: prev.courseLevels[courseId] ?? 1,
+        streak: 0,
+      };
+      save(next, items);
+      return next;
+    });
+  }, [items, save]);
 
   const onWrong = useCallback((): { nextLevel: number; courseId: string } => {
     const prev = gameState;
     const attendance = applyAttendance(prev);
     const cp: CourseProgress = prev.courseProgress[prev.courseId] ?? { attempted: 0, correct: 0, recent: [] };
-    const recent = [...cp.recent, false].slice(-PROMOTE_WINDOW);
+    const recent = [...cp.recent, false].slice(-UNLOCK_WINDOW);
     const level = Math.max(prev.level - 1, 1);
 
     const next: GameState = {
@@ -249,5 +268,5 @@ export function useGameState() {
     });
   }, [save]);
 
-  return { gameState, items, onCorrect, onWrong, buyItem, equipItem };
+  return { gameState, items, onCorrect, onWrong, buyItem, equipItem, switchCourse };
 }

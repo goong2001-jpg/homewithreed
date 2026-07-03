@@ -6,9 +6,10 @@ interface Props {
   points: number;
   courseName?: string;
   courseEmoji?: string;
+  onCourseClick?: () => void;
 }
 
-export default function ProgressBar({ level, streak, points, courseName, courseEmoji }: Props) {
+export default function ProgressBar({ level, streak, points, courseName, courseEmoji, onCourseClick }: Props) {
   const maxLevel = 20;
   const pct = (level / maxLevel) * 100;
 
@@ -27,8 +28,16 @@ export default function ProgressBar({ level, streak, points, courseName, courseE
     }}>
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#9b59b6' }}>
-            {courseName ? `${courseEmoji ?? ''} ${courseName} · ` : ''}레벨 {level}
+          <span
+            onClick={onCourseClick}
+            style={{
+              fontSize: 13, fontWeight: 700, color: '#9b59b6',
+              cursor: onCourseClick ? 'pointer' : 'default',
+              textDecoration: onCourseClick ? 'underline dotted' : 'none',
+              textUnderlineOffset: 3,
+            }}
+          >
+            {courseName ? `📚 ${courseEmoji ?? ''} ${courseName} · ` : ''}레벨 {level}
           </span>
           <span style={{ fontSize: 13, color: '#bbb' }}>최대 {maxLevel}</span>
         </div>
