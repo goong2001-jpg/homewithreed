@@ -59,8 +59,11 @@ export default function ProblemCard({ problem, onSubmit, isCorrect }: Props) {
         }}>
           <span style={{ color: '#3498db' }}>{problem.num1}</span>
           {' '}
-          <span style={{ color: problem.operation === 'add' ? '#27ae60' : '#e74c3c' }}>
-            {problem.operation === 'add' ? '+' : '-'}
+          <span style={{
+            color: problem.operation === 'add' ? '#27ae60'
+              : problem.operation === 'subtract' ? '#e74c3c' : '#8e44ad',
+          }}>
+            {problem.operation === 'add' ? '+' : problem.operation === 'subtract' ? '-' : '×'}
           </span>
           {' '}
           <span style={{ color: '#9b59b6' }}>{problem.num2}</span>

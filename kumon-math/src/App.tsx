@@ -1,10 +1,12 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import './App.css';
-import { Problem, Operation } from './types';
+import { Problem } from './types';
 import { useGameState } from './hooks/useGameState';
+import { generateProblem, getCourse } from './curriculum/math';
 import Avatar from './components/Avatar';
 import ProblemCard from './components/ProblemCard';
 import ProgressBar from './components/ProgressBar';
+import DailyMission from './components/DailyMission';
 import CountingHelper from './components/CountingHelper';
 import Shop from './components/Shop';
 import { playCorrect, playWrong, playStreak } from './utils/sounds';
@@ -34,48 +36,9 @@ const WRONG_MESSAGES = [
   '실수해도 괜찮아, 같이 세어보자 🤗',
 ];
 
-function generateProblem(level: number): Problem {
-  const operations: Operation[] = level <= 12 ? ['add'] : ['add', 'subtract'];
-  const operation = operations[Math.floor(Math.random() * operations.length)];
-
-  let num1: number, num2: number;
-
-  if (level <= 3) {
-    num1 = Math.floor(Math.random() * 5) + 1;
-    num2 = Math.floor(Math.random() * Math.min(5, 10 - num1)) + 1;
-  } else if (level <= 7) {
-    num1 = Math.floor(Math.random() * 9) + 1;
-    num2 = Math.floor(Math.random() * 9) + 1;
-    if (num1 + num2 > 15) num2 = Math.floor(Math.random() * (15 - num1)) + 1;
-  } else if (level <= 12) {
-    num1 = Math.floor(Math.random() * 10) + 1;
-    num2 = 10;
-  } else if (level <= 16) {
-    if (operation === 'add') {
-      num1 = Math.floor(Math.random() * 10) + 1;
-      num2 = Math.floor(Math.random() * 9) + 1;
-      if (num1 + num2 > 20) num2 = 20 - num1;
-    } else {
-      num1 = Math.floor(Math.random() * 10) + 11;
-      num2 = Math.floor(Math.random() * 10) + 1;
-    }
-  } else {
-    if (operation === 'add') {
-      num1 = Math.floor(Math.random() * 15) + 6;
-      num2 = Math.floor(Math.random() * 9) + 1;
-    } else {
-      num1 = Math.floor(Math.random() * 20) + 5;
-      num2 = Math.floor(Math.random() * (num1 - 1)) + 1;
-    }
-  }
-
-  const answer = operation === 'add' ? num1 + num2 : num1 - num2;
-  return { num1, num2, operation, answer };
-}
-
 export default function App() {
   const { gameState, items, onCorrect, onWrong, buyItem, equipItem } = useGameState();
-  const [problem, setProblem] = useState<Problem>(() => generateProblem(1));
+  const [problem, setProblem] = useState<Problem>(() => generateProblem(gameState.courseId, gameState.level));
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [mood, setMood] = useState<AvatarMood>('idle');
   const [showHelper, setShowHelper] = useState(false);
@@ -83,11 +46,14 @@ export default function App() {
   const [feedbackMsg, setFeedbackMsg] = useState('');
   const [pointsFlash, setPointsFlash] = useState(0);
   const [flashKey, setFlashKey] = useState(0);
+  const [promotion, setPromotion] = useState<{ id: string; name: string; emoji: string } | null>(null);
 
-  const nextProblem = useCallback((lvl: number) => {
+  const course = getCourse(gameState.courseId);
+
+  const nextProblem = useCallback((courseId: string, lvl: number) => {
     setIsCorrect(null);
     setMood('thinking');
-    setProblem(generateProblem(lvl));
+    setProblem(generateProblem(courseId, lvl));
     setTimeout(() => setMood('idle'), 400);
   }, []);
 
@@ -98,32 +64,36 @@ export default function App() {
       setIsCorrect(true);
       setMood('happy');
 
+      const result = onCorrect();
       const newStreak = gameState.streak + 1;
-      const streakMsg = STREAK_MESSAGES[newStreak];
-      const normalMsg = CORRECT_MESSAGES[Math.floor(Math.random() * CORRECT_MESSAGES.length)];
-      setFeedbackMsg(streakMsg || normalMsg);
 
-      const earned = 3 + (newStreak > 0 && newStreak % 5 === 0 ? 2 : 0);
-      setPointsFlash(earned);
-      setFlashKey(k => k + 1);
-
-      if (newStreak > 0 && newStreak % 5 === 0) {
+      if (result.missionCompleted) {
+        setFeedbackMsg(`오늘의 미션 완료! 보너스 +20⭐ 🏆`);
+        playStreak();
+      } else if (STREAK_MESSAGES[newStreak]) {
+        setFeedbackMsg(STREAK_MESSAGES[newStreak]);
         playStreak();
       } else {
+        setFeedbackMsg(CORRECT_MESSAGES[Math.floor(Math.random() * CORRECT_MESSAGES.length)]);
         playCorrect();
       }
 
-      onCorrect();
+      setPointsFlash(result.earned);
+      setFlashKey(k => k + 1);
+
       setTimeout(() => {
         setPointsFlash(0);
         setFeedbackMsg('');
-        nextProblem(Math.min(gameState.level + (newStreak >= 5 ? 1 : 0), 20));
+        if (result.promotedTo) {
+          setPromotion(result.promotedTo);
+        } else {
+          nextProblem(result.courseId, result.nextLevel);
+        }
       }, 1600);
     } else {
       setIsCorrect(false);
       setMood('sad');
-      const msg = WRONG_MESSAGES[Math.floor(Math.random() * WRONG_MESSAGES.length)];
-      setFeedbackMsg(msg);
+      setFeedbackMsg(WRONG_MESSAGES[Math.floor(Math.random() * WRONG_MESSAGES.length)]);
       playWrong();
       onWrong();
       setTimeout(() => {
@@ -133,12 +103,7 @@ export default function App() {
         setFeedbackMsg('');
       }, 1000);
     }
-  }, [problem, isCorrect, onCorrect, onWrong, gameState.streak, gameState.level, nextProblem]);
-
-  useEffect(() => {
-    setProblem(generateProblem(gameState.level));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [problem, isCorrect, onCorrect, onWrong, gameState.streak, nextProblem]);
 
   return (
     <div style={{
@@ -171,7 +136,19 @@ export default function App() {
         </button>
       </div>
 
-      <ProgressBar level={gameState.level} streak={gameState.streak} points={gameState.points} />
+      <ProgressBar
+        level={gameState.level}
+        streak={gameState.streak}
+        points={gameState.points}
+        courseName={course.name}
+        courseEmoji={course.emoji}
+      />
+
+      <DailyMission
+        todaySolved={gameState.todaySolved}
+        dailyGoal={gameState.dailyGoal}
+        attendanceStreak={gameState.attendanceStreak}
+      />
 
       {/* 아바타 영역 */}
       <div style={{
@@ -227,10 +204,11 @@ export default function App() {
           problem={problem}
           onClose={() => {
             setShowHelper(false);
-            nextProblem(Math.max(gameState.level - 1, 1));
+            nextProblem(gameState.courseId, gameState.level);
           }}
         />
       )}
+
       {showShop && (
         <Shop
           items={items}
@@ -240,6 +218,48 @@ export default function App() {
           onEquip={equipItem}
           onClose={() => setShowShop(false)}
         />
+      )}
+
+      {/* 🎓 코스 승급 축하 모달 */}
+      {promotion && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 200, padding: 20,
+        }}>
+          <div style={{
+            background: 'linear-gradient(160deg, #fbc2eb, #a6c1ee)',
+            borderRadius: 28, padding: '36px 28px', maxWidth: 380, width: '100%',
+            textAlign: 'center', boxShadow: '0 25px 80px rgba(0,0,0,0.4)',
+            animation: 'fadeIn 0.4s ease',
+          }}>
+            <div style={{ fontSize: 64, marginBottom: 8 }}>🎓</div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#5b3a7a', marginBottom: 8 }}>
+              코스 승급!
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: '#6b4a8a', marginBottom: 20, lineHeight: 1.5 }}>
+              정말 잘했어! 이제부터는<br />
+              <span style={{ fontSize: 22, color: '#e74c3c' }}>{promotion.emoji} {promotion.name}</span><br />
+              에 도전해보자!
+            </div>
+            <button
+              onClick={() => {
+                const p = promotion;
+                setPromotion(null);
+                playStreak();
+                nextProblem(p.id, 1);
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                color: 'white', border: 'none', borderRadius: 14,
+                padding: '14px 36px', fontSize: 17, fontWeight: 800,
+                cursor: 'pointer', boxShadow: '0 6px 20px rgba(102,126,234,0.5)',
+              }}
+            >
+              새 코스 시작! 🚀
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

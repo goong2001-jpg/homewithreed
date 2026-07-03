@@ -4,9 +4,11 @@ interface Props {
   level: number;
   streak: number;
   points: number;
+  courseName?: string;
+  courseEmoji?: string;
 }
 
-export default function ProgressBar({ level, streak, points }: Props) {
+export default function ProgressBar({ level, streak, points, courseName, courseEmoji }: Props) {
   const maxLevel = 20;
   const pct = (level / maxLevel) * 100;
 
@@ -25,7 +27,9 @@ export default function ProgressBar({ level, streak, points }: Props) {
     }}>
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#9b59b6' }}>레벨 {level}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#9b59b6' }}>
+            {courseName ? `${courseEmoji ?? ''} ${courseName} · ` : ''}레벨 {level}
+          </span>
           <span style={{ fontSize: 13, color: '#bbb' }}>최대 {maxLevel}</span>
         </div>
         <div style={{ background: '#eee', borderRadius: 99, height: 10, overflow: 'hidden' }}>

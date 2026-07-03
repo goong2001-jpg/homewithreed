@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { GameState, AvatarItem } from '../types';
+import { GameState, AvatarItem, CourseProgress } from '../types';
+import { getNextCourse } from '../curriculum/math';
 
 const INITIAL_ITEMS: AvatarItem[] = [
   // 🐾 펫 — 요정 옆에 따라다니는 친구
@@ -34,12 +35,52 @@ const INITIAL_ITEMS: AvatarItem[] = [
 const STORAGE_KEY = 'kumon_game_state';
 const ITEMS_KEY = 'kumon_items';
 
+const DAILY_GOAL = 20;          // 오늘의 미션: 20문제 맞히기
+const MISSION_BONUS = 20;       // 미션 완료 보너스 ⭐
+const PROMOTE_WINDOW = 20;      // 승급 판정: 최근 20문제
+const PROMOTE_MIN_CORRECT = 18; // 그중 18개 이상 정답 (90%)
+const PROMOTE_MIN_LEVEL = 10;   // 코스 내 레벨 10 이상일 때만 승급
+
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+function yesterdayStr(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+const DEFAULT_STATE: GameState = {
+  points: 0,
+  level: 1,
+  streak: 0,
+  totalCorrect: 0,
+  totalWrong: 0,
+  equippedItems: [],
+  ownedItems: [],
+  courseId: 'addsub20',
+  dailyGoal: DAILY_GOAL,
+  todaySolved: 0,
+  lastPlayedDate: '',
+  attendanceStreak: 0,
+  missionRewardDate: '',
+  courseProgress: {},
+};
+
 function loadState(): GameState {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      // 예전 저장 데이터에 새 필드가 없어도 기본값으로 채워짐
+      const merged: GameState = { ...DEFAULT_STATE, ...JSON.parse(saved) };
+      merged.dailyGoal = DAILY_GOAL;
+      if (merged.lastPlayedDate !== todayStr()) merged.todaySolved = 0;
+      return merged;
+    }
   } catch {}
-  return { points: 0, level: 1, streak: 0, totalCorrect: 0, totalWrong: 0, equippedItems: [], ownedItems: [] };
+  return DEFAULT_STATE;
 }
 
 function loadItems(): AvatarItem[] {
@@ -57,6 +98,24 @@ function loadItems(): AvatarItem[] {
   return INITIAL_ITEMS;
 }
 
+/** 출석 처리: 오늘 처음 풀면 스트릭 갱신 */
+function applyAttendance(prev: GameState): Pick<GameState, 'lastPlayedDate' | 'attendanceStreak' | 'todaySolved'> {
+  const today = todayStr();
+  if (prev.lastPlayedDate === today) {
+    return { lastPlayedDate: today, attendanceStreak: prev.attendanceStreak, todaySolved: prev.todaySolved };
+  }
+  const streak = prev.lastPlayedDate === yesterdayStr() ? prev.attendanceStreak + 1 : 1;
+  return { lastPlayedDate: today, attendanceStreak: streak, todaySolved: 0 };
+}
+
+export interface AnswerResult {
+  earned: number;
+  missionCompleted: boolean;
+  promotedTo: { id: string; name: string; emoji: string } | null;
+  nextLevel: number;
+  courseId: string;
+}
+
 export function useGameState() {
   const [gameState, setGameState] = useState<GameState>(loadState);
   const [items, setItems] = useState<AvatarItem[]>(loadItems);
@@ -66,37 +125,94 @@ export function useGameState() {
     localStorage.setItem(ITEMS_KEY, JSON.stringify(itemList));
   }, []);
 
-  const onCorrect = useCallback(() => {
-    setGameState(prev => {
-      const newStreak = prev.streak + 1;
-      // 기본 3점, 5연속이면 +2 보너스
-      const bonus = newStreak > 0 && newStreak % 5 === 0 ? 2 : 0;
-      const pointsEarned = 3 + bonus;
-      const newLevel = newStreak >= 5 ? Math.min(prev.level + 1, 20) : prev.level;
-      const next = {
-        ...prev,
-        points: prev.points + pointsEarned,
-        streak: newStreak,
-        level: newLevel,
-        totalCorrect: prev.totalCorrect + 1,
-      };
-      save(next, items);
-      return next;
-    });
-  }, [items, save]);
+  const onCorrect = useCallback((): AnswerResult => {
+    const prev = gameState;
+    const today = todayStr();
+    const attendance = applyAttendance(prev);
 
-  const onWrong = useCallback(() => {
-    setGameState(prev => {
-      const next = {
-        ...prev,
-        streak: 0,
-        level: Math.max(prev.level - 1, 1),
-        totalWrong: prev.totalWrong + 1,
-      };
-      save(next, items);
-      return next;
-    });
-  }, [items, save]);
+    const newStreak = prev.streak + 1;
+    const streakBonus = newStreak % 5 === 0 ? 2 : 0;
+    let earned = 3 + streakBonus;
+
+    // 오늘의 미션
+    const todaySolved = attendance.todaySolved + 1;
+    let missionCompleted = false;
+    let missionRewardDate = prev.missionRewardDate;
+    if (todaySolved >= prev.dailyGoal && missionRewardDate !== today) {
+      earned += MISSION_BONUS;
+      missionCompleted = true;
+      missionRewardDate = today;
+    }
+
+    // 코스 진행 기록 + 승급 판정
+    const cp: CourseProgress = prev.courseProgress[prev.courseId] ?? { attempted: 0, correct: 0, recent: [] };
+    let recent = [...cp.recent, true].slice(-PROMOTE_WINDOW);
+    let level = newStreak >= 5 ? Math.min(prev.level + 1, 20) : prev.level;
+    let courseId = prev.courseId;
+    let promotedTo: AnswerResult['promotedTo'] = null;
+
+    const correctInRecent = recent.filter(Boolean).length;
+    if (
+      recent.length >= PROMOTE_WINDOW &&
+      correctInRecent >= PROMOTE_MIN_CORRECT &&
+      level >= PROMOTE_MIN_LEVEL
+    ) {
+      const next = getNextCourse(prev.courseId);
+      if (next) {
+        promotedTo = { id: next.id, name: next.name, emoji: next.emoji };
+        courseId = next.id;
+        level = 1;
+        recent = []; // 이전 코스 기록은 승급으로 마감
+      }
+    }
+
+    const courseProgress = {
+      ...prev.courseProgress,
+      [prev.courseId]: { attempted: cp.attempted + 1, correct: cp.correct + 1, recent: promotedTo ? cp.recent : recent },
+      ...(promotedTo ? { [courseId]: { attempted: 0, correct: 0, recent: [] } } : {}),
+    };
+
+    const next: GameState = {
+      ...prev,
+      ...attendance,
+      points: prev.points + earned,
+      streak: newStreak,
+      level,
+      courseId,
+      todaySolved,
+      missionRewardDate,
+      totalCorrect: prev.totalCorrect + 1,
+      courseProgress,
+    };
+    setGameState(next);
+    save(next, items);
+
+    return { earned, missionCompleted, promotedTo, nextLevel: level, courseId };
+  }, [gameState, items, save]);
+
+  const onWrong = useCallback((): { nextLevel: number; courseId: string } => {
+    const prev = gameState;
+    const attendance = applyAttendance(prev);
+    const cp: CourseProgress = prev.courseProgress[prev.courseId] ?? { attempted: 0, correct: 0, recent: [] };
+    const recent = [...cp.recent, false].slice(-PROMOTE_WINDOW);
+    const level = Math.max(prev.level - 1, 1);
+
+    const next: GameState = {
+      ...prev,
+      ...attendance,
+      streak: 0,
+      level,
+      totalWrong: prev.totalWrong + 1,
+      courseProgress: {
+        ...prev.courseProgress,
+        [prev.courseId]: { attempted: cp.attempted + 1, correct: cp.correct, recent },
+      },
+    };
+    setGameState(next);
+    save(next, items);
+
+    return { nextLevel: level, courseId: prev.courseId };
+  }, [gameState, items, save]);
 
   const buyItem = useCallback((itemId: string) => {
     setItems(prev => {
