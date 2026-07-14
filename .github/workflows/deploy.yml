@@ -36,12 +36,20 @@ jobs:
           npm ci
           npm run build
 
+      - name: Build safety-exam
+        working-directory: safety-exam
+        run: |
+          npm ci
+          npm run build
+
       - name: Combine builds
         run: |
           mkdir -p site
           cp -r kumon-math/build/. site/
           mkdir -p site/receipt-tracker
           cp -r receipt-tracker/build/. site/receipt-tracker/
+          mkdir -p site/safety-exam
+          cp -r safety-exam/build/. site/safety-exam/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
