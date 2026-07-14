@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { WrongNoteEntry } from '../data/types';
-import { getQuestionById } from '../data/writtenQuestions';
+import { getQuestionById } from '../data/questionBank';
 import { loadWrongNotes, removeWrongNote } from '../storage';
 
 interface Props {

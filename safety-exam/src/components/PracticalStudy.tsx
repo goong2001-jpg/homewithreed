@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { practicalQuestions } from '../data/practicalQuestions';
+import { getAllPractical } from '../data/questionBank';
 import { loadPracticalProgress, PracticalMark, savePracticalProgress } from '../storage';
 
 interface Props {
@@ -9,9 +9,10 @@ interface Props {
 const ALL = '전체';
 
 export default function PracticalStudy({ onExit }: Props) {
+  const allQuestions = useMemo(() => getAllPractical(), []);
   const categories = useMemo(
-    () => [ALL, ...Array.from(new Set(practicalQuestions.map((q) => q.category)))],
-    []
+    () => [ALL, ...Array.from(new Set(allQuestions.map((q) => q.category)))],
+    [allQuestions]
   );
   const [category, setCategory] = useState(ALL);
   const [onlyUnknown, setOnlyUnknown] = useState(false);
@@ -20,16 +21,16 @@ export default function PracticalStudy({ onExit }: Props) {
   const [showAnswer, setShowAnswer] = useState(false);
 
   const cards = useMemo(() => {
-    let list = practicalQuestions;
+    let list = allQuestions;
     if (category !== ALL) list = list.filter((q) => q.category === category);
     if (onlyUnknown) list = list.filter((q) => progress[q.id] !== 'known');
     return list;
     // progress를 의존성에서 제외: 채점 직후 카드가 즉시 빠져나가 순서가 흔들리는 것 방지
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, onlyUnknown]);
+  }, [allQuestions, category, onlyUnknown]);
 
-  const knownCount = practicalQuestions.filter((q) => progress[q.id] === 'known').length;
-  const unknownCount = practicalQuestions.filter((q) => progress[q.id] === 'unknown').length;
+  const knownCount = allQuestions.filter((q) => progress[q.id] === 'known').length;
+  const unknownCount = allQuestions.filter((q) => progress[q.id] === 'unknown').length;
 
   const mark = (value: PracticalMark) => {
     const card = cards[index];

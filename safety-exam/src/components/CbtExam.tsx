@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SUBJECTS, SubjectScore, WrittenQuestion } from '../data/types';
-import { writtenQuestions } from '../data/writtenQuestions';
+import { getAllWritten } from '../data/questionBank';
 import { addHistory, addWrongNotes } from '../storage';
 
 const QUESTIONS_PER_SUBJECT = 20;
@@ -16,8 +16,9 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 function buildExam(): WrittenQuestion[] {
+  const bank = getAllWritten();
   return SUBJECTS.flatMap((subject) =>
-    shuffle(writtenQuestions.filter((q) => q.subject === subject)).slice(0, QUESTIONS_PER_SUBJECT)
+    shuffle(bank.filter((q) => q.subject === subject)).slice(0, QUESTIONS_PER_SUBJECT)
   );
 }
 

@@ -48,4 +48,6 @@ export const STORAGE_KEYS = {
   wrongNotes: 'safety-exam-wrong-notes',
   history: 'safety-exam-history',
   practicalProgress: 'safety-exam-practical-progress',
+  customWritten: 'safety-exam-custom-written',
+  customPractical: 'safety-exam-custom-practical',
 } as const;

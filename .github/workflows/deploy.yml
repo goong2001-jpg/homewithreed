@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - claude/intelligent-cannon-txjx76
+      - claude/safety-engineer-exam-prep-72txxe
   workflow_dispatch:
 
 permissions:

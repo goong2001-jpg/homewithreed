@@ -14,7 +14,3 @@ export const writtenQuestions: WrittenQuestion[] = [
   ...subject5,
   ...subject6,
 ];
-
-export function getQuestionById(id: string): WrittenQuestion | undefined {
-  return writtenQuestions.find((q) => q.id === id);
-}

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import CbtExam from './components/CbtExam';
 import PracticalStudy from './components/PracticalStudy';
+import QuestionManager from './components/QuestionManager';
 import WrongNote from './components/WrongNote';
+import { loadCustomPractical, loadCustomWritten } from './data/questionBank';
 import { loadHistory, loadWrongNotes } from './storage';
 
-type View = 'home' | 'cbt' | 'wrongnote' | 'practical';
+type View = 'home' | 'cbt' | 'wrongnote' | 'practical' | 'manage';
 
 export default function App() {
   const [view, setView] = useState<View>('home');
@@ -22,6 +24,7 @@ export default function App() {
       {view === 'cbt' && <CbtExam onExit={goHome} />}
       {view === 'wrongnote' && <WrongNote onExit={goHome} />}
       {view === 'practical' && <PracticalStudy onExit={goHome} />}
+      {view === 'manage' && <QuestionManager onExit={goHome} />}
     </div>
   );
 }
@@ -29,6 +32,7 @@ export default function App() {
 function Home({ onSelect }: { onSelect: (view: View) => void }) {
   const history = loadHistory();
   const wrongCount = loadWrongNotes().length;
+  const customCount = loadCustomWritten().length + loadCustomPractical().length;
 
   return (
     <div>
@@ -50,6 +54,12 @@ function Home({ onSelect }: { onSelect: (view: View) => void }) {
           <h2>실기 필답형 대비</h2>
           <p>기출 유형 필답형 문제를 플래시카드로 암기합니다. 스스로 채점하며 모르는 문제만 반복하세요.</p>
           <span className="badge">셀프 채점</span>
+        </button>
+        <button className="mode-card" onClick={() => onSelect('manage')}>
+          <span className="icon">➕</span>
+          <h2>문제 추가/관리</h2>
+          <p>구한 기출문제를 직접 입력하거나 JSON 파일로 업로드해서 나만의 문제은행을 넓혀보세요.</p>
+          <span className="badge">{customCount}문제 추가됨</span>
         </button>
       </div>
 
