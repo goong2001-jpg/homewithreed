@@ -6,7 +6,7 @@
  * - 메모(업체 사양), 조립 가능 수량(BOM), 월별 입출고 리포트 포함.
  */
 
-var APP_VERSION = 'v7'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
+var APP_VERSION = 'v8'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
 
 var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
@@ -243,6 +243,17 @@ function save(payload) {
   });
   if (!rows.length) throw new Error('수량을 입력하세요.');
   log.getRange(log.getLastRow() + 1, 1, rows.length, 13).setValues(rows);
+  var s = computeStock_()[payload.id] || { total: 0, locs: {} };
+  return { ok: true, total: s.total, locs: s.locs };
+}
+
+/** 수량 변동 없이 사진/메모/위치만 기록 (구분=기록, 증감 0) */
+function saveNote(payload) {
+  var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
+  var imgIds = resolveImgs_(payload.images);
+  if (!imgIds && !payload.memo) throw new Error('사진 또는 메모를 입력하세요.');
+  log.getRange(log.getLastRow() + 1, 1, 1, 13).setValues([[new Date(), payload.id, payload.name, payload.cat,
+    payload.loc || DEFAULT_LOCATIONS[0], '기록', '', '', 0, 0, payload.staff || '', payload.memo || '', imgIds]]);
   var s = computeStock_()[payload.id] || { total: 0, locs: {} };
   return { ok: true, total: s.total, locs: s.locs };
 }
