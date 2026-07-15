@@ -6,7 +6,7 @@
  * - 메모(업체 사양), 조립 가능 수량(BOM), 월별 입출고 리포트 포함.
  */
 
-var APP_VERSION = 'v8'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
+var APP_VERSION = 'v9'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
 
 var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
@@ -247,6 +247,23 @@ function save(payload) {
   return { ok: true, total: s.total, locs: s.locs };
 }
 
+/** 위치 이동: fromLoc에서 toLoc으로 qty만큼 이동 (구분=이동, 2행 기록) */
+function moveStock(p) {
+  var qty = Number(p.qty) || 0;
+  if (qty <= 0) throw new Error('이동 수량을 입력하세요.');
+  if (!p.fromLoc || !p.toLoc || p.fromLoc === p.toLoc) throw new Error('보내는 위치와 받는 위치를 다르게 선택하세요.');
+  var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
+  var now = new Date(), route = p.fromLoc + '→' + p.toLoc;
+  var memo = p.memo ? (route + ' / ' + p.memo) : route;
+  var imgIds = resolveImgs_(p.images);
+  log.getRange(log.getLastRow() + 1, 1, 2, 13).setValues([
+    [now, p.id, p.name, p.cat, p.fromLoc, '이동', '', '', qty, -qty, p.staff || '', memo, ''],
+    [now, p.id, p.name, p.cat, p.toLoc,   '이동', '', '', qty,  qty, p.staff || '', memo, imgIds]
+  ]);
+  var s = computeStock_()[p.id] || { total: 0, locs: {} };
+  return { ok: true, total: s.total, locs: s.locs };
+}
+
 /** 수량 변동 없이 사진/메모/위치만 기록 (구분=기록, 증감 0) */
 function saveNote(payload) {
   var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
@@ -266,7 +283,7 @@ function addItem(p) {
   m.appendRow([id, name, cat, Number(p.unit) || '', Number(p.safe) || '', '']);
   return { id: id, name: name, cat: cat, unit: Number(p.unit) || '', safe: Number(p.safe) || 0, total: 0, locs: {} };
 }
-function renameItem(oldId, name, cat) {
+function renameItem(oldId, name, cat, unit, safe) {
   name = ('' + name).trim(); cat = ('' + cat).trim();
   if (!name) throw new Error('품명을 입력하세요.');
   var ss = SpreadsheetApp.getActive(), m = ss.getSheetByName(TAB_MASTER), log = ss.getSheetByName(TAB_LOG);
@@ -274,11 +291,12 @@ function renameItem(oldId, name, cat) {
   if (m.getLastRow() > 1) { var ids = m.getRange(2, 1, m.getLastRow() - 1, 1).getValues();
     for (var i = 0; i < ids.length; i++) { if (ids[i][0] === oldId) targetRow = i + 2; else if (ids[i][0] === newId && newId !== oldId) throw new Error('이미 같은 품명+분류가 있습니다.'); } }
   if (targetRow < 0) throw new Error('품목을 찾을 수 없습니다.');
-  m.getRange(targetRow, 1, 1, 3).setValues([[newId, name, cat]]);
+  var unitV = Number(unit) || '', safeV = Number(safe) || '';
+  m.getRange(targetRow, 1, 1, 5).setValues([[newId, name, cat, unitV, safeV]]);
   if (log.getLastRow() > 1) { var rng = log.getRange(2, 2, log.getLastRow() - 1, 3), lv = rng.getValues(), ch = false;
     for (var j = 0; j < lv.length; j++) if (lv[j][0] === oldId) { lv[j] = [newId, name, cat]; ch = true; }
     if (ch) rng.setValues(lv); }
-  return { id: newId, name: name, cat: cat };
+  return { id: newId, name: name, cat: cat, unit: unitV, safe: Number(safe) || 0 };
 }
 function deleteItem(id) {
   var ss = SpreadsheetApp.getActive(), m = ss.getSheetByName(TAB_MASTER), log = ss.getSheetByName(TAB_LOG);
@@ -296,6 +314,21 @@ function getHistory(id) {
     if (v[i][1] !== id) continue;
     out.push({ row: i + 2, date: v[i][0] ? fmtDt_(v[i][0]) : '', type: v[i][5], loc: v[i][4],
                boxes: Number(v[i][6]) || 0, delta: Number(v[i][9]) || 0, staff: v[i][10], imgs: imgList_(v[i][12]) });
+  }
+  return out;
+}
+
+/** 최근 전체 입출고 이력 (모든 품목, 최신순 최대 60건) */
+function getRecentLog() {
+  var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG), out = [];
+  if (!log || log.getLastRow() < 2) return out;
+  var n = log.getLastRow() - 1, take = Math.min(n, 60);
+  var v = log.getRange(log.getLastRow() - take + 1, 1, take, 13).getValues();
+  for (var i = v.length - 1; i >= 0; i--) {
+    out.push({ row: log.getLastRow() - take + 1 + i, date: v[i][0] ? fmtDt2_(v[i][0]) : '',
+               name: v[i][2], cat: v[i][3], type: v[i][5], loc: v[i][4],
+               boxes: Number(v[i][6]) || 0, delta: Number(v[i][9]) || 0,
+               staff: v[i][10], memo: v[i][11], imgs: imgList_(v[i][12]) });
   }
   return out;
 }
@@ -366,6 +399,53 @@ function saveBOM(p) {
   bom.getRange(bom.getLastRow() + 1, 1, rows.length, 5).setValues(rows);
   return { ok: true };
 }
+/** 조립 실행: BOM대로 부품 자동 차감(조립출) + 완제품 자동 입고(조립입) */
+function runBuild(p) {
+  var qty = Number(p.qty) || 0;
+  if (qty <= 0) throw new Error('조립 수량을 입력하세요.');
+  var ss = SpreadsheetApp.getActive(), bom = ss.getSheetByName(TAB_BOM), log = ss.getSheetByName(TAB_LOG);
+  var name = ('' + p.name).trim(), cat = ('' + p.cat).trim(), finId = name + '||' + cat;
+
+  // 레시피 로드
+  var parts = [];
+  if (bom && bom.getLastRow() >= 2) {
+    bom.getRange(2, 1, bom.getLastRow() - 1, 5).getValues().forEach(function (r) {
+      if (('' + r[0]).trim() === name && ('' + r[1]).trim() === cat) {
+        var pn = ('' + r[2]).trim(), pc = ('' + r[3]).trim(), per = Number(r[4]) || 0;
+        if (pn && per > 0) parts.push({ id: pn + '||' + pc, name: pn, cat: pc, need: per * qty });
+      }
+    });
+  }
+  if (!parts.length) throw new Error('이 완제품의 조립 레시피(BOM)를 찾을 수 없습니다.');
+
+  // 재고 확인 (부족 목록 안내)
+  var stock = computeStock_(), lack = [];
+  parts.forEach(function (pt) {
+    var have = stock[pt.id] ? stock[pt.id].total : 0;
+    if (have < pt.need) lack.push(pt.name + (pt.cat ? '(' + pt.cat + ')' : '') + ' ' + (pt.need - have) + '개 부족');
+  });
+  if (lack.length) throw new Error('부품 부족으로 조립할 수 없습니다.\n' + lack.join('\n'));
+
+  // 부품 차감: 보유 위치에서 수량 많은 곳부터 그리디 차감
+  var now = new Date(), rows = [];
+  parts.forEach(function (pt) {
+    var remain = pt.need;
+    var locs = Object.keys(stock[pt.id].locs).map(function (k) { return { loc: k, q: stock[pt.id].locs[k] }; })
+      .filter(function (x) { return x.q > 0; }).sort(function (a, b) { return b.q - a.q; });
+    locs.forEach(function (x) {
+      if (remain <= 0) return;
+      var take = Math.min(remain, x.q); remain -= take;
+      rows.push([now, pt.id, pt.name, pt.cat, x.loc, '조립출', '', '', take, -take, p.staff || '', name + ' ' + qty + '개 조립', '']);
+    });
+    if (remain > 0) // 위치 미기록 재고가 있는 경우 첫 위치(또는 기본 위치)에서 마저 차감
+      rows.push([now, pt.id, pt.name, pt.cat, (locs[0] ? locs[0].loc : DEFAULT_LOCATIONS[0]), '조립출', '', '', remain, -remain, p.staff || '', name + ' ' + qty + '개 조립', '']);
+  });
+  // 완제품 입고
+  rows.push([now, finId, name, cat, p.toLoc || DEFAULT_LOCATIONS[0], '조립입', '', '', qty, qty, p.staff || '', p.memo || (qty + '개 조립 완료'), '']);
+  log.getRange(log.getLastRow() + 1, 1, rows.length, 13).setValues(rows);
+  return { ok: true };
+}
+
 function deleteBOM(name, cat) {
   var bom = SpreadsheetApp.getActive().getSheetByName(TAB_BOM);
   removeBomRows_(bom, [('' + name).trim() + '||' + ('' + cat).trim()]);
