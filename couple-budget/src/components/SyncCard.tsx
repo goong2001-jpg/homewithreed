@@ -201,10 +201,24 @@ export default function SyncCard({
       case 3:
         return (
           <>
-            <div style={{ ...callout, marginBottom: 12 }}>
+            <div style={{ ...callout, marginBottom: 10 }}>
               방금 만든 Firestore 화면 위쪽 <b>규칙</b> 탭으로 갑니다.<br />
               적혀 있는 내용을 <b>전부 지우고</b> 아래를 붙여넣은 뒤,
               오른쪽 위 <b>게시</b> 버튼을 꼭 누르세요.
+            </div>
+
+            {/* 실제로 자주 나는 실수 — 콘솔이 방금 보여준 firebaseConfig 를 여기 붙여넣는다 */}
+            <div style={{
+              fontSize: 12, color: '#9a7d0a', background: '#fef9e7',
+              border: '1px solid #f7dc6f', borderRadius: 10,
+              padding: '11px 12px', marginBottom: 12, lineHeight: 1.7,
+            }}>
+              ⚠️ 여기 넣는 건 <b>아래 규칙</b>입니다.
+              Firebase가 보여준 <b>설정(apiKey가 들어있는 것)이 아닙니다.</b><br />
+              <span style={{ color: '#b7950b' }}>
+                설정을 잘못 넣으면 <b>「Unexpected {'{'}」</b> 빨간 오류가 뜹니다.
+                그럴 땐 전부 지우고 아래 것만 넣으세요.
+              </span>
             </div>
             <button
               onClick={() => copy(RULES, 'rules')}
@@ -229,6 +243,10 @@ export default function SyncCard({
               (예: <b>가계부</b>) → <b>앱 등록</b>.<br />
               <b style={{ color: '#e67e22' }}>닉네임은 그냥 이름표예요. 링크를 넣는 칸이 아닙니다.</b><br />
               그다음 화면의 <b>firebaseConfig = {'{ … }'}</b> 부분을 통째로 복사해 아래에 붙여넣으세요.
+              <br />
+              <span style={{ color: '#90a4ae' }}>
+                (<b>apiKey</b> 가 들어있는 그 덩어리입니다. 3단계의 보안 규칙과는 다른 것이에요)
+              </span>
             </div>
             <textarea
               rows={7}
