@@ -35,8 +35,36 @@ export function isValidRoomCode(code: string): boolean {
 }
 
 /**
+ * 값 두 개만으로 설정을 만든다.
+ *
+ * Firestore만 쓰는 앱이라 apiKey와 projectId면 충분하다.
+ * authDomain은 Firebase Auth 전용이고 appId는 Analytics/Installations용이라
+ * @firebase/firestore 는 둘 다 참조하지 않는다.
+ * 덕분에 '웹 앱 추가 → 닉네임 → 앱 등록' 단계를 통째로 건너뛸 수 있다 —
+ * 두 값은 Firebase 콘솔의 [프로젝트 설정 → 일반] 에 그냥 적혀 있다.
+ */
+export function buildConfig(projectId: string, apiKey: string): { ok: true; config: FirebaseConfigLike } | { ok: false; error: string } {
+  const p = projectId.trim();
+  const k = apiKey.trim();
+
+  if (!p) return { ok: false, error: '프로젝트 ID를 입력해 주세요. [프로젝트 설정 → 일반] 에 있어요.' };
+  if (!k) return { ok: false, error: '웹 API 키를 입력해 주세요. [프로젝트 설정 → 일반] 에 있어요.' };
+
+  // 흔한 실수: 주소창 URL이나 콘솔 링크를 그대로 붙여넣는 경우
+  if (/^https?:\/\//i.test(p) || p.includes('/')) {
+    return { ok: false, error: '링크가 들어왔어요. 프로젝트 ID는 주소가 아니라 wooricip-a1b2c 같은 짧은 이름입니다.' };
+  }
+  if (/\s/.test(k)) {
+    return { ok: false, error: '웹 API 키에 공백이 섞였어요. 앞뒤 공백 없이 붙여넣어 주세요.' };
+  }
+
+  return { ok: true, config: { projectId: p, apiKey: k } };
+}
+
+/**
  * 사용자가 붙여넣은 Firebase 설정을 파싱한다.
  * `const firebaseConfig = { apiKey: "...", ... };` 형태와 순수 JSON 모두 받는다.
+ * (배우자 폰으로 설정을 넘길 때 쓰는 짧은 JSON `{"projectId":…,"apiKey":…}` 도 그대로 통과한다)
  */
 export function parseFirebaseConfig(text: string): { ok: true; config: FirebaseConfigLike } | { ok: false; error: string } {
   const trimmed = text.trim();
@@ -66,31 +94,39 @@ export function parseFirebaseConfig(text: string): { ok: true; config: FirebaseC
     return { ok: false, error: '설정을 읽지 못했어요. 복사할 때 일부가 빠졌는지 확인해 주세요.' };
   }
 
-  const missing = (['apiKey', 'authDomain', 'projectId', 'appId'] as const)
-    .filter(k => typeof parsed[k] !== 'string' || !(parsed[k] as string).trim());
+  const str = (k: string): string =>
+    typeof parsed[k] === 'string' ? (parsed[k] as string).trim() : '';
 
-  if (missing.length) {
-    return { ok: false, error: `${missing.join(', ')} 값이 없어요. firebaseConfig 전체를 복사했는지 확인해 주세요.` };
+  // Firestore에 실제로 필요한 건 이 둘뿐이다 (buildConfig 주석 참고)
+  const projectId = str('projectId');
+  const apiKey = str('apiKey');
+
+  if (!projectId && !apiKey) {
+    return { ok: false, error: 'projectId 와 apiKey 를 찾지 못했어요. firebaseConfig 전체를 복사했는지 확인해 주세요.' };
+  }
+  if (!projectId) {
+    return { ok: false, error: 'projectId 가 없어요. [프로젝트 설정 → 일반] 에서 프로젝트 ID를 확인해 주세요.' };
+  }
+  if (!apiKey) {
+    return { ok: false, error: 'apiKey 가 없어요. [프로젝트 설정 → 일반] 에서 웹 API 키를 확인해 주세요.' };
   }
 
-  return {
-    ok: true,
-    config: {
-      apiKey: String(parsed.apiKey),
-      authDomain: String(parsed.authDomain),
-      projectId: String(parsed.projectId),
-      appId: String(parsed.appId),
-      ...(typeof parsed.storageBucket === 'string' ? { storageBucket: parsed.storageBucket } : {}),
-      ...(typeof parsed.messagingSenderId === 'string' ? { messagingSenderId: parsed.messagingSenderId } : {}),
-    },
-  };
+  // 나머지는 있으면 넘기고 없으면 만다 — 없다고 막지 않는다
+  const optional = (['authDomain', 'appId', 'storageBucket', 'messagingSenderId'] as const)
+    .reduce<Record<string, string>>((acc, k) => {
+      const v = str(k);
+      if (v) acc[k] = v;
+      return acc;
+    }, {});
+
+  return { ok: true, config: { projectId, apiKey, ...optional } };
 }
 
 export interface FirebaseConfigLike {
-  apiKey: string;
-  authDomain: string;
   projectId: string;
-  appId: string;
+  apiKey: string;
+  authDomain?: string;
+  appId?: string;
   storageBucket?: string;
   messagingSenderId?: string;
 }
