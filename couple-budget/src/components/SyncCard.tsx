@@ -41,7 +41,12 @@ export default function SyncCard({
 
   const [projectId, setProjectId] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [pasteMode, setPasteMode] = useState(false);
+  // 붙여넣기를 기본으로 둔다.
+  // 개편된 Firebase 콘솔에는 '웹 API 키' 항목이 따로 없고, 웹 앱을 등록해야만
+  // [프로젝트 설정 → 일반] 아래쪽 SDK 블록에 apiKey 가 나타난다.
+  // 그 블록에는 어차피 설정 전체가 들어 있으니, 값을 두 개 찾아 옮기는 것보다
+  // 통째로 복사해 붙여넣는 쪽이 실제로 더 빠르다.
+  const [pasteMode, setPasteMode] = useState(true);
   const [pasteText, setPasteText] = useState(sync.firebaseConfigText);
 
   const [codeInput, setCodeInput] = useState(sync.roomCode);
@@ -239,10 +244,18 @@ export default function SyncCard({
         return pasteMode ? (
           <>
             <div style={{ ...callout, marginBottom: 12 }}>
-              프로젝트 화면에서 <b>{'</>'}</b> (웹) 아이콘 → <b>앱 닉네임</b>에 아무 이름
-              (예: <b>가계부</b>) → <b>앱 등록</b>.<br />
-              <b style={{ color: '#e67e22' }}>닉네임은 그냥 이름표예요. 링크를 넣는 칸이 아닙니다.</b><br />
-              그다음 화면의 <b>firebaseConfig = {'{ … }'}</b> 부분을 통째로 복사해 아래에 붙여넣으세요.
+              왼쪽 위 <b>⚙️ → 프로젝트 설정 → 일반</b> 탭으로 갑니다.<br /><br />
+
+              <b>① 아직 앱이 없다면</b> — <b>내 앱</b> 칸의 <b>{'</>'}</b> (웹) 아이콘 →
+              닉네임에 아무 이름(예: <b>가계부</b>) → <b>앱 등록</b>.<br />
+              <span style={{ color: '#e67e22' }}>
+                닉네임은 그냥 이름표예요. 링크를 넣는 칸이 아닙니다.
+              </span>
+              <br /><br />
+
+              <b>② 화면 아래쪽</b> <b>SDK 설정 및 구성</b> 에 있는
+              <b> firebaseConfig = {'{ … }'}</b> 코드를 <b>복사 아이콘(⧉)</b> 으로
+              통째로 복사해 아래에 붙여넣으세요.
               <br />
               <span style={{ color: '#90a4ae' }}>
                 (<b>apiKey</b> 가 들어있는 그 덩어리입니다. 3단계의 보안 규칙과는 다른 것이에요)
@@ -260,14 +273,17 @@ export default function SyncCard({
               onClick={() => setPasteMode(false)}
               style={{ ...ghost, width: '100%', marginTop: 10, fontSize: 12.5 }}
             >
-              ← 값 두 개만 넣는 쉬운 방법으로 돌아가기
+              붙여넣기가 안 되면 → 값 두 개만 직접 입력하기
             </button>
           </>
         ) : (
           <>
             <div style={{ ...callout, marginBottom: 14 }}>
-              왼쪽 위 <b>⚙️ (톱니바퀴) → 프로젝트 설정</b> → <b>일반</b> 탭.<br />
-              거기 적혀 있는 값 <b>두 개</b>만 옮기면 됩니다.
+              둘 다 <b>⚙️ → 프로젝트 설정 → 일반</b> 한 화면에 있습니다.<br />
+              <span style={{ color: '#78909c' }}>
+                · <b>프로젝트 ID</b> — 맨 위 <b>내 프로젝트</b> 카드<br />
+                · <b>웹 API 키</b> — 아래쪽 <b>SDK 설정 및 구성</b> 코드에서 <b>apiKey:</b> 뒤 따옴표 안
+              </span>
             </div>
 
             <div style={{ marginBottom: 14 }}>
