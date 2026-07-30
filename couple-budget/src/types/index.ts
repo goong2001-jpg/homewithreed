@@ -86,14 +86,19 @@ export interface Expense extends Syncable {
 
 // ============================== 설정 ==============================
 
-/** Firebase 콘솔에서 복사해 붙여넣는 웹 앱 설정 (비밀값이 아니다) */
+/**
+ * Firebase 웹 설정 (비밀값이 아니다 — 카톡으로 배우자에게 보내도 된다).
+ *
+ * Firestore만 쓰므로 projectId + apiKey 두 개면 충분하다.
+ * authDomain(Auth 전용)과 appId(Analytics 전용)는 있으면 넘기고 없어도 그만이라 선택 필드다.
+ */
 export interface FirebaseWebConfig {
-  apiKey: string;
-  authDomain: string;
   projectId: string;
+  apiKey: string;
+  authDomain?: string;
+  appId?: string;
   storageBucket?: string;
   messagingSenderId?: string;
-  appId: string;
 }
 
 export interface SyncSettings {

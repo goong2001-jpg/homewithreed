@@ -89,22 +89,123 @@ export async function createSyncClient(
   return { push, subscribeSmall, subscribeMonth, fetchAllExpenses, close };
 }
 
-/** 사용자에게 보여줄 한국어 오류 메시지로 바꾼다 */
-export function describeSyncError(e: unknown): string {
-  const msg = e instanceof Error ? e.message : String(e);
-  const code = (e as { code?: string })?.code ?? '';
+/**
+ * 실패를 '설정 마법사 몇 번 단계 탓인지'로 번역한다.
+ * step 이 있으면 화면에서 그 단계로 되돌려 보낼 수 있다.
+ */
+export interface SyncFailure {
+  message: string;
+  /** 설정 마법사 단계 번호 (1~5). 특정할 수 없으면 undefined */
+  step?: number;
+}
 
-  if (code.includes('permission-denied') || msg.includes('permission')) {
-    return '접근이 거부되었어요. Firebase의 보안 규칙을 게시했는지, 우리집 코드가 12자 이상인지 확인해 주세요.';
+/** 시간 안에 안 끝나면 포기한다 */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('__TIMEOUT__')), ms);
+    p.then(v => { clearTimeout(t); resolve(v); },
+           e => { clearTimeout(t); reject(e); });
+  });
+}
+
+export function explainSyncError(e: unknown): SyncFailure {
+  const msg = e instanceof Error ? e.message : String(e);
+  const code = String((e as { code?: string })?.code ?? '');
+  const all = `${code} ${msg}`.toLowerCase();
+
+  if (msg === '__TIMEOUT__') {
+    // Firestore가 조용히 재시도만 하고 있는 상태. 대개 프로젝트 ID가 틀렸다.
+    return {
+      step: 4,
+      message: '응답이 없어요. 프로젝트 ID가 정확한지(오타·다른 프로젝트) 다시 확인해 주세요. 인터넷이 느린 경우에도 이럴 수 있어요.',
+    };
   }
-  if (code.includes('unavailable') || msg.includes('offline')) {
-    return '인터넷에 연결되지 않았어요. 입력한 내역은 연결되면 자동으로 전송됩니다.';
+  if (msg === '__READ_BACK_FAILED__') {
+    return { step: 3, message: '쓰기는 됐는데 읽기가 안 돼요. 보안 규칙의 read 권한을 확인해 주세요.' };
   }
-  if (code.includes('invalid-api-key') || msg.includes('api-key')) {
-    return 'Firebase 설정의 apiKey가 올바르지 않아요. 설정을 다시 복사해 붙여넣어 주세요.';
+
+  if (all.includes('permission-denied') || all.includes('insufficient permissions') || all.includes('permission')) {
+    return {
+      step: 3,
+      message: '보안 규칙이 아직 적용되지 않았어요. Firestore의 [규칙] 탭에 규칙을 붙여넣고 꼭 [게시] 버튼까지 눌러 주세요.',
+    };
   }
-  if (code.includes('not-found') || msg.includes('project')) {
-    return 'Firebase 프로젝트를 찾지 못했어요. Firestore 데이터베이스를 만들었는지 확인해 주세요.';
+  if (all.includes('api key not valid') || all.includes('invalid-api-key') || all.includes('api-key')) {
+    return {
+      step: 4,
+      message: '웹 API 키가 올바르지 않아요. 앞뒤 공백 없이 AIza... 로 시작하는 값을 그대로 붙여넣었는지 확인해 주세요.',
+    };
   }
-  return `동기화 오류: ${msg}`;
+  if (all.includes('not-found') || all.includes('does not exist') || all.includes('404')) {
+    return {
+      step: 2,
+      message: 'Firestore 데이터베이스를 찾지 못했어요. [빌드 → Firestore Database → 데이터베이스 만들기] 를 했는지, 프로젝트 ID가 맞는지 확인해 주세요.',
+    };
+  }
+  if (all.includes('invalid-argument') || all.includes('project')) {
+    return {
+      step: 4,
+      message: '프로젝트 ID가 올바르지 않아요. 주소(링크)가 아니라 wooricip-a1b2c 같은 짧은 이름이어야 합니다.',
+    };
+  }
+  if (all.includes('unavailable') || all.includes('offline') || all.includes('network')) {
+    return {
+      message: '인터넷에 연결되지 않았어요. 입력한 내역은 연결되면 자동으로 전송됩니다.',
+    };
+  }
+  return { message: `연결에 실패했어요: ${msg}` };
+}
+
+/** 기존 호출부 호환용 — 문구만 뽑아 쓴다 */
+export function describeSyncError(e: unknown): string {
+  return explainSyncError(e).message;
+}
+
+/**
+ * 진짜로 읽고 쓸 수 있는지 확인한다.
+ * 방 안에 임시 문서를 하나 썼다가 읽고 지운다 — 보안 규칙
+ * `match /rooms/{roomCode}/{document=**}` 범위 안이라 그대로 통과한다.
+ */
+export async function testConnection(
+  config: FirebaseWebConfig,
+  roomCode: string,
+): Promise<{ ok: true } | ({ ok: false } & SyncFailure)> {
+  try {
+    const { initializeApp, getApp, deleteApp } = await import('firebase/app');
+    const { initializeFirestore, collection, doc, setDoc, getDoc, deleteDoc } =
+      await import('firebase/firestore');
+
+    // 본 연결과 섞이지 않게 일회용 앱 이름을 쓴다
+    const appName = `test-${roomCode}-${Date.now()}`;
+    let app;
+    try {
+      app = getApp(appName);
+    } catch {
+      app = initializeApp(config, appName);
+    }
+
+    try {
+      // 테스트에는 오프라인 캐시를 쓰지 않는다 —
+      // 캐시가 있으면 서버에 못 닿아도 쓰기가 '성공'해 버려서 검사가 무의미해진다
+      const db = initializeFirestore(app, {});
+      const ref = doc(collection(doc(collection(db, 'rooms'), roomCode), '_test'), 'ping');
+
+      // ⚠️ Firestore는 프로젝트가 없거나 주소가 틀리면 오류를 내지 않고 '무한 재시도'한다.
+      //    그대로 두면 화면이 '확인 중…'에서 영영 멈추므로 반드시 시간 제한을 건다.
+      await withTimeout(
+        (async () => {
+          await setDoc(ref, { t: Date.now() });
+          const snap = await getDoc(ref);
+          if (!snap.exists()) throw new Error('__READ_BACK_FAILED__');
+          await deleteDoc(ref);
+        })(),
+        15000,
+      );
+      return { ok: true };
+    } finally {
+      await deleteApp(app).catch(() => {});
+    }
+  } catch (e) {
+    return { ok: false, ...explainSyncError(e) };
+  }
 }
