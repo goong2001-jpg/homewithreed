@@ -183,8 +183,13 @@ export default function SyncCard({
       case 2:
         return (
           <div style={callout}>
-            왼쪽 메뉴에서 <b>빌드 → Firestore Database</b><br />
-            • <b>데이터베이스 만들기</b> 클릭<br />
+            왼쪽 사이드바에서 <b>Firestore</b> 를 찾아 누르세요.<br />
+            <span style={{ color: '#78909c' }}>
+              · <b>프로젝트 바로가기</b> 아래에 있거나<br />
+              · <b>제품 카테고리 → 데이터베이스 및 스토리지 → Firestore</b>
+            </span>
+            <br /><br />
+            들어가면 <b>데이터베이스 만들기</b> 버튼이 있어요.<br />
             • 위치는 <b>asia-northeast3 (서울)</b><br />
             • <b>프로덕션 모드에서 시작</b> 선택 → 만들기<br />
             <span style={{ color: '#90a4ae' }}>
