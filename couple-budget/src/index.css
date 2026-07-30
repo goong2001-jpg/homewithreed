@@ -1,0 +1,36 @@
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  background: #f8f9fa;
+  color: #222;
+  -webkit-font-smoothing: antialiased;
+}
+
+input, select, button, textarea {
+  font-family: inherit;
+}
+
+/* 저금통 수면 물결 — 인라인 style로는 표현할 수 없어 여기 둔다 */
+@keyframes piggy-wave {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(-50px); }
+}
+
+/* 예산 초과일 때 저금통 외곽선 깜빡임 */
+@keyframes piggy-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+/* 움직임을 줄이도록 설정한 기기에서는 모든 전환/애니메이션을 끈다 */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
