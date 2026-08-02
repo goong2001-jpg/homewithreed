@@ -91,6 +91,7 @@ export default function App() {
             onDeleteFixed={ledger.deleteFixed}
             onSetPersons={setPersons}
             onSetSync={setSync}
+            onImport={ledger.importBackup}
             onUploadAll={ledger.uploadAll}
             onClearLocal={ledger.clearLocal}
           />

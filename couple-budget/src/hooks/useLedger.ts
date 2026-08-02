@@ -5,6 +5,7 @@ import {
 } from '../types';
 import { KEYS, load, save } from '../utils/storage';
 import { mergeById } from '../utils/merge';
+import { Backup } from '../utils/backup';
 import { addMonths, monthIncome, monthOf } from '../utils/budget';
 import { newId } from '../utils/id';
 import { useSync } from './useSync';
@@ -189,6 +190,49 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     return source.reduce((s, i) => s + i.amount, 0);
   }, [incomes, commit]);
 
+  /**
+   * 배우자가 보낸 파일을 내 기록과 합친다 (Firebase 없이 쓰는 경로).
+   * 덮어쓰지 않고 id 기준으로 합치므로, 서로 주고받기만 하면 양쪽이 같아진다.
+   * 동기화를 켜 둔 상태라면 합친 결과를 클라우드로도 올린다.
+   */
+  const importBackup = useCallback((backup: Backup) => {
+    /**
+     * ⚠️ 병합을 setState 업데이터 안에서 하면 안 된다.
+     * 업데이터는 나중에 실행되므로 '몇 건 들어왔는지'를 바로 알 수 없고,
+     * 클라우드로 올릴 목록도 빈 채로 남는다.
+     * 그래서 지금 상태값으로 먼저 계산한 뒤 결과를 통째로 넣는다.
+     */
+    const apply = <T extends Syncable>(
+      coll: CollName,
+      storageKey: string,
+      setter: Dispatch<SetStateAction<T[]>>,
+      current: T[],
+      incoming: T[],
+    ): number => {
+      if (!incoming.length) return 0;
+
+      const before = new Map(current.map(r => [r.id, r]));
+      const next = mergeById(current, incoming);
+      // 새로 들어왔거나 내용이 바뀐 것만 추린다
+      const changed = next.filter(r => {
+        const old = before.get(r.id);
+        return !old || old.updatedAt !== r.updatedAt;
+      });
+      if (!changed.length) return 0;
+
+      save(storageKey, next);
+      setter(next);
+      for (const r of changed) push(coll, r);   // 동기화 중이면 클라우드에도 반영
+      return changed.length;
+    };
+
+    return {
+      incomes: apply('incomes', KEYS.incomes, setIncomes, incomes, backup.incomes),
+      fixed: apply('fixedExpenses', KEYS.fixedExpenses, setFixed, fixed, backup.fixedExpenses),
+      expenses: apply('expenses', KEYS.expenses, setExpenses, expenses, backup.expenses),
+    };
+  }, [incomes, fixed, expenses, push]);
+
   // -------------------------- 클라우드 보조작업 --------------------------
 
   /** '지금까지 기록 클라우드로 올리기' — 명시적으로 눌렀을 때만 실행한다 */
@@ -235,6 +279,7 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     copyIncomeFromPrevMonth,
     /** 지난달에 등록된 수입 합계 — 이 달이 비었을 때 '지난달과 같이' 버튼에 쓴다 */
     prevMonthIncome: monthIncome(incomes, addMonths(month, -1)),
+    importBackup,
     uploadAll, pullAllExpenses, clearLocal,
     counts,
     syncStatus: status, syncError: error, isLive,

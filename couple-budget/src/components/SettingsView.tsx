@@ -10,6 +10,7 @@ import IncomeCard from './IncomeCard';
 import FixedExpenseCard from './FixedExpenseCard';
 import PersonsCard from './PersonsCard';
 import SyncCard from './SyncCard';
+import ExchangeCard from './ExchangeCard';
 
 interface Props {
   month: MonthKey;
@@ -29,6 +30,7 @@ interface Props {
   onDeleteFixed: (id: string) => void;
   onSetPersons: (persons: Person[]) => void;
   onSetSync: (patch: Partial<SyncSettings>) => void;
+  onImport: React.ComponentProps<typeof ExchangeCard>['onImport'];
   onUploadAll: () => number;
   onClearLocal: () => void;
 }
@@ -42,7 +44,7 @@ export default function SettingsView(props: Props) {
   const {
     month, budget, settings, incomes, fixed, expenses, syncStatus, syncError, counts,
     onPrev, onNext, onToday, onSaveIncome, onSaveFixed, onDeleteFixed,
-    onSetPersons, onSetSync, onUploadAll, onClearLocal,
+    onSetPersons, onSetSync, onImport, onUploadAll, onClearLocal,
   } = props;
 
   const [confirmClear, setConfirmClear] = useState(false);
@@ -105,6 +107,16 @@ export default function SettingsView(props: Props) {
           counts={counts}
           onChange={onSetSync}
           onUploadAll={onUploadAll}
+          cardStyle={cardStyle}
+        />
+
+        <ExchangeCard
+          persons={settings.persons}
+          incomes={incomes}
+          fixed={fixed}
+          expenses={expenses}
+          onImport={onImport}
+          onSetPersons={onSetPersons}
           cardStyle={cardStyle}
         />
 
