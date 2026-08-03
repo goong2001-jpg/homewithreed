@@ -28,7 +28,9 @@ interface Props {
   onSaveIncome: React.ComponentProps<typeof IncomeCard>['onSave'];
   onSaveFixed: React.ComponentProps<typeof FixedExpenseCard>['onSave'];
   onDeleteFixed: (id: string) => void;
-  onSetPersons: (persons: Person[]) => void;
+  persons: Person[];
+  onSavePerson: React.ComponentProps<typeof PersonsCard>['onSave'];
+  onDeletePerson: (id: string) => void;
   onSetSync: (patch: Partial<SyncSettings>) => void;
   onImport: React.ComponentProps<typeof ExchangeCard>['onImport'];
   onUploadAll: () => number;
@@ -42,9 +44,9 @@ const cardStyle: React.CSSProperties = {
 
 export default function SettingsView(props: Props) {
   const {
-    month, budget, settings, incomes, fixed, expenses, syncStatus, syncError, counts,
+    month, budget, settings, persons, incomes, fixed, expenses, syncStatus, syncError, counts,
     onPrev, onNext, onToday, onSaveIncome, onSaveFixed, onDeleteFixed,
-    onSetPersons, onSetSync, onImport, onUploadAll, onClearLocal,
+    onSavePerson, onDeletePerson, onSetSync, onImport, onUploadAll, onClearLocal,
   } = props;
 
   const [confirmClear, setConfirmClear] = useState(false);
@@ -53,7 +55,7 @@ export default function SettingsView(props: Props) {
   async function handleExport() {
     setExporting(true);
     try {
-      await exportMonthToExcel(month, budget, incomes, fixed, expenses, settings.persons);
+      await exportMonthToExcel(month, budget, incomes, fixed, expenses, persons);
     } catch (e) {
       console.warn('Excel 내보내기 실패:', e);
     } finally {
@@ -75,7 +77,7 @@ export default function SettingsView(props: Props) {
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <IncomeCard
           month={month}
-          persons={settings.persons}
+          persons={persons}
           incomes={incomes}
           totalFixed={budget.totalFixed}
           onSave={onSaveIncome}
@@ -84,7 +86,7 @@ export default function SettingsView(props: Props) {
 
         <FixedExpenseCard
           month={month}
-          persons={settings.persons}
+          persons={persons}
           fixed={fixed}
           onSave={onSaveFixed}
           onDelete={onDeleteFixed}
@@ -92,11 +94,12 @@ export default function SettingsView(props: Props) {
         />
 
         <PersonsCard
-          persons={settings.persons}
+          persons={persons}
           incomes={incomes}
           fixed={fixed}
           expenses={expenses}
-          onChange={onSetPersons}
+          onSave={onSavePerson}
+          onDelete={onDeletePerson}
           cardStyle={cardStyle}
         />
 
@@ -111,12 +114,11 @@ export default function SettingsView(props: Props) {
         />
 
         <ExchangeCard
-          persons={settings.persons}
+          persons={persons}
           incomes={incomes}
           fixed={fixed}
           expenses={expenses}
           onImport={onImport}
-          onSetPersons={onSetPersons}
           cardStyle={cardStyle}
         />
 

@@ -2,7 +2,7 @@
 import type { FirebaseApp } from 'firebase/app';
 import {
   CollName, Expense, FirebaseWebConfig, FixedExpense, IncomeEntry, MonthKey,
-  RemoteBatch, Syncable,
+  Person, RemoteBatch, Syncable,
 } from '../types';
 import { sanitizeForFirestore } from '../utils/merge';
 import { SyncClient } from './types';
@@ -49,6 +49,13 @@ export async function createSyncClient(
   }
 
   function subscribeSmall(cb: (batch: RemoteBatch) => void): () => void {
+    // 사람 목록도 여기서 받는다 — 한쪽에서 자녀를 추가하면 상대 폰에도 넘어가야
+    // 그 아이 이름으로 쓴 지출의 주인이 표시된다
+    const un0 = onSnapshot(
+      col('persons'),
+      snap => cb({ coll: 'persons', records: snap.docs.map(d => d.data() as Person) }),
+      err => console.warn('사람 구독 오류:', err),
+    );
     const un1 = onSnapshot(
       col('incomes'),
       snap => cb({ coll: 'incomes', records: snap.docs.map(d => d.data() as IncomeEntry) }),
@@ -59,7 +66,7 @@ export async function createSyncClient(
       snap => cb({ coll: 'fixedExpenses', records: snap.docs.map(d => d.data() as FixedExpense) }),
       err => console.warn('고정지출 구독 오류:', err),
     );
-    return () => { un1(); un2(); };
+    return () => { un0(); un1(); un2(); };
   }
 
   function subscribeMonth(month: MonthKey, cb: (batch: RemoteBatch) => void): () => void {

@@ -92,25 +92,13 @@ export function parseBackup(
     expenses: readRecords<Expense>(o.expenses),
   };
 
-  const total = backup.incomes.length + backup.fixedExpenses.length + backup.expenses.length;
+  const total = backup.persons.length + backup.incomes.length
+    + backup.fixedExpenses.length + backup.expenses.length;
   if (total === 0) {
     return { ok: false, error: '파일에 기록이 하나도 없어요. 상대방이 먼저 가계부를 입력했는지 확인해 주세요.' };
   }
 
   return { ok: true, backup };
-}
-
-/**
- * 사람 목록 합치기.
- * 내 이름·색을 상대 것으로 덮어쓰지 않는다. 다만 내게 없는 사람은 추가해야
- * 상대가 보낸 지출의 '누가 썼는지'가 빈칸이 되지 않는다.
- */
-export function mergePersons(local: Person[], incoming: Person[]): Person[] {
-  const have = new Set(local.map(p => p.id));
-  const added = incoming.filter(p => !have.has(p.id));
-  if (!added.length) return local;
-  const maxOrder = local.reduce((m, p) => Math.max(m, p.order), -1);
-  return [...local, ...added.map((p, i) => ({ ...p, order: maxOrder + 1 + i }))];
 }
 
 export function backupFileName(now = new Date()): string {

@@ -12,7 +12,7 @@ import SettingsView from './components/SettingsView';
 
 export default function App() {
   const [view, setView] = useState<View>('home');
-  const { settings, setPersons, setSync } = useAppSettings();
+  const { settings, setSync } = useAppSettings();
   const { month, prev, next, goToToday } = useMonthNav();
   const ledger = useLedger(settings.sync, month);
 
@@ -23,9 +23,15 @@ export default function App() {
       incomes: ledger.incomes,
       fixed: ledger.fixed,
       expenses: ledger.expenses,
-      persons: settings.persons,
+      persons: ledger.persons,
     }),
-    [month, ledger.incomes, ledger.fixed, ledger.expenses, settings.persons],
+    [month, ledger.incomes, ledger.fixed, ledger.expenses, ledger.persons],
+  );
+
+  // 지운 사람은 화면에서 뺀다 (과거 내역 보존을 위해 데이터는 남겨둔다)
+  const activePersons = useMemo(
+    () => ledger.persons.filter(p => !p.deleted).sort((a, b) => a.order - b.order),
+    [ledger.persons],
   );
 
   const nav = { onPrev: prev, onNext: next, onToday: goToToday };
@@ -49,7 +55,7 @@ export default function App() {
 
         {view === 'add' && (
           <ExpenseForm
-            persons={settings.persons}
+            persons={activePersons}
             budget={budget}
             onSave={ledger.saveExpense}
             // 저장 후 홈으로 보내서 저금통이 줄어드는 걸 보게 한다
@@ -61,7 +67,7 @@ export default function App() {
           <HistoryView
             month={month}
             budget={budget}
-            persons={settings.persons}
+            persons={activePersons}
             incomes={ledger.incomes}
             fixed={ledger.fixed}
             expenses={ledger.expenses}
@@ -89,7 +95,9 @@ export default function App() {
             onSaveIncome={ledger.saveIncome}
             onSaveFixed={ledger.saveFixed}
             onDeleteFixed={ledger.deleteFixed}
-            onSetPersons={setPersons}
+            persons={activePersons}
+            onSavePerson={ledger.savePerson}
+            onDeletePerson={ledger.deletePerson}
             onSetSync={setSync}
             onImport={ledger.importBackup}
             onUploadAll={ledger.uploadAll}

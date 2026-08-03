@@ -8,8 +8,8 @@ import { Expense, FixedExpense, IncomeEntry, Person } from '../types';
 const NOW = new Date(2026, 6, 10, 15, 0, 0);   // 2026-07-10 (7월은 31일)
 
 const PERSONS: Person[] = [
-  { id: 'p1', name: '나', color: '#3498db', order: 0 },
-  { id: 'p2', name: '와이프', color: '#e8748f', order: 1 },
+  { id: 'p1', name: '나', color: '#3498db', order: 0, createdAt: 0, updatedAt: 0 },
+  { id: 'p2', name: '와이프', color: '#e8748f', order: 1, createdAt: 0, updatedAt: 0 },
 ];
 
 function income(month: string, amount: number, personId = 'p1'): IncomeEntry {

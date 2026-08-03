@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Expense, FixedExpense, IncomeEntry, Person } from '../types';
 import {
-  Backup, backupFileName, backupSummary, buildBackup, mergePersons, parseBackup, serializeBackup,
+  Backup, backupFileName, backupSummary, buildBackup, parseBackup, serializeBackup,
 } from '../utils/backup';
 
 interface Props {
@@ -9,8 +9,7 @@ interface Props {
   incomes: IncomeEntry[];
   fixed: FixedExpense[];
   expenses: Expense[];
-  onImport: (b: Backup) => { incomes: number; fixed: number; expenses: number };
-  onSetPersons: (p: Person[]) => void;
+  onImport: (b: Backup) => { persons: number; incomes: number; fixed: number; expenses: number };
   cardStyle: React.CSSProperties;
 }
 
@@ -19,7 +18,7 @@ interface Props {
  * 서버를 거치지 않으므로 데이터는 두 사람 폰과 두 사람이 쓰는 메신저에만 남는다.
  */
 export default function ExchangeCard({
-  persons, incomes, fixed, expenses, onImport, onSetPersons, cardStyle,
+  persons, incomes, fixed, expenses, onImport, cardStyle,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState('');
@@ -78,15 +77,12 @@ export default function ExchangeCard({
       const parsed = parseBackup(await f.text());
       if (!parsed.ok) { say(parsed.error, 'err'); return; }
 
-      const merged = mergePersons(persons, parsed.backup.persons);
-      if (merged !== persons) onSetPersons(merged);
-
       const n = onImport(parsed.backup);
-      const total = n.incomes + n.fixed + n.expenses;
+      const total = n.persons + n.incomes + n.fixed + n.expenses;
       say(
         total === 0
           ? '이미 다 가지고 있는 기록이에요. 새로 들어온 건 없습니다.'
-          : `${total}건을 합쳤어요. (지출 ${n.expenses} · 수입 ${n.incomes} · 고정지출 ${n.fixed})`,
+          : `${total}건을 합쳤어요. (지출 ${n.expenses} · 수입 ${n.incomes} · 고정지출 ${n.fixed} · 사람 ${n.persons})`,
         'ok',
       );
     } catch (e) {

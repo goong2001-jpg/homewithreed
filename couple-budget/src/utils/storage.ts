@@ -4,6 +4,7 @@
  */
 
 export const KEYS = {
+  persons: 'couple_budget_persons',
   incomes: 'couple_budget_incomes',
   fixedExpenses: 'couple_budget_fixed',
   expenses: 'couple_budget_expenses',
