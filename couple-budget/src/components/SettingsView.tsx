@@ -21,7 +21,7 @@ interface Props {
   expenses: Expense[];
   syncStatus: SyncStatus;
   syncError: string;
-  counts: { incomes: number; fixed: number; expenses: number };
+  counts: { persons: number; incomes: number; fixed: number; expenses: number };
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;

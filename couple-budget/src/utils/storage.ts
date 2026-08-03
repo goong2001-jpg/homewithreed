@@ -9,6 +9,8 @@ export const KEYS = {
   fixedExpenses: 'couple_budget_fixed',
   expenses: 'couple_budget_expenses',
   settings: 'couple_budget_settings',
+  /** 이 기기의 기존 기록을 어느 방에 이미 올렸는지 (방 코드 저장) */
+  seeded: 'couple_budget_seeded_room',
 } as const;
 
 export function load<T>(key: string, fallback: T): T {
