@@ -150,7 +150,8 @@ export function computeMonthBudget(input: {
   // 목표선 = 지금 저금통이 있어야 할 높이. 채움이 이 선보다 위면 앞서가는 중.
   const paceRatio = spendable > 0 ? clamp01((spendable - accrued) / spendable) : 0;
 
-  const perPerson: PersonSpend[] = [...persons]
+  const perPerson: PersonSpend[] = persons
+    .filter(alive)
     .sort((a, b) => a.order - b.order)
     .map(p => {
       const expense = rows

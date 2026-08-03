@@ -1,14 +1,17 @@
 import {
-  BACKUP_FORMAT, backupFileName, backupSummary, buildBackup, mergePersons,
+  BACKUP_FORMAT, backupFileName, backupSummary, buildBackup,
   parseBackup, serializeBackup,
 } from './backup';
 import { mergeById } from './merge';
 import { Expense, FixedExpense, IncomeEntry, Person } from '../types';
 
 const PERSONS: Person[] = [
-  { id: 'p1', name: '나', color: '#3498db', order: 0 },
-  { id: 'p2', name: '와이프', color: '#e8748f', order: 1 },
+  { id: 'p1', name: '나', color: '#3498db', order: 0, createdAt: 0, updatedAt: 0 },
+  { id: 'p2', name: '와이프', color: '#e8748f', order: 1, createdAt: 0, updatedAt: 0 },
 ];
+
+const person = (id: string, name: string, updatedAt = 100): Person =>
+  ({ id, name, color: '#27ae60', order: 2, createdAt: 0, updatedAt });
 
 const income = (id: string, amount: number, updatedAt = 100): IncomeEntry =>
   ({ id, month: '2026-07', personId: 'p1', amount, memo: '급여', createdAt: 0, updatedAt });
@@ -85,7 +88,7 @@ describe('잘못된 파일 방어', () => {
   it('기록이 하나도 없으면 알려준다', () => {
     const r = parseBackup(JSON.stringify({
       format: BACKUP_FORMAT, version: 1, exportedAt: 0,
-      persons: PERSONS, incomes: [], fixedExpenses: [], expenses: [],
+      persons: [], incomes: [], fixedExpenses: [], expenses: [],
     }));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain('기록이 하나도');
@@ -163,31 +166,52 @@ describe('두 폰이 주고받으면 같은 결과로 수렴한다', () => {
   }
 });
 
-describe('mergePersons', () => {
-  it('내 이름·색을 상대 것으로 덮어쓰지 않는다', () => {
-    const local: Person[] = [{ id: 'p1', name: '남편', color: '#111111', order: 0 }];
-    const incoming: Person[] = [{ id: 'p1', name: '나', color: '#3498db', order: 0 }];
-    const out = mergePersons(local, incoming);
-    expect(out).toHaveLength(1);
-    expect(out[0].name).toBe('남편');
-    expect(out[0].color).toBe('#111111');
+describe('사람 목록도 함께 오간다', () => {
+  it('상대가 추가한 자녀가 내 폰으로 넘어온다', () => {
+    // 실제로 사용자가 겪은 문제: 와이프 폰에서 '하율'을 추가하고 지출을 넣었는데
+    // 남편 폰에는 하율이 없어서 그 지출의 주인이 표시되지 않았다
+    const husband: Person[] = PERSONS;
+    const wife: Person[] = [...PERSONS, person('c1', '하율')];
+
+    const b = buildBackup({ persons: wife, incomes: [], fixedExpenses: [], expenses: [] });
+    const r = parseBackup(serializeBackup(b));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+
+    const merged = mergeById(husband, r.backup.persons);
+    expect(merged.map(p => p.name).sort()).toEqual(['나', '와이프', '하율'].sort());
+    expect(merged.find(p => p.id === 'c1')!.name).toBe('하율');
   });
 
-  it('내게 없는 사람은 추가한다 (지출 주인이 빈칸이 되면 안 되므로)', () => {
-    const local: Person[] = [{ id: 'p1', name: '나', color: '#3498db', order: 0 }];
-    const incoming: Person[] = [
-      { id: 'p1', name: '나', color: '#3498db', order: 0 },
-      { id: 'p9', name: '장모님', color: '#27ae60', order: 5 },
-    ];
-    const out = mergePersons(local, incoming);
-    expect(out).toHaveLength(2);
-    expect(out[1].id).toBe('p9');
-    expect(out[1].order).toBe(1);   // 순서는 내 목록 뒤로 다시 매긴다
+  it('사람만 담긴 파일도 받아들인다 (지출 넣기 전에 자녀만 추가한 경우)', () => {
+    const b = buildBackup({
+      persons: [person('c1', '하율')], incomes: [], fixedExpenses: [], expenses: [],
+    });
+    const r = parseBackup(serializeBackup(b));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.backup.persons[0].name).toBe('하율');
   });
 
-  it('추가할 사람이 없으면 원본을 그대로 돌려준다', () => {
-    const local = PERSONS;
-    expect(mergePersons(local, PERSONS)).toBe(local);
+  it('나중에 고친 이름이 이긴다', () => {
+    const mine = [person('c1', '첫째', 500)];
+    const theirs = [person('c1', '하율', 900)];
+    expect(mergeById(mine, theirs)[0].name).toBe('하율');
+    expect(mergeById(theirs, mine)[0].name).toBe('하율');
+  });
+
+  it('손대지 않은 기본값은 상대가 고친 이름에 진다', () => {
+    // 기본값은 updatedAt 0 이라 실제로 고친 쪽이 항상 이긴다
+    const untouched: Person[] = [{ id: 'p2', name: '와이프', color: '#e8748f', order: 1, createdAt: 0, updatedAt: 0 }];
+    const renamed: Person[] = [{ id: 'p2', name: '아내', color: '#e8748f', order: 1, createdAt: 0, updatedAt: 900 }];
+    expect(mergeById(untouched, renamed)[0].name).toBe('아내');
+    expect(mergeById(renamed, untouched)[0].name).toBe('아내');
+  });
+
+  it('지운 사람이 되살아나지 않는다', () => {
+    const removed = [{ ...person('c1', '하율', 900), deleted: true }];
+    const stale = [person('c1', '하율', 100)];
+    expect(mergeById(stale, removed)[0].deleted).toBe(true);
+    expect(mergeById(removed, stale)[0].deleted).toBe(true);
   });
 });
 

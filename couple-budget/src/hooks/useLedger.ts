@@ -1,7 +1,7 @@
 import { Dispatch, SetStateAction, useCallback, useMemo, useState } from 'react';
 import {
-  CollName, Expense, ExpenseCategory, FixedExpense, IncomeEntry, MonthKey,
-  RemoteBatch, Syncable, SyncSettings,
+  CollName, DEFAULT_PERSONS, Expense, ExpenseCategory, FixedExpense, IncomeEntry,
+  MonthKey, Person, RemoteBatch, Syncable, SyncSettings,
 } from '../types';
 import { KEYS, load, save } from '../utils/storage';
 import { mergeById } from '../utils/merge';
@@ -20,7 +20,29 @@ import { useSync } from './useSync';
  * 영속화 방식은 receipt-tracker/src/hooks/useTransactions.ts 와 같다:
  * 모듈 레벨 키 · load()의 try/catch 폴백 · setState 업데이터 안에서 save().
  */
+/**
+ * 사람 목록을 읽는다.
+ * 예전 버전은 설정(couple_budget_settings) 안에 두어 동기화가 안 됐다.
+ * 처음 한 번 자기 저장소로 옮긴다 — updatedAt 은 0으로 둬서,
+ * 상대 폰에서 실제로 고친 내용이 항상 이기게 한다.
+ */
+function loadPersons(): Person[] {
+  const saved = load<Person[]>(KEYS.persons, []);
+  if (saved.length) return saved;
+
+  const legacy = load<{ persons?: Person[] }>(KEYS.settings, {});
+  const base = legacy.persons?.length ? legacy.persons : DEFAULT_PERSONS;
+  const migrated = base.map(p => ({
+    ...p,
+    createdAt: typeof p.createdAt === 'number' ? p.createdAt : 0,
+    updatedAt: typeof p.updatedAt === 'number' ? p.updatedAt : 0,
+  }));
+  save(KEYS.persons, migrated);
+  return migrated;
+}
+
 export function useLedger(sync: SyncSettings, month: MonthKey) {
+  const [persons, setPersons] = useState<Person[]>(loadPersons);
   const [incomes, setIncomes] = useState<IncomeEntry[]>(() => load(KEYS.incomes, []));
   const [fixed, setFixed] = useState<FixedExpense[]>(() => load(KEYS.fixedExpenses, []));
   const [expenses, setExpenses] = useState<Expense[]>(() => load(KEYS.expenses, []));
@@ -28,6 +50,13 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
   /** 클라우드에서 온 스냅샷을 로컬과 합친다 (id 기준 last-write-wins) */
   const onBatch = useCallback((batch: RemoteBatch) => {
     switch (batch.coll) {
+      case 'persons':
+        setPersons(prev => {
+          const next = mergeById(prev, batch.records);
+          save(KEYS.persons, next);
+          return next;
+        });
+        break;
       case 'incomes':
         setIncomes(prev => {
           const next = mergeById(prev, batch.records);
@@ -89,6 +118,29 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
       return next;
     });
   }, [push]);
+
+  // ------------------------------- 사람 -------------------------------
+
+  const savePerson = useCallback((input: {
+    id?: string; name: string; color: string; order: number;
+  }) => {
+    const now = Date.now();
+    const existing = input.id ? persons.find(p => p.id === input.id) : undefined;
+    const rec: Person = {
+      id: input.id ?? newId(),
+      name: input.name,
+      color: input.color,
+      order: input.order,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    commit('persons', KEYS.persons, setPersons, rec);
+  }, [persons, commit]);
+
+  const deletePerson = useCallback(
+    (id: string) => softDelete('persons', KEYS.persons, setPersons, id),
+    [softDelete],
+  );
 
   // ------------------------------- 수입 -------------------------------
 
@@ -227,22 +279,24 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     };
 
     return {
+      persons: apply('persons', KEYS.persons, setPersons, persons, backup.persons),
       incomes: apply('incomes', KEYS.incomes, setIncomes, incomes, backup.incomes),
       fixed: apply('fixedExpenses', KEYS.fixedExpenses, setFixed, fixed, backup.fixedExpenses),
       expenses: apply('expenses', KEYS.expenses, setExpenses, expenses, backup.expenses),
     };
-  }, [incomes, fixed, expenses, push]);
+  }, [persons, incomes, fixed, expenses, push]);
 
   // -------------------------- 클라우드 보조작업 --------------------------
 
   /** '지금까지 기록 클라우드로 올리기' — 명시적으로 눌렀을 때만 실행한다 */
   const uploadAll = useCallback(() => {
     let n = 0;
+    for (const r of persons) { push('persons', r); n++; }
     for (const r of incomes) { push('incomes', r); n++; }
     for (const r of fixed) { push('fixedExpenses', r); n++; }
     for (const r of expenses) { push('expenses', r); n++; }
     return n;
-  }, [incomes, fixed, expenses, push]);
+  }, [persons, incomes, fixed, expenses, push]);
 
   /** '지난 데이터 모두 불러오기' — 새 폰에서 전체 이력을 한 번 받아온다 */
   const pullAllExpenses = useCallback(async (): Promise<number> => {
@@ -272,7 +326,8 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
   );
 
   return {
-    incomes, fixed, expenses,
+    persons, incomes, fixed, expenses,
+    savePerson, deletePerson,
     saveIncome, deleteIncome,
     saveFixed, deleteFixed,
     saveExpense, deleteExpense,

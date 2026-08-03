@@ -1,27 +1,16 @@
 import { useCallback, useState } from 'react';
-import { AppSettings, DEFAULT_SETTINGS, Person, SyncSettings } from '../types';
+import { AppSettings, DEFAULT_SETTINGS, SyncSettings } from '../types';
 import { KEYS, load, save } from '../utils/storage';
 
 function loadSettings(): AppSettings {
   const raw = load<Partial<AppSettings>>(KEYS.settings, {});
-  return {
-    persons: raw.persons?.length ? raw.persons : DEFAULT_SETTINGS.persons,
-    sync: { ...DEFAULT_SETTINGS.sync, ...(raw.sync ?? {}) },
-  };
+  // 사람 목록은 예전엔 여기 있었지만 동기화가 안 돼서 useLedger 로 옮겼다.
+  // 옛 값은 useLedger 의 loadPersons() 가 한 번 읽어 이사시킨다.
+  return { sync: { ...DEFAULT_SETTINGS.sync, ...(raw.sync ?? {}) } };
 }
 
 export function useAppSettings() {
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
-
-  const update = useCallback((patch: Partial<AppSettings>) => {
-    setSettings(prev => {
-      const next = { ...prev, ...patch };
-      save(KEYS.settings, next);
-      return next;
-    });
-  }, []);
-
-  const setPersons = useCallback((persons: Person[]) => update({ persons }), [update]);
 
   const setSync = useCallback((patch: Partial<SyncSettings>) => {
     setSettings(prev => {
@@ -31,5 +20,5 @@ export function useAppSettings() {
     });
   }, []);
 
-  return { settings, setPersons, setSync };
+  return { settings, setSync };
 }

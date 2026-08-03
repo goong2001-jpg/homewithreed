@@ -19,16 +19,25 @@ export interface Syncable {
 
 // ============================== 사람 ==============================
 
-export interface Person {
+/**
+ * 가계부를 같이 쓰는 사람(부부 + 자녀 등).
+ *
+ * 다른 기록들과 같은 Syncable 이다 — 한쪽 폰에서 자녀를 추가하면
+ * 상대 폰에도 넘어가야 그 아이 이름으로 쓴 지출의 주인이 표시된다.
+ */
+export interface Person extends Syncable {
   id: string;      // 'p1' | 'p2' — 이름을 바꿔도 절대 바뀌지 않는다 (과거 내역 보존)
-  name: string;    // '나' | '와이프'
+  name: string;    // '나' | '와이프' | '하율'
   color: string;
   order: number;
+  createdAt: number;
 }
 
+// updatedAt 0 = '아직 아무도 손대지 않은 기본값'.
+// 양쪽 폰이 각자 기본값을 갖고 시작해도, 실제로 고친 쪽이 항상 이긴다.
 export const DEFAULT_PERSONS: Person[] = [
-  { id: 'p1', name: '나', color: '#3498db', order: 0 },
-  { id: 'p2', name: '와이프', color: '#e8748f', order: 1 },
+  { id: 'p1', name: '나', color: '#3498db', order: 0, createdAt: 0, updatedAt: 0 },
+  { id: 'p2', name: '와이프', color: '#e8748f', order: 1, createdAt: 0, updatedAt: 0 },
 ];
 
 export const PERSON_COLORS = [
@@ -108,13 +117,11 @@ export interface SyncSettings {
 }
 
 export interface AppSettings {
-  persons: Person[];
   /** ⚠️ 이 값은 절대 클라우드로 올리지 않는다. 방을 지키는 코드를 그 방 안에 두면 안 된다. */
   sync: SyncSettings;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  persons: DEFAULT_PERSONS,
   sync: { enabled: false, roomCode: '', firebaseConfigText: '' },
 };
 
@@ -168,9 +175,10 @@ export type View = 'home' | 'add' | 'history' | 'settings';
 
 export type SyncStatus = 'off' | 'connecting' | 'live' | 'error';
 
-export type CollName = 'incomes' | 'fixedExpenses' | 'expenses';
+export type CollName = 'persons' | 'incomes' | 'fixedExpenses' | 'expenses';
 
 export type RemoteBatch =
+  | { coll: 'persons'; records: Person[] }
   | { coll: 'incomes'; records: IncomeEntry[] }
   | { coll: 'fixedExpenses'; records: FixedExpense[] }
   | { coll: 'expenses'; records: Expense[] };
