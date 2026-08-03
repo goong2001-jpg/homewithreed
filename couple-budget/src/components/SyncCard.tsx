@@ -8,7 +8,7 @@ interface Props {
   sync: SyncSettings;
   status: SyncStatus;
   error: string;
-  counts: { incomes: number; fixed: number; expenses: number };
+  counts: { persons: number; incomes: number; fixed: number; expenses: number };
   onChange: (patch: Partial<SyncSettings>) => void;
   onUploadAll: () => number;
   cardStyle: React.CSSProperties;
@@ -392,7 +392,7 @@ export default function SyncCard({
                   onClick={() => { const n = onUploadAll(); setNote(`${n}건을 올렸어요.`); }}
                   style={{ ...ghost, width: '100%', marginTop: 8, background: '#fff', color: '#1e8449' }}
                 >
-                  지금까지 기록 올리기 ({counts.incomes + counts.fixed + counts.expenses}건)
+                  지금까지 기록 올리기 ({counts.persons + counts.incomes + counts.fixed + counts.expenses}건)
                 </button>
               </div>
             )}
@@ -415,9 +415,42 @@ export default function SyncCard({
       {statusBox}
 
       {!open ? (
-        <button onClick={() => setOpen(true)} style={{ ...primary, width: '100%' }}>
-          {status === 'live' ? '동기화 설정 다시 보기' : '설정 시작하기 (약 10분, 한 번만)'}
-        </button>
+        <>
+          {/* 연결된 뒤에도 언제든 다시 올릴 수 있어야 한다.
+              예전엔 연결 테스트 직후에만 보여서, 이미 연결된 사람은 버튼을 찾을 수 없었다. */}
+          {status === 'live' && (
+            <>
+              <button
+                onClick={() => { const n = onUploadAll(); setNote(`${n}건을 다시 올렸어요.`); }}
+                style={{ ...primary, width: '100%', marginBottom: 9 }}
+              >
+                이 기기 기록 올리기
+                <span style={{ fontWeight: 400, opacity: 0.85 }}>
+                  {' '}({counts.persons + counts.incomes + counts.fixed + counts.expenses}건)
+                </span>
+              </button>
+              <p style={{ margin: '0 0 12px', fontSize: 11.5, color: '#90a4ae', lineHeight: 1.7 }}>
+                평소엔 자동으로 오갑니다. 상대 폰에 뭔가 빠져 보일 때만 눌러주세요.
+              </p>
+              {note && (
+                <div style={{
+                  fontSize: 12.5, color: '#1e8449', background: '#eafaf1',
+                  borderRadius: 8, padding: '10px 12px', marginBottom: 12,
+                }}>
+                  {note}
+                </div>
+              )}
+            </>
+          )}
+          <button
+            onClick={() => setOpen(true)}
+            style={status === 'live'
+              ? { ...ghost, width: '100%' }
+              : { ...primary, width: '100%' }}
+          >
+            {status === 'live' ? '동기화 설정 다시 보기' : '설정 시작하기 (약 10분, 한 번만)'}
+          </button>
+        </>
       ) : (
         <>
           {/* 진행 표시 */}

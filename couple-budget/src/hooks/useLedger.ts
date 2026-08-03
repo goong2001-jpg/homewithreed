@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useCallback, useMemo, useState } from 'react';
+import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CollName, DEFAULT_PERSONS, Expense, ExpenseCategory, FixedExpense, IncomeEntry,
   MonthKey, Person, RemoteBatch, Syncable, SyncSettings,
@@ -298,6 +298,34 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     return n;
   }, [persons, incomes, fixed, expenses, push]);
 
+  /**
+   * 연결된 뒤 이 기기의 기존 기록을 방에 딱 한 번 올린다.
+   *
+   * 왜 필요한가: 예전 버전에서 만든 사람 목록처럼 '이미 폰에만 있던' 기록은
+   * 아무도 손대지 않으면 영영 클라우드로 안 올라간다. 그러면 상대 폰에서 볼 수 없다.
+   *
+   * 왜 조금 기다리는가: 먼저 들어온 스냅샷을 병합한 뒤에 올려야
+   * 이 기기가 들고 있던 낡은 사본으로 클라우드를 덮어쓰지 않는다.
+   * (push 는 setDoc 이라 서버에서 updatedAt 을 비교해주지 않는다)
+   */
+  const uploadAllRef = useRef<() => number>(() => 0);
+  uploadAllRef.current = uploadAll;
+
+  useEffect(() => {
+    if (!isLive) return;
+    const code = sync.roomCode.trim();
+    if (!code) return;
+    if (load<string>(KEYS.seeded, '') === code) return;   // 이 방엔 이미 올렸다
+
+    // uploadAll 은 ref 로 읽는다 — 의존성에 넣으면 기록이 바뀔 때마다
+    // 타이머가 다시 시작돼서 언제 올라갈지 예측할 수 없게 된다
+    const t = setTimeout(() => {
+      uploadAllRef.current();
+      save(KEYS.seeded, code);
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [isLive, sync.roomCode]);
+
   /** '지난 데이터 모두 불러오기' — 새 폰에서 전체 이력을 한 번 받아온다 */
   const pullAllExpenses = useCallback(async (): Promise<number> => {
     const remote = await fetchAllExpenses();
@@ -318,11 +346,12 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
 
   const counts = useMemo(
     () => ({
+      persons: persons.filter(r => !r.deleted).length,
       incomes: incomes.filter(r => !r.deleted).length,
       fixed: fixed.filter(r => !r.deleted).length,
       expenses: expenses.filter(r => !r.deleted).length,
     }),
-    [incomes, fixed, expenses],
+    [persons, incomes, fixed, expenses],
   );
 
   return {
