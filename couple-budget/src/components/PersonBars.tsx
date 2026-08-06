@@ -4,9 +4,11 @@ import { won } from '../utils/format';
 
 interface Props {
   budget: MonthBudget;
+  /** 사람을 누르면 그 사람 내역으로 보낸다 */
+  onSelectPerson: (personId: string) => void;
 }
 
-export default function PersonBars({ budget }: Props) {
+export default function PersonBars({ budget, onSelectPerson }: Props) {
   const { perPerson, variableSpent } = budget;
   if (!perPerson.length) return null;
 
@@ -24,7 +26,14 @@ export default function PersonBars({ budget }: Props) {
       </div>
 
       {perPerson.map(p => (
-        <div key={p.personId} style={{ marginBottom: 12 }}>
+        <button
+          key={p.personId}
+          onClick={() => onSelectPerson(p.personId)}
+          style={{
+            display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer',
+            background: 'none', border: 'none', padding: '2px 0 10px', marginBottom: 2,
+          }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>
               {p.name}
@@ -34,8 +43,11 @@ export default function PersonBars({ budget }: Props) {
                 </span>
               )}
             </span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: p.expense > 0 ? '#e74c3c' : '#bbb' }}>
-              {won(p.expense)}
+            <span style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: p.expense > 0 ? '#e74c3c' : '#bbb' }}>
+                {won(p.expense)}
+              </span>
+              <span style={{ fontSize: 12, color: '#cfd8dc' }}>›</span>
             </span>
           </div>
           <div style={{ background: '#f1f3f5', borderRadius: 99, height: 8, overflow: 'hidden' }}>
@@ -47,12 +59,16 @@ export default function PersonBars({ budget }: Props) {
               transition: 'width 500ms ease',
             }} />
           </div>
-        </div>
+        </button>
       ))}
 
-      {variableSpent === 0 && (
+      {variableSpent === 0 ? (
         <div style={{ fontSize: 12, color: '#bbb', textAlign: 'center', paddingTop: 2 }}>
           아직 이달 지출이 없어요
+        </div>
+      ) : (
+        <div style={{ fontSize: 11, color: '#b0bec5', textAlign: 'center', paddingTop: 2 }}>
+          이름을 누르면 그 사람 수입·지출을 자세히 볼 수 있어요
         </div>
       )}
     </div>

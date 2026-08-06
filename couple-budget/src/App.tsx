@@ -12,6 +12,8 @@ import SettingsView from './components/SettingsView';
 
 export default function App() {
   const [view, setView] = useState<View>('home');
+  // 내역 화면의 사람 필터. 홈에서 사람을 눌러 들어올 수 있어야 해서 여기서 들고 있다.
+  const [historyPerson, setHistoryPerson] = useState<string>('all');
   const { settings, setSync } = useAppSettings();
   const { month, prev, next, goToToday } = useMonthNav();
   const ledger = useLedger(settings.sync, month);
@@ -50,6 +52,7 @@ export default function App() {
             onGoSettings={() => setView('settings')}
             onGoAdd={() => setView('add')}
             onCopyPrevIncome={() => ledger.copyIncomeFromPrevMonth(month)}
+            onSelectPerson={id => { setHistoryPerson(id); setView('history'); }}
           />
         )}
 
@@ -74,6 +77,8 @@ export default function App() {
             syncStatus={ledger.syncStatus}
             isLive={ledger.isLive}
             {...nav}
+            personFilter={historyPerson}
+            onPersonFilterChange={setHistoryPerson}
             onDeleteExpense={ledger.deleteExpense}
             onPullAll={() => { void ledger.pullAllExpenses(); }}
             onGoSettings={() => setView('settings')}
@@ -106,7 +111,14 @@ export default function App() {
         )}
       </div>
 
-      <TabBar active={view} onChange={setView} />
+      <TabBar
+        active={view}
+        onChange={v => {
+          // 탭으로 직접 들어올 땐 전체를 보여준다 (홈에서 사람을 눌러 들어온 경우만 필터 유지)
+          if (v === 'history') setHistoryPerson('all');
+          setView(v);
+        }}
+      />
     </>
   );
 }

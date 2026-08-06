@@ -1,12 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Expense, FixedExpense, IncomeEntry, MonthBudget, MonthKey, Person, SyncStatus,
+  Expense, ExpenseCategory, FixedExpense, IncomeEntry, MonthBudget, MonthKey,
+  Person, SyncStatus,
 } from '../types';
-import { activeFixed, monthExpenses } from '../utils/budget';
+import { activeFixed, categoryTotals, monthExpenses } from '../utils/budget';
 import { dateLabel, won } from '../utils/format';
 import { exportMonthToExcel } from '../utils/excelExport';
 import MonthHeader from './MonthHeader';
 import ExpenseItem from './ExpenseItem';
+import CategoryBreakdown from './CategoryBreakdown';
 
 interface Props {
   month: MonthKey;
@@ -20,6 +22,9 @@ interface Props {
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
+  /** 'all' 이거나 personId. 홈에서 사람을 눌러 들어오면 그 사람이 들어있다 */
+  personFilter: string;
+  onPersonFilterChange: (v: string) => void;
   onDeleteExpense: (id: string) => void;
   onPullAll: () => void;
   onGoSettings: () => void;
@@ -39,15 +44,37 @@ function groupByDate(rows: Expense[]): [string, Expense[]][] {
 
 export default function HistoryView({
   month, budget, persons, incomes, fixed, expenses, syncStatus, isLive,
+  personFilter: filter, onPersonFilterChange: setFilter,
   onPrev, onNext, onToday, onDeleteExpense, onPullAll, onGoSettings,
 }: Props) {
-  const [filter, setFilter] = useState<string>('all');
+  const [category, setCategory] = useState<ExpenseCategory | null>(null);
   const [exporting, setExporting] = useState(false);
 
   const rows = useMemo(() => monthExpenses(expenses, month), [expenses, month]);
-  const shown = filter === 'all' ? rows : rows.filter(e => e.personId === filter);
+
+  const byPerson = filter === 'all' ? rows : rows.filter(e => e.personId === filter);
+  const shown = category ? byPerson.filter(e => e.category === category) : byPerson;
   const groups = groupByDate(shown);
   const shownTotal = shown.reduce((s, e) => s + e.amount, 0);
+
+  // 카테고리 집계는 사람 필터까지만 반영한다 —
+  // 카테고리를 고르고 나서도 다른 카테고리로 바로 옮겨갈 수 있어야 하니까
+  const catRows = useMemo(
+    () => categoryTotals(expenses, month, filter === 'all' ? undefined : filter),
+    [expenses, month, filter],
+  );
+
+  const selectedPerson = filter === 'all' ? null : persons.find(p => p.id === filter) ?? null;
+  const personStat = filter === 'all'
+    ? null
+    : budget.perPerson.find(p => p.personId === filter) ?? null;
+
+  // 홈에서 사람을 눌러 들어오면 그 칩이 가로 스크롤 밖에 있을 수 있다.
+  // 화면 안으로 끌어와야 지금 누구를 보고 있는지 알 수 있다.
+  const activeChipRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    activeChipRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [filter]);
 
   const activeFixedRows = activeFixed(fixed, month);
   const personOf = (id: string) => persons.find(p => p.id === id);
@@ -104,18 +131,75 @@ export default function HistoryView({
       <div style={{
         display: 'flex', gap: 7, padding: '12px 16px 4px', overflowX: 'auto',
       }}>
-        <button onClick={() => setFilter('all')} style={chip(filter === 'all', '#27ae60')}>
+        <button
+          ref={filter === 'all' ? activeChipRef : undefined}
+          onClick={() => { setFilter('all'); setCategory(null); }}
+          style={chip(filter === 'all', '#27ae60')}
+        >
           전체 {won(rows.reduce((s, e) => s + e.amount, 0))}
         </button>
         {sortedPersons.map(p => {
           const total = rows.filter(e => e.personId === p.id).reduce((s, e) => s + e.amount, 0);
           return (
-            <button key={p.id} onClick={() => setFilter(p.id)} style={chip(filter === p.id, p.color)}>
+            <button
+              key={p.id}
+              ref={filter === p.id ? activeChipRef : undefined}
+              onClick={() => { setFilter(p.id); setCategory(null); }}
+              style={chip(filter === p.id, p.color)}
+            >
               {p.name} {won(total)}
             </button>
           );
         })}
       </div>
+
+      {/* 사람을 골랐을 때: 그 사람 수입 · 지출 요약 */}
+      {personStat && (
+        <div style={{
+          background: '#fff', margin: '12px 16px', borderRadius: 12, padding: 16,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12,
+          }}>
+            <span style={{
+              width: 10, height: 10, borderRadius: '50%',
+              background: personStat.color, flexShrink: 0,
+            }} />
+            <h3 style={{ margin: 0, fontSize: 15, color: '#2c3e50' }}>
+              {personStat.name}
+            </h3>
+          </div>
+          <div style={{ display: 'flex' }}>
+            <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid #f0f0f0' }}>
+              <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>이달 수입</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#27ae60' }}>
+                {won(personStat.income)}
+              </div>
+            </div>
+            <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid #f0f0f0' }}>
+              <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>이달 지출</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#e74c3c' }}>
+                {won(personStat.expense)}
+              </div>
+            </div>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>전체 중</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#2c3e50' }}>
+                {Math.round(personStat.ratio * 100)}%
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 카테고리별 지출 — 눌러서 그 카테고리만 볼 수 있다 */}
+      <CategoryBreakdown
+        rows={catRows}
+        selected={category}
+        onSelect={setCategory}
+        scopeLabel={selectedPerson?.name}
+      />
 
       {/* 고정지출 (매달 반복 — 여기서는 보기만) */}
       {activeFixedRows.length > 0 && (
@@ -166,14 +250,17 @@ export default function HistoryView({
         <div style={{ textAlign: 'center', padding: '54px 20px', color: '#bbb' }}>
           <div style={{ fontSize: 46, marginBottom: 12 }}>📋</div>
           <div style={{ fontSize: 15 }}>
-            {filter === 'all' ? '이달의 지출 내역이 없습니다' : '이 사람의 지출이 없습니다'}
+            {category
+              ? `${category} 지출이 없습니다`
+              : filter === 'all' ? '이달의 지출 내역이 없습니다' : '이 사람의 지출이 없습니다'}
           </div>
         </div>
       ) : (
         <div style={{ marginTop: 8 }}>
-          {filter !== 'all' && (
+          {(filter !== 'all' || category) && (
             <div style={{ padding: '0 16px 8px', fontSize: 12, color: '#95a5a6' }}>
-              {shown.length}건 · {won(shownTotal)}
+              {[selectedPerson?.name, category].filter(Boolean).join(' · ')}
+              {' '}— {shown.length}건 · {won(shownTotal)}
             </div>
           )}
           {groups.map(([date, items]) => (
