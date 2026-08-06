@@ -20,11 +20,12 @@ interface Props {
   onGoSettings: () => void;
   onGoAdd: () => void;
   onCopyPrevIncome: () => void;
+  onSelectPerson: (personId: string) => void;
 }
 
 export default function HomeView({
   month, budget, fixedCount, syncStatus, prevMonthIncome,
-  onPrev, onNext, onToday, onGoSettings, onGoAdd, onCopyPrevIncome,
+  onPrev, onNext, onToday, onGoSettings, onGoAdd, onCopyPrevIncome, onSelectPerson,
 }: Props) {
   const color = LEVEL_COLOR[budget.level];
   const future = budget.phase === 'future';
@@ -157,7 +158,7 @@ export default function HomeView({
           </div>
 
           <StatRow budget={budget} />
-          <PersonBars budget={budget} />
+          <PersonBars budget={budget} onSelectPerson={onSelectPerson} />
 
           <button
             onClick={onGoSettings}

@@ -1,6 +1,6 @@
 import {
-  BudgetLevel, DateKey, Expense, FixedExpense, IncomeEntry, MonthBudget,
-  MonthKey, MonthPhase, Person, PersonSpend,
+  BudgetLevel, CategorySpend, DateKey, Expense, ExpenseCategory, FixedExpense,
+  IncomeEntry, MonthBudget, MonthKey, MonthPhase, Person, PersonSpend,
 } from '../types';
 
 /**
@@ -90,6 +90,37 @@ export function monthFixed(fixed: FixedExpense[], month: MonthKey): number {
 
 export function monthExpenses(expenses: Expense[], month: MonthKey): Expense[] {
   return expenses.filter(e => alive(e) && e.month === month);
+}
+
+/**
+ * 카테고리별 지출 집계. 금액이 큰 순서로 돌려준다.
+ * personId 를 주면 그 사람이 쓴 것만 센다.
+ * 지출이 하나도 없는 카테고리는 아예 빼서 화면이 비어 보이지 않게 한다.
+ */
+export function categoryTotals(
+  expenses: Expense[], month: MonthKey, personId?: string,
+): CategorySpend[] {
+  const rows = monthExpenses(expenses, month)
+    .filter(e => !personId || e.personId === personId);
+
+  const total = rows.reduce((s, e) => s + num(e.amount), 0);
+  const bucket = new Map<ExpenseCategory, { amount: number; count: number }>();
+
+  for (const e of rows) {
+    const cur = bucket.get(e.category) ?? { amount: 0, count: 0 };
+    cur.amount += num(e.amount);
+    cur.count += 1;
+    bucket.set(e.category, cur);
+  }
+
+  return Array.from(bucket.entries())
+    .map(([category, v]) => ({
+      category,
+      amount: v.amount,
+      count: v.count,
+      ratio: total > 0 ? v.amount / total : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category));
 }
 
 /** ★ 하루 수입 = (월 총수입 − 월 고정지출) ÷ 그 달의 실제 일수 */

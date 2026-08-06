@@ -1,6 +1,6 @@
 import {
   addMonths, computeMonthBudget, dailyBudgetOf, daysInMonth, elapsedDays,
-  isFixedActive, monthPhase, todayKey,
+  categoryTotals, isFixedActive, monthPhase, todayKey,
 } from './budget';
 import { Expense, FixedExpense, IncomeEntry, Person } from '../types';
 
@@ -318,5 +318,61 @@ describe('dailyBudgetOf', () => {
   it('일수로 나눈다', () => {
     expect(dailyBudgetOf(3_100_000, '2026-07')).toBe(100_000);
     expect(dailyBudgetOf(0, '2026-07')).toBe(0);
+  });
+});
+
+describe('카테고리별 지출 집계', () => {
+  const catExp = (id: string, amount: number, category: Expense['category'], personId = 'p1'): Expense => ({
+    id, date: '2026-07-05', month: '2026-07', amount, category,
+    content: '테스트', personId, createdAt: 0, updatedAt: 0,
+  });
+
+  const rows: Expense[] = [
+    catExp('1', 50_000, '식비', 'p1'),
+    catExp('2', 30_000, '식비', 'p2'),
+    catExp('3', 100_000, '쇼핑', 'p1'),
+    catExp('4', 20_000, '교통', 'p2'),
+  ];
+
+  it('금액이 큰 순서로 돌려준다', () => {
+    const out = categoryTotals(rows, '2026-07');
+    expect(out.map(c => c.category)).toEqual(['쇼핑', '식비', '교통']);
+    expect(out[0].amount).toBe(100_000);
+    expect(out[1].amount).toBe(80_000);   // 식비 두 건 합산
+  });
+
+  it('건수와 비율을 함께 준다', () => {
+    const out = categoryTotals(rows, '2026-07');
+    const food = out.find(c => c.category === '식비')!;
+    expect(food.count).toBe(2);
+    expect(food.ratio).toBeCloseTo(80_000 / 200_000, 5);
+  });
+
+  it('지출이 없는 카테고리는 빼고 준다', () => {
+    const out = categoryTotals(rows, '2026-07');
+    expect(out.find(c => c.category === '의료')).toBeUndefined();
+  });
+
+  it('사람을 지정하면 그 사람 것만 센다', () => {
+    const out = categoryTotals(rows, '2026-07', 'p2');
+    expect(out.map(c => c.category)).toEqual(['식비', '교통']);
+    expect(out.find(c => c.category === '식비')!.amount).toBe(30_000);
+    // 비율은 그 사람 안에서의 비율
+    expect(out.find(c => c.category === '식비')!.ratio).toBeCloseTo(30_000 / 50_000, 5);
+  });
+
+  it('다른 달은 섞이지 않는다', () => {
+    const other = { ...catExp('9', 999_999, '여가'), date: '2026-06-01', month: '2026-06' };
+    expect(categoryTotals([...rows, other], '2026-07').find(c => c.category === '여가')).toBeUndefined();
+  });
+
+  it('삭제된 지출은 빠진다', () => {
+    const gone = { ...catExp('5', 999_999, '의료'), deleted: true };
+    expect(categoryTotals([...rows, gone], '2026-07').find(c => c.category === '의료')).toBeUndefined();
+  });
+
+  it('기록이 없으면 빈 배열', () => {
+    expect(categoryTotals([], '2026-07')).toEqual([]);
+    expect(categoryTotals(rows, '2026-07', '없는사람')).toEqual([]);
   });
 });

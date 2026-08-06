@@ -73,6 +73,11 @@ export type ExpenseCategory =
 export const CATEGORIES: ExpenseCategory[] =
   ['식비', '생활', '교통', '육아', '의료', '쇼핑', '여가', '기타'];
 
+export const CATEGORY_COLOR: Record<ExpenseCategory, string> = {
+  식비: '#e67e22', 생활: '#16a085', 교통: '#3498db', 육아: '#e8748f',
+  의료: '#9b59b6', 쇼핑: '#f39c12', 여가: '#27ae60', 기타: '#95a5a6',
+};
+
 export const CATEGORY_EMOJI: Record<ExpenseCategory, string> = {
   식비: '🍽️', 생활: '🏠', 교통: '🚌', 육아: '🧸',
   의료: '💊', 쇼핑: '🛍️', 여가: '🎮', 기타: '📌',
@@ -129,6 +134,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 export type MonthPhase = 'past' | 'current' | 'future';
 export type BudgetLevel = 'noIncome' | '여유' | '주의' | '초과';
+
+/** 카테고리별 지출 집계 (budget.ts categoryTotals 산출물) */
+export interface CategorySpend {
+  category: ExpenseCategory;
+  amount: number;
+  count: number;
+  ratio: number;    // amount / 전체 지출 (0..1)
+}
 
 export interface PersonSpend {
   personId: string;
