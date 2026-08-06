@@ -201,51 +201,32 @@ export default function HistoryView({
         scopeLabel={selectedPerson?.name}
       />
 
-      {/* 고정지출 (매달 반복 — 여기서는 보기만) */}
-      {activeFixedRows.length > 0 && (
-        <div style={{
-          background: '#fff', margin: '12px 16px', borderRadius: 12, overflow: 'hidden',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-        }}>
-          <div style={{
-            padding: '11px 14px', background: '#fafbfc', borderBottom: '1px solid #f0f0f0',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          }}>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#607d8b' }}>
-              고정지출 (하루수입에서 이미 차감)
+      {/* 이달 쓴 돈 (변동지출) — 카테고리를 눌렀을 때 바로 보이도록 고정지출보다 위에 둔다 */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        padding: '14px 16px 6px',
+      }}>
+        <h3 style={{ margin: 0, fontSize: 14, color: '#333' }}>
+          이달 쓴 돈
+          {category && (
+            <span style={{ fontSize: 12, color: '#e74c3c', fontWeight: 700, marginLeft: 6 }}>
+              {`· ${category}만 보는 중`}
             </span>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#607d8b' }}>
-              {won(budget.totalFixed)}
-            </span>
-          </div>
-          {activeFixedRows.map(f => (
-            <div key={f.id} style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 14px', borderBottom: '1px solid #f7f7f7', fontSize: 13.5,
-            }}>
-              <span style={{ flex: 1, color: '#2c3e50' }}>{f.name}</span>
-              <span style={{
-                fontSize: 10, color: '#78909c', background: '#eceff1',
-                borderRadius: 6, padding: '2px 6px',
-              }}>
-                매달
-              </span>
-              <span style={{ fontWeight: 700, color: '#607d8b' }}>{won(f.amount)}</span>
-            </div>
-          ))}
+          )}
+        </h3>
+        {(filter !== 'all' || category) && (
           <button
-            onClick={onGoSettings}
+            onClick={() => { setCategory(null); setFilter('all'); }}
             style={{
-              width: '100%', padding: '10px', background: 'none', border: 'none',
-              fontSize: 12, color: '#90a4ae', cursor: 'pointer',
+              fontSize: 11.5, padding: '4px 10px', border: '1px solid #e0e0e0',
+              borderRadius: 12, background: '#fff', color: '#78909c', cursor: 'pointer',
             }}
           >
-            설정에서 수정 ›
+            전체 보기
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* 변동지출 */}
       {groups.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '54px 20px', color: '#bbb' }}>
           <div style={{ fontSize: 46, marginBottom: 12 }}>📋</div>
@@ -284,6 +265,51 @@ export default function HistoryView({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 고정지출 (매달 반복 — 여기서는 보기만) */}
+      {activeFixedRows.length > 0 && (
+        <div style={{
+          background: '#fff', margin: '12px 16px', borderRadius: 12, overflow: 'hidden',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        }}>
+          <div style={{
+            padding: '11px 14px', background: '#fafbfc', borderBottom: '1px solid #f0f0f0',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#607d8b' }}>
+              고정지출 · 매달 반복
+              <span style={{ fontWeight: 400, color: '#90a4ae' }}> (위 목록에는 없어요)</span>
+            </span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#607d8b' }}>
+              {won(budget.totalFixed)}
+            </span>
+          </div>
+          {activeFixedRows.map(f => (
+            <div key={f.id} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 14px', borderBottom: '1px solid #f7f7f7', fontSize: 13.5,
+            }}>
+              <span style={{ flex: 1, color: '#2c3e50' }}>{f.name}</span>
+              <span style={{
+                fontSize: 10, color: '#78909c', background: '#eceff1',
+                borderRadius: 6, padding: '2px 6px',
+              }}>
+                매달
+              </span>
+              <span style={{ fontWeight: 700, color: '#607d8b' }}>{won(f.amount)}</span>
+            </div>
+          ))}
+          <button
+            onClick={onGoSettings}
+            style={{
+              width: '100%', padding: '10px', background: 'none', border: 'none',
+              fontSize: 12, color: '#90a4ae', cursor: 'pointer',
+            }}
+          >
+            설정에서 수정 ›
+          </button>
         </div>
       )}
 
