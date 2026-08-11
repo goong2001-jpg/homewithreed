@@ -1,5 +1,5 @@
 import React from 'react';
-import { Asset, AssetKind, DateKey, Loan, Summary, View } from '../types';
+import { Asset, AssetKind, DateKey, LIQUIDITY_META, Loan, Summary, View } from '../types';
 import { ddayLabel, shortWon, signedPercent, signedWon, won } from '../utils/format';
 import { loanStatus } from '../utils/loan';
 import { alive } from '../utils/merge';
@@ -55,6 +55,28 @@ export default function HomeView({
           <Stat label="총자산" value={shortWon(s.totalAsset)} color={COLOR.asset} />
           <div style={{ width: 1, background: COLOR.line }} />
           <Stat label="총부채" value={shortWon(s.totalDebt)} color={COLOR.debt} />
+        </div>
+
+        {/* 순자산이 커도 대부분 보증금에 묶여 있을 수 있다.
+            지금 당장 꺼내 쓸 수 있는 돈은 따로 봐야 한다. */}
+        <div
+          style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+            marginTop: 12, paddingTop: 12, borderTop: `1px solid ${COLOR.line}`,
+          }}
+        >
+          <span style={{ fontSize: 13, color: COLOR.sub }}>
+            {LIQUIDITY_META['즉시'].emoji} 지금 쓸 수 있는 돈
+          </span>
+          <strong
+            style={{
+              fontSize: 18, fontWeight: 800,
+              color: LIQUIDITY_META['즉시'].color,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {shortWon(s.availableNow)}
+          </strong>
         </div>
 
         {s.totalPrincipal > 0 && (
@@ -148,6 +170,64 @@ export default function HomeView({
         </div>
       )}
 
+      {/* ── 언제 쓸 수 있나 ────────────────────── */}
+      {s.byLiquidity.length > 0 && (
+        <div style={card}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: COLOR.sub, marginBottom: 4 }}>
+            언제 쓸 수 있나
+          </div>
+          <div style={{ fontSize: 11, color: COLOR.faint, marginBottom: 12 }}>
+            대출을 뺀 내 몫 기준
+          </div>
+
+          <div
+            style={{
+              display: 'flex', height: 14, borderRadius: 7,
+              overflow: 'hidden', background: COLOR.line,
+            }}
+          >
+            {s.byLiquidity.map(l => (
+              <div
+                key={l.level}
+                title={`${LIQUIDITY_META[l.level].label} ${Math.round(l.ratio * 100)}%`}
+                style={{ width: `${l.ratio * 100}%`, background: LIQUIDITY_META[l.level].color }}
+              />
+            ))}
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            {s.byLiquidity.map(l => (
+              <div
+                key={l.level}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '7px 0', borderTop: `1px solid ${COLOR.line}`,
+                }}
+              >
+                <span
+                  style={{
+                    width: 9, height: 9, borderRadius: '50%',
+                    background: LIQUIDITY_META[l.level].color, flexShrink: 0,
+                  }}
+                />
+                <span style={{ fontSize: 14, flex: 1 }}>
+                  {LIQUIDITY_META[l.level].emoji} {LIQUIDITY_META[l.level].label}
+                  <span style={{ color: COLOR.faint, fontSize: 12, marginLeft: 5 }}>
+                    {l.count}개
+                  </span>
+                </span>
+                <span style={{ fontSize: 12, color: COLOR.faint, width: 38, textAlign: 'right' }}>
+                  {Math.round(l.ratio * 100)}%
+                </span>
+                <strong style={{ fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>
+                  {shortWon(l.amount)}
+                </strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── 매달 나가는 돈 ──────────────────────── */}
       {s.monthlyOutflow > 0 && (
         <button
@@ -223,6 +303,7 @@ export default function HomeView({
                 const profit = a.principal && a.principal > 0
                   ? (a.value - a.principal) / a.principal
                   : null;
+                const eq = s.equityByAsset[a.id];
                 return (
                   <button
                     key={a.id}
@@ -243,6 +324,12 @@ export default function HomeView({
                       <div style={{ fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                         {shortWon(a.value)}
                       </div>
+                      {/* 대출이 걸려 있으면 평가액만으로는 내 돈이 얼마인지 알 수 없다 */}
+                      {eq && eq.debt > 0 && (
+                        <div style={{ fontSize: 12, color: COLOR.plus, marginTop: 2, fontWeight: 600 }}>
+                          내 몫 {shortWon(eq.equity)}
+                        </div>
+                      )}
                       {profit !== null && (
                         <div
                           style={{

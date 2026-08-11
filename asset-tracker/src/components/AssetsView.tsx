@@ -1,13 +1,16 @@
 import React from 'react';
-import { Asset, AssetKind, DateKey } from '../types';
+import { Asset, AssetEquity, AssetKind, DateKey, LIQUIDITY_META } from '../types';
 import { ddayLabel, shortWon, signedPercent, won } from '../utils/format';
 import { alive } from '../utils/merge';
+import { assetLiquidity } from '../utils/summary';
 import { COLOR, card, empty, ghostButton, row, sectionTitle } from './ui';
 
 interface Props {
   kinds: AssetKind[];
   assets: Asset[];
   totalAsset: number;
+  /** 자산별 걸린 대출과 내 몫 */
+  equityByAsset: Record<string, AssetEquity>;
   today: DateKey;
   onAdd: (kindId: string) => void;
   onEdit: (a: Asset) => void;
@@ -20,7 +23,7 @@ interface Props {
  * 분류마다 ➕ 를 두는 게 중요하다 — 어느 분류에 넣을지 고르는 단계가 통째로 사라진다.
  */
 export default function AssetsView({
-  kinds, assets, totalAsset, today, onAdd, onEdit, onAddKind, onEditKind,
+  kinds, assets, totalAsset, equityByAsset, today, onAdd, onEdit, onAddKind, onEditKind,
 }: Props) {
   const liveKinds = alive(kinds).slice().sort((a, b) => a.order - b.order);
   const liveAssets = alive(assets);
@@ -80,7 +83,13 @@ export default function AssetsView({
 
             <div style={{ ...card, margin: '0 16px', padding: 0, overflow: 'hidden' }}>
               {mine.map(a => (
-                <AssetRow key={a.id} asset={a} today={today} onClick={() => onEdit(a)} />
+                <AssetRow
+                  key={a.id}
+                  asset={a}
+                  equity={equityByAsset[a.id]}
+                  today={today}
+                  onClick={() => onEdit(a)}
+                />
               ))}
               <button
                 onClick={() => onAdd(k.id)}
@@ -123,11 +132,18 @@ export default function AssetsView({
 }
 
 function AssetRow(
-  { asset: a, today, onClick }: { asset: Asset; today: DateKey; onClick: () => void },
+  { asset: a, equity, today, onClick }:
+  { asset: Asset; equity?: AssetEquity; today: DateKey; onClick: () => void },
 ) {
   const profit = a.principal && a.principal > 0 ? (a.value - a.principal) / a.principal : null;
+  const level = assetLiquidity(a);
+  const hasDebt = equity && equity.debt > 0;
+
   return (
     <button onClick={onClick} style={row}>
+      <span title={LIQUIDITY_META[level].label} style={{ fontSize: 15 }}>
+        {LIQUIDITY_META[level].emoji}
+      </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {a.name}
@@ -141,9 +157,20 @@ function AssetRow(
         )}
       </div>
       <div style={{ textAlign: 'right' }}>
-        <div style={{ fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+        <div
+          style={{
+            fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+            // 대출이 걸렸으면 평가액보다 '내 몫'이 주인공이다
+            color: hasDebt ? COLOR.faint : COLOR.text,
+          }}
+        >
           {won(a.value)}
         </div>
+        {hasDebt && (
+          <div style={{ fontSize: 13, marginTop: 2, color: COLOR.plus, fontWeight: 700 }}>
+            내 몫 {won(equity!.equity)}
+          </div>
+        )}
         {profit !== null && (
           <div style={{ fontSize: 12, marginTop: 2, color: profit < 0 ? COLOR.debt : COLOR.plus }}>
             {signedPercent(profit)}

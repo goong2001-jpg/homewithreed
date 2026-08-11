@@ -97,6 +97,7 @@ export default function App() {
           kinds={store.kinds}
           assets={store.assets}
           totalAsset={summary.totalAsset}
+          equityByAsset={summary.equityByAsset}
           today={today}
           onAdd={kindId => setEditing({ kind: 'asset', target: null, defaultKindId: kindId })}
           onEdit={a => setEditing({ kind: 'asset', target: a, defaultKindId: a.kindId })}
@@ -138,6 +139,7 @@ export default function App() {
           asset={editing.target}
           kinds={liveKinds}
           defaultKindId={editing.defaultKindId || liveKinds[0]?.id || ETC_KIND_ID}
+          equity={editing.target ? summary.equityByAsset[editing.target.id] : undefined}
           onClose={close}
           onDelete={editing.target
             ? () => { store.assetOps.remove(editing.target!.id); close(); }
