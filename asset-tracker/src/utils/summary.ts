@@ -106,12 +106,12 @@ export function summarize(input: SummaryInput, today: DateKey = todayKey()): Sum
   // ---------- 유동성 ----------
   // 평가액이 아니라 '내 몫' 기준으로 센다.
   // 주식담보대출처럼 유동자산에 빚이 걸린 경우까지 정직해진다.
-  const liquidityBucket = new Map<Liquidity, { amount: number; count: number }>();
+  const liquidityBucket = new Map<Liquidity, { amount: number; ids: string[] }>();
   for (const a of assets) {
     const level = assetLiquidity(a);
-    const cur = liquidityBucket.get(level) ?? { amount: 0, count: 0 };
+    const cur = liquidityBucket.get(level) ?? { amount: 0, ids: [] };
     cur.amount += equityByAsset[a.id].equity;
-    cur.count += 1;
+    cur.ids.push(a.id);
     liquidityBucket.set(level, cur);
   }
 
@@ -125,7 +125,11 @@ export function summarize(input: SummaryInput, today: DateKey = todayKey()): Sum
         level,
         amount: v.amount,
         ratio: totalEquity > 0 ? v.amount / totalEquity : 0,
-        count: v.count,
+        count: v.ids.length,
+        // 카드가 내 몫 기준이니 줄 세우기도 같은 기준으로 한다
+        assetIds: v.ids
+          .slice()
+          .sort((x, y) => equityByAsset[y].equity - equityByAsset[x].equity),
       };
     });
 
