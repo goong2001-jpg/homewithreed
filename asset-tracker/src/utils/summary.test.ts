@@ -224,6 +224,56 @@ describe('유동성 · 지금 쓸 수 있는 돈', () => {
     expect(s.byLiquidity.reduce((t, l) => t + l.ratio, 0)).toBeCloseTo(1, 10);
   });
 
+  it('단계마다 그 안에 든 자산 id를 담는다 (홈에서 펼쳐 보여준다)', () => {
+    const s = summarize(base({
+      assets: [
+        asset({ id: 'a_cash', kindId: 'k_cash', value: 3_000_000 }),
+        asset({ id: 'a_jeonse', kindId: 'k_jeonse', value: 87_660_000 }),
+        asset({ id: 'a_etc', kindId: 'k_etc', value: 17_660_000 }),
+      ],
+    }), TODAY);
+    const 묶임 = s.byLiquidity.find(l => l.level === '묶임')!;
+    expect(묶임.assetIds).toEqual(['a_jeonse', 'a_etc']);
+    expect(s.byLiquidity.find(l => l.level === '즉시')!.assetIds).toEqual(['a_cash']);
+  });
+
+  it('내 몫 큰 순으로 줄 세운다 (평가액 순이 아니다)', () => {
+    const s = summarize(base({
+      assets: [
+        // 평가액은 보증금이 훨씬 크지만 대출을 빼면 기타가 더 크다
+        asset({ id: 'a_jeonse', kindId: 'k_jeonse', value: 87_660_000 }),
+        asset({ id: 'a_etc', kindId: 'k_etc', value: 17_660_000 }),
+      ],
+      loans: [loan({
+        principal: 77_480_000, method: '만기일시', linkedAssetId: 'a_jeonse',
+      })],
+    }), TODAY);
+    const 묶임 = s.byLiquidity.find(l => l.level === '묶임')!;
+    expect(s.equityByAsset['a_jeonse'].equity).toBe(10_180_000);
+    expect(묶임.assetIds).toEqual(['a_etc', 'a_jeonse']);
+  });
+
+  it('assetIds 개수와 count가 항상 같다', () => {
+    const s = summarize(base({
+      assets: [
+        asset({ id: 'a1', kindId: 'k_invest', value: 1_000_000 }),
+        asset({ id: 'a2', kindId: 'k_invest', value: 2_500_000 }),
+        asset({ id: 'a3', kindId: 'k_jeonse', value: 5_000_000 }),
+      ],
+    }), TODAY);
+    for (const l of s.byLiquidity) expect(l.assetIds).toHaveLength(l.count);
+  });
+
+  it('지운 자산은 assetIds에 안 들어간다', () => {
+    const s = summarize(base({
+      assets: [
+        asset({ id: 'a1', kindId: 'k_cash', value: 3_000_000 }),
+        asset({ id: 'a2', kindId: 'k_cash', value: 9_000_000, deleted: true }),
+      ],
+    }), TODAY);
+    expect(s.byLiquidity.find(l => l.level === '즉시')!.assetIds).toEqual(['a1']);
+  });
+
   it('자산이 없으면 빈 목록이고 가용자금은 0', () => {
     const s = summarize(base(), TODAY);
     expect(s.byLiquidity).toEqual([]);

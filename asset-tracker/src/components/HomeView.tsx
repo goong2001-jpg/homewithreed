@@ -1,5 +1,7 @@
-import React from 'react';
-import { Asset, AssetKind, DateKey, LIQUIDITY_META, Loan, Summary, View } from '../types';
+import React, { useState } from 'react';
+import {
+  Asset, AssetKind, DateKey, LIQUIDITY_META, Liquidity, Loan, Summary, View,
+} from '../types';
 import { ddayLabel, shortWon, signedPercent, signedWon, won } from '../utils/format';
 import { loanStatus } from '../utils/loan';
 import { alive } from '../utils/merge';
@@ -23,7 +25,11 @@ export default function HomeView({
   const liveAssets = alive(assets);
   const liveLoans = alive(loans);
   const kindById = new Map(alive(kinds).map(k => [k.id, k]));
+  const assetById = new Map(liveAssets.map(a => [a.id, a]));
   const nothing = liveAssets.length === 0 && liveLoans.length === 0;
+
+  // 유동성 단계를 눌러 펼친 것. 한 번에 하나만 연다.
+  const [openLevel, setOpenLevel] = useState<Liquidity | null>(null);
 
   return (
     <div>
@@ -196,34 +202,93 @@ export default function HomeView({
           </div>
 
           <div style={{ marginTop: 12 }}>
-            {s.byLiquidity.map(l => (
-              <div
-                key={l.level}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '7px 0', borderTop: `1px solid ${COLOR.line}`,
-                }}
-              >
-                <span
-                  style={{
-                    width: 9, height: 9, borderRadius: '50%',
-                    background: LIQUIDITY_META[l.level].color, flexShrink: 0,
-                  }}
-                />
-                <span style={{ fontSize: 14, flex: 1 }}>
-                  {LIQUIDITY_META[l.level].emoji} {LIQUIDITY_META[l.level].label}
-                  <span style={{ color: COLOR.faint, fontSize: 12, marginLeft: 5 }}>
-                    {l.count}개
-                  </span>
-                </span>
-                <span style={{ fontSize: 12, color: COLOR.faint, width: 38, textAlign: 'right' }}>
-                  {Math.round(l.ratio * 100)}%
-                </span>
-                <strong style={{ fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>
-                  {shortWon(l.amount)}
-                </strong>
-              </div>
-            ))}
+            {s.byLiquidity.map(l => {
+              const open = openLevel === l.level;
+              return (
+                <div key={l.level} style={{ borderTop: `1px solid ${COLOR.line}` }}>
+                  <button
+                    onClick={() => setOpenLevel(open ? null : l.level)}
+                    aria-expanded={open}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      width: '100%', padding: '9px 0',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      font: 'inherit', color: COLOR.text, textAlign: 'left',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 9, height: 9, borderRadius: '50%',
+                        background: LIQUIDITY_META[l.level].color, flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ fontSize: 14, flex: 1 }}>
+                      {LIQUIDITY_META[l.level].emoji} {LIQUIDITY_META[l.level].label}
+                      <span style={{ color: COLOR.faint, fontSize: 12, marginLeft: 5 }}>
+                        {l.count}개
+                      </span>
+                    </span>
+                    <span style={{ fontSize: 12, color: COLOR.faint, width: 38, textAlign: 'right' }}>
+                      {Math.round(l.ratio * 100)}%
+                    </span>
+                    <strong style={{ fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>
+                      {shortWon(l.amount)}
+                    </strong>
+                    <span style={{ fontSize: 11, color: COLOR.faint, width: 10 }}>
+                      {open ? '▴' : '▾'}
+                    </span>
+                  </button>
+
+                  {open && (
+                    <div
+                      style={{
+                        background: '#f4f7f9', borderRadius: 8,
+                        margin: '0 0 10px', overflow: 'hidden',
+                      }}
+                    >
+                      {l.assetIds.map(id => {
+                        const a = assetById.get(id);
+                        if (!a) return null;
+                        const eq = s.equityByAsset[id];
+                        const hasDebt = eq && eq.debt > 0;
+                        return (
+                          <button
+                            key={id}
+                            onClick={() => onEditAsset(a)}
+                            style={{
+                              display: 'flex', alignItems: 'baseline', gap: 8, width: '100%',
+                              padding: '9px 12px', background: 'none', border: 'none',
+                              cursor: 'pointer', font: 'inherit', color: COLOR.text,
+                              textAlign: 'left',
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div
+                                style={{
+                                  fontSize: 14, overflow: 'hidden',
+                                  textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {kindById.get(a.kindId)?.emoji ?? '📌'} {a.name}
+                              </div>
+                              {/* 대출이 걸려 평가액과 내 몫이 다를 때만 근거를 보여준다 */}
+                              {hasDebt && (
+                                <div style={{ fontSize: 11, color: COLOR.faint, marginTop: 2 }}>
+                                  평가액 {shortWon(a.value)} · 대출 {shortWon(eq.debt)}
+                                </div>
+                              )}
+                            </div>
+                            <strong style={{ fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>
+                              {shortWon(eq?.equity ?? a.value)}
+                            </strong>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

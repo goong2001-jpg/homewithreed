@@ -230,6 +230,8 @@ export interface LiquiditySlice {
   amount: number;
   ratio: number;    // amount / 내 몫 총합 (0..1)
   count: number;
+  /** 이 단계에 든 자산 id. 내 몫 큰 순 — 홈에서 펼쳐 보여준다 */
+  assetIds: string[];
 }
 
 export interface Summary {
