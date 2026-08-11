@@ -1,0 +1,180 @@
+// ============================== 공통 ==============================
+
+/** 'YYYY-MM-DD' */
+export type DateKey = string;
+
+/**
+ * 모든 레코드의 공통 필드.
+ *
+ * 이 앱은 지금 한 기기에서만 쓰지만 구조는 couple-budget과 맞춰둔다.
+ * - deleted 툼스톤 → 실수로 지운 항목을 설정에서 되살릴 수 있다
+ * - updatedAt   → 백업 파일을 다시 불러올 때 mergeById로 안전하게 합쳐진다
+ * 나중에 PC에서도 쓰고 싶어지면 sync 계층만 얹으면 된다.
+ */
+export interface Syncable {
+  id: string;
+  updatedAt: number;   // Date.now(). 합칠 때 큰 쪽이 이긴다 (last-write-wins)
+  deleted?: boolean;
+}
+
+// ============================ 자산 분류 ============================
+
+/**
+ * 자산을 묶는 분류. 기본 5종을 주되 사용자가 추가·수정·삭제할 수 있다.
+ *
+ * couple-budget의 ExpenseCategory는 고정된 문자열 유니온이었지만,
+ * 여기서는 "나중에 항목을 추가하거나 삭제"할 수 있어야 하므로 레코드로 만든다.
+ */
+export interface AssetKind extends Syncable {
+  name: string;
+  color: string;
+  emoji: string;
+  order: number;
+  /** 기본 분류는 삭제해도 목록에서 감추기만 한다 (되살리기 쉽게) */
+  builtin: boolean;
+  createdAt: number;
+}
+
+/** 마지막 보루 — 분류가 하나도 없어도 자산이 갈 곳은 있어야 한다 */
+export const ETC_KIND_ID = 'k_etc';
+
+// updatedAt 0 = '아직 아무도 손대지 않은 기본값'.
+// 사용자가 실제로 고치면 Date.now()가 들어가 항상 그쪽이 이긴다.
+export const DEFAULT_KINDS: AssetKind[] = [
+  { id: 'k_jeonse',  name: '전세보증금',  color: '#3498db', emoji: '🏠', order: 0, builtin: true, createdAt: 0, updatedAt: 0 },
+  { id: 'k_deposit', name: '예적금·청약', color: '#16a085', emoji: '🏦', order: 1, builtin: true, createdAt: 0, updatedAt: 0 },
+  { id: 'k_invest',  name: '투자',        color: '#e67e22', emoji: '📈', order: 2, builtin: true, createdAt: 0, updatedAt: 0 },
+  { id: 'k_cash',    name: '현금',        color: '#27ae60', emoji: '💵', order: 3, builtin: true, createdAt: 0, updatedAt: 0 },
+  { id: ETC_KIND_ID, name: '기타',        color: '#95a5a6', emoji: '📌', order: 4, builtin: true, createdAt: 0, updatedAt: 0 },
+];
+
+export const KIND_COLORS = [
+  '#3498db', '#16a085', '#e67e22', '#27ae60', '#9b59b6',
+  '#e8748f', '#f39c12', '#34495e', '#95a5a6',
+];
+
+export const KIND_EMOJIS = [
+  '🏠', '🏦', '📈', '💵', '📌', '🪙', '🚗', '💎', '🎁', '📦',
+];
+
+// ============================== 자산 ==============================
+
+export interface Asset extends Syncable {
+  kindId: string;
+  /** '수지 아파트 전세', '주택청약', '삼성전자' */
+  name: string;
+  /** 현재 평가액 (원) */
+  value: number;
+  /**
+   * 원금 · 매수가. null이면 수익률을 계산하지 않는다.
+   * 전세보증금처럼 원금 = 평가액인 자산은 굳이 넣지 않아도 된다.
+   */
+  principal: number | null;
+  /** 만기일 · 계약 만료일. null이면 만기 개념이 없는 자산 */
+  maturity: DateKey | null;
+  memo: string;
+  order: number;
+  createdAt: number;
+}
+
+// ============================== 부채 ==============================
+
+export type RepayMethod = '원리금균등' | '원금균등' | '만기일시';
+
+export const REPAY_METHODS: RepayMethod[] = ['원리금균등', '원금균등', '만기일시'];
+
+/** 상환 방식별 한 줄 설명 — 입력 화면에서 고를 때 헷갈리지 않게 */
+export const REPAY_METHOD_HINT: Record<RepayMethod, string> = {
+  원리금균등: '매달 같은 금액을 낸다 (주택담보대출에 가장 흔함)',
+  원금균등: '원금은 똑같이 갚고 이자는 갈수록 줄어든다',
+  만기일시: '매달 이자만 내고 만기에 원금을 한 번에 갚는다 (전세자금대출)',
+};
+
+export interface Loan extends Syncable {
+  /** '전세자금대출', '주택담보대출', '마이너스통장' */
+  name: string;
+  /** 최초 대출 실행 금액 */
+  principal: number;
+  /** 연이율 %. 3.5 = 연 3.5% */
+  rate: number;
+  method: RepayMethod;
+  startDate: DateKey;
+  /** 총 상환 기간(개월). 거치기간을 포함한 전체 기간 */
+  termMonths: number;
+  /** 거치기간(개월) — 이 기간에는 이자만 낸다. 전세자금대출에 흔하다 */
+  graceMonths: number;
+  /** 이 대출로 마련한 자산 (전세보증금 등). null이면 연결 없음 */
+  linkedAssetId: string | null;
+  memo: string;
+  order: number;
+  createdAt: number;
+}
+
+// ============================= 고정비 =============================
+
+export interface Recurring extends Syncable {
+  /** '보험료', '통신비', '관리비', '구독료' */
+  name: string;
+  amount: number;
+  /** 결제일 1..31 */
+  payDay: number;
+  memo: string;
+  order: number;
+  createdAt: number;
+}
+
+// ========================= 계산 결과 타입 =========================
+
+/** summary.ts 산출물 — 분류별 자산 집계 */
+export interface KindSlice {
+  kindId: string;
+  name: string;
+  color: string;
+  emoji: string;
+  amount: number;
+  ratio: number;    // amount / 총자산 (0..1)
+  count: number;
+}
+
+export type UpcomingKind = '자산만기' | '대출만기';
+
+/** 다가오는 만기 하나 */
+export interface Upcoming {
+  id: string;
+  label: string;
+  date: DateKey;
+  /** 남은 일수. 오늘이면 0 */
+  dday: number;
+  kind: UpcomingKind;
+  amount: number;
+  color: string;
+}
+
+export interface Summary {
+  totalAsset: number;
+  totalDebt: number;
+  /** ★ 순자산 = 총자산 − 총부채 */
+  netWorth: number;
+
+  byKind: KindSlice[];
+
+  /** 대출 월 상환액 합계 (이번 달 기준) */
+  monthlyLoanPayment: number;
+  /** 고정비 합계 */
+  monthlyFixed: number;
+  /** 매달 나가는 돈 = 위 둘의 합 */
+  monthlyOutflow: number;
+
+  /** 원금을 적어둔 자산에 한해서만 집계한다 (안 적은 자산이 수익률을 왜곡하지 않게) */
+  totalPrincipal: number;
+  totalValueOfPriced: number;
+  totalProfit: number;
+  profitRatio: number;   // totalProfit / totalPrincipal. 원금이 0이면 0
+
+  /** 만기가 가까운 순. 이미 지난 건 제외 */
+  upcoming: Upcoming[];
+}
+
+// ============================== 뷰 ==============================
+
+export type View = 'home' | 'assets' | 'outflow' | 'settings';

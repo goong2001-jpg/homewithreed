@@ -48,6 +48,12 @@ jobs:
           npm ci
           npm run build
 
+      - name: Build asset-tracker
+        working-directory: asset-tracker
+        run: |
+          npm ci
+          npm run build
+
       - name: Combine builds
         run: |
           mkdir -p site
@@ -58,6 +64,8 @@ jobs:
           cp -r safety-exam/build/. site/safety-exam/
           mkdir -p site/couple-budget
           cp -r couple-budget/build/. site/couple-budget/
+          mkdir -p site/asset-tracker
+          cp -r asset-tracker/build/. site/asset-tracker/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
