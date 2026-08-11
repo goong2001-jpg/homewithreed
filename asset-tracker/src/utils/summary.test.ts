@@ -17,7 +17,8 @@ function loan(over: Partial<Loan> = {}): Loan {
     id: 'l1', name: '전세자금대출',
     principal: 240_000_000, rate: 3.5, method: '만기일시',
     startDate: '2026-01-10', termMonths: 24, graceMonths: 0,
-    linkedAssetId: null, memo: '', order: 0, createdAt: 0, updatedAt: 0,
+    linkedAssetId: null, manualRemaining: null, manualPayment: null, manualAsOf: null,
+    memo: '', order: 0, createdAt: 0, updatedAt: 0,
     ...over,
   };
 }
@@ -56,6 +57,40 @@ describe('순자산', () => {
     expect(s.profitRatio).toBe(0);
     expect(s.byKind).toEqual([]);
     expect(s.upcoming).toEqual([]);
+  });
+
+  it('중도상환해서 직접 적은 남은 원금이 순자산에 반영된다', () => {
+    const s = summarize(base({
+      assets: [asset({ value: 100_000_000 })],
+      loans: [loan({
+        name: '자동차 대출', principal: 10_000_000, rate: 5,
+        method: '원리금균등', termMonths: 36,
+        manualRemaining: 3_000_000, manualAsOf: TODAY,
+      })],
+    }), TODAY);
+    expect(s.totalDebt).toBe(3_000_000);            // 계산값(8백만대)이 아니라 적은 값
+    expect(s.netWorth).toBe(97_000_000);
+  });
+
+  it('직접 적은 월 상환액이 매달 나가는 돈에 들어간다', () => {
+    const s = summarize(base({
+      loans: [loan({
+        principal: 10_000_000, rate: 5, method: '원리금균등', termMonths: 36,
+        manualRemaining: 3_000_000, manualPayment: 60_765, manualAsOf: TODAY,
+      })],
+    }), TODAY);
+    expect(s.monthlyLoanPayment).toBe(60_765);
+    expect(s.monthlyOutflow).toBe(60_765);
+  });
+
+  it('다 갚았다고 0을 적으면 빚에서 빠진다', () => {
+    const s = summarize(base({
+      assets: [asset({ value: 100_000_000 })],
+      loans: [loan({ manualRemaining: 0, manualAsOf: TODAY })],
+    }), TODAY);
+    expect(s.totalDebt).toBe(0);
+    expect(s.monthlyLoanPayment).toBe(0);
+    expect(s.netWorth).toBe(100_000_000);
   });
 
   it('갚아나가는 대출은 남은 원금만 빚으로 센다', () => {

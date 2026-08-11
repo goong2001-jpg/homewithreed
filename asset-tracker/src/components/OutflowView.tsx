@@ -126,8 +126,10 @@ function LoanCard(
 ) {
   const st = loanStatus(l, today);
   // 만기일시는 원금이 안 줄어서 상환 진행률 막대가 늘 비어 있다. 기간 경과율을 보여준다.
-  const bar = l.method === '만기일시' ? st.timeProgress : st.progress;
-  const barLabel = l.method === '만기일시' ? '기간 경과' : '원금 상환';
+  // 단 남은 원금을 직접 적었으면 진짜 상환률을 알 수 있으니 그쪽을 쓴다.
+  const useProgress = st.isManual || l.method !== '만기일시';
+  const bar = useProgress ? st.progress : st.timeProgress;
+  const barLabel = useProgress ? '원금 상환' : '기간 경과';
 
   return (
     <button
@@ -148,7 +150,7 @@ function LoanCard(
 
       <div style={{ fontSize: 12, color: COLOR.faint, marginTop: 3 }}>
         {l.method} · 연 {l.rate}% · {monthsLabel(l.termMonths)}
-        {l.graceMonths > 0 && l.method !== '만기일시' && ` (거치 ${l.graceMonths}개월)`}
+        {l.graceMonths > 0 && l.method !== '만기일시' && !st.isManual && ` (거치 ${l.graceMonths}개월)`}
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
@@ -157,7 +159,15 @@ function LoanCard(
           value={st.done ? '—' : won(st.monthlyPayment)}
         />
         <div style={{ width: 1, background: COLOR.line }} />
-        <MiniStat label="남은 원금" value={shortWon(st.remainingPrincipal)} color={COLOR.debt} />
+        <MiniStat
+          label="남은 원금"
+          value={shortWon(st.remainingPrincipal)}
+          color={COLOR.debt}
+          // 직접 적은 값은 저절로 줄지 않는다. 언제 적은 건지 보여줘야 낡았는지 안다.
+          note={st.isManual
+            ? `직접 입력${l.manualAsOf ? ` · ${shortDate(l.manualAsOf)} 기준` : ''}`
+            : undefined}
+        />
       </div>
 
       <div style={{ marginTop: 14 }}>
@@ -190,14 +200,21 @@ function LoanCard(
           }}
         >
           <span>이번 달 이자 {won(st.monthlyInterest)}</span>
-          <span>만기까지 총 이자 {shortWon(st.totalInterest)}</span>
+          <span>
+            {st.isManual ? '앞으로 낼 이자' : '만기까지 총 이자'}{' '}
+            {/* 상환액이 이자에도 못 미치면 영원히 안 끝난다. 0원이라고 하면 거짓말이다. */}
+            {st.isManual && st.monthlyPrincipal <= 0 ? '—' : shortWon(st.totalInterest)}
+          </span>
         </div>
       )}
     </button>
   );
 }
 
-function MiniStat({ label, value, color }: { label: string; value: string; color?: string }) {
+function MiniStat(
+  { label, value, color, note }:
+  { label: string; value: string; color?: string; note?: string },
+) {
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 12, color: COLOR.sub }}>{label}</div>
@@ -209,6 +226,9 @@ function MiniStat({ label, value, color }: { label: string; value: string; color
       >
         {value}
       </div>
+      {note && (
+        <div style={{ fontSize: 11, color: COLOR.faint, marginTop: 2 }}>{note}</div>
+      )}
     </div>
   );
 }
