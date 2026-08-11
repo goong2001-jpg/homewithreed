@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { Asset, AssetKind } from '../types';
-import { formatAmountInput, parseAmountInput, signedPercent, signedWon } from '../utils/format';
+import {
+  Asset, AssetEquity, AssetKind, DEFAULT_LIQUIDITY, FALLBACK_LIQUIDITY,
+  LIQUIDITY_LEVELS, LIQUIDITY_META, Liquidity,
+} from '../types';
+import { formatAmountInput, parseAmountInput, signedPercent, signedWon, won } from '../utils/format';
 import { AmountField, ChoiceField, DateField, PreviewBox, TextField } from './Field';
 import Sheet from './Sheet';
+import { COLOR } from './ui';
 
 interface Props {
   /** 없으면 새로 추가 */
@@ -12,10 +16,13 @@ interface Props {
   defaultKindId: string;
   onSave: (v: {
     kindId: string; name: string; value: number;
-    principal: number | null; maturity: string | null; memo: string;
+    principal: number | null; maturity: string | null;
+    liquidity: Liquidity | null; memo: string;
   }) => void;
   onDelete?: () => void;
   onClose: () => void;
+  /** 이 자산에 걸린 대출 (연결된 게 있을 때만) */
+  equity?: AssetEquity;
 }
 
 /** 분류마다 이름 칸에 다른 예시를 띄운다 */
@@ -27,7 +34,7 @@ const NAME_PLACEHOLDER: Record<string, string> = {
 };
 
 export default function AssetSheet({
-  asset, kinds, defaultKindId, onSave, onDelete, onClose,
+  asset, kinds, defaultKindId, onSave, onDelete, onClose, equity,
 }: Props) {
   const [kindId, setKindId] = useState(asset?.kindId ?? defaultKindId);
   const [name, setName] = useState(asset?.name ?? '');
@@ -37,6 +44,14 @@ export default function AssetSheet({
     asset?.principal != null ? formatAmountInput(String(asset.principal)) : '');
   const [maturity, setMaturity] = useState(asset?.maturity ?? '');
   const [memo, setMemo] = useState(asset?.memo ?? '');
+
+  /**
+   * 유동성. 직접 고르기 전까지는 null로 두고 분류 기본값을 따라간다 —
+   * 분류를 바꾸면 기본값도 같이 바뀌어야 자연스럽다.
+   */
+  const [liquidity, setLiquidity] = useState<Liquidity | null>(asset?.liquidity ?? null);
+  const shownLiquidity: Liquidity =
+    liquidity ?? DEFAULT_LIQUIDITY[kindId] ?? FALLBACK_LIQUIDITY;
 
   const valueNum = parseAmountInput(value);
   const principalNum = principal.trim() ? parseAmountInput(principal) : null;
@@ -61,6 +76,7 @@ export default function AssetSheet({
         value: valueNum,
         principal: principalNum,
         maturity: maturity || null,
+        liquidity,
         memo: memo.trim(),
       })}
     >
@@ -80,6 +96,33 @@ export default function AssetSheet({
       />
 
       <AmountField label="지금 얼마" value={value} onChange={setValue} />
+
+      {/* 걸린 대출을 빼야 진짜 내 돈이 보인다.
+          전세보증금 9,900만원에 대출 6,600만원이면 실제로는 3,300만원이 내 몫이다. */}
+      {equity && equity.debt > 0 ? (
+        <PreviewBox rows={[
+          { label: '이 자산에 걸린 대출', value: `− ${won(equity.debt)}` },
+          { label: '내 몫', value: won(Math.max(0, valueNum - equity.debt)), strong: true },
+        ]} />
+      ) : (
+        <p style={{ margin: '-6px 0 14px', fontSize: 12, color: COLOR.faint, lineHeight: 1.6 }}>
+          이 자산 때문에 받은 대출이 있다면, <strong>나가는돈 → 대출</strong>에서
+          <strong> 어떤 자산 때문에 빌렸나요</strong>로 연결해 주세요.
+          그러면 대출을 뺀 <strong>내 몫</strong>이 같이 보입니다.
+        </p>
+      )}
+
+      <ChoiceField
+        label="언제 쓸 수 있나요"
+        value={shownLiquidity}
+        options={LIQUIDITY_LEVELS.map(l => ({
+          value: l,
+          label: `${LIQUIDITY_META[l].emoji} ${LIQUIDITY_META[l].label}`,
+          color: LIQUIDITY_META[l].color,
+        }))}
+        onChange={setLiquidity}
+        hint={LIQUIDITY_META[shownLiquidity].hint}
+      />
 
       <AmountField
         label="산 가격 · 원금 (선택)"
