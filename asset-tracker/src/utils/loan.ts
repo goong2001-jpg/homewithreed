@@ -29,7 +29,11 @@ export interface LoanStatus {
   remainingMonths: number;
   endDate: DateKey;
 
-  /** 만기까지 낼 이자 총액 (지금까지 낸 것 포함) */
+  /**
+   * 만기까지 낼 이자 총액 (지금까지 낸 것 포함).
+   * 단 isManual이면 뜻이 달라진다 — 중도상환하면 '만기까지 총 이자'가 성립하지 않으므로
+   * 남은 원금 기준의 **앞으로 낼 이자 추정치**가 들어온다. 화면 라벨도 같이 바뀐다.
+   */
   totalInterest: number;
 
   /** 원금 상환 진행률 0..1 */
@@ -41,6 +45,8 @@ export interface LoanStatus {
   inGrace: boolean;
   /** 만기가 지났는가 */
   done: boolean;
+  /** 남은 원금을 사용자가 직접 적었는가 (계산값이 아님) */
+  isManual: boolean;
 }
 
 /** (1+i)^n. i가 0이어도 안전하다 */
@@ -73,6 +79,25 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
 }
 
+/**
+ * 잔액 B를 매달 A씩 갚을 때 몇 달 걸리는가.
+ *   B·i·(1+i)ⁿ / ((1+i)ⁿ − 1) = A  를 n에 대해 푼 것
+ *
+ * 중도상환한 대출에 쓴다. 원래 상환 기간은 더 이상 맞지 않고,
+ * 지금 잔액과 지금 상환액만 믿을 수 있기 때문이다.
+ * 상환액이 이자에도 못 미치면 영원히 안 끝나므로 null을 준다.
+ */
+export function payoffMonths(balance: number, monthlyRate: number, payment: number): number | null {
+  if (balance <= 0) return 0;
+  if (payment <= 0) return null;
+  if (monthlyRate === 0) return balance / payment;
+
+  const interest = balance * monthlyRate;
+  if (payment <= interest) return null;     // 이자도 못 갚으니 잔액이 안 줄어든다
+
+  return -Math.log(1 - (balance * monthlyRate) / payment) / Math.log(1 + monthlyRate);
+}
+
 export function loanStatus(loan: Loan, today: DateKey = todayKey()): LoanStatus {
   const P = Math.max(0, loan.principal);
   const i = Math.max(0, loan.rate) / 100 / 12;
@@ -92,8 +117,54 @@ export function loanStatus(loan: Loan, today: DateKey = todayKey()): LoanStatus 
     remainingPrincipal: 0, paidPrincipal: P,
     elapsedMonths: elapsed, remainingMonths, endDate,
     totalInterest: 0, progress: 1, timeProgress: 1,
-    inGrace: false, done: true,
+    inGrace: false, done: true, isManual: false,
   });
+
+  /**
+   * 남은 원금을 직접 적었으면 계산을 통째로 건너뛴다.
+   *
+   * 중도상환을 하면 원금·금리·기간으로 하는 계산이 실제와 어긋난다.
+   * 은행 앱에 찍힌 값을 그대로 쓰는 게 가장 정확하다.
+   * 적은 값은 저절로 줄어들지 않는다 — 대신 언제 적었는지(manualAsOf)를 화면에 남겨
+   * 낡은 값인지 사용자가 판단할 수 있게 한다.
+   */
+  if (loan.manualRemaining != null) {
+    const remaining = Math.max(0, loan.manualRemaining);
+    const paid = Math.max(0, P - remaining);
+    const isDone = remaining <= 0;
+
+    const monthlyInterest = isDone ? 0 : remaining * i;
+    const payment = isDone
+      ? 0
+      : loan.manualPayment != null
+        ? Math.max(0, loan.manualPayment)
+        // 월 상환액을 안 적었으면 남은 원금을 남은 기간에 나눠 갚는 걸로 본다
+        : equalPayment(remaining, i, Math.max(1, remainingMonths));
+
+    // '만기까지 총 이자'는 중도상환하면 성립하지 않는다.
+    // 지금 잔액을 지금 상환액으로 갚아나갈 때 앞으로 낼 이자로 바꾼다.
+    // 계약 기간이 아니라 실제 상환 속도로 계산해야 맞는 숫자가 나온다.
+    const left = payoffMonths(remaining, i, payment);
+    const futureInterest = left === null ? 0 : Math.max(0, payment * left - remaining);
+
+    return {
+      monthlyPayment: payment,
+      monthlyInterest,
+      monthlyPrincipal: Math.max(0, payment - monthlyInterest),
+      remainingPrincipal: remaining,
+      paidPrincipal: paid,
+      elapsedMonths: elapsed,
+      remainingMonths,
+      endDate,
+      totalInterest: futureInterest,
+      progress: P > 0 ? clamp(paid / P, 0, 1) : (isDone ? 1 : 0),
+      timeProgress: term > 0 ? elapsed / term : 0,
+      // 직접 적은 원금 앞에서는 거치기간이 의미가 없다
+      inGrace: false,
+      done: isDone,
+      isManual: true,
+    };
+  }
 
   if (P === 0 || term === 0) {
     return { ...empty(), paidPrincipal: 0, progress: 0, timeProgress: 0, done: term === 0 };
@@ -149,6 +220,7 @@ export function loanStatus(loan: Loan, today: DateKey = todayKey()): LoanStatus 
     timeProgress: term > 0 ? elapsed / term : 0,
     inGrace,
     done,
+    isManual: false,
   };
 }
 

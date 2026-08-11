@@ -28,6 +28,17 @@ export default function LoanSheet({ loan, assets, onSave, onDelete, onClose }: P
   const [linkedAssetId, setLinkedAssetId] = useState(loan?.linkedAssetId ?? '');
   const [memo, setMemo] = useState(loan?.memo ?? '');
 
+  // 중도상환 등으로 계산과 실제가 어긋났을 때 쓰는 직접 입력
+  const [mode, setMode] = useState<'auto' | 'manual'>(
+    loan?.manualRemaining != null ? 'manual' : 'auto');
+  const [manualRemaining, setManualRemaining] = useState(
+    loan?.manualRemaining != null ? formatAmountInput(String(loan.manualRemaining)) : '');
+  const [manualPayment, setManualPayment] = useState(
+    loan?.manualPayment != null ? formatAmountInput(String(loan.manualPayment)) : '');
+  const [manualAsOf, setManualAsOf] = useState(loan?.manualAsOf ?? todayKey());
+
+  const isManual = mode === 'manual';
+
   const draft: Loan = {
     id: loan?.id ?? 'draft',
     name: name.trim(),
@@ -38,6 +49,10 @@ export default function LoanSheet({ loan, assets, onSave, onDelete, onClose }: P
     termMonths: Number(termMonths) || 0,
     graceMonths: Number(graceMonths) || 0,
     linkedAssetId: linkedAssetId || null,
+    // '계산해줘'로 되돌리면 적어둔 값을 지워서 계산으로 완전히 돌아가게 한다
+    manualRemaining: isManual && manualRemaining.trim() ? parseAmountInput(manualRemaining) : null,
+    manualPayment: isManual && manualPayment.trim() ? parseAmountInput(manualPayment) : null,
+    manualAsOf: isManual ? (manualAsOf || todayKey()) : null,
     memo: memo.trim(),
     order: loan?.order ?? 0,
     createdAt: loan?.createdAt ?? 0,
@@ -53,6 +68,7 @@ export default function LoanSheet({ loan, assets, onSave, onDelete, onClose }: P
     : draft.principal <= 0 ? '빌린 금액을 적어주세요.'
     : draft.termMonths <= 0 ? '상환 기간(개월)을 적어주세요.'
     : draft.graceMonths > draft.termMonths ? '거치기간이 전체 기간보다 길어요.'
+    : isManual && !manualRemaining.trim() ? '지금 남은 원금을 적어주세요.'
     : undefined;
 
   const linkable = assets.filter(a => !a.deleted);
@@ -72,6 +88,9 @@ export default function LoanSheet({ loan, assets, onSave, onDelete, onClose }: P
         termMonths: draft.termMonths,
         graceMonths: draft.graceMonths,
         linkedAssetId: draft.linkedAssetId,
+        manualRemaining: draft.manualRemaining,
+        manualPayment: draft.manualPayment,
+        manualAsOf: draft.manualAsOf,
         memo: draft.memo,
       })}
     >
@@ -115,15 +134,62 @@ export default function LoanSheet({ loan, assets, onSave, onDelete, onClose }: P
         />
       )}
 
+      {/* 중도상환하면 원금·금리·기간으로 하는 계산이 실제와 어긋난다.
+          은행 앱에 찍힌 값을 그대로 적을 수 있게 해준다. */}
+      <ChoiceField
+        label="지금 남은 원금"
+        value={mode}
+        options={[
+          { value: 'auto', label: '계산해줘' },
+          { value: 'manual', label: '직접 적을게' },
+        ]}
+        onChange={setMode}
+        hint={isManual
+          ? '적은 값은 저절로 줄지 않아요. 가끔 은행 앱 보고 갱신해 주세요.'
+          : '중도상환을 했다면 [직접 적을게]로 바꿔주세요.'}
+      />
+
+      {isManual && (
+        <>
+          <AmountField
+            label="남은 원금"
+            value={manualRemaining}
+            onChange={setManualRemaining}
+            hint="은행 앱에 찍힌 대출 잔액"
+          />
+          <AmountField
+            label="월 상환액 (선택)"
+            value={manualPayment}
+            onChange={setManualPayment}
+            allowEmpty
+            hint="중도상환하고 상환액이 바뀌었다면 적어주세요. 비우면 남은 원금으로 계산해요."
+          />
+          <DateField
+            label="언제 기준인가요"
+            value={manualAsOf}
+            onChange={setManualAsOf}
+            hint="화면에 이 날짜가 같이 뜹니다. 숫자가 낡았는지 알 수 있게요."
+          />
+        </>
+      )}
+
       {st && (
         <PreviewBox rows={[
           {
-            label: st.inGrace ? '이번 달 낼 돈 (거치 중, 이자만)' : '이번 달 낼 돈',
+            label: st.done ? '상환 완료'
+              : st.inGrace ? '이번 달 낼 돈 (거치 중, 이자만)'
+              : '이번 달 낼 돈',
             value: won(st.monthlyPayment),
             strong: true,
           },
           { label: '남은 원금', value: won(st.remainingPrincipal) },
-          { label: '만기까지 낼 이자', value: won(st.totalInterest) },
+          {
+            label: st.isManual ? '앞으로 낼 이자 (예상)' : '만기까지 낼 이자',
+            // 상환액이 이자에도 못 미치면 잔액이 안 줄어든다. 0원이라고 하면 거짓말이다.
+            value: st.isManual && st.monthlyPrincipal <= 0 && !st.done
+              ? '상환액이 이자보다 적어요'
+              : won(st.totalInterest),
+          },
           { label: '만기일', value: `${shortDate(st.endDate)} (${monthsLabel(st.remainingMonths)} 남음)` },
         ]} />
       )}

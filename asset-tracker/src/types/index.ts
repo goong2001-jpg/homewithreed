@@ -105,6 +105,21 @@ export interface Loan extends Syncable {
   graceMonths: number;
   /** 이 대출로 마련한 자산 (전세보증금 등). null이면 연결 없음 */
   linkedAssetId: string | null;
+
+  /**
+   * 중도상환·재약정 등으로 계산값과 실제가 달라졌을 때 직접 적는 값.
+   *
+   * 중도상환을 하면 원금·금리·기간으로 하는 계산이 더는 맞지 않는다.
+   * 그렇다고 최초 원금을 낮추면 거기서 또 갚은 만큼 빠져서 오히려 더 틀어진다.
+   * 그래서 계산을 버리지 않고 그 위에 덮어쓰는 방식을 쓴다.
+   *
+   * null이면 지금까지처럼 계산한다. 예전에 저장한 기록에는 이 필드가 아예 없으므로
+   * 반드시 `!= null` 로 검사해서 undefined 도 같이 걸러야 한다.
+   */
+  manualRemaining: number | null;   // 남은 원금 (은행 앱에 찍힌 값)
+  manualPayment: number | null;     // 월 상환액. null이면 남은 원금으로 계산한다
+  manualAsOf: DateKey | null;       // 언제 기준으로 적었나 — 낡은 값인지 보이게
+
   memo: string;
   order: number;
   createdAt: number;
