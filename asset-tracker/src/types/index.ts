@@ -176,6 +176,89 @@ export interface Loan extends Syncable {
   createdAt: number;
 }
 
+// ============================== 목표 ==============================
+
+/**
+ * 무엇을 '준비된 돈'으로 볼지.
+ *
+ * 입주자금처럼 목돈이 필요한 목표는 전세보증금을 빼면 계산이 안 맞는다
+ * (계약 끝나면 돌려받아 그대로 입주자금이 되니까).
+ * 반대로 당장 쓸 돈만 세고 싶을 때도 있어서 고를 수 있게 한다.
+ */
+export type GoalSource = 'liquid' | 'all' | 'picked';
+
+export const GOAL_SOURCE_META: Record<GoalSource, { label: string; hint: string }> = {
+  liquid: {
+    label: '운용 가능한 돈',
+    hint: '지금 바로 + 며칠이면 쓸 수 있는 자산의 내 몫',
+  },
+  all: {
+    label: '전체 자산',
+    hint: '묶여 있는 자산까지 포함 (전세보증금을 입주자금으로 쓸 때)',
+  },
+  picked: {
+    label: '직접 고르기',
+    hint: '이 목표에 쓸 자산만 골라서 셉니다',
+  },
+};
+
+export interface Goal extends Syncable {
+  /** '진접2지구 A1블록 입주자금' */
+  name: string;
+  /** 총 분양가 등 — 참고용. 계산은 netPrice로 한다 */
+  totalPrice: number;
+  /**
+   * 실제로 내야 할 금액 (옵션 제외 등 반영).
+   * null이면 totalPrice를 그대로 쓴다.
+   */
+  netPrice: number | null;
+  /** 취득세·중개비·이사비 등. 분양가에 안 잡히는데 입주 때 목돈으로 나간다 */
+  extraCost: number;
+  /** 예상 대출 — 이만큼은 빌려서 낼 것 */
+  expectedLoan: number;
+  /** 목표일(입주일). 있어야 '매달 얼마' 가 나온다 */
+  targetDate: DateKey | null;
+
+  source: GoalSource;
+  /** source === 'picked' 일 때 쓸 자산 id */
+  assetIds: string[];
+
+  /** 달성 처리한 날. null이면 진행 중 */
+  achievedAt: DateKey | null;
+
+  memo: string;
+  order: number;
+  createdAt: number;
+}
+
+/** goal.ts 산출물 */
+export interface GoalProgress {
+  /** 실제 계약금 (옵션 제외 반영) */
+  price: number;
+  /** 총 필요액 = price + 부대비용 */
+  totalNeeded: number;
+  expectedLoan: number;
+  /** ★ 내가 현금으로 마련해야 할 돈 */
+  cashNeeded: number;
+
+  /** 지금 준비된 돈 */
+  ready: number;
+  /** 아직 모아야 할 돈 */
+  shortfall: number;
+  /** 달성률 0..1 이상 (넘치면 1보다 큼) */
+  rate: number;
+  done: boolean;
+
+  /** 목표일까지 남은 일수 / 개월. 목표일이 없으면 null */
+  daysLeft: number | null;
+  monthsLeft: number | null;
+  /** 목표일까지 매달 / 매일 모아야 할 돈 */
+  perMonth: number | null;
+  perDay: number | null;
+  /** 목표일이 지났는데 아직 못 모았나 */
+  overdue: boolean;
+}
+
 // ============================= 고정비 =============================
 
 export interface Recurring extends Syncable {
@@ -271,4 +354,4 @@ export interface Summary {
 
 // ============================== 뷰 ==============================
 
-export type View = 'home' | 'assets' | 'outflow' | 'settings';
+export type View = 'home' | 'assets' | 'outflow' | 'goals' | 'settings';

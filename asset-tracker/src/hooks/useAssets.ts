@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Asset, AssetKind, DEFAULT_KINDS, Loan, Recurring, Syncable } from '../types';
+import { Asset, AssetKind, DEFAULT_KINDS, Goal, Loan, Recurring, Syncable } from '../types';
 import { Backup } from '../utils/backup';
 import { mergeById } from '../utils/merge';
 import { KEYS, clearAll, load, save } from '../utils/storage';
@@ -40,11 +40,13 @@ export interface AssetStore {
   assets: Asset[];
   loans: Loan[];
   recurrings: Recurring[];
+  goals: Goal[];
 
   kindOps: Ops<AssetKind>;
   assetOps: Ops<Asset>;
   loanOps: Ops<Loan>;
   recurringOps: Ops<Recurring>;
+  goalOps: Ops<Goal>;
 
   /** 삭제 취소 — 툼스톤을 되살린다 */
   restore: (coll: CollName, id: string) => void;
@@ -55,18 +57,20 @@ export interface AssetStore {
   resetAll: () => void;
 }
 
-export type CollName = 'kinds' | 'assets' | 'loans' | 'recurrings';
+export type CollName = 'kinds' | 'assets' | 'loans' | 'recurrings' | 'goals';
 
 export function useAssets(newId: () => string): AssetStore {
   const [kinds, setKinds] = useState<AssetKind[]>(() => load(KEYS.kinds, DEFAULT_KINDS));
   const [assets, setAssets] = useState<Asset[]>(() => load(KEYS.assets, []));
   const [loans, setLoans] = useState<Loan[]>(() => load(KEYS.loans, []));
   const [recurrings, setRecurrings] = useState<Recurring[]>(() => load(KEYS.recurrings, []));
+  const [goals, setGoals] = useState<Goal[]>(() => load(KEYS.goals, []));
 
   useEffect(() => { save(KEYS.kinds, kinds); }, [kinds]);
   useEffect(() => { save(KEYS.assets, assets); }, [assets]);
   useEffect(() => { save(KEYS.loans, loans); }, [loans]);
   useEffect(() => { save(KEYS.recurrings, recurrings); }, [recurrings]);
+  useEffect(() => { save(KEYS.goals, goals); }, [goals]);
 
   /**
    * add/update/remove 한 벌을 만든다 — 네 컬렉션이 똑같이 동작한다.
@@ -103,7 +107,8 @@ export function useAssets(newId: () => string): AssetStore {
   }
 
   const setters: Record<CollName, React.Dispatch<React.SetStateAction<any[]>>> = {
-    kinds: setKinds, assets: setAssets, loans: setLoans, recurrings: setRecurrings,
+    kinds: setKinds, assets: setAssets, loans: setLoans,
+    recurrings: setRecurrings, goals: setGoals,
   };
 
   const restore = useCallback((coll: CollName, id: string) => {
@@ -121,6 +126,7 @@ export function useAssets(newId: () => string): AssetStore {
     setAssets(prev => mergeById(prev, b.assets));
     setLoans(prev => mergeById(prev, b.loans));
     setRecurrings(prev => mergeById(prev, b.recurrings));
+    setGoals(prev => mergeById(prev, b.goals));
   }, []);
 
   const resetAll = useCallback(() => {
@@ -129,14 +135,16 @@ export function useAssets(newId: () => string): AssetStore {
     setAssets([]);
     setLoans([]);
     setRecurrings([]);
+    setGoals([]);
   }, []);
 
   return {
-    kinds, assets, loans, recurrings,
+    kinds, assets, loans, recurrings, goals,
     kindOps: makeOps(kinds, setKinds),
     assetOps: makeOps(assets, setAssets),
     loanOps: makeOps(loans, setLoans),
     recurringOps: makeOps(recurrings, setRecurrings),
+    goalOps: makeOps(goals, setGoals),
     restore, purge, importBackup, resetAll,
   };
 }

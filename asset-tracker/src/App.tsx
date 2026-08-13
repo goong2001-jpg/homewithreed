@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import AssetSheet from './components/AssetSheet';
 import AssetsView from './components/AssetsView';
+import GoalSheet from './components/GoalSheet';
+import GoalsView from './components/GoalsView';
 import HomeView from './components/HomeView';
 import KindSheet from './components/KindSheet';
 import LoanSheet from './components/LoanSheet';
@@ -10,9 +12,10 @@ import SettingsView from './components/SettingsView';
 import TabBar, { TAB_BAR_HEIGHT } from './components/TabBar';
 import { COLOR } from './components/ui';
 import { CollName, useAssets } from './hooks/useAssets';
-import { Asset, AssetKind, ETC_KIND_ID, Loan, Recurring, View } from './types';
+import { Asset, AssetKind, ETC_KIND_ID, Goal, Loan, Recurring, View } from './types';
 import { backupSummary, parseBackup } from './utils/backup';
 import { todayKey } from './utils/date';
+import { goalProgressAll } from './utils/goal';
 import { newId } from './utils/id';
 import { alive } from './utils/merge';
 import { summarize } from './utils/summary';
@@ -21,6 +24,7 @@ const TITLE: Record<View, string> = {
   home: '내 자산',
   assets: '자산',
   outflow: '나가는 돈',
+  goals: '목표',
   settings: '설정',
 };
 
@@ -30,6 +34,7 @@ type Editing =
   | { kind: 'loan'; target: Loan | null }
   | { kind: 'recurring'; target: Recurring | null }
   | { kind: 'assetKind'; target: AssetKind | null }
+  | { kind: 'goal'; target: Goal | null }
   | null;
 
 export default function App() {
@@ -49,6 +54,11 @@ export default function App() {
       recurrings: store.recurrings,
     }, today),
     [store.kinds, store.assets, store.loans, store.recurrings, today],
+  );
+
+  const goalProgress = useMemo(
+    () => goalProgressAll(store.goals, store.assets, summary.equityByAsset, today),
+    [store.goals, store.assets, summary.equityByAsset, today],
   );
 
   const liveKinds = alive(store.kinds).slice().sort((a, b) => a.order - b.order);
@@ -120,12 +130,25 @@ export default function App() {
         />
       )}
 
+      {view === 'goals' && (
+        <GoalsView
+          goals={store.goals}
+          progress={goalProgress}
+          today={today}
+          onAdd={() => setEditing({ kind: 'goal', target: null })}
+          onEdit={g => setEditing({ kind: 'goal', target: g })}
+          onToggleAchieved={g =>
+            store.goalOps.update(g.id, { achievedAt: g.achievedAt ? null : today })}
+        />
+      )}
+
       {view === 'settings' && (
         <SettingsView
           kinds={store.kinds}
           assets={store.assets}
           loans={store.loans}
           recurrings={store.recurrings}
+          goals={store.goals}
           onImport={handleImport}
           onRestore={handleRestore}
           onReset={store.resetAll}
@@ -197,6 +220,24 @@ export default function App() {
           onSave={v => {
             if (editing.target) store.kindOps.update(editing.target.id, v);
             else store.kindOps.add({ ...v, builtin: false });
+            close();
+          }}
+        />
+      )}
+
+      {editing?.kind === 'goal' && (
+        <GoalSheet
+          goal={editing.target}
+          assets={store.assets}
+          equityByAsset={summary.equityByAsset}
+          today={today}
+          onClose={close}
+          onDelete={editing.target
+            ? () => { store.goalOps.remove(editing.target!.id); close(); }
+            : undefined}
+          onSave={v => {
+            if (editing.target) store.goalOps.update(editing.target.id, v);
+            else store.goalOps.add(v);
             close();
           }}
         />

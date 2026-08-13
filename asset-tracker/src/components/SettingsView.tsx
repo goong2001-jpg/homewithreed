@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Asset, AssetKind, Loan, Recurring, Syncable } from '../types';
+import { Asset, AssetKind, Goal, Loan, Recurring, Syncable } from '../types';
 import {
   backupFileName, backupSummary, buildBackup, downloadBackup, parseBackup, serializeBackup,
 } from '../utils/backup';
@@ -12,17 +12,18 @@ interface Props {
   assets: Asset[];
   loans: Loan[];
   recurrings: Recurring[];
+  goals: Goal[];
   onImport: (text: string) => { ok: boolean; message: string };
   onRestore: (coll: CollName, id: string) => void;
   onReset: () => void;
 }
 
 const COLL_LABEL: Record<CollName, string> = {
-  kinds: '분류', assets: '자산', loans: '대출', recurrings: '고정비',
+  kinds: '분류', assets: '자산', loans: '대출', recurrings: '고정비', goals: '목표',
 };
 
 export default function SettingsView({
-  kinds, assets, loans, recurrings, onImport, onRestore, onReset,
+  kinds, assets, loans, recurrings, goals, onImport, onRestore, onReset,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -32,10 +33,11 @@ export default function SettingsView({
     ...deletedOnly(assets).map(r => ({ coll: 'assets' as CollName, rec: r })),
     ...deletedOnly(loans).map(r => ({ coll: 'loans' as CollName, rec: r })),
     ...deletedOnly(recurrings).map(r => ({ coll: 'recurrings' as CollName, rec: r })),
+    ...deletedOnly(goals).map(r => ({ coll: 'goals' as CollName, rec: r })),
   ].sort((a, b) => b.rec.updatedAt - a.rec.updatedAt);
 
   const handleExport = () => {
-    const backup = buildBackup({ kinds, assets, loans, recurrings });
+    const backup = buildBackup({ kinds, assets, loans, recurrings, goals });
     downloadBackup(serializeBackup(backup), backupFileName());
     setMessage({ ok: true, text: `백업 파일을 내려받았어요. (${backupSummary(backup)})` });
   };
@@ -53,7 +55,7 @@ export default function SettingsView({
 
   const handleReset = () => {
     if (!window.confirm(
-      '모든 자산·대출·고정비 기록을 지웁니다.\n되돌릴 수 없어요.\n\n먼저 [백업 파일로 내보내기]를 해두는 걸 권합니다.\n\n정말 지울까요?',
+      '모든 자산·대출·고정비·목표 기록을 지웁니다.\n되돌릴 수 없어요.\n\n먼저 [백업 파일로 내보내기]를 해두는 걸 권합니다.\n\n정말 지울까요?',
     )) return;
     if (!window.confirm('마지막 확인이에요. 정말 전부 지울까요?')) return;
     onReset();

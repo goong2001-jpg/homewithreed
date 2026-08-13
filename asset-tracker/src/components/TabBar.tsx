@@ -11,6 +11,7 @@ const TABS: { view: View; icon: string; label: string }[] = [
   { view: 'home', icon: '📊', label: '한눈에' },
   { view: 'assets', icon: '💰', label: '자산' },
   { view: 'outflow', icon: '💳', label: '나가는돈' },
+  { view: 'goals', icon: '🎯', label: '목표' },
   { view: 'settings', icon: '⚙️', label: '설정' },
 ];
 
