@@ -12,6 +12,7 @@ export const KEYS = {
   assets: 'asset_tracker_assets',
   loans: 'asset_tracker_loans',
   recurrings: 'asset_tracker_recurrings',
+  goals: 'asset_tracker_goals',
 } as const;
 
 export function load<T>(key: string, fallback: T): T {

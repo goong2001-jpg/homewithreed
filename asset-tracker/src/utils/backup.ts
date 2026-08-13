@@ -1,4 +1,4 @@
-import { Asset, AssetKind, Loan, Recurring } from '../types';
+import { Asset, AssetKind, Goal, Loan, Recurring } from '../types';
 
 /**
  * 백업 파일 형식.
@@ -22,6 +22,7 @@ export interface Backup {
   assets: Asset[];
   loans: Loan[];
   recurrings: Recurring[];
+  goals: Goal[];
 }
 
 export function buildBackup(input: {
@@ -29,6 +30,7 @@ export function buildBackup(input: {
   assets: Asset[];
   loans: Loan[];
   recurrings: Recurring[];
+  goals: Goal[];
   now?: number;
 }): Backup {
   return {
@@ -40,6 +42,7 @@ export function buildBackup(input: {
     assets: input.assets,
     loans: input.loans,
     recurrings: input.recurrings,
+    goals: input.goals,
   };
 }
 
@@ -91,10 +94,11 @@ export function parseBackup(
     assets: readRecords<Asset>(o.assets),
     loans: readRecords<Loan>(o.loans),
     recurrings: readRecords<Recurring>(o.recurrings),
+    goals: readRecords<Goal>(o.goals),
   };
 
   const total = backup.kinds.length + backup.assets.length
-    + backup.loans.length + backup.recurrings.length;
+    + backup.loans.length + backup.recurrings.length + backup.goals.length;
   if (total === 0) {
     return { ok: false, error: '파일에 기록이 하나도 없어요.' };
   }
@@ -116,6 +120,7 @@ export function backupSummary(b: Backup): string {
     `자산 ${n(b.assets)}건`,
     `대출 ${n(b.loans)}건`,
     `고정비 ${n(b.recurrings)}건`,
+    `목표 ${n(b.goals)}건`,
   ].join(' · ');
 }
 
