@@ -138,6 +138,7 @@ function TensCounting({ problem, emoji, onSolved }: { problem: Problem; emoji: s
   };
 
   const t2 = Math.floor(problem.num2 / 10), o2 = problem.num2 % 10;
+  const complete = isAdd ? sel.every(Boolean) : count === problem.num2;
 
   return (
     <>
@@ -182,13 +183,16 @@ function TensCounting({ problem, emoji, onSolved }: { problem: Problem; emoji: s
         ))}
       </div>
 
-      <div style={{ fontSize: 17, fontWeight: 800, color: '#e67e22', margin: '8px 0 4px' }}>
-        {isAdd ? `지금까지 센 수: ${count}` : `뺀 수: ${count} → 남은 수: ${problem.num1 - count}`}
-      </div>
+      {/* 세는 중에만 도와주는 숫자 — 다 세고 나면 감춰서 직접 답을 떠올리게 한다 */}
+      {!complete && (
+        <div style={{ fontSize: 17, fontWeight: 800, color: '#e67e22', margin: '8px 0 4px' }}>
+          {isAdd ? `지금까지 센 수: ${count}` : `뺀 수: ${count}`}
+        </div>
+      )}
       <div style={{ fontSize: 14, color: '#999' }}>
         {isAdd
           ? '👆 파란 묶음은 10씩! 전부 눌러서 세어보자!'
-          : `👆 10묶음 ${t2}개와 낱개 ${o2}개를 눌러서 빼보자!`}
+          : `👆 10묶음 ${t2}개와 낱개 ${o2}개를 눌러서 빼보자! 남은 걸 세어봐!`}
       </div>
     </>
   );
@@ -241,7 +245,11 @@ function GroupsCounting({ problem, emoji, onSolved }: { problem: Problem; emoji:
         })}
       </div>
       <div style={{ fontSize: 17, fontWeight: 800, color: '#e67e22', margin: '8px 0 4px' }}>
-        {tapped > 0 ? `${per}씩 ${tapped}묶음 = ${per * tapped}` : `${per}씩 뛰어 세어보자!`}
+        {tapped === 0
+          ? `${per}씩 뛰어 세어보자!`
+          : tapped < groups
+          ? `${per}씩 ${tapped}묶음까지 셌어!`
+          : '다 셌어! 마지막 숫자가 몇이었지? 🤔'}
       </div>
       <div style={{ fontSize: 14, color: '#999' }}>
         👆 묶음을 차례로 눌러봐! {per}, {per * 2}, {per * 3}...
@@ -294,27 +302,33 @@ export default function CountingHelper({ problem, onClose }: Props) {
           {mode === 'groups' && <GroupsCounting problem={problem} emoji={emoji} onSolved={setSolved} />}
         </div>
 
+        {/* 정답을 알려주지 않는다 — 세어본 걸 떠올려 직접 답을 쓰게 한다 */}
         {solved && (
           <div style={{
             background: 'linear-gradient(135deg, #84fab0, #8fd3f4)',
             borderRadius: 16, padding: 16, marginBottom: 16,
-            fontSize: 20, fontWeight: 700, color: '#2c3e50',
-            animation: 'fadeIn 0.3s ease',
+            fontSize: 18, fontWeight: 800, color: '#1e5c40',
+            animation: 'fadeIn 0.3s ease', lineHeight: 1.5,
           }}>
-            🎉 정답은 <span style={{ color: '#e74c3c', fontSize: 28 }}>{problem.answer}</span> 이야!
+            잘 셌어! 👏<br />
+            <span style={{ fontSize: 15, fontWeight: 700 }}>
+              몇 개인지 알겠지? 이제 직접 답을 써보자! ✏️
+            </span>
           </div>
         )}
 
         <button
           onClick={onClose}
           style={{
-            background: 'linear-gradient(135deg, #667eea, #764ba2)',
+            background: solved
+              ? 'linear-gradient(135deg, #27ae60, #2ecc71)'
+              : 'linear-gradient(135deg, #667eea, #764ba2)',
             color: 'white', border: 'none', borderRadius: 12,
             padding: '13px 36px', fontSize: 16, fontWeight: 700,
-            cursor: 'pointer',
+            cursor: 'pointer', transition: 'background 0.3s',
           }}
         >
-          다시 풀어볼게요! ✊
+          {solved ? '알겠어! 답 쓰러 갈래 ✏️' : '이 문제 다시 풀어볼래 ✊'}
         </button>
       </div>
     </div>

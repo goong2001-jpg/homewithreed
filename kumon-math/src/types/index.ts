@@ -46,6 +46,12 @@ export interface GameState {
   dailyGoal: number;
   /** 오늘 맞힌 문제 수 (날짜 바뀌면 0으로) */
   todaySolved: number;
+  /** todaySolved가 어느 날짜의 기록인지 (미리하기 정산 기준) */
+  todaySolvedDate: string;
+  /** 목표를 넘겨 미리 풀어둔 문제 수 — 다음 날 미션에 자동으로 채워짐 */
+  bankedProblems: number;
+  /** 오늘 미리하기에서 채워진 개수 (안내 표시용) */
+  bankedAppliedToday: number;
   /** 마지막으로 문제를 푼 날짜 (YYYY-M-D) */
   lastPlayedDate: string;
   /** 연속 출석 일수 */

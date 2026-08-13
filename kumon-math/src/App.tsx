@@ -49,14 +49,26 @@ export default function App() {
   const [pointsFlash, setPointsFlash] = useState(0);
   const [flashKey, setFlashKey] = useState(0);
   const [unlocked, setUnlocked] = useState<{ id: string; name: string; emoji: string } | null>(null);
+  const [wrongAttempts, setWrongAttempts] = useState(0);
 
   const course = getCourse(gameState.courseId);
 
   const nextProblem = useCallback((courseId: string, lvl: number) => {
     setIsCorrect(null);
     setMood('thinking');
+    setWrongAttempts(0);
     setProblem(generateProblem(courseId, lvl));
     setTimeout(() => setMood('idle'), 400);
+  }, []);
+
+  /**
+   * 같은 문제를 다시 풀게 한다. 값은 그대로 두고 객체만 새로 만들어
+   * ProblemCard의 입력창이 비워지도록 한다(문제는 그대로).
+   */
+  const retrySameProblem = useCallback(() => {
+    setIsCorrect(null);
+    setMood('idle');
+    setProblem(p => ({ ...p }));
   }, []);
 
   const handleSubmit = useCallback((answer: number) => {
@@ -72,6 +84,13 @@ export default function App() {
       if (result.missionCompleted) {
         setFeedbackMsg(`오늘의 미션 완료! 보너스 +20⭐ 🏆`);
         playStreak();
+      } else if (result.bankedNow !== null) {
+        setFeedbackMsg(
+          result.bankedFull
+            ? '저금통이 가득 찼어! 대단해 🍯✨'
+            : `내일 걸 미리 해뒀어! 저금통 ${result.bankedNow}개 🍯`
+        );
+        playCorrect();
       } else if (STREAK_MESSAGES[newStreak]) {
         setFeedbackMsg(STREAK_MESSAGES[newStreak]);
         playStreak();
@@ -95,6 +114,7 @@ export default function App() {
     } else {
       setIsCorrect(false);
       setMood('sad');
+      setWrongAttempts(n => n + 1);
       setFeedbackMsg(WRONG_MESSAGES[Math.floor(Math.random() * WRONG_MESSAGES.length)]);
       playWrong();
       onWrong();
@@ -151,6 +171,8 @@ export default function App() {
         todaySolved={gameState.todaySolved}
         dailyGoal={gameState.dailyGoal}
         attendanceStreak={gameState.attendanceStreak}
+        bankedProblems={gameState.bankedProblems}
+        bankedAppliedToday={gameState.bankedAppliedToday}
       />
 
       {/* 아바타 영역 */}
@@ -207,7 +229,13 @@ export default function App() {
           problem={problem}
           onClose={() => {
             setShowHelper(false);
-            nextProblem(gameState.courseId, gameState.level);
+            // 세어보고 나면 같은 문제를 직접 다시 푼다.
+            // 단, 계속 막히면(3번) 새 문제로 넘어가 답답하지 않게 한다.
+            if (wrongAttempts >= 3) {
+              nextProblem(gameState.courseId, gameState.level);
+            } else {
+              retrySameProblem();
+            }
           }}
         />
       )}

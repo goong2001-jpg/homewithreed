@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { GameState, AvatarItem, CourseProgress } from '../types';
 import { getNextCourse } from '../curriculum/math';
 
@@ -37,6 +37,7 @@ const ITEMS_KEY = 'kumon_items';
 
 const DAILY_GOAL = 20;          // 오늘의 미션: 20문제 맞히기
 const MISSION_BONUS = 20;       // 미션 완료 보너스 ⭐
+const MAX_BANKED_DAYS = 3;      // 미리하기는 최대 3일치까지 저금
 const UNLOCK_WINDOW = 20;      // 다음 코스 해금 판정: 최근 20문제
 const UNLOCK_MIN_CORRECT = 18; // 그중 18개 이상 정답 (90%)
 const UNLOCK_MIN_LEVEL = 10;   // 코스 내 레벨 10 이상일 때만 해금
@@ -63,6 +64,9 @@ const DEFAULT_STATE: GameState = {
   courseId: 'addsub20',
   dailyGoal: DAILY_GOAL,
   todaySolved: 0,
+  todaySolvedDate: '',
+  bankedProblems: 0,
+  bankedAppliedToday: 0,
   lastPlayedDate: '',
   attendanceStreak: 0,
   missionRewardDate: '',
@@ -71,6 +75,32 @@ const DEFAULT_STATE: GameState = {
   courseLevels: {},
 };
 
+/**
+ * 날이 바뀌면 오늘 진행을 0으로 되돌리되, 미리 풀어둔(저금해둔) 문제가 있으면
+ * 오늘 미션에 자동으로 채워 넣는다. 미리 해둔 만큼 오늘은 쉴 수 있다.
+ */
+function rolloverDay(s: GameState): GameState {
+  const today = todayStr();
+  if (s.todaySolvedDate === today) return s;
+
+  const used = Math.min(s.bankedProblems, s.dailyGoal);
+  const rolled: GameState = {
+    ...s,
+    todaySolved: used,
+    bankedProblems: s.bankedProblems - used,
+    bankedAppliedToday: used,
+    todaySolvedDate: today,
+  };
+
+  // 미리하기로 오늘 목표를 이미 채웠다면 출석도 인정 (미리 해둔 날은 쉬어도 됨)
+  if (used >= s.dailyGoal) {
+    rolled.attendanceStreak = s.lastPlayedDate === yesterdayStr() ? s.attendanceStreak + 1 : 1;
+    rolled.lastPlayedDate = today;
+    rolled.missionRewardDate = today; // 보너스는 저금할 때 이미 받았음
+  }
+  return rolled;
+}
+
 function loadState(): GameState {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -78,12 +108,13 @@ function loadState(): GameState {
       // 예전 저장 데이터에 새 필드가 없어도 기본값으로 채워짐
       const merged: GameState = { ...DEFAULT_STATE, ...JSON.parse(saved) };
       merged.dailyGoal = DAILY_GOAL;
-      if (merged.lastPlayedDate !== todayStr()) merged.todaySolved = 0;
+      // 예전 데이터에는 todaySolvedDate가 없으므로 lastPlayedDate로 보정
+      if (!merged.todaySolvedDate) merged.todaySolvedDate = merged.lastPlayedDate;
       // 현재 하고 있는 코스는 항상 해금 목록에 포함 (자동 승급 시절 데이터 호환)
       if (!merged.unlockedCourseIds.includes(merged.courseId)) {
         merged.unlockedCourseIds = [...merged.unlockedCourseIds, merged.courseId];
       }
-      return merged;
+      return rolloverDay(merged);
     }
   } catch {}
   return DEFAULT_STATE;
@@ -104,19 +135,23 @@ function loadItems(): AvatarItem[] {
   return INITIAL_ITEMS;
 }
 
-/** 출석 처리: 오늘 처음 풀면 스트릭 갱신 */
-function applyAttendance(prev: GameState): Pick<GameState, 'lastPlayedDate' | 'attendanceStreak' | 'todaySolved'> {
+/** 출석 처리: 오늘 처음 풀면 스트릭 갱신 (오늘 진행 개수는 rolloverDay가 담당) */
+function applyAttendance(prev: GameState): Pick<GameState, 'lastPlayedDate' | 'attendanceStreak'> {
   const today = todayStr();
   if (prev.lastPlayedDate === today) {
-    return { lastPlayedDate: today, attendanceStreak: prev.attendanceStreak, todaySolved: prev.todaySolved };
+    return { lastPlayedDate: today, attendanceStreak: prev.attendanceStreak };
   }
   const streak = prev.lastPlayedDate === yesterdayStr() ? prev.attendanceStreak + 1 : 1;
-  return { lastPlayedDate: today, attendanceStreak: streak, todaySolved: 0 };
+  return { lastPlayedDate: today, attendanceStreak: streak };
 }
 
 export interface AnswerResult {
   earned: number;
   missionCompleted: boolean;
+  /** 이번 정답이 미리하기(저금)로 쌓였으면 저금통의 현재 개수 */
+  bankedNow: number | null;
+  /** 저금통이 가득 찼는지 */
+  bankedFull: boolean;
   /** 이번 정답으로 새로 열린 코스 (자동 이동하지 않음 — 선택은 아이/부모 몫) */
   unlockedCourse: { id: string; name: string; emoji: string } | null;
   nextLevel: number;
@@ -132,8 +167,18 @@ export function useGameState() {
     localStorage.setItem(ITEMS_KEY, JSON.stringify(itemList));
   }, []);
 
+  // loadState가 날짜 정산(미리하기 차감)을 했으므로 시작하자마자 저장해 둔다.
+  // 저장하지 않으면 앱을 다시 열 때마다 같은 저금이 계속 재사용된다.
+  const didPersistOnMount = useRef(false);
+  useEffect(() => {
+    if (didPersistOnMount.current) return;
+    didPersistOnMount.current = true;
+    save(gameState, items);
+  }, [gameState, items, save]);
+
   const onCorrect = useCallback((): AnswerResult => {
-    const prev = gameState;
+    // 자정을 넘겨 앱이 켜져 있었을 수도 있으니 날짜 정산 먼저
+    const prev = rolloverDay(gameState);
     const today = todayStr();
     const attendance = applyAttendance(prev);
 
@@ -142,7 +187,7 @@ export function useGameState() {
     let earned = 3 + streakBonus;
 
     // 오늘의 미션
-    const todaySolved = attendance.todaySolved + 1;
+    const todaySolved = prev.todaySolved + 1;
     let missionCompleted = false;
     let missionRewardDate = prev.missionRewardDate;
     if (todaySolved >= prev.dailyGoal && missionRewardDate !== today) {
@@ -150,6 +195,13 @@ export function useGameState() {
       missionCompleted = true;
       missionRewardDate = today;
     }
+
+    // 🍯 미리하기: 오늘 목표를 넘겨 푼 문제는 저금통에 쌓아 다음 날 미션에 사용
+    const maxBank = prev.dailyGoal * MAX_BANKED_DAYS;
+    const banked = todaySolved > prev.dailyGoal
+      ? Math.min(prev.bankedProblems + 1, maxBank)
+      : prev.bankedProblems;
+    const bankedFull = banked >= maxBank;
 
     // 코스 진행 기록 + 다음 코스 해금 판정 (코스는 바꾸지 않는다 — 선택식)
     const cp: CourseProgress = prev.courseProgress[prev.courseId] ?? { attempted: 0, correct: 0, recent: [] };
@@ -178,6 +230,8 @@ export function useGameState() {
       streak: newStreak,
       level,
       todaySolved,
+      todaySolvedDate: today,
+      bankedProblems: banked,
       missionRewardDate,
       totalCorrect: prev.totalCorrect + 1,
       unlockedCourseIds,
@@ -190,7 +244,15 @@ export function useGameState() {
     setGameState(next);
     save(next, items);
 
-    return { earned, missionCompleted, unlockedCourse, nextLevel: level, courseId: prev.courseId };
+    return {
+      earned,
+      missionCompleted,
+      bankedNow: todaySolved > prev.dailyGoal ? banked : null,
+      bankedFull,
+      unlockedCourse,
+      nextLevel: level,
+      courseId: prev.courseId,
+    };
   }, [gameState, items, save]);
 
   /** 해금된 코스로 이동 — 코스별 레벨은 기억해 두었다가 이어서 */
@@ -210,7 +272,7 @@ export function useGameState() {
   }, [items, save]);
 
   const onWrong = useCallback((): { nextLevel: number; courseId: string } => {
-    const prev = gameState;
+    const prev = rolloverDay(gameState);
     const attendance = applyAttendance(prev);
     const cp: CourseProgress = prev.courseProgress[prev.courseId] ?? { attempted: 0, correct: 0, recent: [] };
     const recent = [...cp.recent, false].slice(-UNLOCK_WINDOW);
