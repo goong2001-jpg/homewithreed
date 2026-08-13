@@ -59,6 +59,29 @@ export function TextField(
   );
 }
 
+/**
+ * 여러 줄 입력 — 3단계 대본처럼 '한 줄에 하나씩' 적는 칸.
+ * 줄바꿈이 곧 항목 구분이라 따로 목록 UI를 만들지 않는다.
+ */
+export function TextAreaField(
+  { label, hint, value, onChange, placeholder, rows }:
+  BaseProps & { value: string; onChange: (v: string) => void; placeholder?: string; rows?: number },
+) {
+  return (
+    <div style={wrap}>
+      <label style={labelStyle}>{label}</label>
+      <textarea
+        style={{ ...inputStyle, minHeight: 44, lineHeight: 1.6, resize: 'vertical' }}
+        rows={rows ?? 3}
+        value={value}
+        placeholder={placeholder}
+        onChange={e => onChange(e.target.value)}
+      />
+      {hint && <p style={hintStyle}>{hint}</p>}
+    </div>
+  );
+}
+
 export function DateField(
   { label, hint, value, onChange }:
   BaseProps & { value: string; onChange: (v: string) => void },

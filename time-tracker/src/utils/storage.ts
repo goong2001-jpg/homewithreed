@@ -10,6 +10,9 @@
 export const KEYS = {
   categories: 'time_tracker_categories',
   entries: 'time_tracker_entries',
+  blocks: 'time_tracker_blocks',
+  plans: 'time_tracker_plans',
+  resists: 'time_tracker_resists',
 } as const;
 
 export function load<T>(key: string, fallback: T): T {

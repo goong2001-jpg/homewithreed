@@ -1,21 +1,62 @@
 import React from 'react';
-import { Category } from '../types';
-import { durationText } from '../utils/time';
+import { Category, TimeBlock } from '../types';
+import { blockRanges, hasScript } from '../utils/block';
+import { clockOfMinutes, durationText } from '../utils/time';
 import { CategoryMark } from './Field';
-import { COLOR, addButton, card, empty, missBadge, okBadge, sectionTitle, tabular } from './ui';
+import { COLOR, addButton, card, empty, liveBadge, missBadge, okBadge, sectionTitle, tabular } from './ui';
 
 interface Props {
   categories: Category[];
+  blocks: TimeBlock[];
   /** categoryId → 지금까지 적어둔 기록 수 */
   useCount: Record<string, number>;
   onAdd: () => void;
   onEdit: (c: Category) => void;
+  onEditBlock: (b: TimeBlock) => void;
 }
 
-export default function CategoriesView({ categories, useCount, onAdd, onEdit }: Props) {
+export default function CategoriesView({
+  categories, blocks, useCount, onAdd, onEdit, onEditBlock,
+}: Props) {
+  const ranges = blockRanges(blocks);
+
   return (
     <div>
-      <div style={sectionTitle}>내 분류</div>
+      {/* ── 타임블록 ─────────────────────────── */}
+      <div style={sectionTitle}>⏳ 타임블록 · 하루를 나누는 조각</div>
+
+      <div style={{ ...card, margin: '0 16px', padding: 0, overflow: 'hidden' }}>
+        {ranges.map((r, i) => (
+          <button
+            key={r.block.id}
+            onClick={() => onEditBlock(r.block)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+              padding: '12px 16px', background: 'none', border: 'none',
+              borderBottom: i === ranges.length - 1 ? 'none' : `1px solid ${COLOR.line}`,
+              cursor: 'pointer', font: 'inherit', textAlign: 'left', color: COLOR.text,
+            }}
+          >
+            <span style={{ fontSize: 19, width: 26, textAlign: 'center' }}>{r.block.emoji}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>{r.block.name}</span>
+              <span style={{ ...tabular, display: 'block', fontSize: 12, color: COLOR.faint, marginTop: 2 }}>
+                {clockOfMinutes(r.startMinutes)} – {clockOfMinutes(r.endMinutes % 1440)}
+                {' · '}{durationText(r.endMinutes - r.startMinutes)}
+              </span>
+            </span>
+            {i === 0 && <span style={{ ...liveBadge }}>자정 고정</span>}
+          </button>
+        ))}
+      </div>
+
+      <p style={{ margin: '10px 16px 0', fontSize: 12, color: COLOR.faint, lineHeight: 1.7 }}>
+        블록은 <strong>여섯 조각</strong>이고 늘거나 줄지 않습니다. 이름과 시작 시각만 내 생활에 맞추세요.
+        조각이 너무 많으면 계획이 일정표가 되고, 너무 적으면 한 번 무너졌을 때 돌아올 지점이 없습니다.
+      </p>
+
+      {/* ── 분류 ─────────────────────────────── */}
+      <div style={sectionTitle}>🗂 내 분류</div>
 
       <div style={{ ...card, margin: '0 16px', padding: 0, overflow: 'hidden' }}>
         {categories.length === 0 ? (
@@ -38,8 +79,13 @@ export default function CategoriesView({ categories, useCount, onAdd, onEdit }: 
                 <span style={{ fontSize: 15, fontWeight: 600 }}>{c.name}</span>
                 <span style={{ display: 'block', fontSize: 12, color: COLOR.faint, marginTop: 2 }}>
                   기록 {useCount[c.id] ?? 0}건
+                  {c.guard && (hasScript(c)
+                    ? ' · 대본 있음'
+                    : ' · 대본 비었음')}
                 </span>
               </span>
+
+              {c.guard && <span style={{ ...missBadge, marginRight: 2 }}>🚧 붙잡기</span>}
 
               {c.weeklyGoalMinutes != null && c.weeklyGoalMinutes > 0 && (
                 <span style={{ ...(c.goalKind === '이상' ? okBadge : missBadge), ...tabular }}>

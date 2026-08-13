@@ -1,6 +1,9 @@
 import React from 'react';
-import { Category, DateKey, Entry, Gap, PeriodSummary, Segment, UNKNOWN_CATEGORY } from '../types';
+import {
+  BlockReport, Category, DateKey, Entry, Gap, PeriodSummary, Segment, UNKNOWN_CATEGORY,
+} from '../types';
 import { addDays, clock, dayLabel, durationText } from '../utils/time';
+import BlockStrip from './BlockStrip';
 import DayBar from './DayBar';
 import QuickStart from './QuickStart';
 import RunningCard from './RunningCard';
@@ -20,6 +23,7 @@ interface Props {
   segments: Segment[];
   gaps: Gap[];
   summary: PeriodSummary;
+  blockReports: BlockReport[];
   running: Entry | null;
   now: number;
 
@@ -27,6 +31,7 @@ interface Props {
   onStop: () => void;
   onEditEntry: (entryId: string) => void;
   onAdd: (range?: { start: number; end: number }) => void;
+  onPickBlock: (blockId: string) => void;
 }
 
 /** 기록 조각과 빈 구간을 시간순으로 한 줄씩 */
@@ -36,8 +41,8 @@ type Item =
 
 export default function TodayView({
   day, today, onChangeDay, categories, allCategories,
-  segments, gaps, summary, running, now,
-  onStart, onStop, onEditEntry, onAdd,
+  segments, gaps, summary, blockReports, running, now,
+  onStart, onStop, onEditEntry, onAdd, onPickBlock,
 }: Props) {
   const isToday = day === today;
 
@@ -101,6 +106,14 @@ export default function TodayView({
           onEdit={e => onEditEntry(e.id)}
         />
       )}
+
+      {/* ── 타임블록 ─────────────────────────── */}
+      <BlockStrip
+        reports={blockReports}
+        categories={allCategories}
+        isToday={isToday}
+        onPick={onPickBlock}
+      />
 
       {/* ── 한 번 눌러 시작 ───────────────────── */}
       {isToday && (

@@ -1,5 +1,6 @@
 import React from 'react';
-import { CategorySlice, DateKey, PeriodSummary, Span } from '../types';
+import { BlockRollup, Category, CategorySlice, DateKey, PeriodSummary, Span } from '../types';
+import { categoryMeta } from '../utils/block';
 import { DAY_MINUTES, dayLabel, deltaText, durationText, parseDate, rangeLabel, weekdayName } from '../utils/time';
 import { COLOR, card, empty, missBadge, okBadge, sectionTitle, tabular } from './ui';
 
@@ -12,13 +13,24 @@ interface Props {
   summary: PeriodSummary;
   /** 분류별 지난 기간 대비 증감(분) */
   delta: Record<string, number>;
+  /** 시간대별로 접은 것 — 어디서 무너지나 */
+  rollups: BlockRollup[];
+  categories: Category[];
+  /** 이 기간에 충동을 참은 횟수 */
+  resistCount: number;
   today: DateKey;
 }
 
 export default function StatsView({
-  span, onChangeSpan, onShift, canForward, summary, delta, today,
+  span, onChangeSpan, onShift, canForward, summary, delta, rollups, categories, resistCount, today,
 }: Props) {
   const hasAny = summary.totalMinutes > 0;
+
+  // 줄이려는 시간이 가장 많이 몰린 블록 — 손댈 자리가 여기다
+  const weakest = rollups.reduce<BlockRollup | null>(
+    (worst, r) => (r.guardMinutes > 0 && (!worst || r.guardMinutes > worst.guardMinutes) ? r : worst),
+    null,
+  );
 
   return (
     <div>
@@ -64,6 +76,33 @@ export default function StatsView({
       <div style={{ ...card, margin: '0 16px' }}>
         <DayChart summary={summary} span={span} today={today} />
       </div>
+
+      {/* ── 시간대별 ─────────────────────────── */}
+      <div style={sectionTitle}>시간대별 · 어디서 무너지나</div>
+      <div style={{ ...card, margin: '0 16px', padding: 0, overflow: 'hidden' }}>
+        {rollups.map((r, i) => (
+          <BlockRow
+            key={r.blockId}
+            rollup={r}
+            categories={categories}
+            last={i === rollups.length - 1}
+          />
+        ))}
+      </div>
+
+      {weakest && (
+        <p style={{ margin: '10px 16px 0', fontSize: 12, color: COLOR.faint, lineHeight: 1.7 }}>
+          줄이려는 시간이 가장 몰린 건 <strong style={{ color: COLOR.warn }}>{weakest.emoji} {weakest.name}</strong>
+          {' '}블록이에요 ({durationText(weakest.guardMinutes)}).
+          그 시간대에 <strong>미리 대체 행동을 계획</strong>해 두면 가장 크게 바뀝니다.
+        </p>
+      )}
+
+      {resistCount > 0 && (
+        <p style={{ margin: '10px 16px 0', fontSize: 12, color: COLOR.good, lineHeight: 1.7 }}>
+          이 기간에 충동을 <strong>{resistCount}번</strong> 참았어요. 안 한 일은 어디에도 안 쌓이니까 여기 적어둡니다.
+        </p>
+      )}
 
       {/* ── 분류별 ───────────────────────────── */}
       <div style={sectionTitle}>어디에 썼나</div>
@@ -145,6 +184,59 @@ function DayChart({ summary, span, today }: { summary: PeriodSummary; span: Span
 function shortDayLabel(day: DateKey): string {
   const { d } = parseDate(day);
   return d === 1 || d % 5 === 0 ? String(d) : '';
+}
+
+/**
+ * 시간대 한 줄.
+ *
+ * 날짜별로 보면 '어제는 망했네'로 끝나지만, 같은 시간대끼리 모으면
+ * '매일 밤 아홉 시에 무너지는구나'가 보인다. 손을 쓸 수 있는 건 후자다.
+ */
+function BlockRow(
+  { rollup, categories, last }: { rollup: BlockRollup; categories: Category[]; last: boolean },
+) {
+  const top = categoryMeta(categories, rollup.topCategoryId);
+  const rate = rollup.keepRate;
+
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px',
+        borderBottom: last ? 'none' : `1px solid ${COLOR.line}`,
+      }}
+    >
+      <span style={{ fontSize: 17, width: 24, textAlign: 'center' }}>{rollup.emoji}</span>
+
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>{rollup.name}</span>
+        <span
+          style={{
+            display: 'block', fontSize: 11.5, color: COLOR.faint, marginTop: 2,
+            // 뱃지가 둘 붙으면 자리가 좁아진다. 줄바꿈 대신 말줄임으로
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}
+        >
+          {rollup.topCategoryId
+            ? <>주로 {top.emoji} {top.name} · {durationText(rollup.totalMinutes)}</>
+            : '적어둔 게 없어요'}
+        </span>
+      </span>
+
+      {rollup.guardMinutes > 0 && (
+        <span style={{ ...missBadge, ...tabular }}>
+          줄일 것 {durationText(rollup.guardMinutes)}
+        </span>
+      )}
+
+      {rate != null ? (
+        <span style={{ ...(rate >= 0.5 ? okBadge : missBadge), ...tabular }}>
+          {rollup.keptDays}/{rollup.plannedDays} 지킴
+        </span>
+      ) : (
+        <span style={{ fontSize: 11, color: COLOR.faint, whiteSpace: 'nowrap' }}>계획 없음</span>
+      )}
+    </div>
+  );
 }
 
 function CategoryRow({ slice, delta }: { slice: CategorySlice; delta?: number }) {

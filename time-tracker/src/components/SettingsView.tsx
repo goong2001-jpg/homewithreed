@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Category, Entry, UNKNOWN_CATEGORY } from '../types';
+import { BlockPlan, Category, Entry, Resist, TimeBlock, UNKNOWN_CATEGORY } from '../types';
 import { CollName } from '../hooks/useTracker';
 import {
   backupFileName, backupSummary, buildBackup, downloadBackup, parseBackup, serializeBackup,
@@ -11,12 +11,17 @@ import { COLOR, card, dangerButton, empty, ghostButton, primaryButton, sectionTi
 interface Props {
   categories: Category[];
   entries: Entry[];
+  blocks: TimeBlock[];
+  plans: BlockPlan[];
+  resists: Resist[];
   onImport: (text: string) => { ok: boolean; message: string };
   onRestore: (coll: CollName, id: string) => void;
   onReset: () => void;
 }
 
-export default function SettingsView({ categories, entries, onImport, onRestore, onReset }: Props) {
+export default function SettingsView({
+  categories, entries, blocks, plans, resists, onImport, onRestore, onReset,
+}: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -30,6 +35,13 @@ export default function SettingsView({ categories, entries, onImport, onRestore,
       sub: '분류',
       updatedAt: c.updatedAt,
     })),
+    ...deletedOnly(plans).map(p => ({
+      coll: 'plans' as CollName,
+      id: p.id,
+      label: `${nameOf(p.categoryId)} 계획`,
+      sub: `${p.day} · 블록 계획`,
+      updatedAt: p.updatedAt,
+    })),
     ...deletedOnly(entries).map(e => ({
       coll: 'entries' as CollName,
       id: e.id,
@@ -42,7 +54,7 @@ export default function SettingsView({ categories, entries, onImport, onRestore,
   ].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 50);
 
   const handleExport = () => {
-    const backup = buildBackup({ categories, entries });
+    const backup = buildBackup({ categories, entries, blocks, plans, resists });
     downloadBackup(serializeBackup(backup), backupFileName());
     setMessage({ ok: true, text: `백업 파일을 내려받았어요. (${backupSummary(backup)})` });
   };
@@ -60,7 +72,7 @@ export default function SettingsView({ categories, entries, onImport, onRestore,
 
   const handleReset = () => {
     if (!window.confirm(
-      '적어둔 시간 기록과 분류를 전부 지웁니다.\n되돌릴 수 없어요.\n\n먼저 [백업 파일로 내보내기]를 해두는 걸 권합니다.\n\n정말 지울까요?',
+      '적어둔 시간 기록·분류·블록 계획을 전부 지웁니다.\n되돌릴 수 없어요.\n\n먼저 [백업 파일로 내보내기]를 해두는 걸 권합니다.\n\n정말 지울까요?',
     )) return;
     if (!window.confirm('마지막 확인이에요. 정말 전부 지울까요?')) return;
     onReset();

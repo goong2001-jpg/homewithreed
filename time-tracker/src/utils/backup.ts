@@ -1,4 +1,4 @@
-import { Category, Entry } from '../types';
+import { BlockPlan, Category, Entry, Resist, TimeBlock } from '../types';
 
 /**
  * 백업 파일 형식.
@@ -12,7 +12,8 @@ import { Category, Entry } from '../types';
  * 백업을 얹어도 지운 기록이 엉뚱하게 되살아나지 않는다.
  */
 export const BACKUP_FORMAT = 'time-tracker-backup';
-export const BACKUP_VERSION = 1;
+/** 2: 타임블록·블록 계획·참은 기록이 추가됐다. 1로 만든 파일도 그대로 읽는다 */
+export const BACKUP_VERSION = 2;
 
 export interface Backup {
   format: string;
@@ -20,11 +21,17 @@ export interface Backup {
   exportedAt: number;
   categories: Category[];
   entries: Entry[];
+  blocks: TimeBlock[];
+  plans: BlockPlan[];
+  resists: Resist[];
 }
 
 export function buildBackup(input: {
   categories: Category[];
   entries: Entry[];
+  blocks: TimeBlock[];
+  plans: BlockPlan[];
+  resists: Resist[];
   now?: number;
 }): Backup {
   return {
@@ -34,6 +41,9 @@ export function buildBackup(input: {
     // 삭제 표시(툼스톤)도 같이 담는다 — 빼면 복원할 때 지운 기록이 되살아난다
     categories: input.categories,
     entries: input.entries,
+    blocks: input.blocks,
+    plans: input.plans,
+    resists: input.resists,
   };
 }
 
@@ -83,6 +93,10 @@ export function parseBackup(
     exportedAt: typeof o.exportedAt === 'number' ? o.exportedAt : 0,
     categories: readRecords<Category>(o.categories),
     entries: readRecords<Entry>(o.entries),
+    // 버전 1로 만든 파일에는 아예 없는 키들 — 없으면 빈 배열이 된다
+    blocks: readRecords<TimeBlock>(o.blocks),
+    plans: readRecords<BlockPlan>(o.plans),
+    resists: readRecords<Resist>(o.resists),
   };
 
   if (backup.categories.length + backup.entries.length === 0) {
@@ -99,10 +113,12 @@ export function backupFileName(now = new Date()): string {
   return `시간기록백업_${y}${m}${d}.json`;
 }
 
-/** '기록 128건 · 분류 10개' */
+/** '기록 128건 · 분류 10개 · 블록 계획 21개' */
 export function backupSummary(b: Backup): string {
   const n = <T extends { deleted?: boolean }>(rs: T[]) => rs.filter(r => !r.deleted).length;
-  return `기록 ${n(b.entries)}건 · 분류 ${n(b.categories)}개`;
+  const parts = [`기록 ${n(b.entries)}건`, `분류 ${n(b.categories)}개`];
+  if (n(b.plans)) parts.push(`블록 계획 ${n(b.plans)}개`);
+  return parts.join(' · ');
 }
 
 /** 브라우저에서 파일로 내려받는다 */
