@@ -54,6 +54,12 @@ jobs:
           npm ci
           npm run build
 
+      - name: Build time-tracker
+        working-directory: time-tracker
+        run: |
+          npm ci
+          npm run build
+
       - name: Combine builds
         run: |
           mkdir -p site
@@ -66,6 +72,8 @@ jobs:
           cp -r couple-budget/build/. site/couple-budget/
           mkdir -p site/asset-tracker
           cp -r asset-tracker/build/. site/asset-tracker/
+          mkdir -p site/time-tracker
+          cp -r time-tracker/build/. site/time-tracker/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
