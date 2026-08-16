@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  CATEGORIES, CATEGORY_EMOJI, ExpenseCategory, MonthBudget, Person,
+  CATEGORIES, CATEGORY_EMOJI, Expense, ExpenseCategory, MonthBudget, Person,
 } from '../types';
 import { todayKey } from '../utils/budget';
 import { formatAmountInput, parseAmountInput, signedWon, won } from '../utils/format';
@@ -8,24 +8,36 @@ import { formatAmountInput, parseAmountInput, signedWon, won } from '../utils/fo
 interface Props {
   persons: Person[];
   budget: MonthBudget;
+  /** 있으면 새로 쓰는 게 아니라 이 내역을 고치는 화면이 된다 */
+  initial?: Expense;
   onSave: (input: {
+    id?: string;
     date: string; amount: number; category: ExpenseCategory; content: string; personId: string;
   }) => void;
+  onDelete?: (id: string) => void;
   onDone: () => void;
 }
 
-export default function ExpenseForm({ persons, budget, onSave, onDone }: Props) {
+export default function ExpenseForm({
+  persons, budget, initial, onSave, onDelete, onDone,
+}: Props) {
   const sorted = [...persons].sort((a, b) => a.order - b.order);
+  const editing = !!initial;
 
-  const [amountText, setAmountText] = useState('');
-  const [personId, setPersonId] = useState(sorted[0]?.id ?? 'p1');
-  const [category, setCategory] = useState<ExpenseCategory>('식비');
-  const [content, setContent] = useState('');
-  const [date, setDate] = useState(todayKey());
+  const [amountText, setAmountText] = useState(
+    initial ? formatAmountInput(String(initial.amount)) : '',
+  );
+  const [personId, setPersonId] = useState(initial?.personId ?? sorted[0]?.id ?? 'p1');
+  const [category, setCategory] = useState<ExpenseCategory>(initial?.category ?? '식비');
+  const [content, setContent] = useState(initial?.content ?? '');
+  const [date, setDate] = useState(initial?.date ?? todayKey());
   const [error, setError] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const amount = parseAmountInput(amountText);
-  const afterFree = budget.freeCash - amount;
+  // 수정할 땐 '이만큼 더/덜 쓰는 것'이므로 원래 금액과의 차이만 반영해야 맞다
+  const delta = editing ? amount - initial!.amount : amount;
+  const afterFree = budget.freeCash - delta;
 
   const labelStyle: React.CSSProperties = {
     fontSize: 13, fontWeight: 600, color: '#555', marginBottom: 7, display: 'block',
@@ -39,6 +51,7 @@ export default function ExpenseForm({ persons, budget, onSave, onDone }: Props) 
     if (amount <= 0) { setError('금액을 입력해주세요.'); return; }
     if (!date) { setError('날짜를 입력해주세요.'); return; }
     onSave({
+      id: initial?.id,
       date,
       amount,
       category,
@@ -48,13 +61,26 @@ export default function ExpenseForm({ persons, budget, onSave, onDone }: Props) 
     onDone();
   }
 
+  function handleDelete() {
+    if (!initial || !onDelete) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
+    onDelete(initial.id);
+    onDone();
+  }
+
   return (
     <div>
       <div style={{
         background: '#fff', padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
         position: 'sticky', top: 0, zIndex: 10,
       }}>
-        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>쓴 돈 입력</h2>
+        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
+          {editing ? '내역 수정' : '쓴 돈 입력'}
+        </h2>
       </div>
 
       <div style={{ padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -84,7 +110,18 @@ export default function ExpenseForm({ persons, budget, onSave, onDone }: Props) 
             </span>
           </div>
 
-          {amount > 0 && budget.hasIncome && (
+          {editing && (
+            <div style={{ marginTop: 8, fontSize: 12, color: '#95a5a6' }}>
+              원래 금액 {won(initial!.amount)}
+              {delta !== 0 && (
+                <b style={{ color: delta > 0 ? '#e74c3c' : '#27ae60', marginLeft: 6 }}>
+                  {delta > 0 ? '+' : '−'}{won(Math.abs(delta))}
+                </b>
+              )}
+            </div>
+          )}
+
+          {amount > 0 && budget.hasIncome && delta !== 0 && (
             <div style={{
               marginTop: 9, fontSize: 12.5, color: '#7f8c8d', background: '#f5f7f8',
               borderRadius: 8, padding: '9px 12px', lineHeight: 1.6,
@@ -193,9 +230,27 @@ export default function ExpenseForm({ persons, budget, onSave, onDone }: Props) 
               fontSize: 15, fontWeight: 700, color: '#fff', cursor: 'pointer',
             }}
           >
-            {amount > 0 ? `${won(amount)} 저장` : '저장하기'}
+            {editing
+              ? (amount > 0 ? `${won(amount)}으로 수정` : '수정하기')
+              : (amount > 0 ? `${won(amount)} 저장` : '저장하기')}
           </button>
         </div>
+
+        {/* 삭제는 고치러 들어왔을 때만. 실수로 눌리지 않게 두 번 눌러야 지워진다 */}
+        {editing && onDelete && (
+          <button
+            onClick={handleDelete}
+            style={{
+              width: '100%', padding: 13, borderRadius: 10, cursor: 'pointer',
+              border: `1px solid ${confirmDelete ? '#e74c3c' : '#eceff1'}`,
+              background: confirmDelete ? '#fdedec' : '#fff',
+              color: confirmDelete ? '#e74c3c' : '#78909c',
+              fontSize: 13.5, fontWeight: confirmDelete ? 700 : 500,
+            }}
+          >
+            {confirmDelete ? '정말 지울까요? 한 번 더 누르세요' : '이 내역 삭제'}
+          </button>
+        )}
       </div>
     </div>
   );
