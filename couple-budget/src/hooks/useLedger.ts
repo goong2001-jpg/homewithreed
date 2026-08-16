@@ -148,17 +148,19 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     id?: string; month: MonthKey; personId: string; amount: number; memo: string;
   }) => {
     const now = Date.now();
+    const existing = input.id ? incomes.find(i => i.id === input.id) : undefined;
     const rec: IncomeEntry = {
       id: input.id ?? newId(),
       month: input.month,
       personId: input.personId,
       amount: input.amount,
       memo: input.memo,
-      createdAt: now,
+      // 수정일 땐 처음 만든 시각을 지킨다 (정렬 기준이라 바뀌면 순서가 튄다)
+      createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
     commit('incomes', KEYS.incomes, setIncomes, rec);
-  }, [commit]);
+  }, [incomes, commit]);
 
   const deleteIncome = useCallback(
     (id: string) => softDelete('incomes', KEYS.incomes, setIncomes, id),
@@ -172,6 +174,7 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     startMonth: MonthKey; endMonth: MonthKey | null; personId: string | null;
   }) => {
     const now = Date.now();
+    const existing = input.id ? fixed.find(f => f.id === input.id) : undefined;
     const rec: FixedExpense = {
       id: input.id ?? newId(),
       name: input.name,
@@ -179,11 +182,11 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
       startMonth: input.startMonth,
       endMonth: input.endMonth,
       personId: input.personId,
-      createdAt: now,
+      createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
     commit('fixedExpenses', KEYS.fixedExpenses, setFixed, rec);
-  }, [commit]);
+  }, [fixed, commit]);
 
   const deleteFixed = useCallback(
     (id: string) => softDelete('fixedExpenses', KEYS.fixedExpenses, setFixed, id),
@@ -197,6 +200,7 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     category: ExpenseCategory; content: string; personId: string;
   }) => {
     const now = Date.now();
+    const existing = input.id ? expenses.find(e => e.id === input.id) : undefined;
     const rec: Expense = {
       id: input.id ?? newId(),
       date: input.date,
@@ -205,11 +209,12 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
       category: input.category,
       content: input.content,
       personId: input.personId,
-      createdAt: now,
+      // 금액·메모를 고쳐도 목록에서 자리가 바뀌지 않도록 처음 만든 시각을 지킨다
+      createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
     commit('expenses', KEYS.expenses, setExpenses, rec);
-  }, [commit]);
+  }, [expenses, commit]);
 
   const deleteExpense = useCallback(
     (id: string) => softDelete('expenses', KEYS.expenses, setExpenses, id),

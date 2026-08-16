@@ -25,6 +25,7 @@ interface Props {
   /** 'all' 이거나 personId. 홈에서 사람을 눌러 들어오면 그 사람이 들어있다 */
   personFilter: string;
   onPersonFilterChange: (v: string) => void;
+  onEditExpense: (expense: Expense) => void;
   onDeleteExpense: (id: string) => void;
   onPullAll: () => void;
   onGoSettings: () => void;
@@ -45,7 +46,7 @@ function groupByDate(rows: Expense[]): [string, Expense[]][] {
 export default function HistoryView({
   month, budget, persons, incomes, fixed, expenses, syncStatus, isLive,
   personFilter: filter, onPersonFilterChange: setFilter,
-  onPrev, onNext, onToday, onDeleteExpense, onPullAll, onGoSettings,
+  onPrev, onNext, onToday, onEditExpense, onDeleteExpense, onPullAll, onGoSettings,
 }: Props) {
   const [category, setCategory] = useState<ExpenseCategory | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -238,6 +239,9 @@ export default function HistoryView({
         </div>
       ) : (
         <div style={{ marginTop: 8 }}>
+          <div style={{ padding: '0 16px 8px', fontSize: 11.5, color: '#b0bec5' }}>
+            내역을 누르면 금액·메모를 고칠 수 있어요
+          </div>
           {(filter !== 'all' || category) && (
             <div style={{ padding: '0 16px 8px', fontSize: 12, color: '#95a5a6' }}>
               {[selectedPerson?.name, category].filter(Boolean).join(' · ')}
@@ -259,6 +263,7 @@ export default function HistoryView({
                     key={e.id}
                     expense={e}
                     person={personOf(e.personId)}
+                    onEdit={onEditExpense}
                     onDelete={onDeleteExpense}
                   />
                 ))}

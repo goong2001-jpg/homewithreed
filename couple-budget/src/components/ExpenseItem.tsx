@@ -5,49 +5,69 @@ import { won } from '../utils/format';
 interface Props {
   expense: Expense;
   person?: Person;
+  /** 줄을 누르면 수정 화면으로 보낸다 */
+  onEdit?: (expense: Expense) => void;
   onDelete: (id: string) => void;
 }
 
-/** 두 번 눌러 삭제 — receipt-tracker/src/components/TransactionItem.tsx 방식 */
-export default function ExpenseItem({ expense, person, onDelete }: Props) {
+/** 줄을 누르면 수정, ✕ 두 번 누르면 삭제 — receipt-tracker/src/components/TransactionItem.tsx 방식 */
+export default function ExpenseItem({ expense, person, onEdit, onDelete }: Props) {
   const [confirming, setConfirming] = useState(false);
 
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
-      padding: '12px 16px', borderBottom: '1px solid #f5f5f5',
+      padding: '0 16px 0 0', borderBottom: '1px solid #f5f5f5',
     }}>
-      <div style={{
-        width: 36, height: 36, borderRadius: 10, background: '#f5f7f8',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 18, flexShrink: 0,
-      }}>
-        {CATEGORY_EMOJI[expense.category]}
-      </div>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
+      {/* 금액·메모까지 통째로 누를 수 있게 버튼으로 감싼다 */}
+      <button
+        onClick={() => onEdit?.(expense)}
+        disabled={!onEdit}
+        style={{
+          flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12,
+          background: 'none', border: 'none', textAlign: 'left',
+          padding: '12px 0 12px 16px',
+          cursor: onEdit ? 'pointer' : 'default',
+          font: 'inherit', color: 'inherit',
+        }}
+        aria-label={onEdit ? `${expense.content} 수정` : undefined}
+      >
         <div style={{
-          fontSize: 14.5, fontWeight: 600, color: '#2c3e50',
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          width: 36, height: 36, borderRadius: 10, background: '#f5f7f8',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 18, flexShrink: 0,
         }}>
-          {expense.content}
+          {CATEGORY_EMOJI[expense.category]}
         </div>
-        <div style={{ fontSize: 11.5, color: '#95a5a6', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
-          {person && (
-            <span style={{
-              color: person.color, fontWeight: 700,
-              background: `${person.color}14`, borderRadius: 6, padding: '1px 6px',
-            }}>
-              {person.name}
-            </span>
-          )}
-          <span>{expense.category}</span>
-        </div>
-      </div>
 
-      <div style={{ fontSize: 15, fontWeight: 700, color: '#e74c3c', flexShrink: 0 }}>
-        {won(expense.amount)}
-      </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 14.5, fontWeight: 600, color: '#2c3e50',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {expense.content}
+          </div>
+          <div style={{ fontSize: 11.5, color: '#95a5a6', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
+            {person && (
+              <span style={{
+                color: person.color, fontWeight: 700,
+                background: `${person.color}14`, borderRadius: 6, padding: '1px 6px',
+              }}>
+                {person.name}
+              </span>
+            )}
+            <span>{expense.category}</span>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#e74c3c', flexShrink: 0 }}>
+          {won(expense.amount)}
+        </div>
+
+        {onEdit && (
+          <span style={{ fontSize: 12, color: '#cfd8dc', flexShrink: 0 }}>✎</span>
+        )}
+      </button>
 
       <button
         onClick={() => {
