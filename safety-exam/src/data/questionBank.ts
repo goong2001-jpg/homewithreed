@@ -233,3 +233,45 @@ export const IMPORT_TEMPLATE = `{
     }
   ]
 }`;
+
+// ── 시험지 구성 ──
+
+export const QUESTIONS_PER_SUBJECT = 20;
+export const QUICK_QUESTION_COUNT = 10;
+
+export function shuffle<T>(arr: T[]): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+/** 정식 모의고사: 6과목 × 20문제 */
+export function buildFullExam(): WrittenQuestion[] {
+  const bank = getAllWritten();
+  return SUBJECTS.flatMap((subject) =>
+    shuffle(bank.filter((q) => q.subject === subject)).slice(0, QUESTIONS_PER_SUBJECT)
+  );
+}
+
+/**
+ * 간이시험: 여러 과목이 고루 섞이도록 과목별로 한 문제씩 번갈아 뽑는다.
+ * 문제은행이 부족하면 가능한 만큼만 반환한다.
+ */
+export function buildQuickExam(count: number = QUICK_QUESTION_COUNT): WrittenQuestion[] {
+  const bank = getAllWritten();
+  const pools = shuffle(
+    SUBJECTS.map((subject) => shuffle(bank.filter((q) => q.subject === subject)))
+  ).filter((pool) => pool.length > 0);
+  const maxRounds = pools.reduce((max, pool) => Math.max(max, pool.length), 0);
+
+  const picked: WrittenQuestion[] = [];
+  for (let round = 0; round < maxRounds && picked.length < count; round++) {
+    for (let i = 0; i < pools.length && picked.length < count; i++) {
+      if (pools[i].length > round) picked.push(pools[i][round]);
+    }
+  }
+  return shuffle(picked);
+}

@@ -1,47 +1,41 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SUBJECTS, SubjectScore, WrittenQuestion } from '../data/types';
-import { getAllWritten } from '../data/questionBank';
+import { buildFullExam, buildQuickExam, QUESTIONS_PER_SUBJECT } from '../data/questionBank';
 import { addHistory, addWrongNotes } from '../storage';
 
-const QUESTIONS_PER_SUBJECT = 20;
-const EXAM_SECONDS = 180 * 60;
+const FULL_EXAM_SECONDS = 180 * 60;
+const QUICK_EXAM_SECONDS = 10 * 60;
 
-function shuffle<T>(arr: T[]): T[] {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
-function buildExam(): WrittenQuestion[] {
-  const bank = getAllWritten();
-  return SUBJECTS.flatMap((subject) =>
-    shuffle(bank.filter((q) => q.subject === subject)).slice(0, QUESTIONS_PER_SUBJECT)
-  );
-}
+export type ExamMode = 'full' | 'quick';
 
 function formatTime(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
+  if (h === 0) return `${m}:${String(s).padStart(2, '0')}`;
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 interface Props {
   onExit: () => void;
+  mode?: ExamMode;
+  onGoWrongNote?: () => void;
 }
 
 type ReviewFilter = 'all' | 'wrong';
 
-export default function CbtExam({ onExit }: Props) {
-  const [questions] = useState<WrittenQuestion[]>(buildExam);
+export default function CbtExam({ onExit, mode = 'full', onGoWrongNote }: Props) {
+  const isQuick = mode === 'quick';
+  const examSeconds = isQuick ? QUICK_EXAM_SECONDS : FULL_EXAM_SECONDS;
+
+  const [questions, setQuestions] = useState<WrittenQuestion[]>(
+    isQuick ? buildQuickExam : buildFullExam
+  );
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [current, setCurrent] = useState(0);
-  const [remaining, setRemaining] = useState(EXAM_SECONDS);
+  const [remaining, setRemaining] = useState(examSeconds);
   const [submitted, setSubmitted] = useState(false);
-  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('wrong');
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>(isQuick ? 'all' : 'wrong');
 
   useEffect(() => {
     if (submitted) return;
@@ -66,14 +60,14 @@ export default function CbtExam({ onExit }: Props) {
     });
   }, [questions, answers]);
 
-  const avgScore = useMemo(() => {
-    const total = scores.reduce((sum, s) => sum + s.total, 0);
-    const correct = scores.reduce((sum, s) => sum + s.correct, 0);
-    return total === 0 ? 0 : (correct / total) * 100;
-  }, [scores]);
+  const correctCount = useMemo(
+    () => questions.filter((q) => answers[q.id] === q.answer).length,
+    [questions, answers]
+  );
 
-  const hasSubjectFail = scores.some((s) => (s.correct / s.total) * 100 < 40);
-  const passed = avgScore >= 60 && !hasSubjectFail;
+  const avgScore = questions.length === 0 ? 0 : (correctCount / questions.length) * 100;
+  const hasSubjectFail = scores.some((s) => s.total > 0 && (s.correct / s.total) * 100 < 40);
+  const passed = isQuick ? avgScore >= 60 : avgScore >= 60 && !hasSubjectFail;
 
   // 제출 시 기록 저장 (오답노트 + 응시 이력)
   useEffect(() => {
@@ -86,66 +80,27 @@ export default function CbtExam({ onExit }: Props) {
         savedAt: new Date().toISOString(),
       }));
     addWrongNotes(wrong);
-    addHistory({ date: new Date().toISOString(), scores, passed });
+    addHistory({ date: new Date().toISOString(), scores, passed, mode });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submitted]);
+
+  const restart = () => {
+    setQuestions(isQuick ? buildQuickExam() : buildFullExam());
+    setAnswers({});
+    setCurrent(0);
+    setRemaining(examSeconds);
+    setReviewFilter(isQuick ? 'all' : 'wrong');
+    setSubmitted(false);
+  };
+
+  const wrongCount = questions.length - correctCount;
 
   if (submitted) {
     const reviewQuestions =
       reviewFilter === 'all' ? questions : questions.filter((q) => answers[q.id] !== q.answer);
-    return (
-      <div>
-        <div className="result-summary">
-          <div className={`headline ${passed ? 'pass' : 'fail'}`}>
-            {passed ? '합격 🎉' : '불합격'}
-          </div>
-          <div className="avg">
-            평균 {avgScore.toFixed(1)}점 · 합격 기준: 평균 60점 이상 &amp; 전 과목 40점 이상
-          </div>
-        </div>
 
-        <table className="score-table">
-          <thead>
-            <tr>
-              <th>과목</th>
-              <th>정답</th>
-              <th>점수</th>
-            </tr>
-          </thead>
-          <tbody>
-            {scores.map((s) => {
-              const score = (s.correct / s.total) * 100;
-              const fail = score < 40;
-              return (
-                <tr key={s.subject} className={fail ? 'fail-row' : ''}>
-                  <td>{s.subject}</td>
-                  <td>
-                    {s.correct} / {s.total}
-                  </td>
-                  <td className="score">
-                    {score.toFixed(0)}점 {fail && <span className="fail-note">과락</span>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        <div className="review-filters">
-          <button
-            className={reviewFilter === 'wrong' ? 'active' : ''}
-            onClick={() => setReviewFilter('wrong')}
-          >
-            틀린 문제만 ({questions.filter((q) => answers[q.id] !== q.answer).length})
-          </button>
-          <button
-            className={reviewFilter === 'all' ? 'active' : ''}
-            onClick={() => setReviewFilter('all')}
-          >
-            전체 해설 보기
-          </button>
-        </div>
-
+    const reviewList = (
+      <>
         {reviewQuestions.length === 0 && <div className="empty-note">틀린 문제가 없습니다! 👏</div>}
         {reviewQuestions.map((q, i) => {
           const my = answers[q.id];
@@ -174,6 +129,112 @@ export default function CbtExam({ onExit }: Props) {
             </div>
           );
         })}
+      </>
+    );
+
+    if (isQuick) {
+      return (
+        <div>
+          <div className="result-summary">
+            <div className={`headline ${passed ? 'pass' : 'fail'}`}>
+              {correctCount} / {questions.length} 정답
+            </div>
+            <div className="avg">
+              {avgScore.toFixed(0)}점 ·{' '}
+              {wrongCount === 0
+                ? '전부 맞혔어요! 완벽합니다 🎉'
+                : `틀린 ${wrongCount}문제는 오답노트에 저장했어요`}
+            </div>
+          </div>
+
+          <div className="review-filters">
+            <button
+              className={reviewFilter === 'all' ? 'active' : ''}
+              onClick={() => setReviewFilter('all')}
+            >
+              전체 해설 ({questions.length})
+            </button>
+            <button
+              className={reviewFilter === 'wrong' ? 'active' : ''}
+              onClick={() => setReviewFilter('wrong')}
+            >
+              틀린 문제만 ({wrongCount})
+            </button>
+          </div>
+
+          {reviewList}
+
+          <div className="exam-nav">
+            <button className="btn" onClick={restart}>
+              새 문제로 다시 풀기
+            </button>
+            {onGoWrongNote && wrongCount > 0 && (
+              <button className="btn secondary" onClick={onGoWrongNote}>
+                오답노트 보기
+              </button>
+            )}
+            <button className="btn secondary" onClick={onExit}>
+              홈으로
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <div className="result-summary">
+          <div className={`headline ${passed ? 'pass' : 'fail'}`}>
+            {passed ? '합격 🎉' : '불합격'}
+          </div>
+          <div className="avg">
+            평균 {avgScore.toFixed(1)}점 · 합격 기준: 평균 60점 이상 &amp; 전 과목 40점 이상
+          </div>
+        </div>
+
+        <table className="score-table">
+          <thead>
+            <tr>
+              <th>과목</th>
+              <th>정답</th>
+              <th>점수</th>
+            </tr>
+          </thead>
+          <tbody>
+            {scores.map((s) => {
+              const score = s.total === 0 ? 0 : (s.correct / s.total) * 100;
+              const fail = s.total > 0 && score < 40;
+              return (
+                <tr key={s.subject} className={fail ? 'fail-row' : ''}>
+                  <td>{s.subject}</td>
+                  <td>
+                    {s.correct} / {s.total}
+                  </td>
+                  <td className="score">
+                    {score.toFixed(0)}점 {fail && <span className="fail-note">과락</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div className="review-filters">
+          <button
+            className={reviewFilter === 'wrong' ? 'active' : ''}
+            onClick={() => setReviewFilter('wrong')}
+          >
+            틀린 문제만 ({wrongCount})
+          </button>
+          <button
+            className={reviewFilter === 'all' ? 'active' : ''}
+            onClick={() => setReviewFilter('all')}
+          >
+            전체 해설 보기
+          </button>
+        </div>
+
+        {reviewList}
 
         <div className="exam-nav">
           <button className="btn secondary" onClick={onExit}>
@@ -187,12 +248,29 @@ export default function CbtExam({ onExit }: Props) {
   const q = questions[current];
   const answeredCount = Object.keys(answers).length;
 
+  // 답을 고르면: 간이시험은 다음 미응답 문제로 자동 이동, 마지막까지 풀면 바로 채점
+  const pickChoice = (choiceIndex: number) => {
+    const next = { ...answers, [q.id]: choiceIndex };
+    setAnswers(next);
+    if (!isQuick) return;
+
+    const unansweredAfter = questions.filter((item) => next[item.id] === undefined);
+    if (unansweredAfter.length === 0) {
+      setSubmitted(true);
+      return;
+    }
+    const order = questions.map((_, i) => i);
+    const rotated = [...order.slice(current + 1), ...order.slice(0, current)];
+    const nextIndex = rotated.find((i) => next[questions[i].id] === undefined);
+    if (nextIndex !== undefined) setCurrent(nextIndex);
+  };
+
+  const timerWarning = isQuick ? remaining < 60 : remaining < 600;
+
   return (
     <div>
       <div className="exam-topbar">
-        <span className={`timer ${remaining < 600 ? 'warning' : ''}`}>
-          ⏱ {formatTime(remaining)}
-        </span>
+        <span className={`timer ${timerWarning ? 'warning' : ''}`}>⏱ {formatTime(remaining)}</span>
         <span className="progress">
           {answeredCount} / {questions.length} 답안 표시
         </span>
@@ -207,12 +285,22 @@ export default function CbtExam({ onExit }: Props) {
             if (window.confirm(message)) setSubmitted(true);
           }}
         >
-          답안 제출
+          {isQuick ? '바로 채점' : '답안 제출'}
         </button>
       </div>
 
+      {isQuick && (
+        <div className="quick-hint">
+          ⚡ {questions.length}문제 간이시험 · 마지막 문제까지 풀면 바로 채점되고, 틀린 문제는
+          오답노트에 저장됩니다.
+        </div>
+      )}
+
       <span className="subject-label">
-        {q.subject} · {(current % QUESTIONS_PER_SUBJECT) + 1}/{QUESTIONS_PER_SUBJECT}
+        {q.subject}
+        {isQuick
+          ? ` · ${current + 1}/${questions.length}`
+          : ` · ${(current % QUESTIONS_PER_SUBJECT) + 1}/${QUESTIONS_PER_SUBJECT}`}
       </span>
       <div className="question-card">
         <p className="q-text">
@@ -223,7 +311,7 @@ export default function CbtExam({ onExit }: Props) {
             <button
               key={ci}
               className={`choice ${answers[q.id] === ci ? 'selected' : ''}`}
-              onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: ci }))}
+              onClick={() => pickChoice(ci)}
             >
               <span className="num">{ci + 1}</span>
               <span>{choice}</span>

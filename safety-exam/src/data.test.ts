@@ -1,5 +1,5 @@
 import { practicalQuestions } from './data/practicalQuestions';
-import { parseImportJson } from './data/questionBank';
+import { buildFullExam, buildQuickExam, parseImportJson } from './data/questionBank';
 import { SUBJECTS } from './data/types';
 import { writtenQuestions } from './data/writtenQuestions';
 
@@ -108,5 +108,35 @@ describe('문제 업로드 JSON 파싱', () => {
     const result = parseImportJson('이것은 JSON이 아님');
     expect(result.errors.length).toBeGreaterThan(0);
     expect(result.written).toHaveLength(0);
+  });
+});
+
+describe('간이시험 문제 구성', () => {
+  test('기본 10문제를 뽑는다', () => {
+    const exam = buildQuickExam();
+    expect(exam).toHaveLength(10);
+  });
+
+  test('중복 문제 없이 여러 과목이 섞인다', () => {
+    for (let i = 0; i < 20; i++) {
+      const exam = buildQuickExam();
+      const ids = new Set(exam.map((q) => q.id));
+      expect(ids.size).toBe(exam.length);
+      const subjects = new Set(exam.map((q) => q.subject));
+      expect(subjects.size).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  test('요청 문제 수를 조절할 수 있다', () => {
+    expect(buildQuickExam(5)).toHaveLength(5);
+    expect(buildQuickExam(30)).toHaveLength(30);
+  });
+
+  test('정식 모의고사는 6과목 × 20문제', () => {
+    const exam = buildFullExam();
+    expect(exam).toHaveLength(120);
+    SUBJECTS.forEach((subject) => {
+      expect(exam.filter((q) => q.subject === subject)).toHaveLength(20);
+    });
   });
 });

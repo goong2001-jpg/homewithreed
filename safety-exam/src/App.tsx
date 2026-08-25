@@ -6,7 +6,7 @@ import WrongNote from './components/WrongNote';
 import { loadCustomPractical, loadCustomWritten } from './data/questionBank';
 import { loadHistory, loadWrongNotes } from './storage';
 
-type View = 'home' | 'cbt' | 'wrongnote' | 'practical' | 'manage';
+type View = 'home' | 'cbt' | 'quick' | 'wrongnote' | 'practical' | 'manage';
 
 export default function App() {
   const [view, setView] = useState<View>('home');
@@ -17,11 +17,14 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <h1 onClick={goHome}>🦺 산업안전기사 시험 대비</h1>
-        <span className="subtitle">필기 CBT · 오답노트 · 실기 필답형</span>
+        <span className="subtitle">간이시험 · 필기 CBT · 오답노트 · 실기 필답형</span>
       </header>
 
       {view === 'home' && <Home onSelect={setView} />}
       {view === 'cbt' && <CbtExam onExit={goHome} />}
+      {view === 'quick' && (
+        <CbtExam mode="quick" onExit={goHome} onGoWrongNote={() => setView('wrongnote')} />
+      )}
       {view === 'wrongnote' && <WrongNote onExit={goHome} />}
       {view === 'practical' && <PracticalStudy onExit={goHome} />}
       {view === 'manage' && <QuestionManager onExit={goHome} />}
@@ -37,6 +40,12 @@ function Home({ onSelect }: { onSelect: (view: View) => void }) {
   return (
     <div>
       <div className="mode-cards">
+        <button className="mode-card highlight" onClick={() => onSelect('quick')}>
+          <span className="icon">⚡</span>
+          <h2>10문제 간이시험</h2>
+          <p>시간이 없을 때 딱 10분! 여러 과목에서 10문제만 골라 풀고, 다 풀면 바로 채점과 해설을 확인합니다.</p>
+          <span className="badge">10문제 · 10분</span>
+        </button>
         <button className="mode-card" onClick={() => onSelect('cbt')}>
           <span className="icon">📝</span>
           <h2>필기 CBT 모의고사</h2>
@@ -63,9 +72,11 @@ function Home({ onSelect }: { onSelect: (view: View) => void }) {
         </button>
       </div>
 
-      <h3 className="section-title">최근 모의고사 기록</h3>
+      <h3 className="section-title">최근 응시 기록</h3>
       {history.length === 0 ? (
-        <div className="empty-note">아직 응시 기록이 없습니다. 첫 모의고사에 도전해 보세요!</div>
+        <div className="empty-note">
+          아직 응시 기록이 없습니다. 10문제 간이시험으로 가볍게 시작해 보세요!
+        </div>
       ) : (
         <div className="history-list">
           {history.slice(0, 5).map((record, i) => {
@@ -80,10 +91,18 @@ function Home({ onSelect }: { onSelect: (view: View) => void }) {
                     timeStyle: 'short',
                   })}
                 </span>
-                <span>평균 {avg.toFixed(1)}점</span>
-                <span className={`pass-tag ${record.passed ? 'pass' : 'fail'}`}>
-                  {record.passed ? '합격' : '불합격'}
+                <span>
+                  {record.mode === 'quick'
+                    ? `${correct}/${total}문제 (${avg.toFixed(0)}점)`
+                    : `평균 ${avg.toFixed(1)}점`}
                 </span>
+                {record.mode === 'quick' ? (
+                  <span className="pass-tag quick">간이</span>
+                ) : (
+                  <span className={`pass-tag ${record.passed ? 'pass' : 'fail'}`}>
+                    {record.passed ? '합격' : '불합격'}
+                  </span>
+                )}
               </div>
             );
           })}
