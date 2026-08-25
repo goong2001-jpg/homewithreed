@@ -3,6 +3,8 @@ import { useCallback, useState } from 'react';
 const KEY = 'alphabet_progress';
 
 export type LetterCase = 'upper' | 'lower';
+/** stroke = 획순대로 쓰기, trace = 자유롭게 따라 그리기 */
+export type PracticeMode = 'stroke' | 'trace';
 
 export interface AlphabetProgress {
   /** 완성한 글자들 — 'A', 'a' 처럼 대소문자 구분해서 저장 */
@@ -11,9 +13,11 @@ export interface AlphabetProgress {
   index: number;
   /** 대문자/소문자 모드 */
   letterCase: LetterCase;
+  /** 연습 방식 */
+  mode: PracticeMode;
 }
 
-const DEFAULT: AlphabetProgress = { mastered: [], index: 0, letterCase: 'upper' };
+const DEFAULT: AlphabetProgress = { mastered: [], index: 0, letterCase: 'upper', mode: 'stroke' };
 
 function load(): AlphabetProgress {
   try {
@@ -47,6 +51,7 @@ export function useAlphabetProgress() {
 
   const setIndex = useCallback((index: number) => update({ index }), [update]);
   const setLetterCase = useCallback((letterCase: LetterCase) => update({ letterCase }), [update]);
+  const setMode = useCallback((mode: PracticeMode) => update({ mode }), [update]);
 
-  return { progress, completeLetter, setIndex, setLetterCase };
+  return { progress, completeLetter, setIndex, setLetterCase, setMode };
 }
