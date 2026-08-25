@@ -330,5 +330,18 @@ export function useGameState() {
     });
   }, [save]);
 
-  return { gameState, items, onCorrect, onWrong, buyItem, equipItem, switchCourse };
+  /**
+   * 다른 놀이(알파벳 등)에서 얻은 별을 같은 지갑에 넣는다.
+   * 수학 통계(정답 수·레벨·미션)는 건드리지 않고 포인트만 더한다.
+   */
+  const addPoints = useCallback((amount: number) => {
+    if (!amount) return;
+    setGameState(prev => {
+      const next = { ...prev, points: prev.points + amount };
+      save(next, items);
+      return next;
+    });
+  }, [items, save]);
+
+  return { gameState, items, onCorrect, onWrong, buyItem, equipItem, switchCourse, addPoints };
 }

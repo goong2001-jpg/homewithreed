@@ -7,15 +7,13 @@ export type LetterCase = 'upper' | 'lower';
 export interface AlphabetProgress {
   /** 완성한 글자들 — 'A', 'a' 처럼 대소문자 구분해서 저장 */
   mastered: string[];
-  /** 알파벳 놀이에서 모은 별 */
-  stars: number;
   /** 마지막으로 보던 글자 번호(0=A) */
   index: number;
   /** 대문자/소문자 모드 */
   letterCase: LetterCase;
 }
 
-const DEFAULT: AlphabetProgress = { mastered: [], stars: 0, index: 0, letterCase: 'upper' };
+const DEFAULT: AlphabetProgress = { mastered: [], index: 0, letterCase: 'upper' };
 
 function load(): AlphabetProgress {
   try {
@@ -36,16 +34,16 @@ export function useAlphabetProgress() {
     });
   }, []);
 
-  /** 글자를 완성했을 때 — 처음 완성하면 별 5개, 다시 하면 1개 */
+  /**
+   * 글자를 완성했을 때 — 처음 완성하면 별 5개, 다시 하면 1개.
+   * 별 적립 자체는 수학놀이와 공유하는 지갑(useGameState)에서 처리한다.
+   */
   const completeLetter = useCallback((letter: string): { earned: number; isFirst: boolean } => {
     const isFirst = !progress.mastered.includes(letter);
     const earned = isFirst ? 5 : 1;
-    update({
-      mastered: isFirst ? [...progress.mastered, letter] : progress.mastered,
-      stars: progress.stars + earned,
-    });
+    if (isFirst) update({ mastered: [...progress.mastered, letter] });
     return { earned, isFirst };
-  }, [progress.mastered, progress.stars, update]);
+  }, [progress.mastered, update]);
 
   const setIndex = useCallback((index: number) => update({ index }), [update]);
   const setLetterCase = useCallback((letterCase: LetterCase) => update({ letterCase }), [update]);

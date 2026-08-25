@@ -4,8 +4,14 @@ const SIZE = 300;          // 캔버스 내부 해상도 (정사각형)
 const FONT_SIZE = 236;     // 글자 크기
 const BRUSH = 32;          // 손가락 붓 굵기 (글자 획 두께에 맞춤)
 const SLACK = 12;          // 획 밖으로 이만큼 삐져나가도 인정
-const NEED_COVERAGE = 0.65;// 글자의 65% 이상 칠하면 완성
+const NEED_COVERAGE = 0.6; // 글자 전체의 60% 이상
 const NEED_ACCURACY = 0.45;// 칠한 것의 45% 이상이 글자 안이어야 (마구 칠하기 방지)
+
+// 글자를 격자로 나눠 "모든 부분"을 지났는지 본다.
+// (이게 없으면 A의 가운데 선을 빼먹어도 넓이만으로 통과해 버린다)
+const GRID = 12;             // 12 x 12 칸
+const CELL_MIN_PIXELS = 26;  // 이만큼 글자가 든 칸은 반드시 지나야 함
+const CELL_NEED = 0.4;       // 그 칸의 글자 픽셀 40% 이상 칠하면 그 칸 통과
 
 const FONT = `900 ${FONT_SIZE}px Nunito, 'Trebuchet MS', sans-serif`;
 
@@ -27,6 +33,9 @@ export default function TracingCanvas({ letter, onComplete, resetKey = 0 }: Prop
   const coreMaskRef = useRef<Uint8Array | null>(null);
   const tolerantMaskRef = useRef<Uint8Array | null>(null);
   const coreCountRef = useRef(0);
+  // 칸마다 글자 픽셀이 몇 개인지 / 반드시 지나야 하는 칸 목록
+  const cellTotalRef = useRef<Int32Array>(new Int32Array(GRID * GRID));
+  const requiredCellsRef = useRef<number[]>([]);
   const drawingRef = useRef(false);
   const lastRef = useRef<Pt | null>(null);
   const doneRef = useRef(false);
@@ -34,6 +43,7 @@ export default function TracingCanvas({ letter, onComplete, resetKey = 0 }: Prop
   const [coverage, setCoverage] = useState(0);
   const [done, setDone] = useState(false);
   const [hasInk, setHasInk] = useState(false);
+  const [missingParts, setMissingParts] = useState(0);
 
   /** 글자 모양 마스크를 만들고 안내선을 그린다 */
   const buildLetter = useCallback(async () => {
@@ -87,14 +97,28 @@ export default function TracingCanvas({ letter, onComplete, resetKey = 0 }: Prop
 
     const core = new Uint8Array(SIZE * SIZE);
     const tolerant = new Uint8Array(SIZE * SIZE);
+    const cellTotal = new Int32Array(GRID * GRID);
+    const cellSize = SIZE / GRID;
     let count = 0;
     for (let i = 0; i < core.length; i++) {
-      if (coreData[i * 4 + 3] > 40) { core[i] = 1; count++; }
+      if (coreData[i * 4 + 3] > 40) {
+        core[i] = 1;
+        count++;
+        const cx = Math.min(GRID - 1, Math.floor((i % SIZE) / cellSize));
+        const cy = Math.min(GRID - 1, Math.floor(Math.floor(i / SIZE) / cellSize));
+        cellTotal[cy * GRID + cx]++;
+      }
       if (tolData[i * 4 + 3] > 40) tolerant[i] = 1;
+    }
+    const required: number[] = [];
+    for (let c = 0; c < cellTotal.length; c++) {
+      if (cellTotal[c] >= CELL_MIN_PIXELS) required.push(c);
     }
     coreMaskRef.current = core;
     tolerantMaskRef.current = tolerant;
     coreCountRef.current = count;
+    cellTotalRef.current = cellTotal;
+    requiredCellsRef.current = required;
   }, [letter]);
 
   /** 캔버스 비우기 */
@@ -107,6 +131,7 @@ export default function TracingCanvas({ letter, onComplete, resetKey = 0 }: Prop
     setCoverage(0);
     setDone(false);
     setHasInk(false);
+    setMissingParts(0);
   }, []);
 
   useEffect(() => {
@@ -123,19 +148,38 @@ export default function TracingCanvas({ letter, onComplete, resetKey = 0 }: Prop
     if (!core || !tolerant || !ink || !ctx || !coreCountRef.current) return;
 
     const data = ctx.getImageData(0, 0, SIZE, SIZE).data;
+    const cellFilled = new Int32Array(GRID * GRID);
+    const cellSize = SIZE / GRID;
     let filled = 0, onTarget = 0, painted = 0;
     for (let i = 0; i < core.length; i++) {
       if (data[i * 4 + 3] > 30) {
         painted++;
-        if (core[i]) filled++;        // 글자를 얼마나 채웠나
+        if (core[i]) {
+          filled++;                   // 글자를 얼마나 채웠나
+          const cx = Math.min(GRID - 1, Math.floor((i % SIZE) / cellSize));
+          const cy = Math.min(GRID - 1, Math.floor(Math.floor(i / SIZE) / cellSize));
+          cellFilled[cy * GRID + cx]++;
+        }
         if (tolerant[i]) onTarget++;  // 글자 근처에 칠했나(살짝 삐져나감 허용)
       }
     }
     const cov = filled / coreCountRef.current;
     const acc = painted ? onTarget / painted : 0;
-    setCoverage(Math.min(1, cov));
 
-    if (!doneRef.current && cov >= NEED_COVERAGE && acc >= NEED_ACCURACY) {
+    // 반드시 지나야 하는 칸을 몇 개나 지났는지 — 빠뜨린 획이 있으면 여기서 걸린다
+    const required = requiredCellsRef.current;
+    const cellTotal = cellTotalRef.current;
+    let cellsDone = 0;
+    for (const c of required) {
+      if (cellFilled[c] / cellTotal[c] >= CELL_NEED) cellsDone++;
+    }
+    const cellRatio = required.length ? cellsDone / required.length : 0;
+    setMissingParts(required.length - cellsDone);
+
+    // 진행바는 "빠짐없이 그렸는지"를 보여준다
+    setCoverage(Math.min(cov, cellRatio));
+
+    if (!doneRef.current && cov >= NEED_COVERAGE && acc >= NEED_ACCURACY && cellRatio >= 1) {
       doneRef.current = true;
       setDone(true);
       onComplete();
@@ -233,6 +277,16 @@ export default function TracingCanvas({ letter, onComplete, resetKey = 0 }: Prop
             color: '#b0a0d0', pointerEvents: 'none',
           }}>
             👆 점선을 따라 그려봐!
+          </div>
+        )}
+        {/* 빠뜨린 획이 있으면 알려준다 (예: A의 가운데 선) */}
+        {hasInk && !done && missingParts > 0 && (
+          <div style={{
+            position: 'absolute', bottom: 12, left: 0, right: 0,
+            textAlign: 'center', fontSize: 14, fontWeight: 800,
+            color: '#e67e22', pointerEvents: 'none',
+          }}>
+            아직 안 그린 곳이 있어! 점선을 다 채워봐 ✏️
           </div>
         )}
         {done && (

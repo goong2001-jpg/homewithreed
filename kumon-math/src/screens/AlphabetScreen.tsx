@@ -4,14 +4,21 @@ import {
   speakLetter, speakWord, speakLetterAndWord, warmUpVoices, speechSupported,
 } from '../alphabet/speech';
 import { useAlphabetProgress } from '../hooks/useAlphabetProgress';
+import { useGameState } from '../hooks/useGameState';
 import TracingCanvas from '../components/TracingCanvas';
+import Avatar from '../components/Avatar';
+import Shop from '../components/Shop';
 import { playCorrect, playStreak, playClick } from '../utils/sounds';
 
 export default function AlphabetScreen() {
   const { progress, completeLetter, setIndex, setLetterCase } = useAlphabetProgress();
+  // 별(포인트)과 아바타는 수학놀이와 같은 지갑을 쓴다
+  const { gameState, items, buyItem, equipItem, addPoints } = useGameState();
   const [resetKey, setResetKey] = useState(0);
   const [celebrate, setCelebrate] = useState<{ earned: number; isFirst: boolean } | null>(null);
   const [showList, setShowList] = useState(false);
+  const [showShop, setShowShop] = useState(false);
+  const [happy, setHappy] = useState(false);
 
   const idx = Math.min(progress.index, LETTERS.length - 1);
   const info = LETTERS[idx];
@@ -32,10 +39,13 @@ export default function AlphabetScreen() {
   const handleComplete = useCallback(() => {
     const result = completeLetter(glyph);
     setCelebrate(result);
+    addPoints(result.earned);          // 수학놀이와 같은 별로 적립
+    setHappy(true);
+    setTimeout(() => setHappy(false), 1200);
     if (result.isFirst) playStreak(); else playCorrect();
     // 다 그리면 글자와 단어를 읽어준다
     setTimeout(() => speakLetterAndWord(info.upper, info.word), 350);
-  }, [completeLetter, glyph, info.upper, info.word]);
+  }, [completeLetter, glyph, info.upper, info.word, addPoints]);
 
   const masteredCount = progress.mastered.filter(m =>
     isUpper ? m === m.toUpperCase() : m === m.toLowerCase()
@@ -55,12 +65,26 @@ export default function AlphabetScreen() {
         width: '100%', maxWidth: 380, marginBottom: 12,
       }}>
         <div style={{ fontSize: 22, fontWeight: 900, color: '#4a3070' }}>🔤 알파벳 놀이</div>
-        <div style={{
-          background: 'white', borderRadius: 14, padding: '7px 14px',
-          fontSize: 15, fontWeight: 800, color: '#f39c12',
-          boxShadow: '0 3px 10px rgba(0,0,0,0.1)',
-        }}>
-          ⭐ {progress.stars}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            background: 'white', borderRadius: 14, padding: '7px 14px',
+            fontSize: 15, fontWeight: 800, color: '#f39c12',
+            boxShadow: '0 3px 10px rgba(0,0,0,0.1)',
+          }}>
+            ⭐ {gameState.points}
+          </div>
+          <button
+            onClick={() => { setShowShop(true); playClick(); }}
+            style={{
+              background: 'linear-gradient(135deg, #f093fb, #f5576c)',
+              color: 'white', border: 'none', borderRadius: 14,
+              padding: '9px 14px', fontSize: 14, fontWeight: 800,
+              cursor: 'pointer', fontFamily: 'inherit',
+              boxShadow: '0 4px 12px rgba(240,147,251,0.45)',
+            }}
+          >
+            🛍️
+          </button>
         </div>
       </div>
 
@@ -113,6 +137,14 @@ export default function AlphabetScreen() {
             }} />
           </div>
         </div>
+      </div>
+
+      {/* 아바타 — 수학놀이에서 꾸민 그대로 응원해준다 */}
+      <div
+        className={happy ? 'avatar-bounce' : ''}
+        style={{ marginBottom: 10 }}
+      >
+        <Avatar items={items} mood={happy ? 'happy' : 'idle'} size="small" />
       </div>
 
       {/* 글자 + 단어 카드 */}
@@ -232,6 +264,17 @@ export default function AlphabetScreen() {
         <div style={{ marginTop: 12, fontSize: 12, color: '#8a7aa8', textAlign: 'center' }}>
           이 브라우저는 읽어주기를 지원하지 않아요. (그리기는 정상 동작해요)
         </div>
+      )}
+
+      {showShop && (
+        <Shop
+          items={items}
+          points={gameState.points}
+          totalCorrect={gameState.totalCorrect}
+          onBuy={buyItem}
+          onEquip={equipItem}
+          onClose={() => setShowShop(false)}
+        />
       )}
 
       {/* 글자 모아보기 */}
