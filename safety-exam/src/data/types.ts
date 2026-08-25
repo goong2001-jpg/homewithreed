@@ -42,6 +42,8 @@ export interface ExamRecord {
   date: string;
   scores: SubjectScore[];
   passed: boolean;
+  /** 'quick'은 10문제 간이시험 기록 (없으면 정식 모의고사) */
+  mode?: 'full' | 'quick';
 }
 
 export const STORAGE_KEYS = {
