@@ -44,6 +44,7 @@ button {
   border: none;
   border-radius: 8px;
   font-size: 0.95rem;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .btn {
@@ -54,8 +55,10 @@ button {
   transition: background 0.15s;
 }
 
-.btn:hover {
-  background: #15803d;
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover {
+    background: #15803d;
+  }
 }
 
 .btn.secondary {
@@ -63,16 +66,20 @@ button {
   color: #374151;
 }
 
-.btn.secondary:hover {
-  background: #d1d5db;
+@media (hover: hover) and (pointer: fine) {
+  .btn.secondary:hover {
+    background: #d1d5db;
+  }
 }
 
 .btn.danger {
   background: #dc2626;
 }
 
-.btn.danger:hover {
-  background: #b91c1c;
+@media (hover: hover) and (pointer: fine) {
+  .btn.danger:hover {
+    background: #b91c1c;
+  }
 }
 
 .btn:disabled {
@@ -108,9 +115,11 @@ button {
   color: #fff;
 }
 
-.mode-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .mode-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+  }
 }
 
 .mode-card .icon {
@@ -288,9 +297,13 @@ button {
   transition: border-color 0.1s, background 0.1s;
 }
 
-.choice:hover {
-  border-color: #86efac;
-  background: #f0fdf4;
+/* 마우스가 있는 기기에서만 hover 강조.
+   터치 기기는 탭한 자리에 hover가 남아 다음 문제에서 선택된 것처럼 보인다. */
+@media (hover: hover) and (pointer: fine) {
+  .choice:not(:disabled):hover {
+    border-color: #86efac;
+    background: #f0fdf4;
+  }
 }
 
 .choice.selected {

@@ -309,9 +309,14 @@ export default function CbtExam({ onExit, mode = 'full', onGoWrongNote }: Props)
         <div className="choices">
           {q.choices.map((choice, ci) => (
             <button
-              key={ci}
+              // 문제가 바뀌면 새 버튼으로 그린다. 같은 버튼을 재사용하면
+              // 탭한 흔적(포커스)이 다음 문제의 같은 자리에 남는다.
+              key={`${q.id}-${ci}`}
               className={`choice ${answers[q.id] === ci ? 'selected' : ''}`}
-              onClick={() => pickChoice(ci)}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                pickChoice(ci);
+              }}
             >
               <span className="num">{ci + 1}</span>
               <span>{choice}</span>
