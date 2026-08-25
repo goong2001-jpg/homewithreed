@@ -1,5 +1,6 @@
 import React from 'react';
 import { LESSONS } from '../data/lessons';
+import { useVoiceGuide } from '../voiceGuide';
 import SpeakButton from './SpeakButton';
 
 interface Props {
@@ -13,13 +14,17 @@ interface Props {
 export default function StudyView({ index, onIndexChange, learned, onToggleLearned, voiceMissing }: Props) {
   const set = LESSONS[index];
   const isLearned = learned.includes(set.id);
+  const { openGuide } = useVoiceGuide();
 
   return (
     <>
       {voiceMissing && (
         <div className="notice">
-          이 기기에 중국어 음성이 없어 발음이 안 나올 수 있어요. 안드로이드
-          <b> 설정 → 일반 관리 → 언어 → 음성 텍스트 변환(TTS)</b>에서 중국어(중국)를 내려받으면 들립니다.
+          이 기기에 <b>중국어 음성이 없습니다.</b> 그대로 읽으면 한국어 음성이 한자를 한국식으로 읽어
+          你好를 "니호"처럼 발음하기 때문에, 잘못 배우지 않도록 소리를 내지 않습니다.
+          <button type="button" className="btn small" style={{ marginTop: 8 }} onClick={openGuide}>
+            중국어 음성 설치 방법 보기
+          </button>
         </div>
       )}
 

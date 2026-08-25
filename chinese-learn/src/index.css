@@ -286,3 +286,59 @@ button { font-family: inherit; cursor: pointer; }
 }
 .tabs button .ico { display: block; font-size: 21px; margin-bottom: 2px; }
 .tabs button.active { color: var(--red); }
+
+/* ── 소리 안내 시트 ───────────────────── */
+.btn.muted { background: #f6f1ec; border-color: #e3d6c9; color: #8a7c70; }
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(38, 32, 28, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 20;
+  padding: 12px;
+}
+.sheet {
+  background: var(--card);
+  border-radius: 20px;
+  padding: 20px 16px 16px;
+  width: 100%;
+  max-width: 496px;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: 0 -6px 30px rgba(60, 40, 25, 0.25);
+}
+.sheet-title { font-size: 18px; font-weight: 800; margin-bottom: 10px; }
+.sheet p { font-size: 14.5px; }
+
+.steps { counter-reset: step; margin: 12px 0; }
+.steps > div {
+  counter-increment: step;
+  position: relative;
+  padding: 8px 0 8px 34px;
+  font-size: 14.5px;
+  border-top: 1px solid var(--line);
+}
+.steps > div:first-child { border-top: none; }
+.steps > div::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--red);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fine { font-size: 12.5px; color: var(--muted); }
+
+.notice .btn.small { display: block; }
