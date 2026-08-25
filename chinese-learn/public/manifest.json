@@ -1,0 +1,12 @@
+{
+  "short_name": "중국어 한 세트",
+  "name": "중국어 한 세트 - 단어와 회화",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#c8302f",
+  "background_color": "#fff8f2"
+}

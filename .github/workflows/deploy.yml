@@ -60,6 +60,12 @@ jobs:
           npm ci
           npm run build
 
+      - name: Build chinese-learn
+        working-directory: chinese-learn
+        run: |
+          npm ci
+          npm run build
+
       - name: Combine builds
         run: |
           mkdir -p site
@@ -74,6 +80,8 @@ jobs:
           cp -r asset-tracker/build/. site/asset-tracker/
           mkdir -p site/time-tracker
           cp -r time-tracker/build/. site/time-tracker/
+          mkdir -p site/chinese-learn
+          cp -r chinese-learn/build/. site/chinese-learn/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
