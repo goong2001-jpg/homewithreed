@@ -15,9 +15,11 @@ export interface AlphabetProgress {
   letterCase: LetterCase;
   /** 연습 방식 */
   mode: PracticeMode;
+  /** 지금까지 쓴 글자 총 개수 (같은 글자를 또 써도 늘어난다) */
+  totalWritten: number;
 }
 
-const DEFAULT: AlphabetProgress = { mastered: [], index: 0, letterCase: 'upper', mode: 'stroke' };
+const DEFAULT: AlphabetProgress = { mastered: [], index: 0, letterCase: 'upper', mode: 'stroke', totalWritten: 0 };
 
 function load(): AlphabetProgress {
   try {
@@ -45,9 +47,12 @@ export function useAlphabetProgress() {
   const completeLetter = useCallback((letter: string): { earned: number; isFirst: boolean } => {
     const isFirst = !progress.mastered.includes(letter);
     const earned = isFirst ? 5 : 1;
-    if (isFirst) update({ mastered: [...progress.mastered, letter] });
+    update({
+      mastered: isFirst ? [...progress.mastered, letter] : progress.mastered,
+      totalWritten: progress.totalWritten + 1,
+    });
     return { earned, isFirst };
-  }, [progress.mastered, update]);
+  }, [progress.mastered, progress.totalWritten, update]);
 
   const setIndex = useCallback((index: number) => update({ index }), [update]);
   const setLetterCase = useCallback((letterCase: LetterCase) => update({ letterCase }), [update]);

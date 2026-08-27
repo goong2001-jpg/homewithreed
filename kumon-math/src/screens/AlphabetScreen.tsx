@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LETTERS } from '../alphabet/letters';
 import {
   speakLetter, speakWord, speakLetterAndWord, warmUpVoices, speechSupported,
@@ -20,6 +20,13 @@ export default function AlphabetScreen() {
   const [showList, setShowList] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const [happy, setHappy] = useState(false);
+  const celebrateRef = useRef<HTMLDivElement>(null);
+  const autoNextRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelAutoNext = useCallback(() => {
+    if (autoNextRef.current) { clearTimeout(autoNextRef.current); autoNextRef.current = null; }
+  }, []);
+  useEffect(() => cancelAutoNext, [cancelAutoNext]);
 
   const idx = Math.min(progress.index, LETTERS.length - 1);
   const info = LETTERS[idx];
@@ -30,12 +37,13 @@ export default function AlphabetScreen() {
   useEffect(() => { warmUpVoices(); }, []);
 
   const goTo = useCallback((next: number) => {
+    cancelAutoNext();
     const clamped = (next + LETTERS.length) % LETTERS.length;
     setIndex(clamped);
     setCelebrate(null);
     setResetKey(k => k + 1);
     playClick();
-  }, [setIndex]);
+  }, [setIndex, cancelAutoNext]);
 
   const handleComplete = useCallback(() => {
     const result = completeLetter(glyph);
@@ -46,7 +54,18 @@ export default function AlphabetScreen() {
     if (result.isFirst) playStreak(); else playCorrect();
     // 다 그리면 글자와 단어를 읽어준다
     setTimeout(() => speakLetterAndWord(info.upper, info.word), 350);
-  }, [completeLetter, glyph, info.upper, info.word, addPoints]);
+
+    // 축하 카드가 화면 밖으로 밀려 아무것도 못 누르는 일이 없게 보여주고,
+    // 잠시 뒤 다음 글자로 자동으로 넘어가 계속 쓸 수 있게 한다.
+    setTimeout(() => {
+      celebrateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 120);
+    cancelAutoNext();
+    autoNextRef.current = setTimeout(() => {
+      autoNextRef.current = null;
+      goTo(idx + 1);
+    }, 2600);
+  }, [completeLetter, glyph, info.upper, info.word, addPoints, cancelAutoNext, goTo, idx]);
 
   const masteredCount = progress.mastered.filter(m =>
     isUpper ? m === m.toUpperCase() : m === m.toLowerCase()
@@ -154,8 +173,9 @@ export default function AlphabetScreen() {
       }}>
         <span style={{ fontSize: 20 }}>🏅</span>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>
-            {isUpper ? '대문자' : '소문자'} {masteredCount} / 26 완성
+          <div style={{ fontSize: 12, color: '#888', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+            <span>{isUpper ? '대문자' : '소문자'} {masteredCount} / 26 완성</span>
+            <span style={{ color: '#9b59b6', fontWeight: 700 }}>✏️ 지금까지 {progress.totalWritten}개</span>
           </div>
           <div style={{ background: '#eee', borderRadius: 99, height: 8, overflow: 'hidden' }}>
             <div style={{
@@ -217,7 +237,7 @@ export default function AlphabetScreen() {
 
       {/* 완성 축하 */}
       {celebrate && (
-        <div style={{
+        <div ref={celebrateRef} style={{
           marginTop: 14, background: 'white', borderRadius: 20,
           padding: '14px 22px', textAlign: 'center', maxWidth: 340, width: '100%',
           boxShadow: '0 6px 20px rgba(0,0,0,0.12)', animation: 'fadeIn 0.3s ease',
@@ -230,7 +250,7 @@ export default function AlphabetScreen() {
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
             <button
-              onClick={() => speakLetterAndWord(info.upper, info.word)}
+              onClick={() => { cancelAutoNext(); speakLetterAndWord(info.upper, info.word); }}
               style={{
                 background: 'white', color: '#7c4dff', border: '2px solid #7c4dff',
                 borderRadius: 12, padding: '10px 16px', fontSize: 14, fontWeight: 800,
@@ -251,6 +271,9 @@ export default function AlphabetScreen() {
             >
               다음 글자 →
             </button>
+          </div>
+          <div style={{ fontSize: 11, color: '#aaa', marginTop: 8 }}>
+            잠시 뒤 다음 글자로 넘어가요
           </div>
         </div>
       )}
