@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LETTERS } from '../alphabet/letters';
+import type { LetterCase } from '../hooks/useAlphabetProgress';
 import {
   speakLetter, speakWord, speakLetterAndWord, warmUpVoices, speechSupported,
 } from '../alphabet/speech';
@@ -10,6 +11,13 @@ import StrokeOrderCanvas from '../components/StrokeOrderCanvas';
 import Avatar from '../components/Avatar';
 import Shop from '../components/Shop';
 import { playCorrect, playStreak, playClick } from '../utils/sounds';
+
+/** 연습 순서를 만든다. mixed면 A a B b ... 처럼 대소문자를 번갈아 낸다. */
+function sequenceFor(mode: LetterCase): { li: number; upper: boolean }[] {
+  if (mode === 'upper') return LETTERS.map((_, li) => ({ li, upper: true }));
+  if (mode === 'lower') return LETTERS.map((_, li) => ({ li, upper: false }));
+  return LETTERS.flatMap((_, li) => [{ li, upper: true }, { li, upper: false }]);
+}
 
 export default function AlphabetScreen() {
   const { progress, completeLetter, setIndex, setLetterCase, setMode } = useAlphabetProgress();
@@ -28,9 +36,11 @@ export default function AlphabetScreen() {
   }, []);
   useEffect(() => cancelAutoNext, [cancelAutoNext]);
 
-  const idx = Math.min(progress.index, LETTERS.length - 1);
-  const info = LETTERS[idx];
-  const isUpper = progress.letterCase === 'upper';
+  const seq = sequenceFor(progress.letterCase);
+  const idx = Math.min(progress.index, seq.length - 1);
+  const step = seq[idx];
+  const info = LETTERS[step.li];
+  const isUpper = step.upper;
   const glyph = isUpper ? info.upper : info.lower;
   const isMastered = progress.mastered.includes(glyph);
 
@@ -38,12 +48,12 @@ export default function AlphabetScreen() {
 
   const goTo = useCallback((next: number) => {
     cancelAutoNext();
-    const clamped = (next + LETTERS.length) % LETTERS.length;
+    const clamped = (next + seq.length) % seq.length;
     setIndex(clamped);
     setCelebrate(null);
     setResetKey(k => k + 1);
     playClick();
-  }, [setIndex, cancelAutoNext]);
+  }, [setIndex, cancelAutoNext, seq.length]);
 
   const handleComplete = useCallback(() => {
     const result = completeLetter(glyph);
@@ -67,9 +77,11 @@ export default function AlphabetScreen() {
     }, 2600);
   }, [completeLetter, glyph, info.upper, info.word, addPoints, cancelAutoNext, goTo, idx]);
 
-  const masteredCount = progress.mastered.filter(m =>
-    isUpper ? m === m.toUpperCase() : m === m.toLowerCase()
-  ).length;
+  // 지금 순서에 나오는 글자들 중 몇 개를 완성했는지
+  const seqGlyphs = seq.map(t => (t.upper ? LETTERS[t.li].upper : LETTERS[t.li].lower));
+  const masteredCount = seqGlyphs.filter(g => progress.mastered.includes(g)).length;
+  const caseLabel = progress.letterCase === 'mixed' ? '대소문자'
+    : progress.letterCase === 'upper' ? '대문자' : '소문자';
 
   return (
     <div style={{
@@ -137,20 +149,30 @@ export default function AlphabetScreen() {
 
       {/* 대문자 / 소문자 + 모아보기 */}
       <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 380, marginBottom: 12 }}>
-        {(['upper', 'lower'] as const).map(c => (
+        {([
+          { id: 'mixed' as const, label: 'Aa 번갈아' },
+          { id: 'upper' as const, label: 'ABC' },
+          { id: 'lower' as const, label: 'abc' },
+        ]).map(c => (
           <button
-            key={c}
-            onClick={() => { setLetterCase(c); setResetKey(k => k + 1); setCelebrate(null); playClick(); }}
+            key={c.id}
+            onClick={() => {
+              setLetterCase(c.id);
+              setIndex(0);
+              setResetKey(k => k + 1);
+              setCelebrate(null);
+              playClick();
+            }}
             style={{
-              flex: 1, padding: '10px 4px', borderRadius: 14, border: 'none',
-              background: progress.letterCase === c ? '#7c4dff' : 'white',
-              color: progress.letterCase === c ? 'white' : '#666',
+              flex: c.id === 'mixed' ? 1.4 : 1, padding: '10px 4px', borderRadius: 14, border: 'none',
+              background: progress.letterCase === c.id ? '#7c4dff' : 'white',
+              color: progress.letterCase === c.id ? 'white' : '#666',
               fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
-              boxShadow: progress.letterCase === c
+              boxShadow: progress.letterCase === c.id
                 ? '0 4px 12px rgba(124,77,255,0.4)' : '0 2px 6px rgba(0,0,0,0.08)',
             }}
           >
-            {c === 'upper' ? 'ABC 대문자' : 'abc 소문자'}
+            {c.label}
           </button>
         ))}
         <button
@@ -174,12 +196,12 @@ export default function AlphabetScreen() {
         <span style={{ fontSize: 20 }}>🏅</span>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 12, color: '#888', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
-            <span>{isUpper ? '대문자' : '소문자'} {masteredCount} / 26 완성</span>
+            <span>{caseLabel} {masteredCount} / {seq.length} 완성</span>
             <span style={{ color: '#9b59b6', fontWeight: 700 }}>✏️ 지금까지 {progress.totalWritten}개</span>
           </div>
           <div style={{ background: '#eee', borderRadius: 99, height: 8, overflow: 'hidden' }}>
             <div style={{
-              width: `${(masteredCount / 26) * 100}%`, height: '100%',
+              width: `${(masteredCount / seq.length) * 100}%`, height: '100%',
               background: 'linear-gradient(90deg, #a18cd1, #fbc2eb)',
               borderRadius: 99, transition: 'width 0.4s ease',
             }} />
@@ -357,14 +379,15 @@ export default function AlphabetScreen() {
                 width: 34, height: 34, fontSize: 17, cursor: 'pointer', fontWeight: 700,
               }}>✕</button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
-              {LETTERS.map((l, i) => {
-                const g = isUpper ? l.upper : l.lower;
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${progress.letterCase === 'mixed' ? 6 : 5}, 1fr)`, gap: 8 }}>
+              {seq.map((t, i) => {
+                const l = LETTERS[t.li];
+                const g = t.upper ? l.upper : l.lower;
                 const doneL = progress.mastered.includes(g);
                 const cur = i === idx;
                 return (
                   <button
-                    key={l.upper}
+                    key={`${l.upper}-${t.upper ? 'u' : 'l'}`}
                     onClick={() => { goTo(i); setShowList(false); }}
                     style={{
                       aspectRatio: '1 / 1', borderRadius: 14,

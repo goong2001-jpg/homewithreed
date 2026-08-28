@@ -2,14 +2,15 @@ import { useCallback, useState } from 'react';
 
 const KEY = 'alphabet_progress';
 
-export type LetterCase = 'upper' | 'lower';
+/** mixed = A a B b 처럼 번갈아, upper = 대문자만, lower = 소문자만 */
+export type LetterCase = 'mixed' | 'upper' | 'lower';
 /** stroke = 획순대로 쓰기, trace = 자유롭게 따라 그리기 */
 export type PracticeMode = 'stroke' | 'trace';
 
 export interface AlphabetProgress {
   /** 완성한 글자들 — 'A', 'a' 처럼 대소문자 구분해서 저장 */
   mastered: string[];
-  /** 마지막으로 보던 글자 번호(0=A) */
+  /** 연습 순서에서 지금 몇 번째인지 */
   index: number;
   /** 대문자/소문자 모드 */
   letterCase: LetterCase;
@@ -17,14 +18,32 @@ export interface AlphabetProgress {
   mode: PracticeMode;
   /** 지금까지 쓴 글자 총 개수 (같은 글자를 또 써도 늘어난다) */
   totalWritten: number;
+  /** 대소문자 번갈아 순서로 한 번 옮겼는지 (예전 저장 데이터 호환용) */
+  mixedMigrated?: boolean;
 }
 
-const DEFAULT: AlphabetProgress = { mastered: [], index: 0, letterCase: 'upper', mode: 'stroke', totalWritten: 0 };
+const DEFAULT: AlphabetProgress = {
+  mastered: [], index: 0, letterCase: 'mixed', mode: 'stroke', totalWritten: 0,
+  // 새로 시작하는 경우는 이미 번갈아 순서이므로 변환할 필요가 없다.
+  // (이 표시가 없으면 앱을 열 때마다 변환이 다시 돌아 위치가 엉킨다)
+  mixedMigrated: true,
+};
 
 function load(): AlphabetProgress {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...DEFAULT, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const saved: AlphabetProgress = { ...DEFAULT, ...parsed };
+      // 예전에는 대문자/소문자를 따로 돌았다. 한 번만 'A a B b' 순서로 옮겨준다.
+      if (!parsed.mixedMigrated) {
+        const wasLower = saved.letterCase === 'lower';
+        saved.index = Math.min(saved.index, 25) * 2 + (wasLower ? 1 : 0);
+        saved.letterCase = 'mixed';
+        saved.mixedMigrated = true;
+      }
+      return saved;
+    }
   } catch {}
   return DEFAULT;
 }
