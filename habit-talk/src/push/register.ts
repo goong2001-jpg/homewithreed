@@ -14,12 +14,58 @@ import { PushConfig } from '../types';
  *     getSubscription() 으로 직접 확인하고, 없으면 다시 구독한다.
  */
 
-export const VAPID_PUBLIC_KEY = (process.env.REACT_APP_VAPID_PUBLIC_KEY || '').trim();
-export const PUSH_ENDPOINT = (process.env.REACT_APP_PUSH_ENDPOINT || '').trim().replace(/\/$/, '');
+/**
+ * 푸시 서버 주소는 빌드에 박지 않고 public/push-config.json 에서 읽는다.
+ * 공개키는 거기 적지 않고 서버의 /health 에서 받아온다 — 그래야 서버에서 키를
+ * 바꿔도 앱을 다시 배포할 필요가 없고, 키가 어긋날 일도 없다.
+ *
+ * 환경변수(.env.local)를 넣어두면 그게 우선한다 — 로컬에서 시험할 때 쓴다.
+ */
+export let VAPID_PUBLIC_KEY = (process.env.REACT_APP_VAPID_PUBLIC_KEY || '').trim();
+export let PUSH_ENDPOINT = (process.env.REACT_APP_PUSH_ENDPOINT || '').trim().replace(/\/$/, '');
 
-/** 빌드에 푸시 설정이 들어 있는지 */
+let configLoaded = VAPID_PUBLIC_KEY.length > 0 && PUSH_ENDPOINT.length > 0;
+
+async function readEndpoint(): Promise<string> {
+  if (PUSH_ENDPOINT) return PUSH_ENDPOINT;
+  try {
+    const res = await fetch(`${process.env.PUBLIC_URL || ''}/push-config.json`, { cache: 'no-cache' });
+    if (!res.ok) return '';
+    const data = await res.json();
+    return String(data?.endpoint ?? '').trim().replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * 앱이 뜰 때 한 번 부른다.
+ * 주소를 읽고, 그 서버에서 공개키를 받아온다. 어느 쪽이든 실패하면 푸시만 잠긴다.
+ */
+export async function loadPushConfig(): Promise<boolean> {
+  if (configLoaded) return true;
+
+  const endpoint = await readEndpoint();
+  if (!endpoint) return false;
+
+  try {
+    const res = await fetch(`${endpoint}/health`, { cache: 'no-cache' });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const key = String(data?.vapidPublicKey ?? '').trim();
+    if (!key) return false; // 서버는 떴는데 키가 아직 없다
+    PUSH_ENDPOINT = endpoint;
+    VAPID_PUBLIC_KEY = key;
+    configLoaded = true;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 푸시 서버가 연결돼 있는지 */
 export function pushConfigured(): boolean {
-  return VAPID_PUBLIC_KEY.length > 0 && PUSH_ENDPOINT.length > 0;
+  return configLoaded;
 }
 
 /** 브라우저가 푸시를 지원하는지 */

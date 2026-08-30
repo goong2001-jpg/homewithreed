@@ -68,11 +68,8 @@ jobs:
 
       - name: Build habit-talk
         working-directory: habit-talk
-        # 푸시 설정은 공개돼도 되는 값이라 Secret 이 아니라 저장소 Variable 로 둔다.
-        # 비어 있어도 빌드는 되고, 그때는 앱에서 푸시 기능만 잠긴다.
-        env:
-          REACT_APP_VAPID_PUBLIC_KEY: ${{ vars.VAPID_PUBLIC_KEY }}
-          REACT_APP_PUSH_ENDPOINT: ${{ vars.PUSH_ENDPOINT }}
+        # 푸시 서버 주소는 public/push-config.json 에 들어 있어서
+        # 빌드 시점에 넣어줄 값이 없다.
         run: |
           npm ci
           npm run build

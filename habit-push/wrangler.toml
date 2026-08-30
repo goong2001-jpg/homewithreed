@@ -4,23 +4,24 @@ compatibility_date = "2025-01-01"
 
 # 1분마다 깨어나 "지금 보낼 알림이 있나" 확인한다.
 # 하루 1,440번 — 무료 한도(하루 10만 요청)에 견주면 아무것도 아니다.
-# 알림 시각을 cron 에 박지 않는 이유: 부모가 앱에서 시간을 바꿔도
+# 알림 시각을 여기 박지 않는 이유: 부모가 앱에서 시간을 바꿔도
 # Worker 를 다시 배포할 필요가 없어야 하기 때문이다.
 [triggers]
 crons = ["* * * * *"]
 
+# ⬇️ Cloudflare 대시보드에서 KV 를 만들면 나오는 ID 를 여기에 넣으세요.
+#    (비밀값이 아닙니다)
 [[kv_namespaces]]
 binding = "HABIT_KV"
 id = "여기에_KV_네임스페이스_ID를_넣으세요"
 
 [vars]
-# 앱을 올려둔 주소. CORS 를 이 주소로만 열어둔다.
+# /subscribe 를 이 주소에서만 호출할 수 있게 한다. 비워두면 아무 데서나 가능.
+# (진짜 방어선은 알림 암호다)
 ALLOWED_ORIGIN = "https://goong2001-jpg.github.io"
-# VAPID 공개키 (공개돼도 되는 값 — 앱 번들에도 같이 들어간다)
-VAPID_PUBLIC_KEY = ""
-# 푸시 서비스가 연락할 곳. mailto: 또는 https: 여야 한다
+# 푸시 서비스가 문제 생겼을 때 연락할 곳. mailto: 또는 https: 여야 한다
 VAPID_SUBJECT = "mailto:goong2001@gmail.com"
 
-# 아래 두 개는 절대 여기 적지 말고 시크릿으로 넣으세요:
-#   npx wrangler secret put VAPID_PRIVATE_KEY
-#   npx wrangler secret put PASSPHRASE
+# 알림 키와 암호는 여기 적지 않습니다.
+# KV 에 config:vapid / config:passphrase 로 넣어두면 Worker 가 읽어 씁니다.
+# 그래서 API 토큰도, wrangler secret 도 필요 없습니다.

@@ -20,12 +20,49 @@ import { deserializeVapidKeys, sendPushNotification } from 'web-push-browser';
 export interface Env {
   HABIT_KV: KVNamespace;
   ALLOWED_ORIGIN: string;
-  VAPID_PUBLIC_KEY: string;
   VAPID_SUBJECT: string;
-  /** wrangler secret put VAPID_PRIVATE_KEY */
-  VAPID_PRIVATE_KEY: string;
-  /** wrangler secret put PASSPHRASE */
-  PASSPHRASE: string;
+  /**
+   * 아래 세 개는 없어도 된다.
+   * 배포 워크플로가 키와 암호를 만들어 KV 에 넣어두기 때문에, 기본 경로에서는
+   * 사람이 시크릿을 등록할 일이 없다. 직접 wrangler 로 설정하고 싶을 때만 쓴다.
+   */
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  PASSPHRASE?: string;
+}
+
+/** KV 에 들어 있는 설정 키 이름 — 배포 워크플로가 같은 이름으로 넣는다 */
+const VAPID_KV_KEY = 'config:vapid';
+const PASSPHRASE_KV_KEY = 'config:passphrase';
+
+interface VapidPair {
+  publicKey: string;
+  privateKey: string;
+}
+
+/** 매 tick 마다 KV 를 읽지 않도록 아이솔레이트가 살아 있는 동안 들고 있는다 */
+let cachedVapid: VapidPair | null = null;
+let cachedPassphrase: string | null = null;
+
+/** 환경변수로 직접 넣었으면 그걸 쓰고, 아니면 KV 에서 읽는다 */
+async function getVapid(env: Env): Promise<VapidPair | null> {
+  if (env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY) {
+    return { publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY };
+  }
+  if (cachedVapid) return cachedVapid;
+  const raw = await env.HABIT_KV.get(VAPID_KV_KEY, 'json');
+  const pair = raw as VapidPair | null;
+  if (!pair || !pair.publicKey || !pair.privateKey) return null;
+  cachedVapid = pair;
+  return pair;
+}
+
+async function getPassphrase(env: Env): Promise<string> {
+  if (env.PASSPHRASE) return env.PASSPHRASE;
+  if (cachedPassphrase !== null) return cachedPassphrase;
+  const value = (await env.HABIT_KV.get(PASSPHRASE_KV_KEY)) ?? '';
+  cachedPassphrase = value;
+  return value;
 }
 
 interface PushSlotConfig {
@@ -74,19 +111,22 @@ const sentInMemory = new Set<string>();
 
 // ── 유틸 ─────────────────────────────────────────────
 
-function corsHeaders(env: Env): Record<string, string> {
+function corsHeaders(env: Env, open = false): Record<string, string> {
   return {
-    'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
+    // open=true 는 /health 전용. 공개키만 돌려주는 곳이라 아무 데서나 읽어도 된다.
+    // 여기까지 ALLOWED_ORIGIN 으로 막으면, 주소를 한 글자만 잘못 적어도
+    // 앱이 "서버가 연결되지 않았어요"만 띄우고 이유를 알 길이 없어진다.
+    'Access-Control-Allow-Origin': open ? '*' : env.ALLOWED_ORIGIN || '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400',
   };
 }
 
-function json(body: unknown, status: number, env: Env): Response {
+function json(body: unknown, status: number, env: Env, open = false): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders(env) },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(env, open) },
   });
 }
 
@@ -196,7 +236,8 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
     return json({ error: 'bad json' }, 400, env);
   }
 
-  if (!env.PASSPHRASE || !safeEqual(body.passphrase ?? '', env.PASSPHRASE)) {
+  const passphrase = await getPassphrase(env);
+  if (!passphrase || !safeEqual(body.passphrase ?? '', passphrase)) {
     return json({ error: 'unauthorized' }, 401, env);
   }
   if (!validSubscription(body.subscription) || !validConfig(body.config)) {
@@ -234,7 +275,8 @@ async function handleUnsubscribe(request: Request, env: Env): Promise<Response> 
   } catch {
     return json({ error: 'bad json' }, 400, env);
   }
-  if (!env.PASSPHRASE || !safeEqual(body.passphrase ?? '', env.PASSPHRASE)) {
+  const passphrase = await getPassphrase(env);
+  if (!passphrase || !safeEqual(body.passphrase ?? '', passphrase)) {
     return json({ error: 'unauthorized' }, 401, env);
   }
 
@@ -322,10 +364,10 @@ async function runSchedule(env: Env, now: Date): Promise<void> {
   const jobs = dueJobs(devices, now, sentInMemory);
   if (jobs.length === 0) return;
 
-  const keys = await deserializeVapidKeys({
-    publicKey: env.VAPID_PUBLIC_KEY,
-    privateKey: env.VAPID_PRIVATE_KEY,
-  });
+  const vapid = await getVapid(env);
+  if (!vapid) return; // 키가 아직 없다 — 배포가 덜 끝난 상태
+
+  const keys = await deserializeVapidKeys(vapid);
 
   const gone = new Set<string>();
 
@@ -376,7 +418,18 @@ export default {
       return handleUnsubscribe(request, env);
     }
     if (url.pathname === '/health') {
-      return json({ ok: true, configured: Boolean(env.VAPID_PUBLIC_KEY && env.PASSPHRASE) }, 200, env);
+      const [vapid, passphrase] = await Promise.all([getVapid(env), getPassphrase(env)]);
+      return json(
+        {
+          ok: true,
+          configured: Boolean(vapid && passphrase),
+          // 공개키는 공개돼도 되는 값이다. 앱이 이걸 받아서 구독한다
+          vapidPublicKey: vapid?.publicKey ?? '',
+        },
+        200,
+        env,
+        true
+      );
     }
 
     return json({ error: 'not found' }, 404, env);

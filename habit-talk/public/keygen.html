@@ -35,57 +35,49 @@
 <div class="wrap">
   <h1>🔑 알림 키 만들기</h1>
   <p class="lead">
-    푸시 알림에 쓰는 VAPID 키 한 쌍을 만듭니다.
-    키는 <b>이 브라우저 안에서만</b> 만들어지고 어디에도 전송되지 않습니다.
+    푸시 알림에 쓰는 키를 만듭니다. 키는 <b>이 브라우저 안에서만</b> 만들어지고
+    어디로도 전송되지 않습니다.
   </p>
 
   <div class="card">
     <button id="gen">키 만들기</button>
     <div class="warn">
-      개인키는 비밀입니다. 아래 GitHub 시크릿에 넣은 뒤에는 이 페이지를 닫으세요.
+      만든 값은 Cloudflare KV 에 넣은 뒤 이 페이지를 닫으세요.
       메신저나 메모장에 남기지 마세요.
     </div>
   </div>
 
   <div id="out">
     <div class="card">
-      <h2>1. 공개키</h2>
+      <h2>1. KV 에 넣기 — <span class="name">config:vapid</span></h2>
       <p class="desc">
-        공개돼도 되는 값입니다. GitHub 저장소
-        <b>Settings → Secrets and variables → Actions → Variables</b> 탭에
-        <span class="name">VAPID_PUBLIC_KEY</span> 라는 이름으로 넣으세요.
+        Cloudflare 대시보드 → Storage &amp; Databases → KV → <b>HABIT_KV</b> →
+        <b>Add entry</b> 에서<br>
+        Key 에 <span class="name">config:vapid</span>, Value 에 아래 내용을 그대로 붙여넣으세요.
       </p>
-      <textarea id="pub" rows="3" readonly></textarea>
-      <div class="row"><button class="copy" data-for="pub">복사</button><span id="pubMsg"></span></div>
+      <textarea id="vapid" rows="4" readonly></textarea>
+      <div class="row"><button class="copy" data-for="vapid">복사</button><span id="vapidMsg"></span></div>
     </div>
 
     <div class="card">
-      <h2>2. 개인키 (비밀)</h2>
+      <h2>2. KV 에 넣기 — <span class="name">config:passphrase</span></h2>
       <p class="desc">
-        같은 화면의 <b>Secrets</b> 탭에
-        <span class="name">VAPID_PRIVATE_KEY</span> 라는 이름으로 넣으세요.
-        Variables 가 아니라 <b>Secrets</b> 입니다.
-      </p>
-      <textarea id="priv" rows="4" readonly></textarea>
-      <div class="row"><button class="copy" data-for="priv">복사</button><span id="privMsg"></span></div>
-    </div>
-
-    <div class="card">
-      <h2>3. 알림 암호</h2>
-      <p class="desc">
-        아무나 알림 서버에 등록하지 못하게 막는 암호입니다. <b>Secrets</b> 탭에
-        <span class="name">PUSH_PASSPHRASE</span> 라는 이름으로 넣고,
-        나중에 앱 <b>설정 → 알림 암호</b>에도 똑같이 입력하세요.
+        같은 곳에서 <b>Add entry</b> 를 한 번 더 눌러,
+        Key 에 <span class="name">config:passphrase</span>, Value 에 아래 값을 넣으세요.
       </p>
       <textarea id="pass" rows="2" readonly></textarea>
       <div class="row"><button class="copy" data-for="pass">복사</button><span id="passMsg"></span></div>
+      <div class="warn">
+        이 암호는 나중에 폰 앱의 <b>설정 → 알림 암호</b> 에도 똑같이 넣어야 합니다.
+        여기서 복사해 두세요.
+      </div>
     </div>
 
     <div class="ok">
-      세 값을 다 넣었으면 GitHub <b>Actions → Deploy push worker</b> 워크플로를 실행하세요.
+      두 개를 다 넣었으면 Cloudflare 에서 저장소를 연결해 Worker 를 배포하면 됩니다.
+      자세한 순서는 <b>habit-push/README.md</b> 에 있습니다.
     </div>
   </div>
-</div>
 
 <script>
 const b64u = (buf) => {
@@ -101,10 +93,13 @@ document.getElementById('gen').addEventListener('click', async () => {
   const pair = await crypto.subtle.generateKey(
     { name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']
   );
-  document.getElementById('pub').value = b64u(await crypto.subtle.exportKey('raw', pair.publicKey));
-  document.getElementById('priv').value = b64u(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+  const publicKey = b64u(await crypto.subtle.exportKey('raw', pair.publicKey));
+  const privateKey = b64u(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
 
-  // 사람이 옮겨 적기 쉬우면서 추측은 어려운 암호를 만든다
+  // Worker 가 KV 에서 그대로 JSON.parse 하는 형태로 내보낸다
+  document.getElementById('vapid').value = JSON.stringify({ publicKey, privateKey });
+
+  // 사람이 옮겨 적기 쉬우면서 추측은 어려운 암호
   const rnd = new Uint8Array(18);
   crypto.getRandomValues(rnd);
   document.getElementById('pass').value = b64u(rnd);

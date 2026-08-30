@@ -11,6 +11,8 @@ import { downloadBackup, parseBackup } from '../utils/backup';
 
 interface Props {
   state: AppState;
+  /** 푸시 서버 주소를 다 읽었는지. 읽는 중에는 "확인 중"으로 보여준다 */
+  pushReady: boolean;
   pushBusy: boolean;
   pushError: string;
   onChange: (next: AppState) => void;
@@ -25,6 +27,7 @@ function newId(prefix: string): string {
 
 export default function SettingsView({
   state,
+  pushReady,
   pushBusy,
   pushError,
   onChange,
@@ -53,7 +56,7 @@ export default function SettingsView({
       ),
     });
 
-  const canPush = pushConfigured() && pushSupported();
+  const canPush = pushReady && pushConfigured() && pushSupported();
   const mustInstall = needsInstallFirst();
 
   const onImportFile = async (file: File) => {
@@ -151,8 +154,10 @@ export default function SettingsView({
             <div>
               <div className="label">푸시 알림</div>
               <div className="hint">
-                {!pushConfigured()
-                  ? '이 빌드에는 알림 서버가 연결돼 있지 않아요. 앱을 열면 밀린 메시지는 그대로 볼 수 있어요.'
+                {!pushReady
+                  ? '알림 서버를 확인하는 중이에요…'
+                  : !pushConfigured()
+                  ? '알림 서버가 아직 연결되지 않았어요. 앱을 열면 밀린 메시지는 그대로 볼 수 있어요.'
                   : mustInstall
                   ? '아이폰은 먼저 홈 화면에 추가하고, 그 앱 안에서 켜주세요.'
                   : state.push.enabled

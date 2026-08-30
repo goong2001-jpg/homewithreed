@@ -17,6 +17,7 @@ import {
 import {
   disablePush,
   enablePush,
+  loadPushConfig,
   pushConfigured,
   readHints,
   refreshSubscription,
@@ -44,6 +45,8 @@ export default function App() {
   const [typing, setTyping] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushError, setPushError] = useState('');
+  /** 푸시 서버 주소를 다 읽었는지 — 설정 화면의 안내문이 이걸 보고 달라진다 */
+  const [pushReady, setPushReady] = useState(false);
 
   /** 이번 대화에서 아이가 몇 번 말했는지 (마무리 시점 계산용, 세션 단위) */
   const turnRef = useRef(0);
@@ -79,6 +82,8 @@ export default function App() {
   useEffect(() => {
     void registerServiceWorker();
     void runCatchUp();
+    // 푸시 서버 주소는 배포 때 채워지는 파일에서 읽는다
+    void loadPushConfig().then(() => setPushReady(true));
 
     const tick = window.setInterval(() => void runCatchUp(), 60_000);
     const onVisible = () => {
@@ -364,6 +369,7 @@ export default function App() {
       {view === 'settings' && (
         <SettingsView
           state={state}
+          pushReady={pushReady}
           pushBusy={pushBusy}
           pushError={pushError}
           onChange={(next) => update(() => next)}

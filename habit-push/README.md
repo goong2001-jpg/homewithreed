@@ -30,75 +30,103 @@ Worker도 내용이 같으면 저장을 생략합니다. `list()`는 쓰지 않�
 
 ## 설치
 
-두 가지 방법이 있습니다. 어느 쪽이든 결과는 같습니다.
+**API 토큰도, 시크릿 등록도 필요 없습니다.** Cloudflare 대시보드에서 저장소를
+연결하고, 알림 키는 KV 에 넣어두면 Worker 가 알아서 읽어 씁니다.
 
-### 방법 A — 브라우저만으로 (터미널 없이)
+브라우저에서만 하면 되는 일이라 사람이 직접 해도 되고, 브라우저를 다루는
+AI 에이전트에게 시켜도 됩니다.
 
-Cloudflare와 GitHub 웹 화면에서만 하면 됩니다. 사람이 직접 해도 되고,
-브라우저를 다루는 AI 에이전트에게 시켜도 됩니다.
+### 1. Cloudflare 가입
 
-**1. Cloudflare 가입** — <https://dash.cloudflare.com/sign-up> (무료, 카드 등록 불필요)
+<https://dash.cloudflare.com/sign-up> — 무료, 카드 등록 불필요
 
-**2. 계정 ID 확인** — 대시보드 우측 하단 또는 Workers & Pages 화면의 `Account ID` 를 복사
+### 2. KV 만들기
 
-**3. KV 네임스페이스 만들기**
-Storage & Databases → KV → **Create Instance** → 이름 `HABIT_KV` → 만든 뒤 표시되는 ID 복사
+Storage & Databases → KV → **Create Instance** → 이름 `HABIT_KV`
 
-**4. API 토큰 만들기**
-My Profile → API Tokens → **Create Token** → *Edit Cloudflare Workers* 템플릿 사용 →
-Account Resources 에서 본인 계정 선택 → 만든 뒤 토큰 복사
-(이 화면을 벗어나면 다시 볼 수 없습니다)
+만들어지면 목록에 **Namespace ID**(32자리)가 나옵니다. 이 값을
+`habit-push/wrangler.toml` 의 `id = "..."` 자리에 넣어야 합니다.
+비밀값이 아니니 그대로 커밋하면 됩니다.
 
-**5. 알림 키 만들기**
-배포된 앱의 `/keygen.html` 을 엽니다. 예: `https://<계정>.github.io/homewithreed/habit-talk/keygen.html`
-**키 만들기** 를 누르면 공개키·개인키·알림 암호가 나옵니다.
-키는 그 브라우저 안에서만 만들어지고 어디로도 전송되지 않습니다.
+### 3. 알림 키를 KV 에 넣기
 
-**6. GitHub 에 값 등록**
-저장소 → Settings → Secrets and variables → **Actions**
+배포된 앱의 `/keygen.html` 을 엽니다.
+예: `https://<계정>.github.io/homewithreed/habit-talk/keygen.html`
+**키 만들기** 를 누르면 세 값이 나옵니다. 키는 그 브라우저 안에서만
+만들어지고 어디로도 전송되지 않습니다.
 
-| 탭 | 이름 | 값 |
-|---|---|---|
-| Secrets | `CLOUDFLARE_API_TOKEN` | 4번 토큰 |
-| Secrets | `VAPID_PRIVATE_KEY` | 5번 개인키 |
-| Secrets | `PUSH_PASSPHRASE` | 5번 알림 암호 |
-| Variables | `CLOUDFLARE_ACCOUNT_ID` | 2번 계정 ID |
-| Variables | `HABIT_KV_ID` | 3번 KV ID |
-| Variables | `VAPID_PUBLIC_KEY` | 5번 공개키 |
+방금 만든 KV 에서 **Add entry** 로 두 개를 넣으세요.
 
-**7. 배포**
-Actions → **Deploy push worker** → Run workflow.
-끝나면 요약 화면에 Worker 주소가 나옵니다.
+| Key | Value |
+|---|---|
+| `config:vapid` | `{"publicKey":"<공개키>","privateKey":"<개인키>"}` |
+| `config:passphrase` | `<알림 암호>` |
 
-**8. 앱에 연결**
-Variables 탭에 `PUSH_ENDPOINT` 라는 이름으로 7번 주소를 등록하고,
-Actions → **Deploy to GitHub Pages** 를 다시 실행합니다.
+`config:vapid` 는 위 형태의 JSON 한 줄이어야 합니다. keygen 페이지가
+붙여넣기 좋게 만들어 줍니다.
 
-**9. 폰에서 켜기**
-앱을 홈 화면에 추가 → **홈 화면 아이콘으로 다시 열기** →
-설정 → 알림 암호에 `PUSH_PASSPHRASE` 와 같은 값 입력 → 푸시 알림 스위치 켜기
+알림 암호는 나중에 폰 앱 **설정 → 알림 암호** 에도 똑같이 넣어야 하니
+기억해 두세요.
+
+### 4. 저장소 연결해서 배포
+
+Workers & Pages → **Create** → **Workers** 탭 → **Import a repository**
+→ GitHub 연결 후 이 저장소 선택
+
+빌드 설정:
+
+| 항목 | 값 |
+|---|---|
+| Root directory | `habit-push` |
+| Build command | `npm install` |
+| Deploy command | `npx wrangler deploy` |
+
+배포되면 `https://habit-push.<계정>.workers.dev` 같은 주소가 나옵니다.
+앞으로는 이 폴더가 바뀔 때마다 Cloudflare 가 알아서 다시 배포합니다.
+
+### 5. 앱에 주소 알려주기
+
+`habit-talk/public/push-config.json` 의 `endpoint` 에 4번 주소를 넣고
+커밋하면, GitHub Pages 가 다시 배포되면서 앱에 알림 기능이 켜집니다.
+
+```json
+{ "endpoint": "https://habit-push.<계정>.workers.dev" }
+```
+
+공개키는 여기 적지 않습니다 — 앱이 Worker 의 `/health` 에서 직접 받아옵니다.
+그래서 나중에 키를 바꿔도 앱은 손댈 필요가 없습니다.
+
+### 6. 폰에서 켜기
+
+1. 앱을 **홈 화면에 추가**
+2. **홈 화면 아이콘으로 다시 열기** (아이폰은 사파리 탭에서 알림이 안 됩니다)
+3. 설정 → **알림 암호** 에 3번의 암호 입력
+4. **푸시 알림** 스위치 켜기 → 권한 허용
+
+잘 됐는지 보려면 설정에서 아무 시간대나 1~2분 뒤로 바꿔두고 기다려 보세요.
 
 ---
 
-### 방법 B — 터미널에서
+### 터미널이 편하다면
+
+같은 일을 CLI 로도 할 수 있습니다.
 
 ```bash
 cd habit-push
 npm install
 npx wrangler login
+npx wrangler kv namespace create HABIT_KV    # 나온 id 를 wrangler.toml 에
+npm run keys                                 # 키 만들기
 
-npx wrangler kv namespace create HABIT_KV   # 나온 id 를 wrangler.toml 에 넣기
-npm run keys                                # 공개키는 wrangler.toml 에, 개인키는 아래로
+# 키와 암호를 KV 에 넣는다
+npx wrangler kv key put --binding HABIT_KV "config:vapid" '{"publicKey":"...","privateKey":"..."}'
+npx wrangler kv key put --binding HABIT_KV "config:passphrase" "정한암호"
 
-npx wrangler secret put VAPID_PRIVATE_KEY
-npx wrangler secret put PASSPHRASE
-
-# wrangler.toml 의 ALLOWED_ORIGIN(앱 주소) 과 VAPID_SUBJECT(본인 이메일) 도 채우기
 npm run deploy
 ```
 
-배포 후 나온 주소를 GitHub 저장소 Variables 에 `PUSH_ENDPOINT` 로,
-공개키를 `VAPID_PUBLIC_KEY` 로 등록하고 Pages 워크플로를 다시 실행하면 됩니다.
+KV 대신 Worker 시크릿을 쓰고 싶으면 `VAPID_PUBLIC_KEY` `VAPID_PRIVATE_KEY`
+`PASSPHRASE` 를 넣어도 됩니다. 그쪽이 있으면 KV 보다 우선합니다.
 
 ---
 
@@ -109,18 +137,21 @@ npm test        # 발송 시각 고르는 로직 테스트
 npm run typecheck
 ```
 
-Worker를 직접 띄워보려면 `wrangler.toml`을 복사해 `wrangler.local.toml`을 만들고
-(KV `id`는 아무 문자열이나 넣으면 됩니다), `.dev.vars`에 시크릿을 적은 뒤:
+Worker 를 직접 띄워보려면 `wrangler.toml` 을 `wrangler.local.toml` 로 복사하고
+(KV `id` 는 아무 문자열이나 넣으면 됩니다) 키를 로컬 KV 에 넣으세요.
 
 ```bash
+npx wrangler kv key put --local --config wrangler.local.toml --binding HABIT_KV \
+  "config:vapid" '{"publicKey":"...","privateKey":"..."}'
+npx wrangler kv key put --local --config wrangler.local.toml --binding HABIT_KV \
+  "config:passphrase" "아무암호"
+
 npx wrangler dev --config wrangler.local.toml --test-scheduled --local
 curl http://127.0.0.1:8787/health
 curl "http://127.0.0.1:8787/__scheduled?cron=*+*+*+*+*"   # 크론 강제 실행
 ```
 
-두 파일 모두 `.gitignore`에 들어 있습니다.
-
----
+`wrangler.local.toml` 은 `.gitignore` 에 들어 있습니다.
 
 ## 알아둘 것
 
@@ -149,4 +180,4 @@ curl "http://127.0.0.1:8787/__scheduled?cron=*+*+*+*+*"   # 크론 강제 실행
 |---|---|
 | `POST /subscribe` | 구독 + 시간표 등록 (암호 필요). 내용이 같으면 저장을 건너뜁니다 |
 | `POST /unsubscribe` | 등록 해제 (암호 필요) |
-| `GET /health` | 서버가 떠 있는지, 키가 설정됐는지 확인 |
+| `GET /health` | 서버 상태와 VAPID 공개키. 앱이 이걸로 구독합니다 (아무 데서나 읽을 수 있음) |
