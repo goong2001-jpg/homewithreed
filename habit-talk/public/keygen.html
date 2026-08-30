@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>알림 키 만들기 — 톡톡 습관친구</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic',
+         'Noto Sans KR', sans-serif; margin: 0; background: #f5f6f8; color: #1a1a1a;
+         line-height: 1.6; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  .lead { color: #6a6a6a; font-size: 14px; margin: 0 0 20px; }
+  .card { background: #fff; border-radius: 12px; padding: 18px; margin-bottom: 14px; }
+  h2 { font-size: 15px; margin: 0 0 4px; }
+  .desc { font-size: 13px; color: #6a6a6a; margin: 0 0 12px; }
+  button { font-family: inherit; font-size: 15px; font-weight: 700; border: none; cursor: pointer;
+           background: #fee500; padding: 13px 20px; border-radius: 10px; }
+  button.copy { background: #eef1f5; font-size: 13px; font-weight: 600; padding: 8px 14px; }
+  button:active { opacity: .8; }
+  textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, Consolas, monospace;
+             font-size: 12px; padding: 11px; border: 1px solid #e2e5ea; border-radius: 9px;
+             background: #fafbfc; resize: vertical; word-break: break-all; }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .name { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+          background: #eef1f5; padding: 3px 7px; border-radius: 5px; }
+  .warn { background: #fff6e0; color: #7a5a10; padding: 11px 13px; border-radius: 9px;
+          font-size: 13px; margin-top: 12px; }
+  .ok { background: #eaf7ee; color: #2f6b45; padding: 11px 13px; border-radius: 9px;
+        font-size: 13px; margin-top: 12px; }
+  #out { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔑 알림 키 만들기</h1>
+  <p class="lead">
+    푸시 알림에 쓰는 키를 만듭니다. 키는 <b>이 브라우저 안에서만</b> 만들어지고
+    어디로도 전송되지 않습니다.
+  </p>
+
+  <div class="card">
+    <button id="gen">키 만들기</button>
+    <div class="warn">
+      만든 값은 Cloudflare KV 에 넣은 뒤 이 페이지를 닫으세요.
+      메신저나 메모장에 남기지 마세요.
+    </div>
+  </div>
+
+  <div id="out">
+    <div class="card">
+      <h2>1. KV 에 넣기 — <span class="name">config:vapid</span></h2>
+      <p class="desc">
+        Cloudflare 대시보드 → Storage &amp; Databases → KV → <b>HABIT_KV</b> →
+        <b>Add entry</b> 에서<br>
+        Key 에 <span class="name">config:vapid</span>, Value 에 아래 내용을 그대로 붙여넣으세요.
+      </p>
+      <textarea id="vapid" rows="4" readonly></textarea>
+      <div class="row"><button class="copy" data-for="vapid">복사</button><span id="vapidMsg"></span></div>
+    </div>
+
+    <div class="card">
+      <h2>2. KV 에 넣기 — <span class="name">config:passphrase</span></h2>
+      <p class="desc">
+        같은 곳에서 <b>Add entry</b> 를 한 번 더 눌러,
+        Key 에 <span class="name">config:passphrase</span>, Value 에 아래 값을 넣으세요.
+      </p>
+      <textarea id="pass" rows="2" readonly></textarea>
+      <div class="row"><button class="copy" data-for="pass">복사</button><span id="passMsg"></span></div>
+      <div class="warn">
+        이 암호는 나중에 폰 앱의 <b>설정 → 알림 암호</b> 에도 똑같이 넣어야 합니다.
+        여기서 복사해 두세요.
+      </div>
+    </div>
+
+    <div class="ok">
+      두 개를 다 넣었으면 Cloudflare 에서 저장소를 연결해 Worker 를 배포하면 됩니다.
+      자세한 순서는 <b>habit-push/README.md</b> 에 있습니다.
+    </div>
+  </div>
+
+<script>
+const b64u = (buf) => {
+  const bytes = new Uint8Array(buf);
+  let s = '';
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+document.getElementById('gen').addEventListener('click', async () => {
+  // web-push-browser 의 serializeVapidKeys 와 같은 형식이어야 한다:
+  // ECDSA P-256, 공개키는 raw, 개인키는 pkcs8, 둘 다 base64url
+  const pair = await crypto.subtle.generateKey(
+    { name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']
+  );
+  const publicKey = b64u(await crypto.subtle.exportKey('raw', pair.publicKey));
+  const privateKey = b64u(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+
+  // Worker 가 KV 에서 그대로 JSON.parse 하는 형태로 내보낸다
+  document.getElementById('vapid').value = JSON.stringify({ publicKey, privateKey });
+
+  // 사람이 옮겨 적기 쉬우면서 추측은 어려운 암호
+  const rnd = new Uint8Array(18);
+  crypto.getRandomValues(rnd);
+  document.getElementById('pass').value = b64u(rnd);
+
+  document.getElementById('out').style.display = 'block';
+  document.getElementById('out').scrollIntoView({ behavior: 'smooth' });
+});
+
+document.querySelectorAll('button.copy').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    const id = btn.dataset.for;
+    const el = document.getElementById(id);
+    try {
+      await navigator.clipboard.writeText(el.value);
+      document.getElementById(id + 'Msg').textContent = '복사됨';
+    } catch {
+      el.select();
+      document.getElementById(id + 'Msg').textContent = '직접 복사해 주세요';
+    }
+  });
+});
+</script>
+</body>
+</html>
