@@ -28,79 +28,77 @@ Worker도 내용이 같으면 저장을 생략합니다. `list()`는 쓰지 않�
 
 ---
 
-## 설치 (한 번만 하면 됩니다)
+## 설치
 
-### 1. Cloudflare 계정 만들기
+두 가지 방법이 있습니다. 어느 쪽이든 결과는 같습니다.
 
-<https://dash.cloudflare.com/sign-up> — 무료입니다. 카드 등록 필요 없습니다.
+### 방법 A — 브라우저만으로 (터미널 없이)
 
-### 2. 로그인
+Cloudflare와 GitHub 웹 화면에서만 하면 됩니다. 사람이 직접 해도 되고,
+브라우저를 다루는 AI 에이전트에게 시켜도 됩니다.
+
+**1. Cloudflare 가입** — <https://dash.cloudflare.com/sign-up> (무료, 카드 등록 불필요)
+
+**2. 계정 ID 확인** — 대시보드 우측 하단 또는 Workers & Pages 화면의 `Account ID` 를 복사
+
+**3. KV 네임스페이스 만들기**
+Storage & Databases → KV → **Create Instance** → 이름 `HABIT_KV` → 만든 뒤 표시되는 ID 복사
+
+**4. API 토큰 만들기**
+My Profile → API Tokens → **Create Token** → *Edit Cloudflare Workers* 템플릿 사용 →
+Account Resources 에서 본인 계정 선택 → 만든 뒤 토큰 복사
+(이 화면을 벗어나면 다시 볼 수 없습니다)
+
+**5. 알림 키 만들기**
+배포된 앱의 `/keygen.html` 을 엽니다. 예: `https://<계정>.github.io/homewithreed/habit-talk/keygen.html`
+**키 만들기** 를 누르면 공개키·개인키·알림 암호가 나옵니다.
+키는 그 브라우저 안에서만 만들어지고 어디로도 전송되지 않습니다.
+
+**6. GitHub 에 값 등록**
+저장소 → Settings → Secrets and variables → **Actions**
+
+| 탭 | 이름 | 값 |
+|---|---|---|
+| Secrets | `CLOUDFLARE_API_TOKEN` | 4번 토큰 |
+| Secrets | `VAPID_PRIVATE_KEY` | 5번 개인키 |
+| Secrets | `PUSH_PASSPHRASE` | 5번 알림 암호 |
+| Variables | `CLOUDFLARE_ACCOUNT_ID` | 2번 계정 ID |
+| Variables | `HABIT_KV_ID` | 3번 KV ID |
+| Variables | `VAPID_PUBLIC_KEY` | 5번 공개키 |
+
+**7. 배포**
+Actions → **Deploy push worker** → Run workflow.
+끝나면 요약 화면에 Worker 주소가 나옵니다.
+
+**8. 앱에 연결**
+Variables 탭에 `PUSH_ENDPOINT` 라는 이름으로 7번 주소를 등록하고,
+Actions → **Deploy to GitHub Pages** 를 다시 실행합니다.
+
+**9. 폰에서 켜기**
+앱을 홈 화면에 추가 → **홈 화면 아이콘으로 다시 열기** →
+설정 → 알림 암호에 `PUSH_PASSPHRASE` 와 같은 값 입력 → 푸시 알림 스위치 켜기
+
+---
+
+### 방법 B — 터미널에서
 
 ```bash
 cd habit-push
 npm install
 npx wrangler login
-```
 
-### 3. KV 네임스페이스 만들기
+npx wrangler kv namespace create HABIT_KV   # 나온 id 를 wrangler.toml 에 넣기
+npm run keys                                # 공개키는 wrangler.toml 에, 개인키는 아래로
 
-```bash
-npx wrangler kv namespace create HABIT_KV
-```
+npx wrangler secret put VAPID_PRIVATE_KEY
+npx wrangler secret put PASSPHRASE
 
-출력에 나온 `id = "..."` 값을 `wrangler.toml`의 `[[kv_namespaces]]` 아래
-`id` 자리에 붙여넣으세요.
-
-### 4. VAPID 키 만들기
-
-```bash
-npm run keys
-```
-
-* **공개키** → `wrangler.toml`의 `VAPID_PUBLIC_KEY` 에 넣기 (공개돼도 되는 값)
-* **개인키** → 아래 5번에서 시크릿으로 넣기 (**절대 커밋하지 마세요**)
-
-### 5. 시크릿 넣기
-
-```bash
-npx wrangler secret put VAPID_PRIVATE_KEY   # 4번의 개인키를 붙여넣기
-npx wrangler secret put PASSPHRASE          # 아무 암호나 정하세요
-```
-
-`PASSPHRASE`는 아무나 이 서버에 구독을 등록하지 못하게 막는 값입니다.
-나중에 앱 **설정 → 알림 암호**에 똑같이 입력해야 합니다.
-
-### 6. `wrangler.toml` 마무리
-
-* `ALLOWED_ORIGIN` — 앱이 올라간 주소. GitHub Pages라면 `https://<계정>.github.io`
-* `VAPID_SUBJECT` — 본인 이메일 (`mailto:` 형태)
-
-### 7. 배포
-
-```bash
+# wrangler.toml 의 ALLOWED_ORIGIN(앱 주소) 과 VAPID_SUBJECT(본인 이메일) 도 채우기
 npm run deploy
 ```
 
-배포되면 `https://habit-push.<계정>.workers.dev` 같은 주소가 나옵니다.
-
-### 8. 앱에 연결하기
-
-GitHub 저장소 → **Settings → Secrets and variables → Actions → Variables** 탭에서
-저장소 변수 두 개를 추가하세요 (둘 다 공개돼도 되는 값이라 Secret이 아니라 Variable):
-
-| 이름 | 값 |
-|---|---|
-| `VAPID_PUBLIC_KEY` | 4번에서 만든 공개키 |
-| `PUSH_ENDPOINT` | 7번에서 나온 Worker 주소 |
-
-그 다음 배포 워크플로를 다시 돌리면 앱에 푸시 기능이 켜집니다.
-
-### 9. 폰에서 켜기
-
-1. 폰에서 앱을 열고 **홈 화면에 추가**
-2. **홈 화면 아이콘으로 다시 열기** (중요 — 아이폰은 사파리 탭에서는 알림이 안 됩니다)
-3. 설정 → **알림 암호**에 5번의 `PASSPHRASE` 입력
-4. **푸시 알림** 스위치 켜기 → 권한 허용
+배포 후 나온 주소를 GitHub 저장소 Variables 에 `PUSH_ENDPOINT` 로,
+공개키를 `VAPID_PUBLIC_KEY` 로 등록하고 Pages 워크플로를 다시 실행하면 됩니다.
 
 ---
 
