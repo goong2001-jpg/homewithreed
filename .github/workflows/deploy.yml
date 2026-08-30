@@ -66,6 +66,17 @@ jobs:
           npm ci
           npm run build
 
+      - name: Build habit-talk
+        working-directory: habit-talk
+        # 푸시 설정은 공개돼도 되는 값이라 Secret 이 아니라 저장소 Variable 로 둔다.
+        # 비어 있어도 빌드는 되고, 그때는 앱에서 푸시 기능만 잠긴다.
+        env:
+          REACT_APP_VAPID_PUBLIC_KEY: ${{ vars.VAPID_PUBLIC_KEY }}
+          REACT_APP_PUSH_ENDPOINT: ${{ vars.PUSH_ENDPOINT }}
+        run: |
+          npm ci
+          npm run build
+
       - name: Combine builds
         run: |
           mkdir -p site
@@ -82,6 +93,8 @@ jobs:
           cp -r time-tracker/build/. site/time-tracker/
           mkdir -p site/chinese-learn
           cp -r chinese-learn/build/. site/chinese-learn/
+          mkdir -p site/habit-talk
+          cp -r habit-talk/build/. site/habit-talk/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
