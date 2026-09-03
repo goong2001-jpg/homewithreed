@@ -1,6 +1,6 @@
 import {
   addMonths, computeMonthBudget, dailyBudgetOf, daysInMonth, elapsedDays,
-  categoryTotals, isFixedActive, monthPhase, todayKey,
+  categoryTotals, isFixedActive, monthPhase, todayKey, topExpenses,
 } from './budget';
 import { Expense, FixedExpense, IncomeEntry, Person } from '../types';
 
@@ -374,5 +374,66 @@ describe('카테고리별 지출 집계', () => {
   it('기록이 없으면 빈 배열', () => {
     expect(categoryTotals([], '2026-07')).toEqual([]);
     expect(categoryTotals(rows, '2026-07', '없는사람')).toEqual([]);
+  });
+});
+
+describe('큰 지출 TOP', () => {
+  const exp = (
+    id: string, amount: number, date = '2026-07-05', personId = 'p1', createdAt = 0,
+  ): Expense => ({
+    id, date, month: date.slice(0, 7), amount, category: '식비',
+    content: `건${id}`, personId, createdAt, updatedAt: 0,
+  });
+
+  const rows: Expense[] = [
+    exp('a', 30_000),
+    exp('b', 120_000),
+    exp('c', 5_000),
+    exp('d', 80_000, '2026-07-05', 'p2'),
+    exp('e', 45_000, '2026-07-05', 'p2'),
+    exp('f', 12_000),
+  ];
+
+  it('금액이 큰 순서로 요청한 건수만 준다', () => {
+    expect(topExpenses(rows, '2026-07', 3).map(e => e.id)).toEqual(['b', 'd', 'e']);
+  });
+
+  it('기본은 5건', () => {
+    expect(topExpenses(rows, '2026-07')).toHaveLength(5);
+  });
+
+  it('있는 것보다 많이 달라고 해도 있는 만큼만 준다', () => {
+    expect(topExpenses(rows, '2026-07', 100)).toHaveLength(6);
+  });
+
+  it('금액이 같으면 최근에 쓴 것이 먼저', () => {
+    const tie = [
+      exp('old', 50_000, '2026-07-01'),
+      exp('new', 50_000, '2026-07-20'),
+    ];
+    expect(topExpenses(tie, '2026-07').map(e => e.id)).toEqual(['new', 'old']);
+  });
+
+  it('날짜까지 같으면 나중에 입력한 것이 먼저', () => {
+    const tie = [
+      exp('first', 50_000, '2026-07-01', 'p1', 100),
+      exp('second', 50_000, '2026-07-01', 'p1', 200),
+    ];
+    expect(topExpenses(tie, '2026-07').map(e => e.id)).toEqual(['second', 'first']);
+  });
+
+  it('사람을 지정하면 그 사람 것만', () => {
+    expect(topExpenses(rows, '2026-07', 5, 'p2').map(e => e.id)).toEqual(['d', 'e']);
+  });
+
+  it('다른 달과 삭제된 건은 섞이지 않는다', () => {
+    const other = exp('other', 999_999, '2026-06-01');
+    const gone = { ...exp('gone', 999_999), deleted: true };
+    expect(topExpenses([...rows, other, gone], '2026-07')[0].id).toBe('b');
+  });
+
+  it('기록이 없으면 빈 배열', () => {
+    expect(topExpenses([], '2026-07')).toEqual([]);
+    expect(topExpenses(rows, '2026-07', 0)).toEqual([]);
   });
 });

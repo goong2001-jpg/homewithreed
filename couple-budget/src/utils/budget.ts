@@ -123,6 +123,22 @@ export function categoryTotals(
     .sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category));
 }
 
+/**
+ * 금액이 큰 지출부터 limit 건.
+ * 같은 금액이면 최근에 쓴 것을 먼저 보여준다 (기억이 생생한 쪽이 위로).
+ */
+export function topExpenses(
+  expenses: Expense[], month: MonthKey, limit = 5, personId?: string,
+): Expense[] {
+  return monthExpenses(expenses, month)
+    .filter(e => !personId || e.personId === personId)
+    .sort((a, b) =>
+      num(b.amount) - num(a.amount)
+      || b.date.localeCompare(a.date)
+      || b.createdAt - a.createdAt)
+    .slice(0, Math.max(0, limit));
+}
+
 /** ★ 하루 수입 = (월 총수입 − 월 고정지출) ÷ 그 달의 실제 일수 */
 export function dailyBudgetOf(spendable: number, month: MonthKey): number {
   const days = daysInMonth(month);

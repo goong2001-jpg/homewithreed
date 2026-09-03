@@ -19,13 +19,16 @@ interface Props {
   onToday: () => void;
   onGoSettings: () => void;
   onGoAdd: () => void;
+  /** 들어온 돈 입력 — 부업 일당처럼 수시로 들어오는 수입을 여기서 바로 더한다 */
+  onGoAddIncome: () => void;
   onCopyPrevIncome: () => void;
   onSelectPerson: (personId: string) => void;
 }
 
 export default function HomeView({
   month, budget, fixedCount, syncStatus, prevMonthIncome,
-  onPrev, onNext, onToday, onGoSettings, onGoAdd, onCopyPrevIncome, onSelectPerson,
+  onPrev, onNext, onToday, onGoSettings, onGoAdd, onGoAddIncome,
+  onCopyPrevIncome, onSelectPerson,
 }: Props) {
   const color = LEVEL_COLOR[budget.level];
   const future = budget.phase === 'future';
@@ -80,7 +83,7 @@ export default function HomeView({
           )}
 
           <button
-            onClick={onGoSettings}
+            onClick={onGoAddIncome}
             style={{
               width: '100%', padding: 14,
               background: prevMonthIncome > 0 ? '#f5f7f8' : '#27ae60',
@@ -180,16 +183,28 @@ export default function HomeView({
           </button>
 
           {budget.phase === 'current' && (
-            <button
-              onClick={onGoAdd}
-              style={{
-                display: 'block', width: 'calc(100% - 32px)', margin: '4px 16px 16px',
-                padding: 15, background: '#27ae60', color: '#fff', border: 'none',
-                borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer',
-              }}
-            >
-              오늘 쓴 돈 입력하기
-            </button>
+            <div style={{ display: 'flex', gap: 9, margin: '4px 16px 16px' }}>
+              <button
+                onClick={onGoAdd}
+                style={{
+                  flex: 2, padding: 15, background: '#27ae60', color: '#fff', border: 'none',
+                  borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                오늘 쓴 돈 입력
+              </button>
+              {/* 부업 일당처럼 수시로 들어오는 돈도 한 번에 닿을 수 있어야 한다 */}
+              <button
+                onClick={onGoAddIncome}
+                style={{
+                  flex: 1, padding: 15, background: '#fff', color: '#27ae60',
+                  border: '1.5px solid #d5f0e0', borderRadius: 12,
+                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                + 수입
+              </button>
+            </div>
           )}
         </>
       )}

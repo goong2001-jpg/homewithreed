@@ -10,6 +10,7 @@ const TABS: { view: View; icon: string; label: string }[] = [
   { view: 'home', icon: '🐷', label: '저금통' },
   { view: 'add', icon: '➕', label: '입력' },
   { view: 'history', icon: '📋', label: '내역' },
+  { view: 'top', icon: '🏆', label: 'TOP5' },
   { view: 'settings', icon: '⚙️', label: '설정' },
 ];
 
