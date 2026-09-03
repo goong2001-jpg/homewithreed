@@ -225,22 +225,24 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
    * 지난달 수입을 이 달로 그대로 가져온다.
    * 급여는 보통 매달 같으므로, 달이 바뀔 때마다 처음부터 입력하지 않도록 한 번에 복사한다.
    * (달마다 금액이 다를 수 있으니 자동이 아니라 사용자가 누를 때만 실행한다)
+   *
+   * ⚠️ 이 달에 수입이 이미 하나라도 있으면 아무것도 하지 않는다.
+   * 한 사람이 급여 + 부업 일당처럼 여러 건을 가질 수 있으므로
+   * '사람별로 덮어쓰기'가 성립하지 않는다 — 그대로 두면 같은 급여가 두 번 쌓인다.
    */
   const copyIncomeFromPrevMonth = useCallback((target: MonthKey) => {
-    const from = addMonths(target, -1);
-    const source = incomes.filter(i => !i.deleted && i.month === from);
+    if (incomes.some(i => !i.deleted && i.month === target)) return 0;
+
+    const source = incomes.filter(i => !i.deleted && i.month === addMonths(target, -1));
     for (const src of source) {
-      const existing = incomes.find(
-        i => !i.deleted && i.month === target && i.personId === src.personId,
-      );
       const now = Date.now();
       commit('incomes', KEYS.incomes, setIncomes, {
-        id: existing?.id ?? newId(),
+        id: newId(),
         month: target,
         personId: src.personId,
         amount: src.amount,
         memo: src.memo,
-        createdAt: existing?.createdAt ?? now,
+        createdAt: now,
         updatedAt: now,
       });
     }

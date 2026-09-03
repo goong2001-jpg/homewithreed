@@ -25,7 +25,10 @@ interface Props {
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
-  onSaveIncome: React.ComponentProps<typeof IncomeCard>['onSave'];
+  onAddIncome: () => void;
+  onEditIncome: React.ComponentProps<typeof IncomeCard>['onEdit'];
+  onDeleteIncome: (id: string) => void;
+  onCopyPrevIncome: () => number;
   onSaveFixed: React.ComponentProps<typeof FixedExpenseCard>['onSave'];
   onDeleteFixed: (id: string) => void;
   persons: Person[];
@@ -45,7 +48,8 @@ const cardStyle: React.CSSProperties = {
 export default function SettingsView(props: Props) {
   const {
     month, budget, settings, persons, incomes, fixed, expenses, syncStatus, syncError, counts,
-    onPrev, onNext, onToday, onSaveIncome, onSaveFixed, onDeleteFixed,
+    onPrev, onNext, onToday, onAddIncome, onEditIncome, onDeleteIncome, onCopyPrevIncome,
+    onSaveFixed, onDeleteFixed,
     onSavePerson, onDeletePerson, onSetSync, onImport, onUploadAll, onClearLocal,
   } = props;
 
@@ -80,7 +84,10 @@ export default function SettingsView(props: Props) {
           persons={persons}
           incomes={incomes}
           totalFixed={budget.totalFixed}
-          onSave={onSaveIncome}
+          onAdd={onAddIncome}
+          onEdit={onEditIncome}
+          onDelete={onDeleteIncome}
+          onCopyPrev={onCopyPrevIncome}
           cardStyle={cardStyle}
         />
 

@@ -49,10 +49,16 @@ export const PERSON_COLORS = [
 export interface IncomeEntry extends Syncable {
   month: MonthKey;
   personId: string;
-  amount: number;    // 그 달의 예상 수입 (세후 실수령)
-  memo: string;      // '7월 급여', '상여' 등
+  amount: number;    // 그 달에 들어온 돈 한 건 (세후 실수령)
+  memo: string;      // '급여', '부업 일당', '상여' 등
   createdAt: number;
 }
+
+/**
+ * 수입 메모 빠른 선택.
+ * 부업 일당처럼 여러 번 들어오는 돈을 매번 손으로 적지 않게 한다.
+ */
+export const INCOME_MEMO_PRESETS = ['급여', '부업', '상여', '용돈', '기타'];
 
 // ============ 고정지출 (매달 반복 · 하루수입에서 먼저 차감) ============
 
@@ -184,7 +190,10 @@ export interface MonthBudget {
 
 // ========================== 뷰 / 동기화 ==========================
 
-export type View = 'home' | 'add' | 'history' | 'settings';
+export type View = 'home' | 'add' | 'history' | 'top' | 'settings';
+
+/** 입력 화면이 지출을 받는지 수입을 받는지 */
+export type AddMode = 'expense' | 'income';
 
 export type SyncStatus = 'off' | 'connecting' | 'live' | 'error';
 
