@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Settings, WeekPlan } from '../types';
-import { buildShoppingList, formatQty, toShareText } from '../utils/shopping';
+import { DAY_NAMES } from '../utils/planner';
+import { buildDayLists, buildShoppingList, formatQty, toShareText } from '../utils/shopping';
 import { C, CARD } from '../theme';
 
 interface Props {
@@ -13,7 +14,9 @@ interface Props {
 
 export default function ShoppingView({ plan, settings, checked, onToggle, onClear }: Props) {
   const [copied, setCopied] = useState(false);
+  const [byDay, setByDay] = useState(false);
   const groups = useMemo(() => buildShoppingList(plan, settings), [plan, settings]);
+  const dayLists = useMemo(() => buildDayLists(plan, settings), [plan, settings]);
   const checkedSet = new Set(checked);
 
   const visible = groups
@@ -44,10 +47,83 @@ export default function ShoppingView({ plan, settings, checked, onToggle, onClea
   return (
     <div>
       <h1 style={{ fontSize: 21, margin: '0 0 4px' }}>장보기</h1>
-      <p style={{ margin: '0 0 14px', fontSize: 12.5, color: C.muted }}>
-        이번 주 식단 {settings.servings}인분에 필요한 전부입니다.
+      <p style={{ margin: '0 0 12px', fontSize: 12.5, color: C.muted }}>
+        {byDay
+          ? '그날 실제로 만드는 메뉴에 필요한 재료입니다. 담기는 주간 목록에서 하세요.'
+          : `이번 주 식단 ${settings.servings}인분에 필요한 전부입니다.`}
       </p>
 
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+        {[
+          { on: false, label: '주간 전체' },
+          { on: true, label: '요일별' },
+        ].map((t) => (
+          <button
+            key={t.label}
+            onClick={() => setByDay(t.on)}
+            aria-pressed={byDay === t.on}
+            style={{
+              flex: 1,
+              padding: '9px 0',
+              borderRadius: 10,
+              border: `1px solid ${byDay === t.on ? C.accent : C.border}`,
+              background: byDay === t.on ? C.accentSoft : '#fff',
+              color: byDay === t.on ? '#b5622c' : C.text,
+              fontSize: 13.5,
+              fontWeight: byDay === t.on ? 700 : 500,
+              cursor: 'pointer',
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {byDay && (
+        <>
+          {dayLists.map((d) => {
+            const items = d.groups
+              .flatMap((g) => g.items)
+              .filter((i) => !i.have && !(settings.hidePantry && i.pantry));
+            return (
+              <div key={d.day} style={{ ...CARD, marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span
+                    style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 8,
+                      background: C.accentSoft,
+                      color: '#b5622c',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {DAY_NAMES[d.day]}
+                  </span>
+                  <span style={{ fontSize: 12.5, color: C.muted, flex: 1, minWidth: 0 }}>
+                    {d.cooking.join(' · ')}
+                  </span>
+                </div>
+                <div style={{ fontSize: 13.5, lineHeight: 1.8, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+                  {items.length > 0
+                    ? items.map((i) => `${i.name} ${formatQty(i.qty, i.unit)}`).join(' · ')
+                    : '이 날 새로 살 것은 없습니다.'}
+                </div>
+              </div>
+            );
+          })}
+          <p style={{ fontSize: 12, color: C.muted, lineHeight: 1.6, margin: '4px 2px 0' }}>
+            어제 만든 반찬을 먹는 날은 그 재료가 빠져 있습니다. 주말에 한 번 장을 보고, 이 목록으로
+            무엇을 언제까지 써야 하는지 확인하세요.
+          </p>
+        </>
+      )}
+
+      {!byDay && (
       <div style={{ ...CARD, marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
           <span style={{ fontWeight: 700 }}>
@@ -88,8 +164,9 @@ export default function ShoppingView({ plan, settings, checked, onToggle, onClea
           {copied ? '복사했습니다' : '목록 복사하기'}
         </button>
       </div>
+      )}
 
-      {visible.map((g) => (
+      {!byDay && visible.map((g) => (
         <div key={g.aisle} style={{ ...CARD, marginBottom: 10 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 4 }}>{g.aisle}</div>
           {g.items.map((item) => {
@@ -165,7 +242,7 @@ export default function ShoppingView({ plan, settings, checked, onToggle, onClea
         </div>
       ))}
 
-      {atHome.length > 0 && (
+      {!byDay && atHome.length > 0 && (
         <div style={{ ...CARD, marginBottom: 10, background: '#f6f9f7' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: C.good, marginBottom: 6 }}>
             집에 있어서 뺐습니다 ({atHome.length}개)
@@ -179,7 +256,7 @@ export default function ShoppingView({ plan, settings, checked, onToggle, onClea
         </div>
       )}
 
-      {settings.hidePantry && (
+      {!byDay && settings.hidePantry && (
         <p style={{ fontSize: 12, color: C.muted, lineHeight: 1.6, margin: '4px 2px 0' }}>
           간장·참기름 같은 상비 양념은 목록에서 빼 두었습니다. 설정에서 켜면 같이 보입니다.
         </p>

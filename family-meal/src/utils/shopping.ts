@@ -1,7 +1,7 @@
 import { getRecipe } from '../data/recipes';
 import { Aisle, AISLE_ORDER, Ingredient, Settings, WeekPlan } from '../types';
 import { isAtHome } from './ingredients';
-import { planRecipeIds } from './planner';
+import { cookedRecipeIds, planRecipeIds } from './planner';
 
 export interface ShopItem {
   /** 이름+단위. 체크 상태를 저장하는 키로도 쓴다. */
@@ -53,10 +53,14 @@ export function formatQty(qty: number, unit: string): string {
 }
 
 /**
- * 일주일 식단에 들어가는 재료를 전부 더해 코너별로 묶는다.
+ * 재료를 이름+단위로 더해 코너별로 묶는다.
  * 같은 재료라도 단위가 다르면(예: 두부 '모' vs 'g') 합치지 않고 따로 둔다.
  */
-export function buildShoppingList(plan: WeekPlan, settings: Settings): AisleGroup[] {
+function groupItems(
+  recipeIds: string[],
+  settings: Settings,
+  withBase: boolean
+): AisleGroup[] {
   const merged = new Map<string, ShopItem>();
 
   const add = (raw: Ingredient, from: string | null) => {
@@ -84,8 +88,8 @@ export function buildShoppingList(plan: WeekPlan, settings: Settings): AisleGrou
     });
   };
 
-  BASE_ITEMS.forEach((i) => add(i, null));
-  for (const id of planRecipeIds(plan)) {
+  if (withBase) BASE_ITEMS.forEach((i) => add(i, null));
+  for (const id of recipeIds) {
     const recipe = getRecipe(id);
     if (!recipe) continue;
     recipe.ingredients.forEach((ing) => add(ing, recipe.name));
@@ -102,6 +106,38 @@ export function buildShoppingList(plan: WeekPlan, settings: Settings): AisleGrou
     aisle,
     items: items.filter((i) => i.aisle === aisle).sort((a, b) => a.name.localeCompare(b.name, 'ko')),
   })).filter((g) => g.items.length > 0);
+}
+
+/** 일주일치 전부. 장보기 탭의 기본 화면이다. */
+export function buildShoppingList(plan: WeekPlan, settings: Settings): AisleGroup[] {
+  return groupItems(planRecipeIds(plan), settings, true);
+}
+
+export interface DayList {
+  day: number;
+  /** 그날 만드는 메뉴 이름들 */
+  cooking: string[];
+  groups: AisleGroup[];
+}
+
+/**
+ * 요일별로 그날 **만드는** 메뉴에 필요한 재료만 추린다.
+ * 어제 만든 반찬을 먹는 날은 그 반찬 재료가 빠지므로, 이 목록을 따라가면
+ * 무엇을 언제까지 써야 하는지가 보인다.
+ */
+export function buildDayLists(plan: WeekPlan, settings: Settings): DayList[] {
+  return plan.days.map((d) => {
+    const rows = cookedRecipeIds(d);
+    return {
+      day: d.day,
+      cooking: rows.map((r) => getRecipe(r.id)?.name).filter((n): n is string => !!n),
+      groups: groupItems(
+        rows.map((r) => r.id),
+        settings,
+        false
+      ),
+    };
+  });
 }
 
 /**

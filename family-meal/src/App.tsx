@@ -7,10 +7,13 @@ import ShoppingView from './components/ShoppingView';
 import TabBar, { TAB_BAR_HEIGHT } from './components/TabBar';
 import { getRecipe } from './data/recipes';
 import { DEFAULT_SETTINGS, Settings, Slot, View, WeekPlan } from './types';
-import { dayRecipeIds, generateWeek, swapMeal } from './utils/planner';
+import { dayRecipeIds, generateWeek, planRecipeIds, swapMeal } from './utils/planner';
 import { newSeed } from './utils/random';
 import { KEYS, load, save } from './utils/storage';
 import { C } from './theme';
+
+/** 몇 개의 메뉴까지 "최근에 나왔다"고 기억할지. 레시피 수보다 조금 크게 잡았다. */
+const HISTORY_SIZE = 90;
 
 export default function App() {
   const [settings, setSettings] = useState<Settings>(() => ({
@@ -23,15 +26,21 @@ export default function App() {
     return generateWeek(newSeed(), DEFAULT_SETTINGS);
   });
   const [checked, setChecked] = useState<string[]>(() => load<string[]>(KEYS.checked, []));
+  /** 최근 몇 주에 이미 올렸던 메뉴. 매주 같은 국이 나오지 않게 하는 재료다. */
+  const [history, setHistory] = useState<string[]>(() => load<string[]>(KEYS.history, []));
   const [view, setView] = useState<View>('plan');
   const [openRecipe, setOpenRecipe] = useState<string | null>(null);
 
   useEffect(() => save(KEYS.settings, settings), [settings]);
   useEffect(() => save(KEYS.plan, plan), [plan]);
   useEffect(() => save(KEYS.checked, checked), [checked]);
+  useEffect(() => save(KEYS.history, history), [history]);
 
   const regenerate = (seed = newSeed(), next = settings) => {
-    setPlan(generateWeek(seed, next));
+    // 지금 상에 올라 있던 메뉴를 이력 맨 앞에 넣어, 새 식단이 그걸 피해 가게 한다.
+    const past = Array.from(new Set(planRecipeIds(plan).concat(history))).slice(0, HISTORY_SIZE);
+    setHistory(past);
+    setPlan(generateWeek(seed, next, past));
     // 식단이 바뀌면 필요한 재료도 달라진다. 담아 둔 체크는 의미가 없어지므로 비운다.
     setChecked([]);
   };
@@ -44,7 +53,9 @@ export default function App() {
 
   const reset = () => {
     setSettings(DEFAULT_SETTINGS);
-    regenerate(newSeed(), DEFAULT_SETTINGS);
+    setHistory([]);
+    setPlan(generateWeek(newSeed(), DEFAULT_SETTINGS));
+    setChecked([]);
     setView('plan');
   };
 

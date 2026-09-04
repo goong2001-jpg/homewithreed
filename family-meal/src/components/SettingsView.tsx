@@ -198,6 +198,13 @@ export default function SettingsView({ settings, onChange, onReset }: Props) {
 
       <div style={{ ...CARD, marginBottom: 12 }}>
         <Switch
+          text="장보기 줄이기"
+          hint="아침은 네 가지를 돌려 먹고 반찬은 이틀씩 먹습니다. 이미 사기로 한 재료를 다시 쓰는 메뉴를 앞세워 살 것을 줄입니다."
+          on={settings.saveShopping}
+          onToggle={() => set({ saveShopping: !settings.saveShopping })}
+        />
+        <div style={{ height: 1, background: C.border, margin: '12px 0' }} />
+        <Switch
           text="매운 메뉴 빼기"
           hint="김치찌개·제육볶음처럼 아이가 못 먹는 메뉴를 아예 추천하지 않습니다."
           on={settings.noSpicy}
