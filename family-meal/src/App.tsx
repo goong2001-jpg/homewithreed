@@ -7,7 +7,7 @@ import ShoppingView from './components/ShoppingView';
 import TabBar, { TAB_BAR_HEIGHT } from './components/TabBar';
 import { getRecipe } from './data/recipes';
 import { DEFAULT_SETTINGS, Settings, Slot, View, WeekPlan } from './types';
-import { generateWeek, swapMeal } from './utils/planner';
+import { dayRecipeIds, generateWeek, swapMeal } from './utils/planner';
 import { newSeed } from './utils/random';
 import { KEYS, load, save } from './utils/storage';
 import { C } from './theme';
@@ -58,6 +58,35 @@ export default function App() {
 
   const recipe = useMemo(() => (openRecipe ? getRecipe(openRecipe) : undefined), [openRecipe]);
 
+  /**
+   * 잘 먹는 메뉴와 뺀 메뉴는 서로 반대말이라 한쪽을 켜면 다른 쪽은 꺼 준다.
+   * 별 하나 눌렀다고 이번 주 상을 통째로 바꾸면 놀라니, 식단은 그대로 두고
+   * 뺀 메뉴가 이번 주에 올라 있을 때만 그 자리를 다른 메뉴로 갈아 끼운다.
+   */
+  const rate = (id: string, kind: 'favorites' | 'excluded') => {
+    const other = kind === 'favorites' ? 'excluded' : 'favorites';
+    const turningOn = !settings[kind].includes(id);
+    const next: Settings = {
+      ...settings,
+      [kind]: turningOn ? [...settings[kind], id] : settings[kind].filter((x) => x !== id),
+      [other]: settings[other].filter((x) => x !== id),
+    };
+    setSettings(next);
+
+    if (kind === 'excluded' && turningOn) {
+      setPlan((p) => {
+        let updated = p;
+        p.days.forEach((d, i) =>
+          dayRecipeIds(d).forEach(({ slot, id: used }) => {
+            if (used === id) updated = swapMeal(updated, i, slot, next);
+          })
+        );
+        return updated;
+      });
+      setChecked([]);
+    }
+  };
+
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: C.bg }}>
       <main style={{ padding: `16px 16px ${TAB_BAR_HEIGHT + 24}px` }}>
@@ -86,7 +115,15 @@ export default function App() {
       </main>
 
       {recipe && (
-        <RecipeSheet recipe={recipe} servings={settings.servings} onClose={() => setOpenRecipe(null)} />
+        <RecipeSheet
+          recipe={recipe}
+          servings={settings.servings}
+          favorite={settings.favorites.includes(recipe.id)}
+          excluded={settings.excluded.includes(recipe.id)}
+          onToggleFavorite={() => rate(recipe.id, 'favorites')}
+          onToggleExcluded={() => rate(recipe.id, 'excluded')}
+          onClose={() => setOpenRecipe(null)}
+        />
       )}
 
       <TabBar active={view} onChange={setView} />

@@ -71,11 +71,13 @@ export default function PlanView({ plan, settings, onRegenerate, onSwap, onPick 
           onToggle={() => setOpen(open === i ? null : i)}
           onPick={onPick}
           onSwap={(slot) => onSwap(i, slot)}
+          favorites={settings.favorites}
         />
       ))}
 
       <p style={{ fontSize: 12, color: C.muted, lineHeight: 1.6, margin: '4px 2px 0' }}>
         메뉴를 누르면 재료와 순서, 아기 몫 만드는 법이 나옵니다. 🔄 는 그 한 끼만 다른 메뉴로 바꿉니다.
+        레시피 안에서 <b>잘 먹어요 / 안 먹어요</b>를 눌러 두면 다음 추천부터 반영됩니다.
       </p>
     </div>
   );

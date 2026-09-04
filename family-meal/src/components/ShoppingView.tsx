@@ -17,8 +17,14 @@ export default function ShoppingView({ plan, settings, checked, onToggle, onClea
   const checkedSet = new Set(checked);
 
   const visible = groups
-    .map((g) => ({ ...g, items: g.items.filter((i) => !(settings.hidePantry && i.pantry)) }))
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((i) => !i.have && !(settings.hidePantry && i.pantry)),
+    }))
     .filter((g) => g.items.length > 0);
+
+  // 냉장고에 있다고 적어 둔 재료는 사러 갈 목록에서 빼고 따로 모아 둔다.
+  const atHome = groups.flatMap((g) => g.items).filter((i) => i.have);
 
   const all = visible.flatMap((g) => g.items);
   const done = all.filter((i) => checkedSet.has(i.key)).length;
@@ -158,6 +164,20 @@ export default function ShoppingView({ plan, settings, checked, onToggle, onClea
           })}
         </div>
       ))}
+
+      {atHome.length > 0 && (
+        <div style={{ ...CARD, marginBottom: 10, background: '#f6f9f7' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.good, marginBottom: 6 }}>
+            집에 있어서 뺐습니다 ({atHome.length}개)
+          </div>
+          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>
+            {atHome.map((i) => `${i.name} ${formatQty(i.qty, i.unit)}`).join(' · ')}
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>
+            양이 모자라면 설정에서 냉장고 재료를 지우세요.
+          </div>
+        </div>
+      )}
 
       {settings.hidePantry && (
         <p style={{ fontSize: 12, color: C.muted, lineHeight: 1.6, margin: '4px 2px 0' }}>

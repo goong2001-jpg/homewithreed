@@ -1,5 +1,6 @@
 import { getRecipe } from '../data/recipes';
 import { Aisle, AISLE_ORDER, Ingredient, Settings, WeekPlan } from '../types';
+import { isAtHome } from './ingredients';
 import { planRecipeIds } from './planner';
 
 export interface ShopItem {
@@ -10,6 +11,8 @@ export interface ShopItem {
   unit: string;
   aisle: Aisle;
   pantry: boolean;
+  /** 냉장고에 이미 있다고 적어 둔 재료 */
+  have: boolean;
   /** 이 재료가 들어가는 메뉴 이름들 */
   usedIn: string[];
 }
@@ -76,6 +79,7 @@ export function buildShoppingList(plan: WeekPlan, settings: Settings): AisleGrou
       unit: ing.unit,
       aisle: ing.aisle,
       pantry: !!ing.pantry,
+      have: false,
       usedIn: from ? [from] : [],
     });
   };
@@ -91,6 +95,7 @@ export function buildShoppingList(plan: WeekPlan, settings: Settings): AisleGrou
   const items = Array.from(merged.values()).map((item) => ({
     ...item,
     qty: scaleQty(item.qty, item.unit, settings.servings),
+    have: isAtHome(settings.haveAtHome, item.name),
   }));
 
   return AISLE_ORDER.map((aisle) => ({
@@ -99,11 +104,14 @@ export function buildShoppingList(plan: WeekPlan, settings: Settings): AisleGrou
   })).filter((g) => g.items.length > 0);
 }
 
-/** 장보기 목록을 카톡이나 메모장에 붙여 넣을 수 있는 글로 만든다. */
+/**
+ * 장보기 목록을 카톡이나 메모장에 붙여 넣을 수 있는 글로 만든다.
+ * 냉장고에 이미 있는 것은 사러 가는 목록에서 뺀다.
+ */
 export function toShareText(groups: AisleGroup[], hidePantry: boolean): string {
   const lines: string[] = ['[이번 주 장보기]'];
   for (const g of groups) {
-    const items = g.items.filter((i) => !(hidePantry && i.pantry));
+    const items = g.items.filter((i) => !i.have && !(hidePantry && i.pantry));
     if (items.length === 0) continue;
     lines.push('', `■ ${g.aisle}`);
     items.forEach((i) => lines.push(`- ${i.name} ${formatQty(i.qty, i.unit)}`));

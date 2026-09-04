@@ -6,12 +6,24 @@ import { C } from '../theme';
 interface Props {
   recipe: Recipe;
   servings: number;
+  favorite: boolean;
+  excluded: boolean;
+  onToggleFavorite: () => void;
+  onToggleExcluded: () => void;
   onClose: () => void;
 }
 
 const EASE_LABEL = ['', '아주 쉬움', '보통', '손이 좀 감'];
 
-export default function RecipeSheet({ recipe, servings, onClose }: Props) {
+export default function RecipeSheet({
+  recipe,
+  servings,
+  favorite,
+  excluded,
+  onToggleFavorite,
+  onToggleExcluded,
+  onClose,
+}: Props) {
   return (
     <div
       onClick={onClose}
@@ -88,11 +100,25 @@ export default function RecipeSheet({ recipe, servings, onClose }: Props) {
         <Note icon="👶" title="아기(16개월) 몫" body={recipe.babyTip} bg="#f1f8f4" />
         {recipe.kidTip && <Note icon="🧒" title="7살 팁" body={recipe.kidTip} bg={C.accentSoft} />}
 
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <Verdict on={favorite} onClick={onToggleFavorite} color={C.accent}>
+            {favorite ? '⭐ 잘 먹는 메뉴' : '☆ 잘 먹어요'}
+          </Verdict>
+          <Verdict on={excluded} onClick={onToggleExcluded} color={C.warn}>
+            {excluded ? '🚫 뺀 메뉴' : '안 먹어요'}
+          </Verdict>
+        </div>
+        <p style={{ fontSize: 12, color: C.muted, lineHeight: 1.6, margin: '8px 2px 0' }}>
+          {excluded
+            ? '이번 주 상에서 바로 내리고, 앞으로도 추천하지 않습니다. 설정에서 되돌릴 수 있습니다.'
+            : '⭐ 는 다음 추천부터 먼저 뽑고, 안 먹는다고 하면 그 자리를 바로 다른 메뉴로 바꿉니다.'}
+        </p>
+
         <button
           onClick={onClose}
           style={{
             width: '100%',
-            marginTop: 18,
+            marginTop: 14,
             padding: '13px 0',
             background: C.accent,
             color: '#fff',
@@ -124,6 +150,38 @@ function Chip({ children, warn }: { children: React.ReactNode; warn?: boolean })
     >
       {children}
     </span>
+  );
+}
+
+function Verdict({
+  children,
+  on,
+  color,
+  onClick,
+}: {
+  children: React.ReactNode;
+  on: boolean;
+  color: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      style={{
+        flex: 1,
+        padding: '11px 0',
+        borderRadius: 12,
+        border: `1px solid ${on ? color : C.border}`,
+        background: on ? color : '#fff',
+        color: on ? '#fff' : C.text,
+        fontSize: 13.5,
+        fontWeight: on ? 700 : 500,
+        cursor: 'pointer',
+      }}
+    >
+      {children}
+    </button>
   );
 }
 

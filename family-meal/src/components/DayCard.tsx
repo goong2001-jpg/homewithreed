@@ -11,6 +11,7 @@ interface Props {
   onToggle: () => void;
   onPick: (recipeId: string) => void;
   onSwap: (slot: Slot) => void;
+  favorites: string[];
 }
 
 const ROW_LABEL: Record<Slot, string> = {
@@ -21,7 +22,7 @@ const ROW_LABEL: Record<Slot, string> = {
   side: '곁들임',
 };
 
-export default function DayCard({ plan, today, open, onToggle, onPick, onSwap }: Props) {
+export default function DayCard({ plan, today, open, onToggle, onPick, onSwap, favorites }: Props) {
   const rows = dayRecipeIds(plan);
   const minutes = rows.reduce((sum, r) => sum + (getRecipe(r.id)?.minutes ?? 0), 0);
   // 카드를 접었을 때는 그날 저녁 상만 보이면 충분하다.
@@ -116,6 +117,7 @@ export default function DayCard({ plan, today, open, onToggle, onPick, onSwap }:
                   }}
                 >
                   {r.name}
+                  {favorites.includes(r.id) && <span title="잘 먹는 메뉴"> ⭐</span>}
                   {r.spicy && <span title="매운 메뉴"> 🌶</span>}
                   <span style={{ color: C.muted, fontSize: 12 }}> · {r.minutes}분</span>
                 </button>

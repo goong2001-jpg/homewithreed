@@ -1,5 +1,6 @@
 import { RECIPES } from '../data/recipes';
 import { DayPlan, Recipe, Settings, Slot, WeekPlan } from '../types';
+import { countAtHome } from './ingredients';
 import { makeRng } from './random';
 
 export const DAY_NAMES = ['월', '화', '수', '목', '금', '토', '일'];
@@ -20,6 +21,7 @@ const MIN_GAP: Record<Slot, number> = {
 export function candidates(slot: Slot, settings: Settings, maxMinutes: number): Recipe[] {
   return RECIPES.filter((r) => {
     if (r.slot !== slot) return false;
+    if (settings.excluded.includes(r.id)) return false;
     if (r.allergens.some((a) => settings.avoid.includes(a))) return false;
     if (settings.noSpicy && r.spicy) return false;
     return r.minutes <= maxMinutes;
@@ -35,7 +37,10 @@ function pool(slot: Slot, settings: Settings): Recipe[] {
     const found = candidates(slot, settings, limit);
     if (found.length > 0) return found;
   }
-  return candidates(slot, settings, Infinity);
+  const anyTime = candidates(slot, settings, Infinity);
+  if (anyTime.length > 0) return anyTime;
+  // 뺀 메뉴가 너무 많아 한 자리가 통째로 비면 빈 상을 내는 것보다는 낫다.
+  return candidates(slot, { ...settings, excluded: [] }, Infinity);
 }
 
 interface Ctx {
@@ -52,12 +57,20 @@ interface Ctx {
   dayProteins: Set<string>;
   /** 오늘 이미 쓴 주재료(각 레시피의 첫 재료) */
   dayHeads: Set<string>;
+  /** 오늘 지금까지 쌓인 채소 점수 */
+  dayVeg: number;
   /** 어제 저녁 메인의 단백질원 */
   prevMainProtein?: string;
 }
 
-function score(r: Recipe, day: number, slot: Slot, ctx: Ctx, rng: () => number): number {
+function score(r: Recipe, day: number, slot: Slot, ctx: Ctx, rng: () => number, settings: Settings): number {
   let s = rng() * 10;
+
+  // 식구들이 잘 먹는다고 표시한 메뉴는 확실히 앞에 세운다.
+  if (settings.favorites.includes(r.id)) s += 25;
+
+  // 냉장고에 있는 재료를 쓰는 메뉴일수록 장바구니가 가벼워진다.
+  s += countAtHome(r, settings.haveAtHome) * 7;
 
   const last = ctx.lastUsed.get(r.id);
   if (last !== undefined) {
@@ -70,8 +83,8 @@ function score(r: Recipe, day: number, slot: Slot, ctx: Ctx, rng: () => number):
     const used = ctx.proteinCount.get(r.protein) ?? 0;
     s -= used * 8;
     if (r.protein !== 'none' && r.protein === ctx.prevMainProtein) s -= 20;
-    // 생선은 주 2회를 목표로 삼는다.
-    if (r.protein === 'fish' && ctx.fishCount < 2) s += 14;
+    // 생선은 주 2회가 목표다. 주 후반까지 못 채웠으면 만회하도록 크게 민다.
+    if (r.protein === 'fish' && ctx.fishCount < 2) s += 14 + Math.max(0, day - 3) * 18;
   }
 
   // 한 상에 같은 재료가 두 번 오르면 종일 같은 걸 먹는 느낌이 든다.
@@ -92,29 +105,33 @@ function score(r: Recipe, day: number, slot: Slot, ctx: Ctx, rng: () => number):
   if (r.calcium && ctx.calciumCount < 4) s += 6;
 
   if (slot === 'side' || slot === 'onedish') s += r.veg * 4;
+  // 곁들임은 그날 마지막으로 정하는 자리다. 여기서 하루 채소량을 채운다.
+  if (slot === 'side' && ctx.dayVeg + r.veg >= 4) s += 25;
   // 손이 덜 가는 쪽을 기본으로 고른다.
   s += (3 - r.ease) * 3;
 
   return s;
 }
 
-function pick(list: Recipe[], day: number, slot: Slot, ctx: Ctx, rng: () => number): Recipe {
+function pick(list: Recipe[], day: number, slot: Slot, ctx: Ctx, rng: () => number, settings: Settings): Recipe {
   let best = list[0];
   let bestScore = -Infinity;
   for (const r of list) {
-    const s = score(r, day, slot, ctx, rng);
+    const s = score(r, day, slot, ctx, rng, settings);
     if (s > bestScore) {
       bestScore = s;
       best = r;
     }
   }
   ctx.lastUsed.set(best.id, day);
-  if (best.protein === 'fish') ctx.fishCount += 1;
+  // 생선 횟수는 국·메인만 센다. 아침 참치주먹밥까지 세면 저녁 생선을 안 넣게 된다.
+  if (best.protein === 'fish' && (slot === 'soup' || slot === 'main')) ctx.fishCount += 1;
   if (best.calcium) ctx.calciumCount += 1;
   if (best.spicy) ctx.spicyCount += 1;
   if (slot === 'soup' || slot === 'main' || slot === 'side') ctx.dinnerMinutes += best.minutes;
   if (best.protein !== 'none') ctx.dayProteins.add(best.protein);
   ctx.dayHeads.add(best.ingredients[0].name);
+  ctx.dayVeg += best.veg;
   if (slot === 'soup' || slot === 'main') {
     ctx.proteinCount.set(best.protein, (ctx.proteinCount.get(best.protein) ?? 0) + 1);
   }
@@ -141,6 +158,7 @@ export function generateWeek(seed: number, settings: Settings): WeekPlan {
     dinnerMinutes: 0,
     dayProteins: new Set(),
     dayHeads: new Set(),
+    dayVeg: 0,
   };
 
   const days: DayPlan[] = [];
@@ -148,11 +166,12 @@ export function generateWeek(seed: number, settings: Settings): WeekPlan {
     ctx.dinnerMinutes = 0;
     ctx.dayProteins = new Set();
     ctx.dayHeads = new Set();
-    const breakfast = pick(pools.breakfast, day, 'breakfast', ctx, rng);
-    const lunch = pick(pools.onedish, day, 'onedish', ctx, rng);
-    const soup = pick(pools.soup, day, 'soup', ctx, rng);
-    const main = pick(pools.main, day, 'main', ctx, rng);
-    const side = pick(pools.side, day, 'side', ctx, rng);
+    ctx.dayVeg = 0;
+    const breakfast = pick(pools.breakfast, day, 'breakfast', ctx, rng, settings);
+    const lunch = pick(pools.onedish, day, 'onedish', ctx, rng, settings);
+    const soup = pick(pools.soup, day, 'soup', ctx, rng, settings);
+    const main = pick(pools.main, day, 'main', ctx, rng, settings);
+    const side = pick(pools.side, day, 'side', ctx, rng, settings);
     ctx.prevMainProtein = main.protein;
     days.push({
       day,

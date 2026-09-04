@@ -87,6 +87,12 @@ export interface Settings {
   maxMinutes: number;
   /** 이미 갖고 있는 양념을 장보기 목록에서 접어둘지 */
   hidePantry: boolean;
+  /** 식구들이 잘 먹는 메뉴. 추천에서 먼저 뽑는다. */
+  favorites: string[];
+  /** 안 먹는 메뉴. 다시 추천하지 않는다. */
+  excluded: string[];
+  /** 냉장고에 이미 있는 재료. 이걸 쓰는 메뉴를 먼저 뽑고, 장보기에서는 빼 준다. */
+  haveAtHome: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -95,6 +101,9 @@ export const DEFAULT_SETTINGS: Settings = {
   noSpicy: false,
   maxMinutes: 40,
   hidePantry: true,
+  favorites: [],
+  excluded: [],
+  haveAtHome: [],
 };
 
 export interface DayPlan {

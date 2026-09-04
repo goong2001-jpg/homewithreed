@@ -1,4 +1,4 @@
-import { getRecipe } from '../data/recipes';
+import { getRecipe, RECIPES } from '../data/recipes';
 import { DEFAULT_SETTINGS, Settings } from '../types';
 import { generateWeek, planRecipeIds } from './planner';
 
@@ -95,4 +95,47 @@ test('같은 날 점심·국·메인의 단백질원이 겹치는 날은 주 1�
     }).length;
     expect(dupDays).toBeLessThanOrEqual(1);
   }
+});
+
+test('안 먹는다고 뺀 메뉴는 추천에 나오지 않는다', () => {
+  const settings: Settings = {
+    ...DEFAULT_SETTINGS,
+    excluded: ['m-bulgogi', 's-kimchijjigae', 'o-curry', 'd-myeolchi'],
+  };
+  SEEDS.forEach((seed) => {
+    const ids = planRecipeIds(generateWeek(seed, settings));
+    settings.excluded.forEach((id) => expect(ids).not.toContain(id));
+  });
+});
+
+test('한 자리의 메뉴를 전부 빼 버려도 빈자리 없이 채운다', () => {
+  const allSoups = RECIPES.filter((r) => r.slot === 'soup').map((r) => r.id);
+  const plan = generateWeek(9, { ...DEFAULT_SETTINGS, excluded: allSoups });
+  plan.days.forEach((d) => expect(getRecipe(d.soup)).toBeDefined());
+});
+
+test('잘 먹는다고 표시한 메뉴는 그 주에 반드시 올라온다', () => {
+  const settings: Settings = { ...DEFAULT_SETTINGS, favorites: ['m-bulgogi', 'o-curry'] };
+  SEEDS.forEach((seed) => {
+    const ids = planRecipeIds(generateWeek(seed, settings));
+    expect(ids).toContain('m-bulgogi');
+    expect(ids).toContain('o-curry');
+  });
+});
+
+test('냉장고에 있는 재료를 쓰는 메뉴가 더 많이 뽑힌다', () => {
+  const have = ['두부', '애호박'];
+  const countUsing = (settings: Settings) => {
+    let used = 0;
+    for (let seed = 0; seed < 20; seed++) {
+      planRecipeIds(generateWeek(seed * 31 + 5, settings)).forEach((id) => {
+        const r = getRecipe(id)!;
+        if (r.ingredients.some((i) => have.includes(i.name))) used += 1;
+      });
+    }
+    return used;
+  };
+  const before = countUsing(DEFAULT_SETTINGS);
+  const after = countUsing({ ...DEFAULT_SETTINGS, haveAtHome: have });
+  expect(after).toBeGreaterThan(before);
 });

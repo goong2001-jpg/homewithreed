@@ -62,3 +62,14 @@ test('밥이 많이 들어간 식단일수록 쌀도 많이 산다', () => {
   // 저녁 7끼분(2.5kg)은 어떤 식단에서도 기본으로 깔린다.
   expect(rice(1)).toBeGreaterThanOrEqual(2.5);
 });
+
+test('냉장고에 있는 재료는 사러 갈 목록에서 빠진다', () => {
+  const settings: Settings = { ...DEFAULT_SETTINGS, haveAtHome: ['양파', '당근'] };
+  const groups = buildShoppingList(generateWeek(42, settings), settings);
+  const items = groups.flatMap((g) => g.items);
+  const onion = items.find((i) => i.name === '양파');
+  expect(onion?.have).toBe(true);
+  expect(toShareText(groups, true)).not.toContain('양파');
+  // 목록에서 감추는 것이지 재료 자체가 사라지는 것은 아니다.
+  expect(onion!.qty).toBeGreaterThan(0);
+});
