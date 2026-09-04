@@ -132,4 +132,4 @@ export interface WeekPlan {
   days: DayPlan[];
 }
 
-export type View = 'plan' | 'shopping' | 'balance' | 'settings';
+export type View = 'plan' | 'fridge' | 'shopping' | 'balance' | 'settings';

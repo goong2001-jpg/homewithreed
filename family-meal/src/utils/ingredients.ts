@@ -35,22 +35,38 @@ export const QUICK_PICKS = [
   '치즈',
 ];
 
-/** "소 고기" 와 "소고기"를 같은 것으로 보기 위해 공백을 지운다. */
-function normalize(name: string): string {
+/** "소 고기"와 "소고기"를 같은 것으로 보기 위해 공백을 지운다. */
+function squash(name: string): string {
   return name.replace(/\s+/g, '');
 }
 
 /**
- * 냉장고에 있다고 적어 둔 것과 레시피 재료가 같은 것인지 본다.
- * "소고기"라고만 적어도 '소고기 국거리'·'소고기 다짐육'이 다 걸리도록
- * 양쪽 방향의 부분 일치를 인정한다.
+ * 냉장고에 적어 둔 것과 레시피 재료가 같은 것인지 본다.
+ *
+ * 단순 부분 일치는 쓰지 않는다 — "두부"가 "순두부"까지 잡아서
+ * 순두부가 없는데도 "바로 만들 수 있다"고 말해 버린다.
+ * 대신 재료 이름을 낱말로 쪼개, 낱말과 **같거나 그 낱말이 시작되는** 경우만 인정한다.
+ *   소고기 → '소고기 국거리'·'불고기용 소고기' ○ / 두부 → '순두부' ×
+ * 한 글자짜리(무 등)는 딱 맞을 때만 인정한다. '파'가 '대파'를 잡으면 곤란하다.
  */
 export function matchesAtHome(have: string, ingredientName: string): boolean {
-  const a = normalize(have);
-  const b = normalize(ingredientName);
-  if (a.length < 2 || b.length === 0) return false;
-  if (b.includes(a) || a.includes(b)) return true;
-  return (ALIASES[have] ?? []).some((alias) => b.includes(normalize(alias)));
+  const target = squash(ingredientName);
+  if (target.length === 0) return false;
+
+  // "소고기 다짐육"처럼 길게 적었을 때도 첫 낱말로 걸리게 한다.
+  // 뒷낱말은 '다짐육'·'국거리' 같은 부위라서 쓰지 않는다 —
+  // 그걸 쓰면 소고기 다짐육이 돼지고기 다짐육까지 잡는다.
+  const first = have.trim().split(/\s+/)[0] ?? '';
+  const keys = [squash(have), squash(first)].filter((k) => k.length > 0);
+  const words = [target, ...ingredientName.trim().split(/\s+/).map(squash)];
+
+  for (const key of keys) {
+    for (const word of words) {
+      if (word === key) return true;
+      if (key.length >= 2 && word.startsWith(key)) return true;
+    }
+  }
+  return (ALIASES[have] ?? []).some((alias) => target.includes(squash(alias)));
 }
 
 export function isAtHome(haveList: string[], ingredientName: string): boolean {
