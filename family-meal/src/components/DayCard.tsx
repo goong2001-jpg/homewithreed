@@ -1,7 +1,7 @@
 import React from 'react';
 import { getRecipe } from '../data/recipes';
 import { DayPlan, Slot } from '../types';
-import { DAY_NAMES, dayRecipeIds } from '../utils/planner';
+import { cookedRecipeIds, DAY_NAMES, dayRecipeIds } from '../utils/planner';
 import { C, CARD } from '../theme';
 
 interface Props {
@@ -24,7 +24,10 @@ const ROW_LABEL: Record<Slot, string> = {
 
 export default function DayCard({ plan, today, open, onToggle, onPick, onSwap, favorites }: Props) {
   const rows = dayRecipeIds(plan);
-  const minutes = rows.reduce((sum, r) => sum + (getRecipe(r.id)?.minutes ?? 0), 0);
+  // 어제 만들어 둔 반찬은 오늘 조리 시간에 넣지 않는다.
+  const minutes = cookedRecipeIds(plan).reduce((sum, r) => sum + (getRecipe(r.id)?.minutes ?? 0), 0);
+  const reused = (slot: string) =>
+    (slot === 'side' && plan.reusedSide) || (slot === 'breakfast' && plan.reusedBreakfast);
   // 카드를 접었을 때는 그날 저녁 상만 보이면 충분하다.
   const dinner = rows
     .filter((r) => r.slot === 'main' || r.slot === 'soup')
@@ -119,7 +122,9 @@ export default function DayCard({ plan, today, open, onToggle, onPick, onSwap, f
                   {r.name}
                   {favorites.includes(r.id) && <span title="잘 먹는 메뉴"> ⭐</span>}
                   {r.spicy && <span title="매운 메뉴"> 🌶</span>}
-                  <span style={{ color: C.muted, fontSize: 12 }}> · {r.minutes}분</span>
+                  <span style={{ color: C.muted, fontSize: 12 }}>
+                    {reused(slot) ? ' · 만들어 둔 것' : ` · ${r.minutes}분`}
+                  </span>
                 </button>
                 <button
                   onClick={() => onSwap(slot)}

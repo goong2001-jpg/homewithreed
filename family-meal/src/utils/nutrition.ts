@@ -43,8 +43,10 @@ export function weekBalance(plan: WeekPlan): Balance {
     for (const { slot, id } of dayRecipeIds(day)) {
       const r = getRecipe(id);
       if (!r) continue;
-      minutes += r.minutes;
-      if (slot === 'soup' || slot === 'main' || slot === 'side') dinnerMinutes += r.minutes;
+      // 어제 만들어 둔 것을 먹는 날은 오늘의 조리 시간이 아니다.
+      const cooked = !(slot === 'side' && day.reusedSide) && !(slot === 'breakfast' && day.reusedBreakfast);
+      if (cooked) minutes += r.minutes;
+      if (cooked && (slot === 'soup' || slot === 'main' || slot === 'side')) dinnerMinutes += r.minutes;
       if (slot === 'soup' || slot === 'main') {
         counts.set(r.protein, (counts.get(r.protein) ?? 0) + 1);
         if (r.protein === 'fish') fish += 1;

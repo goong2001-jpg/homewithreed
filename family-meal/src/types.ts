@@ -87,6 +87,11 @@ export interface Settings {
   maxMinutes: number;
   /** 이미 갖고 있는 양념을 장보기 목록에서 접어둘지 */
   hidePantry: boolean;
+  /**
+   * 장보기 줄이기. 켜면 아침은 네 가지를 돌려 먹고 반찬은 이틀씩 먹으며,
+   * 이미 사기로 한 재료를 다시 쓰는 메뉴를 앞세운다.
+   */
+  saveShopping: boolean;
   /** 식구들이 잘 먹는 메뉴. 추천에서 먼저 뽑는다. */
   favorites: string[];
   /** 안 먹는 메뉴. 다시 추천하지 않는다. */
@@ -101,6 +106,7 @@ export const DEFAULT_SETTINGS: Settings = {
   noSpicy: false,
   maxMinutes: 40,
   hidePantry: true,
+  saveShopping: true,
   favorites: [],
   excluded: [],
   haveAtHome: [],
@@ -114,6 +120,9 @@ export interface DayPlan {
   soup: string;
   main: string;
   side: string;
+  /** 어제(또는 며칠 전) 만든 것을 그대로 먹는 자리 — 오늘은 안 만든다 */
+  reusedBreakfast?: boolean;
+  reusedSide?: boolean;
 }
 
 export interface WeekPlan {

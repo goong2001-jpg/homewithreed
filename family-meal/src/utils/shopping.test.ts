@@ -1,6 +1,6 @@
 import { DEFAULT_SETTINGS, Settings } from '../types';
 import { generateWeek } from './planner';
-import { buildShoppingList, formatQty, scaleQty, toShareText } from './shopping';
+import { buildDayLists, buildShoppingList, formatQty, scaleQty, toShareText } from './shopping';
 
 test('4인분 기준 수량을 인분 수에 맞춰 줄인다', () => {
   expect(scaleQty(400, 'g', 2)).toBe(200);
@@ -72,4 +72,46 @@ test('냉장고에 있는 재료는 사러 갈 목록에서 빠진다', () => {
   expect(toShareText(groups, true)).not.toContain('양파');
   // 목록에서 감추는 것이지 재료 자체가 사라지는 것은 아니다.
   expect(onion!.qty).toBeGreaterThan(0);
+});
+
+test('장보기 줄이기를 켜면 살 품목이 실제로 줄어든다', () => {
+  const count = (save: boolean) => {
+    const settings: Settings = { ...DEFAULT_SETTINGS, saveShopping: save };
+    let total = 0;
+    for (let i = 0; i < 20; i++) {
+      total += buildShoppingList(generateWeek(i * 137 + 11, settings), settings)
+        .flatMap((g) => g.items)
+        .filter((x) => !x.pantry).length;
+    }
+    return total / 20;
+  };
+  const on = count(true);
+  const off = count(false);
+  expect(`${on.toFixed(0)} < ${off.toFixed(0)}`).toBe(`${Math.min(on, off - 1).toFixed(0)} < ${off.toFixed(0)}`);
+});
+
+test('요일별 목록은 그날 만드는 메뉴만 담는다', () => {
+  const settings: Settings = { ...DEFAULT_SETTINGS, saveShopping: true };
+  const plan = generateWeek(21, settings);
+  const lists = buildDayLists(plan, settings);
+  expect(lists).toHaveLength(7);
+  lists.forEach((l, i) => {
+    // 어제 만들어 둔 자리(반찬·아침)만큼 그날 만드는 메뉴가 줄어든다.
+    const kept = (plan.days[i].reusedSide ? 1 : 0) + (plan.days[i].reusedBreakfast ? 1 : 0);
+    expect(l.cooking.length).toBe(5 - kept);
+  });
+  // 쌀은 콩나물밥·닭죽처럼 밥을 짓는 메뉴에서만 요일별에 나타난다.
+  lists.forEach((l) => {
+    const rice = l.groups.flatMap((g) => g.items).filter((i) => i.name === '쌀');
+    expect(rice.length).toBeLessThanOrEqual(1);
+  });
+});
+
+test('쌀은 여러 메뉴에 들어가도 한 줄로 합쳐진다', () => {
+  const settings: Settings = { ...DEFAULT_SETTINGS, servings: 4 };
+  const rice = buildShoppingList(generateWeek(3, settings), settings)
+    .flatMap((g) => g.items)
+    .filter((i) => i.name === '쌀');
+  expect(rice).toHaveLength(1);
+  expect(rice[0].unit).toBe('kg');
 });

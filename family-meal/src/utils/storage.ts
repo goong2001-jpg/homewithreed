@@ -5,6 +5,8 @@ export const KEYS = {
   settings: 'family_meal_settings',
   /** 장바구니에서 이미 담은 항목 키 목록 */
   checked: 'family_meal_checked',
+  /** 최근 몇 주에 올렸던 메뉴 id — 같은 메뉴가 매주 반복되지 않게 하는 데 쓴다 */
+  history: 'family_meal_history',
 } as const;
 
 export function load<T>(key: string, fallback: T): T {

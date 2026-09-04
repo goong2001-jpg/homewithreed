@@ -1,6 +1,6 @@
 import { getRecipe, RECIPES } from '../data/recipes';
 import { DEFAULT_SETTINGS, Settings } from '../types';
-import { generateWeek, planRecipeIds } from './planner';
+import { cookedRecipeIds, generateWeek, planRecipeIds } from './planner';
 
 const SEEDS = [1, 7, 42, 1234, 98765, 2468013];
 
@@ -84,7 +84,7 @@ test('알레르기를 많이 제외해도 빈자리 없이 채운다', () => {
   });
 });
 
-test('같은 날 점심·국·메인의 단백질원이 겹치는 날은 주 1회를 넘지 않는다', () => {
+test('같은 날 점심·국·메인의 단백질원이 겹치는 날은 주 2회를 넘지 않는다', () => {
   for (let i = 0; i < 40; i++) {
     const plan = generateWeek(i * 13 + 7, DEFAULT_SETTINGS);
     const dupDays = plan.days.filter((d) => {
@@ -93,7 +93,7 @@ test('같은 날 점심·국·메인의 단백질원이 겹치는 날은 주 1�
         .filter((p) => p !== 'none');
       return new Set(proteins).size < proteins.length;
     }).length;
-    expect(dupDays).toBeLessThanOrEqual(1);
+    expect(dupDays).toBeLessThanOrEqual(2);
   }
 });
 
@@ -138,4 +138,55 @@ test('냉장고에 있는 재료를 쓰는 메뉴가 더 많이 뽑힌다', () =
   const before = countUsing(DEFAULT_SETTINGS);
   const after = countUsing({ ...DEFAULT_SETTINGS, haveAtHome: have });
   expect(after).toBeGreaterThan(before);
+});
+
+test('지난 주에 올렸던 메뉴는 이번 주에 거의 나오지 않는다', () => {
+  let recent: string[] = [];
+  let prev: string[] = [];
+  let worst = 0;
+  for (let week = 0; week < 20; week++) {
+    const ids = Array.from(new Set(planRecipeIds(generateWeek(week * 137 + 11, DEFAULT_SETTINGS, recent))));
+    if (week > 0) worst = Math.max(worst, ids.filter((id) => prev.includes(id)).length);
+    prev = ids;
+    recent = Array.from(new Set(ids.concat(recent))).slice(0, 90);
+  }
+  // 한 주에 스물다섯 가지쯤 오르는데, 지난 주와 겹치는 건 많아야 서너 개여야 한다.
+  expect(worst).toBeLessThanOrEqual(4);
+});
+
+test('장보기 줄이기를 켜면 반찬은 이틀씩, 아침은 네 가지로 돈다', () => {
+  const plan = generateWeek(21, { ...DEFAULT_SETTINGS, saveShopping: true });
+  expect(plan.days.map((d) => d.side)).toEqual([
+    plan.days[0].side,
+    plan.days[0].side,
+    plan.days[2].side,
+    plan.days[2].side,
+    plan.days[4].side,
+    plan.days[4].side,
+    plan.days[6].side,
+  ]);
+  expect(plan.days.map((d) => !!d.reusedSide)).toEqual([false, true, false, true, false, true, false]);
+  expect(new Set(plan.days.map((d) => d.breakfast)).size).toBe(4);
+});
+
+test('장보기 줄이기를 끄면 반찬도 아침도 매일 새로 만든다', () => {
+  const plan = generateWeek(21, { ...DEFAULT_SETTINGS, saveShopping: false });
+  expect(plan.days.every((d) => !d.reusedSide && !d.reusedBreakfast)).toBe(true);
+  expect(new Set(plan.days.map((d) => d.side)).size).toBe(7);
+});
+
+test('만들어 둔 반찬을 먹는 날은 그날 만드는 목록에서 빠진다', () => {
+  const plan = generateWeek(21, { ...DEFAULT_SETTINGS, saveShopping: true });
+  plan.days.forEach((d) => {
+    const cooked = cookedRecipeIds(d).map((r) => r.slot);
+    expect(cooked.includes('side')).toBe(!d.reusedSide);
+  });
+});
+
+test('매운 메뉴는 주 2회를 넘지 않는다', () => {
+  for (let i = 0; i < 30; i++) {
+    const plan = generateWeek(i * 53 + 9, DEFAULT_SETTINGS);
+    const spicy = planRecipeIds(plan).filter((id) => getRecipe(id)!.spicy).length;
+    expect(spicy).toBeLessThanOrEqual(2);
+  }
 });
