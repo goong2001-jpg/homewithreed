@@ -9,6 +9,7 @@ interface Props {
 
 const TABS: { view: View; icon: string; label: string }[] = [
   { view: 'plan', icon: '🍽️', label: '식단' },
+  { view: 'fridge', icon: '🧊', label: '냉장고' },
   { view: 'shopping', icon: '🛒', label: '장보기' },
   { view: 'balance', icon: '🥗', label: '영양' },
   { view: 'settings', icon: '⚙️', label: '설정' },

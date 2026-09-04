@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import BalanceView from './components/BalanceView';
+import FridgeView from './components/FridgeView';
 import PlanView from './components/PlanView';
 import RecipeSheet from './components/RecipeSheet';
 import SettingsView from './components/SettingsView';
@@ -59,6 +60,13 @@ export default function App() {
     setView('plan');
   };
 
+  /**
+   * 냉장고 재료는 저장만 하고 식단은 건드리지 않는다.
+   * 재료 하나 넣을 때마다 이번 주 상이 뒤집히면 쓸 수가 없다 —
+   * 다시 짜는 건 냉장고 화면의 버튼으로 직접 하게 했다.
+   */
+  const setHaveAtHome = (haveAtHome: string[]) => setSettings({ ...settings, haveAtHome });
+
   const swap = (dayIndex: number, slot: Slot) => {
     setPlan((p) => swapMeal(p, dayIndex, slot, settings));
     setChecked([]);
@@ -107,6 +115,17 @@ export default function App() {
             settings={settings}
             onRegenerate={() => regenerate()}
             onSwap={swap}
+            onPick={setOpenRecipe}
+          />
+        )}
+        {view === 'fridge' && (
+          <FridgeView
+            settings={settings}
+            onChangeHave={setHaveAtHome}
+            onReplan={() => {
+              regenerate(plan.seed);
+              setView('plan');
+            }}
             onPick={setOpenRecipe}
           />
         )}

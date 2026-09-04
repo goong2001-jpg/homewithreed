@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { getRecipe } from '../data/recipes';
 import { ALLERGENS, Allergen, Settings } from '../types';
-import { QUICK_PICKS } from '../utils/ingredients';
 import { C, CARD } from '../theme';
 
 interface Props {
@@ -13,18 +12,7 @@ interface Props {
 const MINUTE_OPTIONS = [20, 30, 40, 60];
 
 export default function SettingsView({ settings, onChange, onReset }: Props) {
-  const [draft, setDraft] = useState('');
   const set = (patch: Partial<Settings>) => onChange({ ...settings, ...patch });
-
-  const addHave = (name: string) => {
-    const clean = name.trim();
-    if (clean.length < 2 || settings.haveAtHome.includes(clean)) return;
-    set({ haveAtHome: [...settings.haveAtHome, clean] });
-  };
-  const removeHave = (name: string) =>
-    set({ haveAtHome: settings.haveAtHome.filter((n) => n !== name) });
-
-  const quickPicks = QUICK_PICKS.filter((n) => !settings.haveAtHome.includes(n));
 
   const toggleAllergen = (a: Allergen) =>
     set({
@@ -74,96 +62,6 @@ export default function SettingsView({ settings, onChange, onReset }: Props) {
               </button>
             );
           })}
-        </div>
-      </div>
-
-      <div style={{ ...CARD, marginBottom: 12 }}>
-        <Label
-          text="냉장고에 있는 재료"
-          hint="여기 적은 재료를 쓰는 메뉴를 먼저 추천하고, 장보기 목록에서는 빼 줍니다."
-        />
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            addHave(draft);
-            setDraft('');
-          }}
-          style={{ display: 'flex', gap: 7, marginTop: 10 }}
-        >
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="예: 애호박"
-            aria-label="냉장고에 있는 재료 추가"
-            style={{
-              flex: 1,
-              padding: '10px 12px',
-              borderRadius: 10,
-              border: `1px solid ${C.border}`,
-              fontSize: 14,
-              minWidth: 0,
-            }}
-          />
-          <button
-            type="submit"
-            style={{
-              padding: '0 16px',
-              borderRadius: 10,
-              border: 'none',
-              background: C.accent,
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            추가
-          </button>
-        </form>
-
-        {settings.haveAtHome.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 10 }}>
-            {settings.haveAtHome.map((name) => (
-              <button
-                key={name}
-                onClick={() => removeHave(name)}
-                aria-label={`${name} 빼기`}
-                style={{
-                  padding: '7px 10px 7px 12px',
-                  borderRadius: 20,
-                  border: 'none',
-                  background: C.good,
-                  color: '#fff',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                {name} <span style={{ opacity: 0.75 }}>×</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div style={{ fontSize: 12, color: C.muted, marginTop: 12, marginBottom: 6 }}>자주 쓰는 재료</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {quickPicks.map((name) => (
-            <button
-              key={name}
-              onClick={() => addHave(name)}
-              style={{
-                padding: '6px 10px',
-                borderRadius: 20,
-                border: `1px solid ${C.border}`,
-                background: '#fff',
-                color: C.text,
-                fontSize: 12.5,
-                cursor: 'pointer',
-              }}
-            >
-              + {name}
-            </button>
-          ))}
         </div>
       </div>
 
