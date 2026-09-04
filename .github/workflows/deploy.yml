@@ -74,6 +74,12 @@ jobs:
           npm ci
           npm run build
 
+      - name: Build family-meal
+        working-directory: family-meal
+        run: |
+          npm ci
+          npm run build
+
       - name: Combine builds
         run: |
           mkdir -p site
@@ -92,6 +98,8 @@ jobs:
           cp -r chinese-learn/build/. site/chinese-learn/
           mkdir -p site/habit-talk
           cp -r habit-talk/build/. site/habit-talk/
+          mkdir -p site/family-meal
+          cp -r family-meal/build/. site/family-meal/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

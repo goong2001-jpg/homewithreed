@@ -1,0 +1,12 @@
+{
+  "short_name": "일주일 식단",
+  "name": "우리집 일주일 식단 - 식단·레시피·장보기",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#ff8a3d",
+  "background_color": "#fff8f0"
+}
