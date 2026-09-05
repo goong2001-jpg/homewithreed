@@ -1,0 +1,154 @@
+:root {
+  --bg: #12161c;
+  --card: #1b212b;
+  --line: #2b3442;
+  --text: #e8edf5;
+  --dim: #93a0b4;
+  --accent: #f5a524;
+  --live: #34d399;
+  --danger: #f87171;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  overscroll-behavior: none;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.view { display: flex; flex-direction: column; flex: 1; }
+.hidden { display: none !important; }
+
+/* ---- 입장 화면 ---- */
+.logo { font-size: 28px; margin: 24px 0 8px; letter-spacing: -0.5px; }
+.sub { color: var(--dim); line-height: 1.6; margin: 0 0 28px; font-size: 14px; }
+
+.field { display: block; margin-bottom: 16px; }
+.field span { display: block; font-size: 13px; color: var(--dim); margin-bottom: 6px; }
+.field input {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 18px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  outline: none;
+}
+.field input:focus { border-color: var(--accent); }
+
+button { font-family: inherit; cursor: pointer; }
+
+.primary {
+  width: 100%;
+  padding: 16px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #1b1200;
+  background: var(--accent);
+  border: 0;
+  border-radius: 12px;
+  margin-top: 8px;
+}
+.primary:disabled { opacity: 0.5; }
+
+.ghost {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--dim);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.msg { min-height: 20px; font-size: 13px; color: var(--dim); margin: 12px 0 0; line-height: 1.5; }
+.msg.error { color: var(--danger); }
+
+.tips { margin-top: auto; padding-top: 24px; font-size: 13px; color: var(--dim); }
+.tips summary { cursor: pointer; padding: 8px 0; }
+.tips ul { margin: 4px 0 0; padding-left: 18px; line-height: 1.7; }
+
+/* ---- 무전 화면 ---- */
+.bar { display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; }
+.ch { font-size: 20px; letter-spacing: 1px; }
+.ch b { color: var(--accent); }
+.status { font-size: 12px; color: var(--dim); margin-top: 4px; }
+
+.members { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; padding: 0; }
+.members li {
+  padding: 7px 13px;
+  font-size: 13px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--dim);
+}
+.members li.me { color: var(--text); }
+.members li.talking { border-color: var(--live); color: var(--live); }
+
+.nowTalking {
+  min-height: 22px;
+  font-size: 14px;
+  color: var(--live);
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.ptt {
+  flex: 1;
+  min-height: 220px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 24px;
+  color: var(--text);
+  touch-action: none;
+  user-select: none;
+  transition: background 0.08s, border-color 0.08s, transform 0.08s;
+}
+.ptt .pttIcon { font-size: 56px; }
+.ptt .pttText { font-size: 18px; font-weight: 700; }
+.ptt.on {
+  background: #3b2a00;
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: scale(0.99);
+}
+
+.row { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.toggle { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--dim); }
+.toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+.hint { font-size: 12px; color: var(--dim); text-align: center; margin: 14px 0 0; line-height: 1.6; }
+
+.unlock {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1b1200;
+  background: var(--accent);
+  border: 0;
+  border-radius: 999px;
+}

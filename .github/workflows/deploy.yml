@@ -100,6 +100,9 @@ jobs:
           cp -r habit-talk/build/. site/habit-talk/
           mkdir -p site/family-meal
           cp -r family-meal/build/. site/family-meal/
+          # walkie-talkie 는 빌드가 없는 정적 앱이라 그대로 복사한다.
+          mkdir -p site/walkie-talkie
+          cp -r walkie-talkie/. site/walkie-talkie/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
