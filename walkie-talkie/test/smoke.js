@@ -61,6 +61,16 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   await a.dispatchEvent('#pttBtn', 'pointerdown');
   await a.waitForTimeout(300);
   check('A 송신 중 표시', (await a.getAttribute('#pttBtn', 'class')).includes('on'));
+  // 게이트가 실제로 소리를 흘려보내는지 (마이크 레벨 바가 움직이는지)
+  let micMoved = false;
+  try {
+    await a.waitForFunction(() => parseFloat(document.getElementById('micBar').style.width) > 0,
+      null, { timeout: 8000, polling: 200 });
+    micMoved = true;
+  } catch (_) {}
+  check('송신 중 마이크 레벨이 잡힘 (게이트 열림)', micMoved,
+    await a.evaluate(() => document.getElementById('micBar').style.width || '0'));
+
   await b.waitForFunction(() => document.getElementById('nowTalking').textContent.includes('말하는 중'),
     null, { timeout: 5000, polling: 200 });
   check('B 에 "아빠 말하는 중" 뜸', (await b.textContent('#nowTalking')).includes('아빠'), await b.textContent('#nowTalking'));
@@ -70,6 +80,10 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
     null, { timeout: 5000, polling: 200 });
   check('손 떼면 송신 종료 전파', !(await b.textContent('#nowTalking')).includes('말하는 중'));
   check('버튼 원래대로', !(await a.getAttribute('#pttBtn', 'class')).includes('on'));
+  await a.waitForTimeout(1300);
+  check('손 떼면 마이크 레벨 0 (게이트 닫힘)',
+    parseFloat(await a.evaluate(() => document.getElementById('micBar').style.width)) === 0,
+    await a.evaluate(() => document.getElementById('micBar').style.width || '0'));
 
   // 허브(A)가 나갔을 때 B 가 허브를 이어받고, 새 사람(C)이 여전히 들어올 수 있는지
   console.log('... 허브 승계 확인');

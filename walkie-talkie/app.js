@@ -49,6 +49,7 @@
     localStream: null, micTrack: null,
     talking: false, locked: false, duplex: true,
     hubSeen: 0,
+    rawStream: null, gate: null, analyser: null, levelBuf: null, statsTimer: null,
     wakeLock: null, timer: null, audioCtx: null,
     logs: []
   };
@@ -97,6 +98,98 @@
     var chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     for (var i = 0; i < 10; i++) s += chars[Math.floor(Math.random() * chars.length)];
     return s;
+  }
+
+
+  /* ---------- 마이크 게이트 ----------
+   * PTT 를 트랙 on/off 로 하면, 꺼진 트랙으로 연결을 맺는 순간 한쪽 방향이
+   * 아예 '받기 전용' 으로 굳어버리는 폰이 있다(주로 사파리). 그래서 트랙은 항상 살려두고
+   * 소리 크기(gain)를 0/1 로 여닫는다. 덤으로 내 목소리 입력 레벨도 볼 수 있다.
+   */
+  function buildMicGate(stream) {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return stream;
+      if (!state.audioCtx) state.audioCtx = new AC();
+      var ctx = state.audioCtx;
+      if (ctx.resume) ctx.resume();
+
+      var src = ctx.createMediaStreamSource(stream);
+      var gain = ctx.createGain();
+      gain.gain.value = 0;
+      var dest = ctx.createMediaStreamDestination();
+      var analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+
+      src.connect(analyser);
+      src.connect(gain);
+      gain.connect(dest);
+
+      state.gate = gain;
+      state.analyser = analyser;
+      state.levelBuf = new Uint8Array(analyser.fftSize);
+
+      if (!dest.stream.getAudioTracks().length) { state.gate = null; return stream; }
+      return dest.stream;
+    } catch (e) {
+      log('게이트 생성 실패 → 트랙 방식으로 대체: ' + e);
+      state.gate = null;
+      return stream;
+    }
+  }
+
+  function micLevel() {
+    if (!state.analyser) return 0;
+    state.analyser.getByteTimeDomainData(state.levelBuf);
+    var sum = 0;
+    for (var i = 0; i < state.levelBuf.length; i++) {
+      var v = (state.levelBuf[i] - 128) / 128;
+      sum += v * v;
+    }
+    return Math.min(1, Math.sqrt(sum / state.levelBuf.length) * 4);
+  }
+
+  /* ---------- 실제로 소리가 오가는지 확인 ---------- */
+  function pollStats() {
+    Object.keys(state.peers).forEach(function (id) {
+      var p = state.peers[id];
+      var pc = p.call && p.call.peerConnection;
+      if (!pc || !pc.getStats) return;
+      pc.getStats(null).then(function (report) {
+        var sent = 0, recv = 0;
+        report.forEach(function (r) {
+          if (r.type === 'outbound-rtp' && (r.kind === 'audio' || r.mediaType === 'audio')) sent = r.bytesSent || 0;
+          if (r.type === 'inbound-rtp' && (r.kind === 'audio' || r.mediaType === 'audio')) recv = r.bytesReceived || 0;
+        });
+        p.dSent = sent - (p.lastSent || 0);
+        p.dRecv = recv - (p.lastRecv || 0);
+        p.lastSent = sent;
+        p.lastRecv = recv;
+        if (p.dRecv > 0) p.everRecv = true;
+        if (p.dSent > 0) p.everSent = true;
+      }).catch(function () {});
+    });
+  }
+
+  function renderMeter() {
+    var bar = $('micBar');
+    if (bar) {
+      var lv = state.talking ? micLevel() : 0;
+      bar.style.width = Math.round(lv * 100) + '%';
+      bar.className = lv > 0.03 ? 'ok' : '';
+    }
+    var el = $('netStat');
+    if (!el) return;
+    var ids = Object.keys(state.peers).filter(function (id) { return state.peers[id].call; });
+    if (!ids.length) { el.textContent = ''; return; }
+    el.innerHTML = ids.map(function (id) {
+      var p = state.peers[id];
+      var name = p.name || shortId(id);
+      var up = p.dSent > 0 ? '↑보냄' : '↑없음';
+      var down = p.dRecv > 0 ? '↓받는중' : (p.everRecv ? '↓조용' : '↓안옴');
+      var warn = (!p.everRecv && p.call) ? ' warn' : '';
+      return '<span class="net' + warn + '">' + name + ' ' + up + ' ' + down + '</span>';
+    }).join('');
   }
 
   /* ---------- 화면 ---------- */
@@ -178,10 +271,21 @@
   }
 
   /* ---------- 송신 ---------- */
+  function setMicOpen(on) {
+    if (state.gate) {
+      if (state.audioCtx && state.audioCtx.state === 'suspended' && state.audioCtx.resume) state.audioCtx.resume();
+      try {
+        state.gate.gain.setTargetAtTime(on ? 1 : 0, state.audioCtx.currentTime, 0.01);
+      } catch (e) { state.gate.gain.value = on ? 1 : 0; }
+    } else if (state.micTrack) {
+      state.micTrack.enabled = on;   // 게이트를 못 쓰는 환경 대비
+    }
+  }
+
   function startTalk() {
     if (state.talking || !state.micTrack) return;
     state.talking = true;
-    state.micTrack.enabled = true;
+    setMicOpen(true);
     if (state.duplex) duckRemotes(true);
     $('pttBtn').classList.add('on');
     $('pttBtn').querySelector('.pttText').textContent = '송신 중…';
@@ -193,7 +297,7 @@
   function stopTalk() {
     if (!state.talking) return;
     state.talking = false;
-    if (state.micTrack) state.micTrack.enabled = false;
+    setMicOpen(false);
     duckRemotes(false);
     $('pttBtn').classList.remove('on');
     $('pttBtn').querySelector('.pttText').textContent = state.locked ? '눌러서 송신 시작' : '누르고 말하기';
@@ -473,7 +577,10 @@
     }).catch(function () {});
   }
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible' && state.peer && !state.wakeLock) keepAwake();
+    if (document.visibilityState === 'visible') {
+      if (state.audioCtx && state.audioCtx.state === 'suspended' && state.audioCtx.resume) state.audioCtx.resume();
+      if (state.peer && !state.wakeLock) keepAwake();
+    }
   });
 
   /* ---------- 입장 / 퇴장 ---------- */
@@ -505,10 +612,11 @@
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       video: false
     }).then(function (stream) {
-      state.localStream = stream;
-      state.micTrack = stream.getAudioTracks()[0];
-      state.micTrack.enabled = false;
-      log('마이크 준비됨');
+      state.rawStream = stream;
+      state.localStream = buildMicGate(stream);
+      state.micTrack = state.localStream.getAudioTracks()[0];
+      setMicOpen(false);
+      log('마이크 준비됨 (' + (state.gate ? '게이트 방식' : '트랙 방식') + ')');
       joinMsg('채널에 들어가는 중…');
 
       var peer = new Peer(state.myId, { config: ICE, debug: 0 });
@@ -544,6 +652,7 @@
 
         claimHub();
         state.timer = setInterval(tick, KEEP_MS);
+        state.statsTimer = setInterval(function () { pollStats(); renderMeter(); }, 1000);
         renderMembers();
       });
 
@@ -566,9 +675,11 @@
     stopTalk();
     broadcast({ t: 'bye' });
     if (state.timer) clearInterval(state.timer);
+    if (state.statsTimer) clearInterval(state.statsTimer);
     Object.keys(state.peers).forEach(function (id) { dropPeer(id, '내가 나감'); });
     if (state.hubPeer) { try { state.hubPeer.destroy(); } catch (e) {} }
     if (state.peer) { try { state.peer.destroy(); } catch (e) {} }
+    if (state.rawStream) state.rawStream.getTracks().forEach(function (t) { t.stop(); });
     if (state.localStream) state.localStream.getTracks().forEach(function (t) { t.stop(); });
     if (state.wakeLock) { try { state.wakeLock.release(); } catch (e) {} }
     state.peer = null; state.hubPeer = null; state.hubConn = null; state.isHub = false;
@@ -599,11 +710,16 @@
   ptt.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   ptt.addEventListener('pointerdown', function (e) {
     e.preventDefault();
+    try { if (e.pointerId != null) ptt.setPointerCapture(e.pointerId); } catch (_) {}
     if (state.locked) { if (state.talking) { stopTalk(); } else { startTalk(); } return; }
     startTalk();
   });
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
-    ptt.addEventListener(ev, function () { if (!state.locked) stopTalk(); });
+  // pointerleave 로 끊지 않는다. 버튼을 누른 채 손가락이 1mm 만 움직여도 송신이 끊겼다.
+  ['pointerup', 'pointercancel'].forEach(function (ev) {
+    ptt.addEventListener(ev, function (e) {
+      try { if (e.pointerId != null && ptt.hasPointerCapture(e.pointerId)) ptt.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (!state.locked) stopTalk();
+    });
   });
 
   document.addEventListener('keydown', function (e) {

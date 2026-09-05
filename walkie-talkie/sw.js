@@ -1,5 +1,5 @@
 /* 앱 껍데기만 캐시합니다. 통신 자체는 항상 인터넷이 필요합니다. */
-var CACHE = 'hwr-walkie-talkie-v2';
+var CACHE = 'hwr-walkie-talkie-v3';
 var SHELL = ['./', './index.html', './style.css', './app.js', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', function (e) {
