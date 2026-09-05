@@ -9,8 +9,11 @@
   E.prototype.on = function (e, f) { (this._h[e] = this._h[e] || []).push(f); return this; };
   E.prototype._emit = function (e) { var a = [].slice.call(arguments, 1); (this._h[e] || []).forEach(function (f) { f.apply(null, a); }); };
 
+  var openConns = {};   // peerId -> [Conn]
+
   function Conn(me, remote, kind) {
     E.call(this);
+    (openConns[me] = openConns[me] || []).push(this);
     var self = this;
     this.peer = remote; this.open = false; this._me = me;
     this._ch = new BroadcastChannel(kind + ':' + [me, remote].sort().join('|'));
@@ -21,50 +24,62 @@
         if (!self.open) { self.open = true; self._emit('open'); }
         if (d.t === 'hello') self._ch.postMessage({ from: me, t: 'hello-ack' });
       } else if (d.t === 'msg') { self._emit('data', d.payload); }
+      else if (d.t === 'closed') { self.open = false; self._emit('close'); }
     };
   }
   Conn.prototype = Object.create(E.prototype);
   Conn.prototype._hello = function () { this._ch.postMessage({ from: this._me, t: 'hello' }); };
   Conn.prototype.send = function (p) { this._ch.postMessage({ from: this._me, t: 'msg', payload: p }); };
-  Conn.prototype.close = function () { this._emit('close'); };
+  Conn.prototype.close = function () {
+    try { this._ch.postMessage({ from: this._me, t: 'closed' }); } catch (e) {}
+    this.open = false;
+    this._emit('close');
+  };
 
   function Peer(id) {
     E.call(this);
     var self = this;
-    this.id = id; this.destroyed = false;
+    this.id = id; this.destroyed = false; this._claimed = false;
     setTimeout(function () {
       if (!claim(id)) { self._emit('error', { type: 'unavailable-id' }); return; }
+      self._claimed = true;
       self._bus = new BroadcastChannel('fakepeer');
       self._bus.onmessage = function (ev) {
         var d = ev.data;
         if (d.to !== self.id) return;
-        if (d.t === 'connect') { var c = new Conn(self.id, d.from, 'dc'); self._emit('connection', c); c._hello(); }
+        if (d.t === 'connect') { var c = new Conn(self.id, d.from, 'dc'); c.metadata = d.meta; self._emit('connection', c); c._hello(); }
         if (d.t === 'call') {
           var m = new Conn(self.id, d.from, 'mc');
+          m.metadata = d.meta;
           m.answer = function (s) { m._hello(); setTimeout(function () { m._emit('stream', s || {}); }, 10); };
           self._emit('call', m);
         }
       };
-      window.addEventListener('pagehide', function () { release(id); });
+      window.addEventListener('pagehide', function () { if (self._claimed) release(id); });
       self._emit('open', id);
     }, 20);
   }
   Peer.prototype = Object.create(E.prototype);
-  Peer.prototype.connect = function (target) {
+  Peer.prototype.connect = function (target, opts) {
     var self = this, live = !!reg()[target], c = new Conn(this.id, target, 'dc');
     if (!live) { setTimeout(function () { self._emit('error', { type: 'peer-unavailable' }); }, 10); return c; }
-    new BroadcastChannel('fakepeer').postMessage({ to: target, from: this.id, t: 'connect' });
+    new BroadcastChannel('fakepeer').postMessage({ to: target, from: this.id, t: 'connect', meta: opts && opts.metadata });
     setTimeout(function () { c._hello(); }, 30);
     return c;
   };
-  Peer.prototype.call = function (target, stream) {
+  Peer.prototype.call = function (target, stream, opts) {
     var self = this, live = !!reg()[target], c = new Conn(this.id, target, 'mc');
     if (!live) { setTimeout(function () { self._emit('error', { type: 'peer-unavailable' }); }, 10); return c; }
-    new BroadcastChannel('fakepeer').postMessage({ to: target, from: this.id, t: 'call' });
+    new BroadcastChannel('fakepeer').postMessage({ to: target, from: this.id, t: 'call', meta: opts && opts.metadata });
     setTimeout(function () { c._hello(); c._emit('stream', stream); }, 40);
     return c;
   };
-  Peer.prototype.destroy = function () { this.destroyed = true; release(this.id); };
+  Peer.prototype.destroy = function () {
+    this.destroyed = true;
+    (openConns[this.id] || []).forEach(function (c) { try { c.close(); } catch (e) {} });
+    openConns[this.id] = [];
+    if (this._claimed) { release(this.id); this._claimed = false; }   // 남이 차지한 ID를 지우면 안 된다
+  };
   Peer.prototype.reconnect = function () {};
   window.Peer = Peer;
 })();

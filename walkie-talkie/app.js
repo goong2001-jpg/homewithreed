@@ -1,57 +1,75 @@
 /* 집무전기 — 폰 마이크 + 스피커로 쓰는 PTT 무전기
- * 서버 없이 동작합니다. 신호 교환은 PeerJS 공개 브로커, 음성은 브라우저끼리 직접(P2P).
- * 채널 번호로 슬롯 6개(rw-<채널>-1 ~ -6)를 만들어 빈 자리를 차지하는 방식입니다.
+ *
+ * 구조
+ *   채널마다 '허브' 자리(hwr-wt-<채널>-hub)가 하나 있다. 먼저 들어온 사람이 그 자리를 차지하고
+ *   참가자 명단만 관리한다(통화는 하지 않는다). 나머지는 허브에 이름을 알리고 명단을 받아,
+ *   명단에 실제로 있는 사람하고만 직접 연결한다.
+ *
+ *   예전 방식(자리 6개를 다 두드려 보기)은 빈 자리에도 계속 연결을 걸어서
+ *   폰 브라우저의 동시 연결 한도를 잡아먹고 진짜 연결까지 실패시켰다.
+ *
+ *   허브가 나가면 남은 사람 중 하나가 자동으로 허브 자리를 이어받는다.
+ *   이미 이어진 통화는 허브와 무관하게 계속 유지된다.
  */
 (function () {
   'use strict';
 
-  var NS = 'hwr-wt';          // 다른 서비스와 ID가 겹치지 않게 하는 접두사
-  var SLOTS = 6;              // 채널당 최대 인원
+  var NS = 'hwr-wt';
+  var HUB_SUFFIX = 'hub';
+  var KEEP_MS = 5000;          // 생존 신호 주기
+  var STALE_MS = 20000;        // 이만큼 소식 없으면 끊긴 것으로 본다
+  var CONNECT_TIMEOUT = 12000; // 연결 시도 포기 시간
+  var MAX_TRIES = 4;           // 같은 상대에게 다시 걸어보는 최대 횟수
+
   var ICE = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
-      // 무료 공개 TURN (LTE↔LTE 등 직접 연결이 막힐 때 중계). 불안정하면 자기 TURN으로 교체.
+      // 직접 연결이 막힐 때 쓰는 무료 공개 중계(TURN). 월 20GB 공유 서버라 느리거나 막힐 수 있다.
       {
-        urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443'],
+        urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'],
         username: 'openrelayproject',
         credential: 'openrelayproject'
       }
-    ]
+    ],
+    iceCandidatePoolSize: 2
   };
 
   var $ = function (id) { return document.getElementById(id); };
 
   var state = {
-    name: '',
-    room: '',
-    slot: 0,
-    peer: null,
-    localStream: null,
-    micTrack: null,
-    talking: false,
-    locked: false,
-    duplex: true,            // 말하는 동안 상대 소리 줄이기
-    calls: {},               // slot -> MediaConnection (연결 완료)
-    conns: {},               // slot -> DataConnection (open 된 것만)
-    pending: {},             // 'd3' / 'c3' -> 시도 중인 연결 (빈 슬롯이면 시간이 지나 버려진다)
-    names: {},               // slot -> 이름
-    talkers: {},             // slot -> true
-    lastSeen: {},            // slot -> 마지막 신호 시각 (끊긴 사람 정리용)
-    audios: {},              // slot -> HTMLAudioElement
-    wakeLock: null,
-    scanTimer: null,
-    audioCtx: null
+    name: '', room: '', myId: '', hubId: '',
+    peer: null,            // 내 통화용 Peer
+    hubPeer: null,         // 허브 자리를 차지했을 때만 존재 (명단 관리 전용)
+    isHub: false,
+    hubConn: null,         // 멤버일 때 허브로 가는 데이터 연결
+    hubMembers: {},        // 허브일 때: id -> { name, seen, conn }
+    roster: {},            // 모두: id -> name
+    peers: {},             // id -> { conn, call, name, talking, seen, audio, tries, timer }
+    localStream: null, micTrack: null,
+    talking: false, locked: false, duplex: true,
+    hubSeen: 0,
+    wakeLock: null, timer: null, audioCtx: null,
+    logs: []
   };
+
+  /* ---------- 진단 기록 ---------- */
+  function log(msg) {
+    var t = new Date().toTimeString().slice(0, 8);
+    var line = t + '  ' + msg;
+    state.logs.push(line);
+    if (state.logs.length > 200) state.logs.shift();
+    var el = $('log');
+    if (el) { el.textContent = state.logs.join('\n'); el.scrollTop = el.scrollHeight; }
+  }
+
+  function shortId(id) { return String(id || '').split('-').pop(); }
 
   /* ---------- 저장된 값 ---------- */
   try {
     $('nameInput').value = localStorage.getItem(NS + ':name') || '';
     $('roomInput').value = localStorage.getItem(NS + ':room') || '';
-  } catch (e) { /* 시크릿 모드 등 */ }
-
-  /* ---------- 유틸 ---------- */
-  function peerId(room, slot) { return NS + '-' + room + '-' + slot; }
+  } catch (e) {}
 
   function setStatus(text) { $('statusLine').textContent = text; }
 
@@ -64,58 +82,74 @@
   function beep(freq, ms) {
     try {
       if (!state.audioCtx) return;
-      var ctx = state.audioCtx;
-      var osc = ctx.createOscillator();
-      var gain = ctx.createGain();
+      var osc = state.audioCtx.createOscillator();
+      var gain = state.audioCtx.createGain();
       osc.frequency.value = freq;
       gain.gain.value = 0.06;
-      osc.connect(gain).connect(ctx.destination);
+      osc.connect(gain).connect(state.audioCtx.destination);
       osc.start();
-      osc.stop(ctx.currentTime + ms / 1000);
-    } catch (e) { /* 무시 */ }
+      osc.stop(state.audioCtx.currentTime + ms / 1000);
+    } catch (e) {}
   }
 
-  /* ---------- 화면 갱신 ---------- */
+  function randomId() {
+    var s = '';
+    var chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    for (var i = 0; i < 10; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+  }
+
+  /* ---------- 화면 ---------- */
   function renderMembers() {
     var ul = $('members');
     ul.innerHTML = '';
+
     var mine = document.createElement('li');
     mine.className = 'me' + (state.talking ? ' talking' : '');
-    mine.textContent = (state.name || '나') + ' (나)';
+    mine.textContent = (state.name || '나') + ' (나)' + (state.isHub ? ' ⭐' : '');
     ul.appendChild(mine);
 
-    var count = 1;
-    Object.keys(state.conns).forEach(function (slot) {
+    var ids = Object.keys(state.peers).filter(function (id) { return state.peers[id].call || state.peers[id].conn; });
+    ids.forEach(function (id) {
+      var p = state.peers[id];
       var li = document.createElement('li');
-      li.className = state.talkers[slot] ? 'talking' : '';
-      li.textContent = state.names[slot] || ('무전기 ' + slot);
+      li.className = (p.talking ? 'talking ' : '') + (p.call ? '' : 'half');
+      li.textContent = (p.name || shortId(id)) + (p.call ? '' : ' (소리 연결 중…)');
       ul.appendChild(li);
-      count++;
     });
 
-    setStatus(count > 1 ? '연결됨 · ' + count + '명' : '혼자 있습니다. 상대가 같은 채널로 들어오면 연결됩니다.');
+    var n = ids.length + 1;
+    var waiting = Object.keys(state.roster).length - 1 - ids.length;
+    setStatus(
+      n > 1
+        ? '연결됨 · ' + n + '명' + (waiting > 0 ? ' (' + waiting + '명 연결 중…)' : '')
+        : (state.isHub ? '채널을 열었습니다. 상대를 기다리는 중…' : '채널에 들어왔습니다. 상대를 찾는 중…')
+    );
 
-    var talking = Object.keys(state.talkers).filter(function (s) { return state.talkers[s]; });
+    var talking = ids.filter(function (id) { return state.peers[id].talking; });
     $('nowTalking').textContent = talking.length
-      ? '🔊 ' + talking.map(function (s) { return state.names[s] || ('무전기 ' + s); }).join(', ') + ' 말하는 중'
-      : ' ';
+      ? '🔊 ' + talking.map(function (id) { return state.peers[id].name || shortId(id); }).join(', ') + ' 말하는 중'
+      : ' ';
   }
 
   /* ---------- 오디오 ---------- */
-  function attachStream(slot, stream) {
-    var el = state.audios[slot];
+  function attachStream(id, stream) {
+    var p = state.peers[id];
+    if (!p) return;
+    var el = p.audio;
     if (!el) {
       el = document.createElement('audio');
       el.autoplay = true;
       el.playsInline = true;
       el.setAttribute('playsinline', '');
-      state.audios[slot] = el;
+      p.audio = el;
       $('audioSink').appendChild(el);
     }
-    try { el.srcObject = stream; } catch (e) { return; }
-    el.volume = state.talking && state.duplex ? 0.15 : 1;
-    var p = el.play();
-    if (p && p.catch) p.catch(showUnlock);
+    try { el.srcObject = stream; } catch (e) { log('오디오 붙이기 실패: ' + e); return; }
+    el.volume = (state.talking && state.duplex) ? 0.15 : 1;
+    var pr = el.play();
+    if (pr && pr.catch) pr.catch(function () { log('자동 재생 차단 → 소리 켜기 버튼 표시'); showUnlock(); });
+    log('소리 연결됨: ' + (p.name || shortId(id)));
   }
 
   var unlockBtn = null;
@@ -125,9 +159,9 @@
     unlockBtn.className = 'unlock';
     unlockBtn.textContent = '🔈 소리 켜기 (한 번 눌러주세요)';
     unlockBtn.onclick = function () {
-      Object.keys(state.audios).forEach(function (s) {
-        var p = state.audios[s].play();
-        if (p && p.catch) p.catch(function () {});
+      Object.keys(state.peers).forEach(function (id) {
+        var a = state.peers[id].audio;
+        if (a) { var pr = a.play(); if (pr && pr.catch) pr.catch(function () {}); }
       });
       if (state.audioCtx && state.audioCtx.resume) state.audioCtx.resume();
       unlockBtn.remove();
@@ -138,7 +172,9 @@
 
   function duckRemotes(on) {
     var v = on ? 0.15 : 1;
-    Object.keys(state.audios).forEach(function (s) { state.audios[s].volume = v; });
+    Object.keys(state.peers).forEach(function (id) {
+      if (state.peers[id].audio) state.peers[id].audio.volume = v;
+    });
   }
 
   /* ---------- 송신 ---------- */
@@ -168,158 +204,262 @@
 
   function broadcast(msg) {
     msg.name = state.name;
-    Object.keys(state.conns).forEach(function (slot) {
-      var c = state.conns[slot];
-      try { if (c && c.open) c.send(msg); } catch (e) { /* 무시 */ }
+    Object.keys(state.peers).forEach(function (id) {
+      var c = state.peers[id].conn;
+      try { if (c && c.open) c.send(msg); } catch (e) {}
     });
   }
 
-  /* ---------- 연결 ---------- */
-  function wireData(slot, conn) {
-    var key = 'd' + slot;
-    state.pending[key] = conn;
-    // 빈 슬롯에 건 연결은 아무 신호도 오지 않는다. 일정 시간 뒤 버려서 다음 스캔 때 다시 걸게 한다.
-    var giveUp = setTimeout(function () { if (state.pending[key] === conn) delete state.pending[key]; }, 6000);
+  /* ---------- 상대와의 직접 연결 ---------- */
+  function getPeerRec(id) {
+    if (!state.peers[id]) state.peers[id] = { name: state.roster[id] || '', tries: 0, seen: Date.now() };
+    return state.peers[id];
+  }
 
+  function watchIce(call, id) {
+    try {
+      var pc = call.peerConnection;
+      if (!pc) return;
+      pc.oniceconnectionstatechange = function () {
+        log('ICE(' + shortId(id) + '): ' + pc.iceConnectionState);
+        if (pc.iceConnectionState === 'failed') {
+          log('→ 직접 연결 실패. 중계(TURN)까지 막힌 상태입니다.');
+          dropPeer(id, '연결 실패');
+        }
+      };
+    } catch (e) {}
+  }
+
+  function wirePeerConn(id, conn) {
+    var p = getPeerRec(id);
     conn.on('open', function () {
-      clearTimeout(giveUp);
-      delete state.pending[key];
-      state.conns[slot] = conn;
-      state.lastSeen[slot] = Date.now();
+      p.conn = conn;
+      p.seen = Date.now();
       try { conn.send({ t: 'hi', name: state.name }); } catch (e) {}
+      log('데이터 연결됨: ' + shortId(id));
       renderMembers();
     });
-    var drop = function () {
-      clearTimeout(giveUp);
-      delete state.pending[key];
-      delete state.conns[slot];
-      delete state.talkers[slot];
-      delete state.names[slot];
-      delete state.lastSeen[slot];
-      renderMembers();
-    };
-
     conn.on('data', function (msg) {
       if (!msg || typeof msg !== 'object') return;
-      if (msg.name) state.names[slot] = String(msg.name).slice(0, 12);
-      // 'hi' 에는 'hi-ack' 으로만 답한다. 'hi' 로 답하면 서로 끝없이 주고받는다.
+      p.seen = Date.now();
+      if (msg.name) p.name = String(msg.name).slice(0, 12);
       if (msg.t === 'hi') { try { conn.send({ t: 'hi-ack', name: state.name }); } catch (e) {} }
-      if (msg.t === 'talk') state.talkers[slot] = !!msg.on;
-      state.lastSeen[slot] = Date.now();
-      if (msg.t === 'bye') { drop(); return; }
+      if (msg.t === 'talk') p.talking = !!msg.on;
+      if (msg.t === 'bye') { dropPeer(id, '상대가 나감'); return; }
       renderMembers();
     });
-    conn.on('close', drop);
-    conn.on('error', drop);
+    conn.on('close', function () { dropPeer(id, '데이터 연결 끊김'); });
+    conn.on('error', function (e) { log('데이터 오류(' + shortId(id) + '): ' + (e && e.type || e)); });
   }
 
-  function wireCall(slot, call) {
-    var key = 'c' + slot;
-    state.pending[key] = call;
-    var giveUp = setTimeout(function () { if (state.pending[key] === call) delete state.pending[key]; }, 6000);
-
+  function wirePeerCall(id, call) {
+    var p = getPeerRec(id);
+    watchIce(call, id);
     call.on('stream', function (stream) {
-      clearTimeout(giveUp);
-      delete state.pending[key];
-      state.calls[slot] = call;
-      attachStream(slot, stream);
+      p.call = call;
+      p.seen = Date.now();
+      if (p.timer) { clearTimeout(p.timer); p.timer = null; }
+      attachStream(id, stream);
+      renderMembers();
     });
-    var drop = function () {
-      clearTimeout(giveUp);
-      delete state.pending[key];
-      delete state.calls[slot];
-      if (state.audios[slot]) { state.audios[slot].srcObject = null; state.audios[slot].remove(); delete state.audios[slot]; }
-    };
-    call.on('close', drop);
-    call.on('error', drop);
+    call.on('close', function () { dropPeer(id, '소리 연결 끊김'); });
+    call.on('error', function (e) { log('소리 오류(' + shortId(id) + '): ' + (e && e.type || e)); });
   }
 
-  function connectSlot(slot) {
-    if (slot === state.slot || !state.peer || state.peer.destroyed) return;
-    var target = peerId(state.room, slot);
-    var meta = { slot: state.slot, name: state.name };
+  function dropPeer(id, why) {
+    var p = state.peers[id];
+    if (!p) return;
+    if (p.timer) clearTimeout(p.timer);
+    if (p.audio) { try { p.audio.srcObject = null; } catch (e) {} p.audio.remove(); }
+    try { if (p.conn) p.conn.close(); } catch (e) {}
+    try { if (p.call) p.call.close(); } catch (e) {}
+    delete state.peers[id];
+    log('연결 정리(' + shortId(id) + '): ' + why);
+    renderMembers();
+  }
 
-    if (!state.conns[slot] && !state.pending['d' + slot]) {
-      var conn = state.peer.connect(target, { reliable: true, metadata: meta });
-      if (conn) wireData(slot, conn);
+  // 명단에 실제로 있는 상대에게만, 한쪽에서만 건다 (ID 사전순으로 작은 쪽이 건다)
+  function connectPeer(id) {
+    if (id === state.myId || !state.peer || state.peer.destroyed) return;
+    var p = getPeerRec(id);
+    if (p.conn || p.call || p.timer) return;
+    if (state.myId > id) return;              // 반대쪽이 걸어온다
+    if (p.tries >= MAX_TRIES) return;
+
+    p.tries++;
+    log('연결 시도 ' + p.tries + '/' + MAX_TRIES + ' → ' + (p.name || shortId(id)));
+    try {
+      wirePeerConn(id, state.peer.connect(id, { reliable: true, metadata: { name: state.name } }));
+      var call = state.peer.call(id, state.localStream, { metadata: { name: state.name } });
+      if (call) wirePeerCall(id, call);
+    } catch (e) {
+      log('연결 시도 실패: ' + e);
     }
-    if (!state.calls[slot] && !state.pending['c' + slot] && state.localStream) {
-      var call = state.peer.call(target, state.localStream, { metadata: meta });
-      if (call) wireCall(slot, call);
-    }
+    p.timer = setTimeout(function () {
+      p.timer = null;
+      if (!p.call) {
+        log('응답 없음 → 다시 시도 예정: ' + shortId(id));
+        try { if (p.conn) p.conn.close(); } catch (e) {}
+        p.conn = null;
+      }
+    }, CONNECT_TIMEOUT);
   }
 
-  function slotOf(id) {
-    var m = String(id || '').match(/-(\d+)$/);
-    return m ? Number(m[1]) : 0;
+  /* ---------- 허브(명단 관리) ---------- */
+  function hubBroadcastRoster() {
+    var list = [{ id: state.myId, name: state.name }];
+    Object.keys(state.hubMembers).forEach(function (id) {
+      list.push({ id: id, name: state.hubMembers[id].name });
+    });
+    Object.keys(state.hubMembers).forEach(function (id) {
+      var c = state.hubMembers[id].conn;
+      try { if (c && c.open) c.send({ t: 'roster', list: list }); } catch (e) {}
+    });
+    applyRoster(list);
+    log('명단 전파: ' + list.length + '명');
   }
 
-  function openPeerAtSlot(slot, done) {
-    if (slot > SLOTS) { done(new Error('채널이 꽉 찼습니다 (최대 ' + SLOTS + '명).')); return; }
-    var peer = new Peer(peerId(state.room, slot), { config: ICE, debug: 0 });
+  function claimHub() {
+    if (state.isHub || state.hubPeer) return;
+    log('허브 자리 확인 중…');
+    var hp = new Peer(state.hubId, { config: ICE, debug: 0 });
     var settled = false;
 
-    peer.on('open', function () {
-      if (settled) return;
+    hp.on('open', function () {
       settled = true;
-      state.peer = peer;
-      state.slot = slot;
-      done(null);
+      state.hubPeer = hp;
+      state.isHub = true;
+      log('내가 허브가 되었습니다.');
+      hp.on('connection', function (conn) {
+        conn.on('open', function () {
+          state.hubMembers[conn.peer] = { name: (conn.metadata && conn.metadata.name) || '', seen: Date.now(), conn: conn };
+          log('허브: ' + shortId(conn.peer) + ' 참가');
+          hubBroadcastRoster();
+        });
+        conn.on('data', function (msg) {
+          var m = state.hubMembers[conn.peer];
+          if (!m || !msg) return;
+          m.seen = Date.now();
+          if (msg.name) m.name = String(msg.name).slice(0, 12);
+          try { conn.send({ t: 'keep-ack' }); } catch (e) {}
+          if (msg.t === 'join') hubBroadcastRoster();
+        });
+        var gone = function () {
+          if (!state.hubMembers[conn.peer]) return;
+          delete state.hubMembers[conn.peer];
+          log('허브: ' + shortId(conn.peer) + ' 퇴장');
+          hubBroadcastRoster();
+        };
+        conn.on('close', gone);
+        conn.on('error', gone);
+      });
+      hp.on('error', function (e) { log('허브 오류: ' + (e && e.type || e)); });
+      renderMembers();
     });
 
-    peer.on('error', function (err) {
-      if (err && err.type === 'unavailable-id' && !settled) {
-        settled = true;
-        try { peer.destroy(); } catch (e) {}
-        openPeerAtSlot(slot + 1, done);
-        return;
+    hp.on('error', function (err) {
+      if (settled) return;
+      settled = true;
+      try { hp.destroy(); } catch (e) {}
+      if (err && err.type === 'unavailable-id') {
+        log('허브가 이미 있습니다 → 참가자로 접속');
+        connectToHub();
+      } else {
+        log('허브 확인 실패(' + (err && err.type) + ') → 잠시 후 재시도');
+        setTimeout(claimHub, 3000);
       }
-      if (!settled) {
-        settled = true;
-        try { peer.destroy(); } catch (e) {}
-        done(err);
-        return;
-      }
-      // 연결 후 발생하는 오류: 빈 슬롯 호출은 정상이므로 조용히 무시
-      if (err && (err.type === 'peer-unavailable' || err.type === 'network')) return;
-      console.warn('peer error', err && err.type, err);
     });
   }
 
-  function afterOpen() {
-    state.peer.on('connection', function (conn) {
-      var s = slotOf(conn.peer);
-      if (s) wireData(s, conn);
+  function connectToHub() {
+    if (state.isHub || state.hubConn) return;
+    var conn = state.peer.connect(state.hubId, { reliable: true, metadata: { name: state.name } });
+    var opened = false;
+
+    conn.on('open', function () {
+      opened = true;
+      state.hubConn = conn;
+      state.hubSeen = Date.now();
+      try { conn.send({ t: 'join', name: state.name }); } catch (e) {}
+      log('허브에 연결됨');
+    });
+    conn.on('data', function (msg) {
+      state.hubSeen = Date.now();
+      if (msg && msg.t === 'roster') applyRoster(msg.list);
+    });
+    var lost = function () {
+      if (state.hubConn !== conn && !opened) return;
+      state.hubConn = null;
+      log('허브 연결 끊김 → 허브 자리 이어받기 시도');
+      setTimeout(function () { if (!state.hubConn && !state.isHub) claimHub(); }, 500 + Math.random() * 2500);
+    };
+    conn.on('close', lost);
+    conn.on('error', function (e) { log('허브 연결 오류: ' + (e && e.type || e)); lost(); });
+
+    // 허브 ID가 남아 있지만 실제로는 죽은 경우(앱 강제 종료 등)
+    setTimeout(function () {
+      if (!opened && !state.isHub) {
+        log('허브가 응답하지 않습니다(유령 허브) → 자리 다시 확인');
+        try { conn.close(); } catch (e) {}
+        state.hubConn = null;
+        claimHub();
+      }
+    }, 8000);
+  }
+
+  function applyRoster(list) {
+    if (!list || !list.length) return;
+    var next = {};
+    list.forEach(function (m) {
+      if (!m || !m.id) return;
+      next[m.id] = m.name || '';
+      if (m.id !== state.myId) {
+        var p = getPeerRec(m.id);
+        if (m.name) p.name = m.name;
+      }
+    });
+    state.roster = next;
+    Object.keys(next).forEach(function (id) { if (id !== state.myId) connectPeer(id); });
+    renderMembers();
+  }
+
+  /* ---------- 주기 작업 ---------- */
+  function tick() {
+    if (state.hubConn && state.hubConn.open) {
+      try { state.hubConn.send({ t: 'keep', name: state.name }); } catch (e) {}
+      if (Date.now() - state.hubSeen > STALE_MS) {
+        log('허브가 응답하지 않습니다 → 허브 자리 이어받기');
+        try { state.hubConn.close(); } catch (e) {}
+        state.hubConn = null;
+        setTimeout(function () { if (!state.hubConn && !state.isHub) claimHub(); }, 300 + Math.random() * 2000);
+      }
+    }
+    broadcast({ t: 'ping' });
+
+    var now = Date.now();
+    Object.keys(state.peers).forEach(function (id) {
+      var p = state.peers[id];
+      if ((p.conn || p.call) && now - p.seen > STALE_MS) dropPeer(id, '응답 없음');
     });
 
-    state.peer.on('call', function (call) {
-      var s = slotOf(call.peer);
-      call.answer(state.localStream);
-      if (s) wireCall(s, call);
-    });
-
-    state.peer.on('disconnected', function () {
-      setStatus('브로커 연결이 끊겼습니다. 다시 연결 중…');
-      try { state.peer.reconnect(); } catch (e) {}
-    });
-
-    for (var s = 1; s <= SLOTS; s++) connectSlot(s);
-    state.scanTimer = setInterval(function () {
-      for (var s = 1; s <= SLOTS; s++) connectSlot(s);
-      broadcast({ t: 'ping' });
-      // 16초 넘게 소식이 없으면 끊긴 것으로 보고 목록에서 지운다 (앱이 강제 종료된 경우)
-      var now = Date.now();
-      Object.keys(state.conns).forEach(function (slot) {
-        if (now - (state.lastSeen[slot] || 0) > 16000) {
-          try { state.conns[slot].close(); } catch (e) {}
-          delete state.conns[slot];
-          delete state.talkers[slot];
-          delete state.names[slot];
-          delete state.lastSeen[slot];
+    if (state.isHub) {
+      var changed = false;
+      Object.keys(state.hubMembers).forEach(function (id) {
+        if (now - state.hubMembers[id].seen > STALE_MS + KEEP_MS) {
+          delete state.hubMembers[id];
+          changed = true;
+          log('허브: ' + shortId(id) + ' 응답 없음 → 명단에서 제거');
         }
       });
-      renderMembers();
-    }, 5000);
+      if (changed) hubBroadcastRoster();
+    }
+
+    // 아직 못 붙은 상대 재시도
+    Object.keys(state.roster).forEach(function (id) {
+      if (id === state.myId) return;
+      var p = state.peers[id];
+      if (p && !p.call && !p.timer) connectPeer(id);
+    });
 
     renderMembers();
   }
@@ -345,6 +485,8 @@
 
     state.name = name;
     state.room = room;
+    state.hubId = NS + '-' + room + '-' + HUB_SUFFIX;
+    state.myId = NS + '-' + room + '-' + randomId();
     try {
       localStorage.setItem(NS + ':name', name);
       localStorage.setItem(NS + ':room', room);
@@ -352,6 +494,7 @@
 
     joinMsg('마이크 권한을 확인하는 중…');
     $('joinBtn').disabled = true;
+    log('입장 시도: 채널 ' + room + ' / 내 ID ' + shortId(state.myId));
 
     try {
       var AC = window.AudioContext || window.webkitAudioContext;
@@ -364,20 +507,56 @@
     }).then(function (stream) {
       state.localStream = stream;
       state.micTrack = stream.getAudioTracks()[0];
-      state.micTrack.enabled = false;             // 기본은 송신 꺼짐(PTT)
+      state.micTrack.enabled = false;
+      log('마이크 준비됨');
       joinMsg('채널에 들어가는 중…');
-      openPeerAtSlot(1, function (err) {
+
+      var peer = new Peer(state.myId, { config: ICE, debug: 0 });
+      var opened = false;
+
+      peer.on('open', function () {
+        opened = true;
+        state.peer = peer;
+        log('브로커 접속됨');
         $('joinBtn').disabled = false;
-        if (err) { joinMsg(err.message || '연결에 실패했습니다. 잠시 뒤 다시 시도해 주세요.', true); return; }
         joinMsg('');
         $('chLabel').textContent = state.room;
         $('joinView').classList.add('hidden');
         $('talkView').classList.remove('hidden');
         keepAwake();
-        afterOpen();
+
+        peer.on('connection', function (conn) { wirePeerConn(conn.peer, conn); });
+        peer.on('call', function (call) {
+          getPeerRec(call.peer);
+          if (call.metadata && call.metadata.name) state.peers[call.peer].name = call.metadata.name;
+          call.answer(state.localStream);
+          wirePeerCall(call.peer, call);
+        });
+        peer.on('disconnected', function () {
+          log('브로커 연결 끊김 → 재접속');
+          try { peer.reconnect(); } catch (e) {}
+        });
+        peer.on('error', function (e) {
+          var type = e && e.type;
+          if (type === 'peer-unavailable') { log('상대를 찾을 수 없음(이미 나갔을 수 있음)'); return; }
+          log('오류: ' + type + ' ' + (e && e.message ? e.message : ''));
+        });
+
+        claimHub();
+        state.timer = setInterval(tick, KEEP_MS);
+        renderMembers();
+      });
+
+      peer.on('error', function (err) {
+        if (opened) return;
+        $('joinBtn').disabled = false;
+        log('접속 실패: ' + (err && err.type) + ' ' + (err && err.message ? err.message : ''));
+        joinMsg('채널 접속에 실패했습니다 (' + (err && err.type) + '). 잠시 뒤 다시 시도해 주세요.', true);
+        try { peer.destroy(); } catch (e) {}
       });
     }).catch(function (err) {
       $('joinBtn').disabled = false;
+      log('마이크 실패: ' + (err && err.name));
       joinMsg('마이크를 쓸 수 없습니다: ' + (err && err.name ? err.name : '알 수 없는 오류') +
               '. 브라우저 설정에서 마이크 권한을 허용해 주세요.', true);
     });
@@ -386,19 +565,22 @@
   function leave() {
     stopTalk();
     broadcast({ t: 'bye' });
-    if (state.scanTimer) clearInterval(state.scanTimer);
-    Object.keys(state.audios).forEach(function (s) { state.audios[s].srcObject = null; state.audios[s].remove(); });
+    if (state.timer) clearInterval(state.timer);
+    Object.keys(state.peers).forEach(function (id) { dropPeer(id, '내가 나감'); });
+    if (state.hubPeer) { try { state.hubPeer.destroy(); } catch (e) {} }
     if (state.peer) { try { state.peer.destroy(); } catch (e) {} }
     if (state.localStream) state.localStream.getTracks().forEach(function (t) { t.stop(); });
     if (state.wakeLock) { try { state.wakeLock.release(); } catch (e) {} }
-    state.peer = null; state.localStream = null; state.micTrack = null; state.wakeLock = null;
-    state.calls = {}; state.conns = {}; state.pending = {}; state.names = {}; state.talkers = {}; state.lastSeen = {}; state.audios = {};
+    state.peer = null; state.hubPeer = null; state.hubConn = null; state.isHub = false;
+    state.localStream = null; state.micTrack = null; state.wakeLock = null;
+    state.peers = {}; state.roster = {}; state.hubMembers = {};
     $('talkView').classList.add('hidden');
     $('joinView').classList.remove('hidden');
     $('members').innerHTML = '';
+    log('채널에서 나갔습니다.');
   }
 
-  /* ---------- 입력 바인딩 ---------- */
+  /* ---------- 입력 ---------- */
   $('joinBtn').addEventListener('click', join);
   $('roomInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') join(); });
   $('leaveBtn').addEventListener('click', leave);
@@ -417,7 +599,7 @@
   ptt.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   ptt.addEventListener('pointerdown', function (e) {
     e.preventDefault();
-    if (state.locked) { state.talking ? stopTalk() : startTalk(); return; }
+    if (state.locked) { if (state.talking) { stopTalk(); } else { startTalk(); } return; }
     startTalk();
   });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
@@ -433,6 +615,13 @@
     if (e.code === 'Space' && !state.locked) { e.preventDefault(); stopTalk(); }
   });
 
+  $('copyLog').addEventListener('click', function () {
+    var text = state.logs.join('\n');
+    var done = function () { $('copyLog').textContent = '복사됨!'; setTimeout(function () { $('copyLog').textContent = '기록 복사'; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () {});
+    else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) {} ta.remove(); }
+  });
+
   window.addEventListener('pagehide', function () { if (state.peer) leave(); });
 
   if ('serviceWorker' in navigator) {
@@ -440,4 +629,6 @@
       navigator.serviceWorker.register('sw.js').catch(function () {});
     });
   }
+
+  log('앱 준비됨');
 })();
