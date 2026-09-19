@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Expense, ExpenseCategory, FixedExpense, IncomeEntry, MonthBudget, MonthKey,
+  Expense, ExpenseCategory, FixedExpense, GiftEntry, IncomeEntry, MonthBudget, MonthKey,
   Person, SyncStatus,
 } from '../types';
 import { activeFixed, categoryTotals, monthExpenses } from '../utils/budget';
@@ -17,6 +17,7 @@ interface Props {
   incomes: IncomeEntry[];
   fixed: FixedExpense[];
   expenses: Expense[];
+  gifts: GiftEntry[];
   syncStatus: SyncStatus;
   isLive: boolean;
   onPrev: () => void;
@@ -44,7 +45,7 @@ function groupByDate(rows: Expense[]): [string, Expense[]][] {
 }
 
 export default function HistoryView({
-  month, budget, persons, incomes, fixed, expenses, syncStatus, isLive,
+  month, budget, persons, incomes, fixed, expenses, gifts, syncStatus, isLive,
   personFilter: filter, onPersonFilterChange: setFilter,
   onPrev, onNext, onToday, onEditExpense, onDeleteExpense, onPullAll, onGoSettings,
 }: Props) {
@@ -84,7 +85,7 @@ export default function HistoryView({
   async function handleExport() {
     setExporting(true);
     try {
-      await exportMonthToExcel(month, budget, incomes, fixed, expenses, persons);
+      await exportMonthToExcel(month, budget, incomes, fixed, expenses, persons, gifts);
     } catch (e) {
       console.warn('Excel 내보내기 실패:', e);
     } finally {

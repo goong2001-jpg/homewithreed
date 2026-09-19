@@ -1,7 +1,7 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CollName, DEFAULT_PERSONS, Expense, ExpenseCategory, FixedExpense, IncomeEntry,
-  MonthKey, Person, RemoteBatch, Syncable, SyncSettings,
+  CollName, DEFAULT_PERSONS, Expense, ExpenseCategory, FixedExpense, GiftDirection,
+  GiftEntry, GiftKind, IncomeEntry, MonthKey, Person, RemoteBatch, Syncable, SyncSettings,
 } from '../types';
 import { KEYS, load, save } from '../utils/storage';
 import { mergeById } from '../utils/merge';
@@ -46,6 +46,7 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
   const [incomes, setIncomes] = useState<IncomeEntry[]>(() => load(KEYS.incomes, []));
   const [fixed, setFixed] = useState<FixedExpense[]>(() => load(KEYS.fixedExpenses, []));
   const [expenses, setExpenses] = useState<Expense[]>(() => load(KEYS.expenses, []));
+  const [gifts, setGifts] = useState<GiftEntry[]>(() => load(KEYS.gifts, []));
 
   /** 클라우드에서 온 스냅샷을 로컬과 합친다 (id 기준 last-write-wins) */
   const onBatch = useCallback((batch: RemoteBatch) => {
@@ -75,6 +76,13 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
         setExpenses(prev => {
           const next = mergeById(prev, batch.records);
           save(KEYS.expenses, next);
+          return next;
+        });
+        break;
+      case 'gifts':
+        setGifts(prev => {
+          const next = mergeById(prev, batch.records);
+          save(KEYS.gifts, next);
           return next;
         });
         break;
@@ -221,6 +229,36 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     [softDelete],
   );
 
+  // -------------------------- 경조사 · 용돈 --------------------------
+  // 저금통 계산에는 들어가지 않는다 (types/index.ts GiftEntry 주석 참고)
+
+  const saveGift = useCallback((input: {
+    id?: string; date: string; direction: GiftDirection; amount: number;
+    kind: GiftKind; counterparty: string; personId: string; memo: string;
+  }) => {
+    const now = Date.now();
+    const existing = input.id ? gifts.find(g => g.id === input.id) : undefined;
+    const rec: GiftEntry = {
+      id: input.id ?? newId(),
+      date: input.date,
+      month: monthOf(input.date),
+      direction: input.direction,
+      amount: input.amount,
+      kind: input.kind,
+      counterparty: input.counterparty,
+      personId: input.personId,
+      memo: input.memo,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    commit('gifts', KEYS.gifts, setGifts, rec);
+  }, [gifts, commit]);
+
+  const deleteGift = useCallback(
+    (id: string) => softDelete('gifts', KEYS.gifts, setGifts, id),
+    [softDelete],
+  );
+
   /**
    * 지난달 수입을 이 달로 그대로 가져온다.
    * 급여는 보통 매달 같으므로, 달이 바뀔 때마다 처음부터 입력하지 않도록 한 번에 복사한다.
@@ -290,8 +328,9 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
       incomes: apply('incomes', KEYS.incomes, setIncomes, incomes, backup.incomes),
       fixed: apply('fixedExpenses', KEYS.fixedExpenses, setFixed, fixed, backup.fixedExpenses),
       expenses: apply('expenses', KEYS.expenses, setExpenses, expenses, backup.expenses),
+      gifts: apply('gifts', KEYS.gifts, setGifts, gifts, backup.gifts),
     };
-  }, [persons, incomes, fixed, expenses, push]);
+  }, [persons, incomes, fixed, expenses, gifts, push]);
 
   // -------------------------- 클라우드 보조작업 --------------------------
 
@@ -302,8 +341,9 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     for (const r of incomes) { push('incomes', r); n++; }
     for (const r of fixed) { push('fixedExpenses', r); n++; }
     for (const r of expenses) { push('expenses', r); n++; }
+    for (const r of gifts) { push('gifts', r); n++; }
     return n;
-  }, [persons, incomes, fixed, expenses, push]);
+  }, [persons, incomes, fixed, expenses, gifts, push]);
 
   /**
    * 연결된 뒤 이 기기의 기존 기록을 방에 딱 한 번 올린다.
@@ -347,8 +387,9 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
 
   /** 이 기기의 모든 기록을 지운다 (클라우드는 건드리지 않는다) */
   const clearLocal = useCallback(() => {
-    setIncomes([]); setFixed([]); setExpenses([]);
-    save(KEYS.incomes, []); save(KEYS.fixedExpenses, []); save(KEYS.expenses, []);
+    setIncomes([]); setFixed([]); setExpenses([]); setGifts([]);
+    save(KEYS.incomes, []); save(KEYS.fixedExpenses, []);
+    save(KEYS.expenses, []); save(KEYS.gifts, []);
   }, []);
 
   const counts = useMemo(
@@ -357,16 +398,18 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
       incomes: incomes.filter(r => !r.deleted).length,
       fixed: fixed.filter(r => !r.deleted).length,
       expenses: expenses.filter(r => !r.deleted).length,
+      gifts: gifts.filter(r => !r.deleted).length,
     }),
-    [persons, incomes, fixed, expenses],
+    [persons, incomes, fixed, expenses, gifts],
   );
 
   return {
-    persons, incomes, fixed, expenses,
+    persons, incomes, fixed, expenses, gifts,
     savePerson, deletePerson,
     saveIncome, deleteIncome,
     saveFixed, deleteFixed,
     saveExpense, deleteExpense,
+    saveGift, deleteGift,
     copyIncomeFromPrevMonth,
     /** 지난달에 등록된 수입 합계 — 이 달이 비었을 때 '지난달과 같이' 버튼에 쓴다 */
     prevMonthIncome: monthIncome(incomes, addMonths(month, -1)),

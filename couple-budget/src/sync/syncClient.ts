@@ -1,8 +1,8 @@
 // import type 은 컴파일하면 사라지므로 런타임 비용이 없다 (번들에 firebase가 안 들어간다)
 import type { FirebaseApp } from 'firebase/app';
 import {
-  CollName, Expense, FirebaseWebConfig, FixedExpense, IncomeEntry, MonthKey,
-  Person, RemoteBatch, Syncable,
+  CollName, Expense, FirebaseWebConfig, FixedExpense, GiftEntry, IncomeEntry,
+  MonthKey, Person, RemoteBatch, Syncable,
 } from '../types';
 import { sanitizeForFirestore } from '../utils/merge';
 import { SyncClient } from './types';
@@ -66,7 +66,15 @@ export async function createSyncClient(
       snap => cb({ coll: 'fixedExpenses', records: snap.docs.map(d => d.data() as FixedExpense) }),
       err => console.warn('고정지출 구독 오류:', err),
     );
-    return () => { un0(); un1(); un2(); };
+    // 경조사·용돈은 달로 자르지 않고 전부 받는다 —
+    // '몇 년 전에 얼마 했더라'를 찾는 게 이 장부의 쓸모라서 과거가 보여야 한다.
+    // 한 해에 몇 십 건이라 전부 받아도 부담이 없다.
+    const un3 = onSnapshot(
+      col('gifts'),
+      snap => cb({ coll: 'gifts', records: snap.docs.map(d => d.data() as GiftEntry) }),
+      err => console.warn('경조사 구독 오류:', err),
+    );
+    return () => { un0(); un1(); un2(); un3(); };
   }
 
   function subscribeMonth(month: MonthKey, cb: (batch: RemoteBatch) => void): () => void {

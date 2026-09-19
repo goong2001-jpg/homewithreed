@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AddMode, Expense, IncomeEntry, View } from './types';
+import { AddMode, Expense, GiftDirection, GiftEntry, IncomeEntry, View } from './types';
 import { computeMonthBudget } from './utils/budget';
 import { useAppSettings } from './hooks/useAppSettings';
 import { useMonthNav } from './hooks/useMonthNav';
@@ -9,6 +9,8 @@ import HomeView from './components/HomeView';
 import AddView from './components/AddView';
 import HistoryView from './components/HistoryView';
 import TopSpendView from './components/TopSpendView';
+import GiftsView from './components/GiftsView';
+import GiftForm from './components/GiftForm';
 import SettingsView from './components/SettingsView';
 
 export default function App() {
@@ -20,6 +22,10 @@ export default function App() {
   // 고치는 중인 내역. 둘 다 null 이면 입력 화면은 '새로 쓰기'다
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editingIncome, setEditingIncome] = useState<IncomeEntry | null>(null);
+  // 경조사 적기/고치기 화면. null 이면 장부 목록을 보여준다
+  // (탭을 따로 만들지 않는다 — 경조사 탭 안에서만 열리는 화면이라 탭 표시가 유지돼야 한다)
+  const [giftForm, setGiftForm] =
+    useState<{ entry?: GiftEntry; direction: GiftDirection } | null>(null);
   const { settings, setSync } = useAppSettings();
   const { month, prev, next, goToToday } = useMonthNav();
   const ledger = useLedger(settings.sync, month);
@@ -116,6 +122,7 @@ export default function App() {
             incomes={ledger.incomes}
             fixed={ledger.fixed}
             expenses={ledger.expenses}
+            gifts={ledger.gifts}
             syncStatus={ledger.syncStatus}
             isLive={ledger.isLive}
             {...nav}
@@ -141,6 +148,29 @@ export default function App() {
           />
         )}
 
+        {view === 'gifts' && (
+          giftForm ? (
+            <GiftForm
+              key={giftForm.entry?.id ?? `new-${giftForm.direction}`}
+              persons={activePersons}
+              initial={giftForm.entry}
+              defaultDirection={giftForm.direction}
+              onSave={ledger.saveGift}
+              onDelete={ledger.deleteGift}
+              onDone={() => setGiftForm(null)}
+            />
+          ) : (
+            <GiftsView
+              gifts={ledger.gifts}
+              persons={activePersons}
+              syncStatus={ledger.syncStatus}
+              onAdd={d => setGiftForm({ direction: d })}
+              onEdit={g => setGiftForm({ entry: g, direction: g.direction })}
+              onGoSettings={() => setView('settings')}
+            />
+          )
+        )}
+
         {view === 'settings' && (
           <SettingsView
             month={month}
@@ -149,6 +179,7 @@ export default function App() {
             incomes={ledger.incomes}
             fixed={ledger.fixed}
             expenses={ledger.expenses}
+            gifts={ledger.gifts}
             syncStatus={ledger.syncStatus}
             syncError={ledger.syncError}
             counts={ledger.counts}
@@ -176,6 +207,8 @@ export default function App() {
           // 탭으로 직접 들어올 땐 전체를 보여준다 (홈에서 사람을 눌러 들어온 경우만 필터 유지)
           if (v === 'history') setHistoryPerson('all');
           // 입력 탭은 언제나 '새로 쓰기'다 — 고치던 내역을 물고 들어가지 않는다
+          // 경조사 탭도 언제나 목록부터 — 적다 만 화면을 물고 돌아오지 않는다
+          setGiftForm(null);
           if (v === 'add') { openAdd('expense'); return; }
           setEditingExpense(null);
           setEditingIncome(null);
