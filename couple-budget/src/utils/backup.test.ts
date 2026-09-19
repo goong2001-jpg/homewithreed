@@ -3,7 +3,7 @@ import {
   parseBackup, serializeBackup,
 } from './backup';
 import { mergeById } from './merge';
-import { Expense, FixedExpense, IncomeEntry, Person } from '../types';
+import { Expense, FixedExpense, GiftEntry, IncomeEntry, Person } from '../types';
 
 const PERSONS: Person[] = [
   { id: 'p1', name: '나', color: '#3498db', order: 0, createdAt: 0, updatedAt: 0 },
@@ -26,12 +26,20 @@ const expense = (id: string, amount: number, updatedAt = 100, deleted?: boolean)
     ...(deleted !== undefined ? { deleted } : {}),
   });
 
+const giftRec = (id: string, amount: number, updatedAt = 100): GiftEntry =>
+  ({
+    id, date: '2026-07-05', month: '2026-07', direction: 'out', amount,
+    kind: '축의금', counterparty: '김철수 결혼', personId: 'p1', memo: '',
+    createdAt: 0, updatedAt,
+  });
+
 function sample() {
   return buildBackup({
     persons: PERSONS,
     incomes: [income('i1', 3_200_000)],
     fixedExpenses: [fixedExp('f1', 1_000_000)],
     expenses: [expense('e1', 30_000), expense('e2', 50_000)],
+    gifts: [giftRec('g1', 100_000)],
     now: 1_700_000_000_000,
   });
 }
@@ -51,7 +59,7 @@ describe('내보내기 → 가져오기 왕복', () => {
   it('삭제 표시도 함께 실려간다', () => {
     // 이게 빠지면 상대 폰에서 지운 항목이 내 파일 때문에 되살아난다
     const b = buildBackup({
-      persons: PERSONS, incomes: [], fixedExpenses: [],
+      persons: PERSONS, incomes: [], fixedExpenses: [], gifts: [],
       expenses: [expense('e1', 30_000, 200, true)],
     });
     const out = parseBackup(serializeBackup(b));
@@ -159,7 +167,7 @@ describe('두 폰이 주고받으면 같은 결과로 수렴한다', () => {
 
   /** 실제 흐름대로 직렬화 → 파싱을 거쳐서 지출만 뽑는다 */
   function parseBackupExpenses(expenses: Expense[]): Expense[] {
-    const b = buildBackup({ persons: PERSONS, incomes: [], fixedExpenses: [], expenses });
+    const b = buildBackup({ persons: PERSONS, incomes: [], fixedExpenses: [], expenses, gifts: [] });
     const r = parseBackup(serializeBackup(b));
     if (!r.ok) throw new Error(r.error);
     return r.backup.expenses;
@@ -173,7 +181,7 @@ describe('사람 목록도 함께 오간다', () => {
     const husband: Person[] = PERSONS;
     const wife: Person[] = [...PERSONS, person('c1', '하율')];
 
-    const b = buildBackup({ persons: wife, incomes: [], fixedExpenses: [], expenses: [] });
+    const b = buildBackup({ persons: wife, incomes: [], fixedExpenses: [], expenses: [], gifts: [] });
     const r = parseBackup(serializeBackup(b));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -185,7 +193,7 @@ describe('사람 목록도 함께 오간다', () => {
 
   it('사람만 담긴 파일도 받아들인다 (지출 넣기 전에 자녀만 추가한 경우)', () => {
     const b = buildBackup({
-      persons: [person('c1', '하율')], incomes: [], fixedExpenses: [], expenses: [],
+      persons: [person('c1', '하율')], incomes: [], fixedExpenses: [], expenses: [], gifts: [],
     });
     const r = parseBackup(serializeBackup(b));
     expect(r.ok).toBe(true);
@@ -226,7 +234,54 @@ describe('파일 이름과 요약', () => {
       incomes: [income('i1', 100)],
       fixedExpenses: [],
       expenses: [expense('e1', 1), expense('e2', 2, 100, true)],
+      gifts: [],
     });
     expect(backupSummary(b)).toBe('지출 1건 · 수입 1건 · 고정지출 0건');
+  });
+
+  it('경조사가 있으면 요약에 붙는다', () => {
+    const b = buildBackup({
+      persons: PERSONS, incomes: [], fixedExpenses: [], expenses: [],
+      gifts: [giftRec('g1', 100_000), giftRec('g2', 50_000)],
+    });
+    expect(backupSummary(b)).toBe('지출 0건 · 수입 0건 · 고정지출 0건 · 경조사 2건');
+  });
+});
+
+describe('경조사도 함께 오간다', () => {
+  it('왕복해도 그대로다', () => {
+    const out = parseBackup(serializeBackup(sample()));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.backup.gifts).toHaveLength(1);
+    expect(out.backup.gifts[0].counterparty).toBe('김철수 결혼');
+    expect(out.backup.gifts[0].direction).toBe('out');
+  });
+
+  it('경조사만 들어 있는 파일도 받아준다', () => {
+    const b = buildBackup({
+      persons: [], incomes: [], fixedExpenses: [], expenses: [], gifts: [giftRec('g1', 100_000)],
+    });
+    expect(parseBackup(serializeBackup(b)).ok).toBe(true);
+  });
+
+  it('경조사가 없던 버전의 파일도 그대로 열린다', () => {
+    // 배우자 폰이 아직 옛 버전일 때 보내온 파일 — gifts 키가 아예 없다
+    const old = {
+      format: BACKUP_FORMAT, version: 1, exportedAt: 1,
+      persons: PERSONS, incomes: [], fixedExpenses: [], expenses: [expense('e1', 30_000)],
+    };
+    const out = parseBackup(JSON.stringify(old));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.backup.gifts).toEqual([]);
+    expect(out.backup.expenses).toHaveLength(1);
+  });
+
+  it('두 폰이 각자 적은 경조사는 둘 다 남는다', () => {
+    const mine = [giftRec('g1', 100_000)];
+    const theirs = [giftRec('g2', 50_000)];
+    const merged = mergeById(mine, theirs);
+    expect(merged.map(g => g.id).sort()).toEqual(['g1', 'g2']);
   });
 });

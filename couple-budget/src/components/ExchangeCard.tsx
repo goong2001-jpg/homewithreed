@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Expense, FixedExpense, IncomeEntry, Person } from '../types';
+import { Expense, FixedExpense, GiftEntry, IncomeEntry, Person } from '../types';
 import {
   Backup, backupFileName, backupSummary, buildBackup, parseBackup, serializeBackup,
 } from '../utils/backup';
@@ -9,7 +9,10 @@ interface Props {
   incomes: IncomeEntry[];
   fixed: FixedExpense[];
   expenses: Expense[];
-  onImport: (b: Backup) => { persons: number; incomes: number; fixed: number; expenses: number };
+  gifts: GiftEntry[];
+  onImport: (b: Backup) => {
+    persons: number; incomes: number; fixed: number; expenses: number; gifts: number;
+  };
   cardStyle: React.CSSProperties;
 }
 
@@ -18,14 +21,14 @@ interface Props {
  * 서버를 거치지 않으므로 데이터는 두 사람 폰과 두 사람이 쓰는 메신저에만 남는다.
  */
 export default function ExchangeCard({
-  persons, incomes, fixed, expenses, onImport, cardStyle,
+  persons, incomes, fixed, expenses, gifts, onImport, cardStyle,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState('');
   const [tone, setTone] = useState<'ok' | 'err' | 'info'>('info');
   const [busy, setBusy] = useState(false);
 
-  const hasData = incomes.length + fixed.length + expenses.length > 0;
+  const hasData = incomes.length + fixed.length + expenses.length + gifts.length > 0;
 
   function say(msg: string, t: 'ok' | 'err' | 'info' = 'info') {
     setNote(msg);
@@ -36,7 +39,7 @@ export default function ExchangeCard({
     if (!hasData) { say('아직 내보낼 기록이 없어요.', 'err'); return; }
     setBusy(true);
     try {
-      const backup = buildBackup({ persons, incomes, fixedExpenses: fixed, expenses });
+      const backup = buildBackup({ persons, incomes, fixedExpenses: fixed, expenses, gifts });
       const text = serializeBackup(backup);
       const name = backupFileName();
       const file = new File([text], name, { type: 'application/json' });
@@ -78,11 +81,13 @@ export default function ExchangeCard({
       if (!parsed.ok) { say(parsed.error, 'err'); return; }
 
       const n = onImport(parsed.backup);
-      const total = n.persons + n.incomes + n.fixed + n.expenses;
+      const total = n.persons + n.incomes + n.fixed + n.expenses + n.gifts;
       say(
         total === 0
           ? '이미 다 가지고 있는 기록이에요. 새로 들어온 건 없습니다.'
-          : `${total}건을 합쳤어요. (지출 ${n.expenses} · 수입 ${n.incomes} · 고정지출 ${n.fixed} · 사람 ${n.persons})`,
+          : `${total}건을 합쳤어요. (지출 ${n.expenses} · 수입 ${n.incomes}`
+            + ` · 고정지출 ${n.fixed} · 사람 ${n.persons}`
+            + (n.gifts > 0 ? ` · 경조사 ${n.gifts}` : '') + ')',
         'ok',
       );
     } catch (e) {

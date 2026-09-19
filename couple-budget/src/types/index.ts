@@ -104,6 +104,65 @@ export interface Expense extends Syncable {
   createdAt: number;
 }
 
+// ================= 경조사 · 용돈 (오고 간 돈, 별도 장부) =================
+
+/**
+ * 축의금·부의금·아이들 용돈처럼 **집 밖 사람과 오고 간 돈**.
+ *
+ * ⚠️ 일부러 저금통(하루 수입) 계산에 넣지 않는다.
+ * 축의금 30만원이 하루 예산에서 빠지면 그날 저금통이 빨갛게 되는데,
+ * 그건 '생활비를 헤프게 썼다'는 뜻이 아니라서 신호를 망친다.
+ * 아이가 받은 용돈도 우리가 쓸 돈이 아니다.
+ * 그래서 '나중에 찾아보는 장부'로 따로 둔다.
+ */
+export type GiftDirection = 'in' | 'out';   // 받음 / 냄
+
+export type GiftKind = '축의금' | '부의금' | '용돈' | '돌잔치' | '선물' | '기타';
+
+export const GIFT_KINDS: GiftKind[] =
+  ['축의금', '부의금', '용돈', '돌잔치', '선물', '기타'];
+
+export const GIFT_KIND_EMOJI: Record<GiftKind, string> = {
+  축의금: '💐', 부의금: '🕯️', 용돈: '🧧', 돌잔치: '🎂', 선물: '🎁', 기타: '📌',
+};
+
+/** 종류를 고르면 방향은 대개 정해져 있다 — 기본값으로만 쓰고 바꿀 수 있다 */
+export const GIFT_KIND_DEFAULT_DIRECTION: Record<GiftKind, GiftDirection> = {
+  축의금: 'out', 부의금: 'out', 용돈: 'in', 돌잔치: 'out', 선물: 'in', 기타: 'out',
+};
+
+export interface GiftEntry extends Syncable {
+  date: DateKey;
+  /** date.slice(0,7) 비정규화 — 지출과 같은 이유 */
+  month: MonthKey;
+  direction: GiftDirection;
+  amount: number;
+  kind: GiftKind;
+  /** 상대방 — '김철수 결혼', '외할머니' */
+  counterparty: string;
+  /** 우리집 누구 몫인지 — 용돈 받은 아이, 축의금 낸 사람 */
+  personId: string;
+  memo: string;
+  createdAt: number;
+}
+
+/** 상대별 집계 — '김철수한테 얼마 냈더라?' 에 답하기 위한 것 */
+export interface CounterpartyTotal {
+  name: string;
+  received: number;
+  given: number;
+  net: number;       // received - given
+  count: number;
+  lastDate: DateKey;
+}
+
+export interface GiftSummary {
+  received: number;
+  given: number;
+  net: number;
+  count: number;
+}
+
 // ============================== 설정 ==============================
 
 /**
@@ -190,17 +249,18 @@ export interface MonthBudget {
 
 // ========================== 뷰 / 동기화 ==========================
 
-export type View = 'home' | 'add' | 'history' | 'top' | 'settings';
+export type View = 'home' | 'add' | 'history' | 'top' | 'gifts' | 'settings';
 
 /** 입력 화면이 지출을 받는지 수입을 받는지 */
 export type AddMode = 'expense' | 'income';
 
 export type SyncStatus = 'off' | 'connecting' | 'live' | 'error';
 
-export type CollName = 'persons' | 'incomes' | 'fixedExpenses' | 'expenses';
+export type CollName = 'persons' | 'incomes' | 'fixedExpenses' | 'expenses' | 'gifts';
 
 export type RemoteBatch =
   | { coll: 'persons'; records: Person[] }
   | { coll: 'incomes'; records: IncomeEntry[] }
   | { coll: 'fixedExpenses'; records: FixedExpense[] }
-  | { coll: 'expenses'; records: Expense[] };
+  | { coll: 'expenses'; records: Expense[] }
+  | { coll: 'gifts'; records: GiftEntry[] };

@@ -9,7 +9,7 @@ export interface SyncClient {
   /** 레코드 하나를 올린다. 실패는 호출자가 무시해도 된다 (Firestore가 재시도한다) */
   push(coll: CollName, rec: Syncable): Promise<void>;
 
-  /** 수입 + 고정지출 구독 — 개수가 적어서 전부 받는다 */
+  /** 사람 + 수입 + 고정지출 + 경조사 구독 — 개수가 적어서 전부 받는다 */
   subscribeSmall(cb: (batch: RemoteBatch) => void): () => void;
 
   /** 특정 달의 변동지출만 구독 */

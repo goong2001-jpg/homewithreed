@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  AppSettings, Expense, FixedExpense, IncomeEntry, MonthBudget, MonthKey,
+  AppSettings, Expense, FixedExpense, GiftEntry, IncomeEntry, MonthBudget, MonthKey,
   Person, SyncSettings, SyncStatus,
 } from '../types';
 import { monthLabel } from '../utils/format';
@@ -19,9 +19,10 @@ interface Props {
   incomes: IncomeEntry[];
   fixed: FixedExpense[];
   expenses: Expense[];
+  gifts: GiftEntry[];
   syncStatus: SyncStatus;
   syncError: string;
-  counts: { persons: number; incomes: number; fixed: number; expenses: number };
+  counts: { persons: number; incomes: number; fixed: number; expenses: number; gifts: number };
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
@@ -47,7 +48,8 @@ const cardStyle: React.CSSProperties = {
 
 export default function SettingsView(props: Props) {
   const {
-    month, budget, settings, persons, incomes, fixed, expenses, syncStatus, syncError, counts,
+    month, budget, settings, persons, incomes, fixed, expenses, gifts,
+    syncStatus, syncError, counts,
     onPrev, onNext, onToday, onAddIncome, onEditIncome, onDeleteIncome, onCopyPrevIncome,
     onSaveFixed, onDeleteFixed,
     onSavePerson, onDeletePerson, onSetSync, onImport, onUploadAll, onClearLocal,
@@ -59,7 +61,7 @@ export default function SettingsView(props: Props) {
   async function handleExport() {
     setExporting(true);
     try {
-      await exportMonthToExcel(month, budget, incomes, fixed, expenses, persons);
+      await exportMonthToExcel(month, budget, incomes, fixed, expenses, persons, gifts);
     } catch (e) {
       console.warn('Excel 내보내기 실패:', e);
     } finally {
@@ -125,6 +127,7 @@ export default function SettingsView(props: Props) {
           incomes={incomes}
           fixed={fixed}
           expenses={expenses}
+          gifts={gifts}
           onImport={onImport}
           cardStyle={cardStyle}
         />

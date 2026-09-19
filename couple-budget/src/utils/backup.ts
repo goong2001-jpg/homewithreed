@@ -1,4 +1,4 @@
-import { Expense, FixedExpense, IncomeEntry, Person } from '../types';
+import { Expense, FixedExpense, GiftEntry, IncomeEntry, Person } from '../types';
 
 /**
  * 부부끼리 파일로 주고받는 백업 형식.
@@ -11,6 +11,12 @@ import { Expense, FixedExpense, IncomeEntry, Person } from '../types';
  * 서로 주고받기만 하면 양쪽이 같은 결과로 수렴한다.
  */
 export const BACKUP_FORMAT = 'couple-budget-backup';
+/**
+ * ⚠️ 경조사(gifts)를 더하면서도 1로 둔다.
+ * 새 필드를 더하기만 했으므로 옛 버전 앱이 이 파일을 읽어도 gifts 만 못 보고
+ * 나머지는 정상으로 합쳐진다. 버전을 올리면 옛 앱이 파일 전체를 거부해서,
+ * 배우자가 새로고침하기 전까지 지출조차 주고받지 못하게 된다.
+ */
 export const BACKUP_VERSION = 1;
 
 export interface Backup {
@@ -21,6 +27,7 @@ export interface Backup {
   incomes: IncomeEntry[];
   fixedExpenses: FixedExpense[];
   expenses: Expense[];
+  gifts: GiftEntry[];
 }
 
 export function buildBackup(input: {
@@ -28,6 +35,7 @@ export function buildBackup(input: {
   incomes: IncomeEntry[];
   fixedExpenses: FixedExpense[];
   expenses: Expense[];
+  gifts: GiftEntry[];
   now?: number;
 }): Backup {
   return {
@@ -39,6 +47,7 @@ export function buildBackup(input: {
     incomes: input.incomes,
     fixedExpenses: input.fixedExpenses,
     expenses: input.expenses,
+    gifts: input.gifts,
   };
 }
 
@@ -90,10 +99,12 @@ export function parseBackup(
     incomes: readRecords<IncomeEntry>(o.incomes),
     fixedExpenses: readRecords<FixedExpense>(o.fixedExpenses),
     expenses: readRecords<Expense>(o.expenses),
+    // 경조사가 없던 버전이 만든 파일이면 그냥 빈 배열이 된다
+    gifts: readRecords<GiftEntry>(o.gifts),
   };
 
   const total = backup.persons.length + backup.incomes.length
-    + backup.fixedExpenses.length + backup.expenses.length;
+    + backup.fixedExpenses.length + backup.expenses.length + backup.gifts.length;
   if (total === 0) {
     return { ok: false, error: '파일에 기록이 하나도 없어요. 상대방이 먼저 가계부를 입력했는지 확인해 주세요.' };
   }
@@ -108,12 +119,15 @@ export function backupFileName(now = new Date()): string {
   return `우리집가계부_${y}${m}${d}.json`;
 }
 
-/** '지출 123건 · 수입 4건 · 고정지출 3건' */
+/** '지출 123건 · 수입 4건 · 고정지출 3건 · 경조사 2건' */
 export function backupSummary(b: Backup): string {
   const alive = <T extends { deleted?: boolean }>(rs: T[]) => rs.filter(r => !r.deleted).length;
-  return [
+  const parts = [
     `지출 ${alive(b.expenses)}건`,
     `수입 ${alive(b.incomes)}건`,
     `고정지출 ${alive(b.fixedExpenses)}건`,
-  ].join(' · ');
+  ];
+  // 경조사는 없는 집도 많으니 0건이면 굳이 보여주지 않는다
+  if (alive(b.gifts) > 0) parts.push(`경조사 ${alive(b.gifts)}건`);
+  return parts.join(' · ');
 }
