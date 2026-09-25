@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#4f8ef7" />
+    <meta name="description" content="구름이가 받은 용돈을 버튼 한 번으로 적는 연도별 용돈기입장." />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="구름이 용돈" />
+    <link rel="stylesheet" href="style.css" />
+    <title>구름이 용돈기입장</title>
+  </head>
+  <body>
+    <noscript>이 앱을 실행하려면 JavaScript가 필요합니다.</noscript>
+
+    <main id="app">
+      <header class="top">
+        <h1>☁️ 구름이 용돈기입장</h1>
+      </header>
+
+      <!-- 연도 선택 + 합계 -->
+      <section class="card total">
+        <div class="yearNav">
+          <button id="prevYear" class="navBtn" aria-label="이전 해">◀</button>
+          <span id="yearLabel" class="yearLabel">2026년</span>
+          <button id="nextYear" class="navBtn" aria-label="다음 해">▶</button>
+        </div>
+        <div class="totalLabel">올해 받은 용돈</div>
+        <div id="yearTotal" class="totalAmount">0원</div>
+        <div id="yearCount" class="totalSub">0번 받았어요</div>
+        <div class="allTotal">지금까지 모은 돈 <b id="allTotal">0원</b></div>
+      </section>
+
+      <!-- 기록하기 -->
+      <section class="card">
+        <h2>용돈 받았어요! 💰</h2>
+
+        <div class="fieldRow">
+          <label for="dateInput">받은 날</label>
+          <input id="dateInput" type="date" />
+        </div>
+
+        <div class="fieldLabel">누가 줬어요? <small>(안 골라도 돼요)</small></div>
+        <div id="givers" class="chips"></div>
+
+        <div class="bills">
+          <button class="bill b1000" data-amount="1000"><span class="billNum">1,000</span><span class="billWon">천원</span></button>
+          <button class="bill b5000" data-amount="5000"><span class="billNum">5,000</span><span class="billWon">오천원</span></button>
+          <button class="bill b10000" data-amount="10000"><span class="billNum">10,000</span><span class="billWon">만원</span></button>
+          <button class="bill b50000" data-amount="50000"><span class="billNum">50,000</span><span class="billWon">오만원</span></button>
+        </div>
+        <p class="hint">버튼을 누르면 바로 적혀요. 잘못 눌렀으면 아래 알림에서 <b>되돌리기</b>.</p>
+      </section>
+
+      <!-- 올해 요약 -->
+      <section class="card">
+        <h2 id="summaryTitle">2026년 요약</h2>
+        <div id="billCounts" class="billCounts"></div>
+        <div id="months" class="months"></div>
+      </section>
+
+      <!-- 기록 목록 -->
+      <section class="card">
+        <h2 id="listTitle">2026년 기록</h2>
+        <div id="list"></div>
+      </section>
+
+      <!-- 백업 -->
+      <details class="card backup">
+        <summary>백업 · 옮기기</summary>
+        <p class="hint">기록은 이 폰 브라우저에만 저장돼요. 폰을 바꾸거나 브라우저 데이터를 지우면 사라지니 가끔 백업 파일을 저장해 두세요.</p>
+        <div class="backupBtns">
+          <button id="exportBtn" class="ghost">백업 파일 저장</button>
+          <label class="ghost fileBtn">백업 불러오기<input id="importInput" type="file" accept="application/json,.json" hidden /></label>
+        </div>
+        <p id="lastBackup" class="hint"></p>
+      </details>
+    </main>
+
+    <div id="toast" class="toast hidden" role="status">
+      <span id="toastText"></span>
+      <button id="undoBtn" class="undo">되돌리기</button>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
