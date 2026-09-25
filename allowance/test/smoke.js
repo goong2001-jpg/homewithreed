@@ -24,16 +24,34 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   // ---- 받은 돈 ----
   check('연도 라벨', (await t('#yearLabel')) === year + '년');
   check('처음엔 0원', (await t('#balance')) === '0원');
-  await p.click('.bill.b1000');
+  // 지폐를 이어서 누르면 한 줄로 합쳐진다
   await p.click('#tags [data-tag="할머니"]');
   await p.click('.bill.b50000');
+  await p.click('.bill.b50000');
   await p.click('.bill.b10000');
-  await p.click('.bill.b5000');
-  check('받은 돈 66,000원', (await t('#yearIn')) === '+66,000원', await t('#yearIn'));
-  check('가진 돈 66,000원', (await t('#balance')) === '66,000원');
-  check('할머니 기록', (await p.locator('.row .who', { hasText: '할머니' }).count()) === 1);
+  check('5만×2+1만 → 한 줄', (await p.locator('.row').count()) === 1, String(await p.locator('.row').count()));
+  check('합친 금액 110,000원', (await t('#yearIn')) === '+110,000원', await t('#yearIn'));
+  check('합친 기록에 준 사람 유지', (await t('.row .who')).includes('할머니'));
+  check('지폐 구성 표시', (await t('.row .who')).includes('오만원×2 + 만원'), await t('.row .who'));
+  check('알림에 합계', (await t('#toastText')).includes('110,000원'));
+  check('지폐 장수는 따로 셈', (await t('#billCounts')).replace(/\s/g, '').includes('오만원2장'), await t('#billCounts'));
   await p.click('#undoBtn');
-  check('되돌리기 → 61,000원', (await t('#balance')) === '61,000원');
+  check('되돌리기 → 합친 줄 통째로 취소', (await t('#balance')) === '0원');
+
+  // 칩을 새로 고르면 새 줄
+  await p.click('#tags [data-tag="할머니"]');
+  await p.click('.bill.b1000');
+  await p.click('#tags [data-tag="엄마"]');
+  await p.click('.bill.b50000');
+  await p.click('.bill.b10000');
+  check('새 칩 → 새 줄', (await p.locator('.row').count()) === 2);
+  check('받은 돈 61,000원', (await t('#yearIn')) === '+61,000원', await t('#yearIn'));
+  // 알림이 사라진 뒤 누르면 새 줄
+  await p.waitForTimeout(5300);
+  await p.click('.bill.b5000');
+  check('알림 끝난 뒤 → 새 줄', (await p.locator('.row').count()) === 3);
+  await p.click('#undoBtn');
+  check('가진 돈 61,000원', (await t('#balance')) === '61,000원');
 
   // ---- 쓴 돈 ----
   await p.click('.seg [data-mode="out"]');
@@ -74,6 +92,23 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('목표 비워짐', (await t('#goalBody')).includes('목표 정하기'));
   await p.click('#undoBtn');
   check('되돌리면 목표 복원', (await t('.goalName')).includes('레고 성') && (await t('#balance')) === '109,500원');
+
+  // ---- 큰 금액 / 한국어 단위 ----
+  answers.push('자율주행 FSD차', '125000000');
+  await p.click('[data-goal="set"]');
+  check('목표 1억2500만 (숫자)', (await t('.goalNums')).includes('125,000,000원'), await t('.goalNums'));
+  answers.push('자율주행 FSD차', '1억 2500만원');
+  await p.click('[data-goal="set"]');
+  check('목표 "1억 2500만원"', (await t('.goalNums')).includes('125,000,000원'), await t('.goalNums'));
+  answers.push('레고 성', '십만원', '100,000');   // 못 읽으면 다시 묻는다
+  await p.click('[data-goal="set"]');
+  check('잘못 넣으면 다시 물어봄', (await t('.goalName')).includes('레고 성') && (await t('.goalNums')).includes('/ 100,000원'));
+  await p.click('.seg [data-mode="out"]');
+  answers.push('3만5천');
+  await p.click('#customBtn');
+  check('직접 입력 "3만5천"', (await p.locator('.row.out .amt', { hasText: '−35,000원' }).count()) === 1);
+  await p.click('#undoBtn');
+  await p.click('.seg [data-mode="in"]');
 
   // ---- 연도 ----
   await p.fill('#dateInput', (year - 1) + '-12-31');
