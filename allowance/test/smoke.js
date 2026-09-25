@@ -10,84 +10,118 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   const p = await ctx.newPage();
   const errors = [];
   p.on('pageerror', e => errors.push(String(e)));
-  // prompt 에 넣을 답을 차례로 쌓아 둔다. 비어 있으면 기본값으로 확인.
+  // prompt/confirm 답을 차례로 쌓아 둔다. 비어 있으면 기본값으로 확인.
   const answers = [];
-  p.on('dialog', d => (d.type() === 'prompt' && answers.length ? d.accept(answers.shift()) : d.accept()));
+  let dismissNext = false;
+  p.on('dialog', d => {
+    if (dismissNext && d.type() === 'confirm') { dismissNext = false; return d.dismiss(); }
+    return d.type() === 'prompt' && answers.length ? d.accept(answers.shift()) : d.accept();
+  });
   await p.goto(BASE + '/index.html');
-
+  const t = sel => p.textContent(sel);
   const year = new Date().getFullYear();
-  check('연도 라벨', (await p.textContent('#yearLabel')) === year + '년');
-  check('처음엔 0원', (await p.textContent('#yearTotal')) === '0원');
 
+  // ---- 받은 돈 ----
+  check('연도 라벨', (await t('#yearLabel')) === year + '년');
+  check('처음엔 0원', (await t('#balance')) === '0원');
   await p.click('.bill.b1000');
-  await p.click('.chip[data-giver="할머니"]');
+  await p.click('#tags [data-tag="할머니"]');
   await p.click('.bill.b50000');
   await p.click('.bill.b10000');
   await p.click('.bill.b5000');
-  check('올해 합계 66,000원', (await p.textContent('#yearTotal')) === '66,000원', await p.textContent('#yearTotal'));
-  check('4번 받음', (await p.textContent('#yearCount')) === '4번 받았어요');
-  check('할머니 기록 표시', (await p.locator('.row .who', { hasText: '할머니' }).count()) === 1);
-  check('선택한 사람은 기록 후 해제', (await p.locator('.chip.on').count()) === 0);
-
+  check('받은 돈 66,000원', (await t('#yearIn')) === '+66,000원', await t('#yearIn'));
+  check('가진 돈 66,000원', (await t('#balance')) === '66,000원');
+  check('할머니 기록', (await p.locator('.row .who', { hasText: '할머니' }).count()) === 1);
   await p.click('#undoBtn');
-  check('되돌리기 → 61,000원', (await p.textContent('#yearTotal')) === '61,000원');
+  check('되돌리기 → 61,000원', (await t('#balance')) === '61,000원');
 
-  // 작년 날짜로 기록 → 작년 화면으로 넘어감
+  // ---- 쓴 돈 ----
+  await p.click('.seg [data-mode="out"]');
+  check('쓴 돈 모드 제목', (await t('#recordTitle')).includes('썼어요'));
+  check('쓴 곳 칩', (await p.locator('#tags [data-tag="과자·간식"]').count()) === 1);
+  await p.click('#tags [data-tag="과자·간식"]');
+  answers.push('1,500원');
+  await p.click('#customBtn');
+  check('직접 입력 1,500원 씀', (await t('#yearOut')) === '−1,500원', await t('#yearOut'));
+  check('가진 돈 59,500원', (await t('#balance')) === '59,500원');
+  check('목록에 −1,500원', (await p.locator('.row.out .amt', { hasText: '−1,500원' }).count()) === 1);
+  check('어디에 썼나', (await t('#useBreak')).includes('과자·간식'));
+
+  dismissNext = true;   // 가진 돈보다 많이 쓰기 → 취소
+  await p.click('.bill.b50000'); await p.click('.bill.b10000');
+  check('초과 지출 확인창(취소하면 안 적힘)', (await t('#yearOut')) === '−51,500원', await t('#yearOut'));
+  await p.click('#undoBtn');
+
+  // 쓴 곳 목록 편집 (받은 돈 목록과 따로)
+  answers.push('포켓몬 카드');
+  await p.click('#tags [data-act="add"]');
+  check('쓴 곳 추가', (await p.locator('#tags [data-tag="포켓몬 카드"]').count()) === 1);
+  await p.click('.seg [data-mode="in"]');
+  check('받은 돈 목록엔 없음', (await p.locator('#tags [data-tag="포켓몬 카드"]').count()) === 0);
+
+  // ---- 목표 ----
+  check('목표 없음 안내', (await t('#goalBody')).includes('목표 정하기'));
+  answers.push('레고 성', '100,000');
+  await p.click('[data-goal="set"]');
+  check('목표 이름', (await t('.goalName')).includes('레고 성'));
+  check('진행률 59%', (await t('.progress span')) === '59%', await t('.progress span'));
+  check('남은 금액', (await t('.goalMsg')) === '40,500원 더 모으면 돼요!', await t('.goalMsg'));
+  await p.click('.bill.b50000');
+  check('달성', (await t('.goalMsg')).includes('목표 달성'));
+  await p.click('[data-goal="buy"]');
+  check('샀어요 → 쓴 돈', (await p.locator('.row.out .who', { hasText: '레고 성' }).count()) === 1);
+  check('샀어요 → 가진 돈 9,500원', (await t('#balance')) === '9,500원', await t('#balance'));
+  check('목표 비워짐', (await t('#goalBody')).includes('목표 정하기'));
+  await p.click('#undoBtn');
+  check('되돌리면 목표 복원', (await t('.goalName')).includes('레고 성') && (await t('#balance')) === '109,500원');
+
+  // ---- 연도 ----
   await p.fill('#dateInput', (year - 1) + '-12-31');
   await p.click('.bill.b10000');
-  check('작년으로 이동', (await p.textContent('#yearLabel')) === (year - 1) + '년');
-  check('작년 합계 10,000원', (await p.textContent('#yearTotal')) === '10,000원');
-  check('전체 합계 71,000원', (await p.textContent('#allTotal')) === '71,000원');
+  check('작년으로 이동', (await t('#yearLabel')) === (year - 1) + '년');
+  check('작년 받은 돈', (await t('#yearIn')) === '+10,000원');
+  check('가진 돈은 전체 합', (await t('#balance')) === '119,500원', await t('#balance'));
   await p.click('#nextYear');
-  check('다음 해 버튼', (await p.textContent('#yearTotal')) === '61,000원');
+
+  // ---- 이름 수정/삭제 ----
+  await p.click('#tags [data-act="edit"]');
+  answers.push('친할머니');
+  await p.click('#tags [data-rename="0"]');
+  check('이름 수정 → 지난 기록도', (await p.locator('.row .who', { hasText: '친할머니' }).count()) === 1);
+  await p.click('#tags [data-remove="0"]');
+  await p.click('#tags [data-act="done"]');
+  check('삭제해도 기록 유지', (await p.locator('#tags [data-tag="친할머니"]').count()) === 0 &&
+    (await p.locator('.row .who', { hasText: '친할머니' }).count()) === 1);
 
   await p.reload();
-  check('새로고침 후 유지', (await p.textContent('#allTotal')) === '71,000원');
+  check('새로고침 후 유지', (await t('#balance')) === '119,500원' && (await t('.goalName')).includes('레고 성'));
 
-  await p.locator('.row .del').first().click();
-  check('삭제', (await p.textContent('#yearTotal')) !== '61,000원', await p.textContent('#yearTotal'));
+  // ---- 옛 기록(type 없음) 호환 ----
+  await p.evaluate(() => {
+    const a = JSON.parse(localStorage.getItem('hwr-allowance-v1'));
+    a.push({ id: 'old1', date: new Date().getFullYear() + '-01-02', amount: 1000, giver: '아빠', createdAt: 1 });
+    localStorage.setItem('hwr-allowance-v1', JSON.stringify(a));
+  });
+  await p.reload();
+  check('옛 기록은 받은 돈', (await t('#balance')) === '120,500원', await t('#balance'));
 
-  // 백업 → 비우고 → 불러오기
+  // ---- 백업 ----
   await p.click('.backup summary');
   const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#exportBtn')]);
   const file = await dl.path();
-  const before = await p.textContent('#allTotal');
-  await p.evaluate(() => localStorage.removeItem('hwr-allowance-v1'));
+  await p.evaluate(() => localStorage.clear());
   await p.reload();
-  check('비운 뒤 0원', (await p.textContent('#allTotal')) === '0원');
+  check('비운 뒤 0원', (await t('#balance')) === '0원');
   await p.click('.backup summary');
   await p.setInputFiles('#importInput', file);
   await p.waitForTimeout(300);
-  check('백업 복원', (await p.textContent('#allTotal')) === before, await p.textContent('#allTotal'));
+  check('백업 복원(기록)', (await t('#balance')) === '120,500원', await t('#balance'));
+  check('백업 복원(목표)', (await t('.goalName')).includes('레고 성'));
+  await p.click('.seg [data-mode="out"]');
+  check('백업 복원(쓴 곳 목록)', (await p.locator('#tags [data-tag="포켓몬 카드"]').count()) === 1);
 
-  // ---- 준 사람 추가·수정·삭제 ----
-  const chips = () => p.$$eval('#givers .chip[data-giver]', els => els.map(e => e.textContent));
-  answers.push('  고모  ');
-  await p.click('#givers [data-act="add"]');
-  check('추가 (공백 정리)', (await chips()).includes('고모'));
-  check('추가한 사람 바로 선택', (await p.textContent('.chip.on')) === '고모');
-  await p.click('.bill.b10000');
-  check('고모 기록', (await p.locator('.row .who', { hasText: '고모' }).count()) === 1);
-
-  await p.click('#givers [data-act="edit"]');
-  const idx = (await p.$$eval('#givers .chipName', els => els.map(e => e.textContent.replace(' ✏️', '')))).indexOf('고모');
-  answers.push('큰고모');
-  await p.click(`#givers [data-rename="${idx}"]`);
-  check('이름 수정', (await p.$$eval('#givers .chipName', els => els.map(e => e.textContent))).some(t => t.startsWith('큰고모')));
-  check('지난 기록 이름도 바뀜', (await p.locator('.row .who', { hasText: '큰고모' }).count()) === 1);
-
-  answers.push('할머니');
-  await p.click(`#givers [data-rename="${idx}"]`);
-  check('중복 이름 거부', (await p.$$eval('#givers .chipName', els => els.map(e => e.textContent))).some(t => t.startsWith('큰고모')));
-
-  await p.click('#givers [data-remove="0"]');   // 할머니
-  await p.click('#givers [data-act="done"]');
-  check('삭제', !(await chips()).includes('할머니'));
-  check('삭제해도 지난 기록 유지', (await p.locator('.row .who', { hasText: '할머니' }).count()) >= 1);
-
-  await p.reload();
-  check('목록 새로고침 후 유지', (await chips()).includes('큰고모') && !(await chips()).includes('할머니'));
-
+  await p.click('.seg [data-mode="in"]');
+  await p.evaluate(() => window.scrollTo(0, 0));
   await p.screenshot({ path: process.env.SHOT || 'shot.png', fullPage: true });
   check('JS 에러 없음', errors.length === 0, errors.join(' | '));
   await browser.close();

@@ -7,6 +7,8 @@
   --accent: #4f8ef7;
   --accent-soft: #e8f0fe;
   --danger: #e5484d;
+  --spend: #e5484d;
+  --good: #2f9e5b;
   /* 실제 지폐 색 */
   --w1000: #5b8fd6;
   --w5000: #e0763a;
@@ -58,18 +60,51 @@ html, body {
 
 /* ---- 합계 ---- */
 .total { text-align: center; background: linear-gradient(160deg, var(--accent) 0%, #7aa9fb 100%); color: #fff; border: 0; }
-.yearNav { display: flex; align-items: center; justify-content: center; gap: 18px; margin-bottom: 10px; }
-.yearLabel { font-size: 20px; font-weight: 700; min-width: 90px; }
+.totalLabel { font-size: 14px; opacity: 0.9; }
+.totalAmount { font-size: 40px; font-weight: 800; letter-spacing: -1px; margin: 2px 0 12px; font-variant-numeric: tabular-nums; }
+.totalAmount.minus { color: #ffd4d4; }
+.yearNav { display: flex; align-items: center; justify-content: center; gap: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.3); }
+.yearLabel { font-size: 17px; font-weight: 700; min-width: 80px; }
 .navBtn {
-  width: 40px; height: 40px; border-radius: 50%; border: 0;
-  background: rgba(255,255,255,0.22); color: #fff; font-size: 15px; cursor: pointer;
+  width: 34px; height: 34px; border-radius: 50%; border: 0;
+  background: rgba(255,255,255,0.22); color: #fff; font-size: 13px; cursor: pointer;
 }
 .navBtn:disabled { opacity: 0.35; cursor: default; }
-.totalLabel { font-size: 14px; opacity: 0.9; }
-.totalAmount { font-size: 38px; font-weight: 800; letter-spacing: -1px; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
-.totalSub { font-size: 14px; opacity: 0.9; }
-.allTotal { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.3); font-size: 14px; }
-.allTotal b { font-size: 16px; }
+.yearStats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.yearStats > div { background: rgba(255,255,255,0.16); border-radius: 12px; padding: 10px 6px; }
+.ysLabel { font-size: 13px; opacity: 0.92; }
+.ysLabel small { opacity: 0.85; }
+.ysNum { font-size: 19px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+/* ---- 목표 ---- */
+.goalEmpty { margin: 0 0 12px; color: var(--dim); font-size: 14px; line-height: 1.5; }
+.goalName { font-size: 18px; font-weight: 700; }
+.goalNums { margin: 6px 0 10px; color: var(--dim); font-size: 14px; font-variant-numeric: tabular-nums; }
+.goalNums b { color: var(--text); font-size: 17px; }
+.progress { position: relative; height: 22px; border-radius: 11px; background: var(--bg); overflow: hidden; border: 1px solid var(--line); }
+.progress i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #7aa9fb, var(--accent)); border-radius: 11px; transition: width 0.4s ease; }
+.progress.done i { background: linear-gradient(90deg, #5fd08a, var(--good)); }
+.progress span { position: relative; display: block; text-align: center; font-size: 12px; font-weight: 700; line-height: 20px; }
+.goalMsg { margin: 10px 0 0; font-size: 15px; font-weight: 600; }
+.goalMsg.done { color: var(--good); }
+.goalTools { display: flex; gap: 16px; margin-top: 12px; }
+.primaryBtn {
+  width: 100%; margin-top: 10px; font: inherit; font-size: 15px; font-weight: 700; padding: 13px; border: 0; border-radius: 12px;
+  background: var(--accent); color: #fff; cursor: pointer;
+}
+.linkBtn { font: inherit; font-size: 13px; color: var(--dim); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
+
+/* ---- 받았어요 / 썼어요 ---- */
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: var(--bg); margin-bottom: 16px; }
+.seg button { font: inherit; font-size: 15px; padding: 10px; border: 0; border-radius: 9px; background: transparent; color: var(--dim); cursor: pointer; }
+.seg button.on { background: var(--card); color: var(--text); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.modeOut { border-color: color-mix(in srgb, var(--spend) 40%, var(--line)); }
+.modeOut .seg button.on { color: var(--spend); }
+.modeOut .chip.on { background: var(--spend); border-color: var(--spend); }
+.customBtn {
+  width: 100%; margin-top: 10px; font: inherit; font-size: 14px; padding: 12px; border-radius: 12px; cursor: pointer;
+  border: 1px dashed var(--line); background: var(--bg); color: var(--text);
+}
 
 /* ---- 입력 ---- */
 .fieldRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
@@ -119,7 +154,9 @@ input[type="date"] {
 .months { display: flex; align-items: flex-end; gap: 4px; height: 110px; }
 .mo { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
 .mo .barWrap { flex: 1; width: 100%; display: flex; align-items: flex-end; }
-.mo .bar { width: 100%; border-radius: 4px 4px 0 0; background: var(--accent); min-height: 0; }
+.mo .barWrap { gap: 1px; }
+.mo .bar { flex: 1; border-radius: 3px 3px 0 0; background: var(--accent); min-height: 0; }
+.mo .bar.out { background: var(--spend); }
 .mo .bar.zero { background: var(--line); height: 2px !important; }
 .mo .lbl { font-size: 10px; color: var(--dim); margin-top: 4px; }
 
@@ -170,3 +207,19 @@ input[type="date"] {
 .chip.edit button { font: inherit; font-size: 14px; border: 0; background: transparent; color: var(--text); cursor: pointer; }
 .chipName { padding: 8px 4px 8px 14px; }
 .chipDel { padding: 8px 12px 8px 6px; color: var(--danger) !important; font-size: 17px !important; line-height: 1; }
+
+/* ---- 요약 보강 ---- */
+.subHead { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--dim); margin: 0 0 8px; }
+#useBreak .subHead { margin-top: 18px; }
+.legend { font-size: 11px; }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin: 0 3px 0 8px; vertical-align: -1px; }
+.lgIn { background: var(--accent); }
+.lgOut { background: var(--spend); }
+.ub { display: grid; grid-template-columns: 76px 1fr auto; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
+.ub span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ubBar { height: 8px; border-radius: 4px; background: var(--bg); overflow: hidden; }
+.ubBar i { display: block; height: 100%; background: var(--spend); border-radius: 4px; }
+.ub b { font-variant-numeric: tabular-nums; }
+.monthHead em { font-style: normal; color: var(--spend); }
+.row.out .amt { color: var(--spend); }
+.row:not(.out) .amt { color: var(--good); }
