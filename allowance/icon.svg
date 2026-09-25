@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#4f8ef7"/>
+  <g transform="translate(256 262)">
+    <ellipse cx="0" cy="18" rx="150" ry="104" fill="#ffffff"/>
+    <circle cx="-78" cy="-40" r="72" fill="#ffffff"/>
+    <circle cx="36" cy="-70" r="96" fill="#ffffff"/>
+    <circle cx="-38" cy="40" r="62" fill="#fbbf24"/>
+    <text x="-38" y="62" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="64" fill="#7c4a03">₩</text>
+    <rect x="30" y="4" width="112" height="64" rx="10" fill="#34a853"/>
+    <circle cx="86" cy="36" r="18" fill="#bfe8c8"/>
+  </g>
+</svg>
