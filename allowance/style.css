@@ -161,3 +161,12 @@ input[type="date"] {
   box-shadow: 0 8px 24px rgba(0,0,0,0.25);
 }
 .undo { border: 0; background: transparent; color: #8fb7ff; font: inherit; font-weight: 700; cursor: pointer; padding: 0; }
+
+/* ---- 준 사람 편집 ---- */
+.chip.add { border-style: dashed; color: var(--accent); }
+.chip.tool { color: var(--dim); }
+.chip.done { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.chip.edit { display: inline-flex; align-items: center; padding: 0; overflow: hidden; }
+.chip.edit button { font: inherit; font-size: 14px; border: 0; background: transparent; color: var(--text); cursor: pointer; }
+.chipName { padding: 8px 4px 8px 14px; }
+.chipDel { padding: 8px 12px 8px 6px; color: var(--danger) !important; font-size: 17px !important; line-height: 1; }

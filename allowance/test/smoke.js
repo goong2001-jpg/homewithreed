@@ -10,7 +10,9 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   const p = await ctx.newPage();
   const errors = [];
   p.on('pageerror', e => errors.push(String(e)));
-  p.on('dialog', d => d.accept());
+  // prompt 에 넣을 답을 차례로 쌓아 둔다. 비어 있으면 기본값으로 확인.
+  const answers = [];
+  p.on('dialog', d => (d.type() === 'prompt' && answers.length ? d.accept(answers.shift()) : d.accept()));
   await p.goto(BASE + '/index.html');
 
   const year = new Date().getFullYear();
@@ -57,6 +59,34 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   await p.setInputFiles('#importInput', file);
   await p.waitForTimeout(300);
   check('백업 복원', (await p.textContent('#allTotal')) === before, await p.textContent('#allTotal'));
+
+  // ---- 준 사람 추가·수정·삭제 ----
+  const chips = () => p.$$eval('#givers .chip[data-giver]', els => els.map(e => e.textContent));
+  answers.push('  고모  ');
+  await p.click('#givers [data-act="add"]');
+  check('추가 (공백 정리)', (await chips()).includes('고모'));
+  check('추가한 사람 바로 선택', (await p.textContent('.chip.on')) === '고모');
+  await p.click('.bill.b10000');
+  check('고모 기록', (await p.locator('.row .who', { hasText: '고모' }).count()) === 1);
+
+  await p.click('#givers [data-act="edit"]');
+  const idx = (await p.$$eval('#givers .chipName', els => els.map(e => e.textContent.replace(' ✏️', '')))).indexOf('고모');
+  answers.push('큰고모');
+  await p.click(`#givers [data-rename="${idx}"]`);
+  check('이름 수정', (await p.$$eval('#givers .chipName', els => els.map(e => e.textContent))).some(t => t.startsWith('큰고모')));
+  check('지난 기록 이름도 바뀜', (await p.locator('.row .who', { hasText: '큰고모' }).count()) === 1);
+
+  answers.push('할머니');
+  await p.click(`#givers [data-rename="${idx}"]`);
+  check('중복 이름 거부', (await p.$$eval('#givers .chipName', els => els.map(e => e.textContent))).some(t => t.startsWith('큰고모')));
+
+  await p.click('#givers [data-remove="0"]');   // 할머니
+  await p.click('#givers [data-act="done"]');
+  check('삭제', !(await chips()).includes('할머니'));
+  check('삭제해도 지난 기록 유지', (await p.locator('.row .who', { hasText: '할머니' }).count()) >= 1);
+
+  await p.reload();
+  check('목록 새로고침 후 유지', (await chips()).includes('큰고모') && !(await chips()).includes('할머니'));
 
   await p.screenshot({ path: process.env.SHOT || 'shot.png', fullPage: true });
   check('JS 에러 없음', errors.length === 0, errors.join(' | '));

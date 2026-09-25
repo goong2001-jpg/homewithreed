@@ -8,6 +8,7 @@
   var STORE_KEY = 'hwr-allowance-v1';
   var BACKUP_KEY = 'hwr-allowance-last-backup';
   var BACKUP_FORMAT = 'hwr-allowance-backup';
+  var GIVERS_KEY = 'hwr-allowance-givers';
 
   var BILLS = [
     { amount: 1000, name: '천원', color: 'var(--w1000)' },
@@ -15,7 +16,8 @@
     { amount: 10000, name: '만원', color: 'var(--w10000)' },
     { amount: 50000, name: '오만원', color: 'var(--w50000)' }
   ];
-  var GIVERS = ['할머니', '할아버지', '외할머니', '외할아버지', '엄마', '아빠', '이모·삼촌', '기타'];
+  var DEFAULT_GIVERS = ['할머니', '할아버지', '외할머니', '외할아버지', '엄마', '아빠', '이모·삼촌', '기타'];
+  var GIVER_MAX = 10;   // 칩 한 개에 들어가는 글자 수
 
   var $ = function (id) { return document.getElementById(id); };
 
@@ -30,6 +32,16 @@
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(records)); }
     catch (e) { alert('저장에 실패했어요. 브라우저 저장공간을 확인해 주세요.'); }
+  }
+  function loadGivers() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(GIVERS_KEY));
+      if (Array.isArray(arr)) return arr.filter(function (g) { return typeof g === 'string' && g; });
+    } catch (e) {}
+    return DEFAULT_GIVERS.slice();
+  }
+  function saveGivers() {
+    try { localStorage.setItem(GIVERS_KEY, JSON.stringify(givers)); } catch (e) {}
   }
   function isRecord(r) {
     return r && typeof r.id === 'string' && typeof r.date === 'string' &&
@@ -64,7 +76,9 @@
   // ---------- 상태 ----------
   var records = load();
   var viewYear = new Date().getFullYear();
+  var givers = loadGivers();
   var giver = '';
+  var editingGivers = false;
   var lastAdded = null;
   var toastTimer = null;
 
@@ -139,9 +153,65 @@
   }
 
   function renderGivers() {
-    $('givers').innerHTML = GIVERS.map(function (g) {
-      return '<button class="chip' + (g === giver ? ' on' : '') + '" data-giver="' + esc(g) + '">' + esc(g) + '</button>';
-    }).join('');
+    var html;
+    if (editingGivers) {
+      html = givers.map(function (g, i) {
+        return '<span class="chip edit"><button class="chipName" data-rename="' + i + '">' + esc(g) + ' ✏️</button>' +
+          '<button class="chipDel" data-remove="' + i + '" aria-label="' + esc(g) + ' 지우기">×</button></span>';
+      }).join('') +
+        '<button class="chip add" data-act="add">+ 추가</button>' +
+        '<button class="chip done" data-act="done">완료</button>';
+    } else {
+      html = givers.map(function (g) {
+        return '<button class="chip' + (g === giver ? ' on' : '') + '" data-giver="' + esc(g) + '">' + esc(g) + '</button>';
+      }).join('') +
+        '<button class="chip add" data-act="add">+ 추가</button>' +
+        '<button class="chip tool" data-act="edit">편집</button>';
+    }
+    $('givers').innerHTML = html;
+  }
+
+  // 이름 입력 받기. 취소하면 null.
+  function askName(title, current) {
+    var v = prompt(title, current || '');
+    if (v === null) return null;
+    v = v.replace(/\s+/g, ' ').trim().slice(0, GIVER_MAX);
+    if (!v) return null;
+    return v;
+  }
+
+  function addGiver() {
+    var name = askName('누가 줬어요? (예: 고모, 옆집 할머니)', '');
+    if (!name) return;
+    if (givers.indexOf(name) === -1) { givers.push(name); saveGivers(); }
+    if (!editingGivers) giver = name;   // 추가한 사람을 바로 골라 둔다
+    renderGivers();
+  }
+
+  function renameGiver(i) {
+    var old = givers[i];
+    var name = askName('이름 고치기', old);
+    if (!name || name === old) return;
+    if (givers.indexOf(name) !== -1) { alert('"' + name + '"은(는) 이미 있어요.'); return; }
+    givers[i] = name;
+    saveGivers();
+    // 지난 기록에 적힌 이름도 같이 바꾼다 — 같은 사람이니까
+    var n = 0;
+    records.forEach(function (r) { if (r.giver === old) { r.giver = name; n++; } });
+    if (n) save();
+    if (giver === old) giver = name;
+    renderGivers();
+    render();
+    if (n) toast('지난 기록 ' + n + '개도 "' + name + '"(으)로 바꿨어요', false);
+  }
+
+  function removeGiver(i) {
+    var g = givers[i];
+    if (!confirm('"' + g + '"을(를) 목록에서 뺄까요? 지난 기록은 그대로 남아요.')) return;
+    givers.splice(i, 1);
+    saveGivers();
+    if (giver === g) giver = '';
+    renderGivers();
   }
 
   function toast(text, withUndo) {
@@ -161,6 +231,7 @@
     lastAdded = r.id;
     viewYear = yearOf(r);   // 다른 해 날짜로 적었으면 그 해로 넘어가서 보여준다
     giver = '';
+    editingGivers = false;
     renderGivers();
     render();
     if (btn) { btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop'); }
@@ -187,7 +258,7 @@
   }
 
   function exportBackup() {
-    var data = { format: BACKUP_FORMAT, version: 1, exportedAt: Date.now(), records: records };
+    var data = { format: BACKUP_FORMAT, version: 1, exportedAt: Date.now(), records: records, givers: givers };
     var blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -210,6 +281,12 @@
       // 합치기: 같은 id 는 한 번만. 지금 기록은 지우지 않는다.
       var have = {};
       records.forEach(function (r) { have[r.id] = true; });
+      // 준 사람 목록도 없는 이름만 더한다
+      var addedG = 0;
+      if (Array.isArray(data.givers)) data.givers.forEach(function (g) {
+        if (typeof g === 'string' && g && givers.indexOf(g) === -1) { givers.push(g); addedG++; }
+      });
+      if (addedG) { saveGivers(); renderGivers(); }
       var incoming = data.records.filter(function (r) { return isRecord(r) && !have[r.id]; });
       if (!incoming.length) { alert('새로 추가할 기록이 없어요. (이미 다 있어요)'); return; }
       if (!confirm(incoming.length + '개 기록을 추가할까요? 지금 기록은 그대로 둬요.')) return;
@@ -236,10 +313,14 @@
     if (btn) add(+btn.dataset.amount, btn);
   });
   $('givers').addEventListener('click', function (e) {
-    var c = e.target.closest('.chip');
-    if (!c) return;
-    giver = giver === c.dataset.giver ? '' : c.dataset.giver;
-    renderGivers();
+    var t = e.target.closest('button');
+    if (!t) return;
+    var act = t.dataset.act;
+    if (act === 'add') return addGiver();
+    if (act === 'edit' || act === 'done') { editingGivers = act === 'edit'; giver = ''; return renderGivers(); }
+    if (t.dataset.rename) return renameGiver(+t.dataset.rename);
+    if (t.dataset.remove) return removeGiver(+t.dataset.remove);
+    if (t.dataset.giver) { giver = giver === t.dataset.giver ? '' : t.dataset.giver; renderGivers(); }
   });
   $('list').addEventListener('click', function (e) {
     var d = e.target.closest('.del');
@@ -257,6 +338,7 @@
   // 다른 탭에서 적은 기록 반영
   window.addEventListener('storage', function (e) {
     if (e.key === STORE_KEY) { records = load(); render(); }
+    if (e.key === GIVERS_KEY) { givers = loadGivers(); renderGivers(); }
   });
 
   renderGivers();
