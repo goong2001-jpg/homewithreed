@@ -8,6 +8,9 @@
 (function () {
   'use strict';
 
+  // 배포할 때마다 index.html 의 ?v=, sw.js, version.json 과 같이 올린다
+  var APP_VERSION = '6';
+
   var STORE_KEY = 'hwr-allowance-v1';
   var BACKUP_KEY = 'hwr-allowance-last-backup';
   var BACKUP_FORMAT = 'hwr-allowance-backup';
@@ -237,7 +240,7 @@
       var bill = billOf(r.amount);
       var color = out ? 'var(--spend)' : (bill ? bill.color : 'var(--accent)');
       var t = tagOf(r);
-      html += '<div class="row' + (out ? ' out' : '') + '"><span class="tag" style="background:' + color + '"></span>' +
+      html += '<div class="row' + (out ? ' out' : '') + '" data-id="' + esc(r.id) + '"><span class="tag" style="background:' + color + '"></span>' +
         '<div class="info"><div class="date">' + dateLabel(r.date) + '</div>' +
         '<div class="who">' + (out ? '썼어요' : '받았어요') + (t ? ' · ' + esc(t) : '') +
         (r.bills && (Object.keys(r.bills).length > 1 || r.bills[r.amount] !== 1) ? ' · ' + billText(r.bills) : '') + '</div></div>' +
@@ -421,6 +424,57 @@
     render();
   }
 
+  // ---------- 기록 고치기 ----------
+  var editing = null;   // { id, type }
+
+  function setEditType(type, current) {
+    editing.type = type;
+    document.querySelectorAll('#editType button').forEach(function (b) { b.classList.toggle('on', b.dataset.type === type); });
+    $('editTagLabel').textContent = TAG_TEXT[type].label;
+    var opts = tags[type].slice();
+    if (current && opts.indexOf(current) === -1) opts.unshift(current);   // 목록에서 뺀 이름도 고를 수 있게
+    $('editTag').innerHTML = '<option value="">(안 적음)</option>' + opts.map(function (g) {
+      return '<option' + (g === current ? ' selected' : '') + '>' + esc(g) + '</option>';
+    }).join('');
+  }
+
+  function openEdit(id) {
+    var r = records.filter(function (x) { return x.id === id; })[0];
+    if (!r) return;
+    editing = { id: id, type: typeOf(r) };
+    $('editDate').value = r.date;
+    $('editDate').max = today();
+    $('editAmount').value = r.amount.toLocaleString('ko-KR');
+    setEditType(typeOf(r), tagOf(r));
+    $('editSheet').classList.remove('hidden');
+  }
+
+  function closeEdit() {
+    editing = null;
+    $('editSheet').classList.add('hidden');
+  }
+
+  function saveEdit() {
+    var r = records.filter(function (x) { return x.id === editing.id; })[0];
+    if (!r) return closeEdit();
+    var amount = parseAmount($('editAmount').value);
+    if (!amount) { alert('금액을 읽지 못했어요. 숫자로 적거나 "3만5천"처럼 적어 주세요.'); return; }
+    var date = $('editDate').value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { alert('날짜를 골라 주세요.'); return; }
+    if (amount !== r.amount) delete r.bills;   // 금액이 바뀌면 지폐 구성은 더 이상 맞지 않는다
+    r.amount = amount;
+    r.date = date;
+    r.type = editing.type;
+    delete r.giver; delete r.use;
+    var t = $('editTag').value;
+    if (t) r[TAG_FIELD[editing.type]] = t;
+    save();
+    viewYear = yearOf(r);
+    closeEdit();
+    render();
+    toast('고쳤어요', false);
+  }
+
   function goalAction(act) {
     if (act === 'set') {
       var name = askName('뭘 사고 싶어요? (예: 레고 성)', goal ? goal.name : '');
@@ -499,6 +553,36 @@
     reader.readAsText(file);
   }
 
+  // 캐시·서비스워커를 지우고 새로 연다 (기록은 localStorage 라 그대로)
+  function hardReload() {
+    var jobs = [];
+    if (window.caches) jobs.push(caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n); })); }));
+    if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (r) { return Promise.all(r.map(function (x) { return x.unregister(); })); }));
+    Promise.all(jobs).catch(function () {}).then(function () { location.replace(location.pathname + '?r=' + Date.now()); });
+  }
+
+  // 서버의 version.json 과 비교해서 옛 버전이면 한 번 자동으로 새로 받는다.
+  // 자동으로 했는데도 안 바뀌면(서버 쪽 캐시 등) 무한 새로고침 대신 버튼만 띄운다.
+  function checkUpdate() {
+    if (!window.fetch) return;
+    fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (res) {
+      return res.ok ? res.json() : null;
+    }).then(function (v) {
+      if (!v || !v.version || String(v.version) === APP_VERSION) {
+        try { sessionStorage.removeItem('hwr-allowance-autoupdated'); } catch (e) {}
+        return;
+      }
+      var tried = null;
+      try { tried = sessionStorage.getItem('hwr-allowance-autoupdated'); } catch (e) {}
+      if (tried !== String(v.version)) {
+        try { sessionStorage.setItem('hwr-allowance-autoupdated', String(v.version)); } catch (e) {}
+        hardReload();
+      } else {
+        $('update').hidden = false;
+      }
+    }).catch(function () {});   // 오프라인이면 그냥 지금 버전으로 쓴다
+  }
+
   function showLastBackup() {
     var t = null;
     try { t = +localStorage.getItem(BACKUP_KEY); } catch (e) {}
@@ -538,8 +622,23 @@
   });
   $('list').addEventListener('click', function (e) {
     var d = e.target.closest('.del');
-    if (d) remove(d.dataset.id);
+    if (d) return remove(d.dataset.id);
+    var row = e.target.closest('.row');
+    if (row) openEdit(row.dataset.id);
   });
+  document.querySelectorAll('#editType button').forEach(function (b) {
+    b.addEventListener('click', function () { setEditType(b.dataset.type, ''); });
+  });
+  $('editSave').addEventListener('click', saveEdit);
+  $('editCancel').addEventListener('click', closeEdit);
+  $('editDelete').addEventListener('click', function () {
+    var id = editing && editing.id;
+    closeEdit();
+    if (id) remove(id);
+  });
+  $('editSheet').addEventListener('click', function (e) { if (e.target === $('editSheet')) closeEdit(); });
+  $('updateBtn').addEventListener('click', hardReload);
+  $('updateNow').addEventListener('click', hardReload);
   $('prevYear').addEventListener('click', function () { viewYear--; render(); });
   $('nextYear').addEventListener('click', function () { viewYear++; render(); });
   $('undoBtn').addEventListener('click', undo);
@@ -561,6 +660,9 @@
   render();
   showLastBackup();
   window.__allowanceReady = true;
+  $('verLabel').textContent = '버전 ' + APP_VERSION;
+  checkUpdate();
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) checkUpdate(); });
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
