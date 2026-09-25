@@ -232,3 +232,25 @@ input[type="date"] {
 }
 .bootFail[hidden] { display: none; }
 .bootFail button { border: 0; border-radius: 10px; padding: 8px 14px; font: inherit; font-weight: 700; background: #4f8ef7; color: #fff; }
+
+/* ---- 기록 고치기 ---- */
+.row { cursor: pointer; }
+.sheet { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,0.45); display: flex; align-items: flex-end; justify-content: center; }
+.sheetBox {
+  width: 100%; max-width: 480px; background: var(--card); color: var(--text);
+  border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+}
+.sheetBox h3 { margin: 0 0 14px; font-size: 18px; }
+.editField { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; }
+.editField span { font-size: 14px; color: var(--dim); flex-shrink: 0; }
+.editField input, .editField select {
+  flex: 1; min-width: 0; max-width: 220px; font: inherit; font-size: 16px; color: var(--text);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px;
+}
+.sheetBtns { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; margin-top: 18px; }
+.sheetBtns .primaryBtn { margin-top: 0; }
+.ghost.danger { color: var(--danger); }
+
+/* ---- 버전 ---- */
+.foot { display: flex; justify-content: center; gap: 14px; align-items: center; color: var(--dim); font-size: 12px; margin: 6px 0 0; }
+#update { top: auto; bottom: calc(84px + env(safe-area-inset-bottom)); }

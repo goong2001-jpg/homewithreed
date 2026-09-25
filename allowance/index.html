@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="구름이 용돈" />
-    <link rel="stylesheet" href="style.css?v=5" />
+    <link rel="stylesheet" href="style.css?v=6" />
     <title>구름이 용돈기입장</title>
   </head>
   <body>
@@ -65,7 +65,7 @@
           <button class="bill b50000" data-amount="50000"><span class="billNum">50,000</span><span class="billWon">오만원</span></button>
         </div>
         <button id="customBtn" class="customBtn">✏️ 금액 직접 입력 (예: 1,500원 · 3만5천)</button>
-        <p class="hint">버튼을 누르면 바로 적혀요. <b>여러 장이면 이어서 누르면</b> 한 줄로 합쳐져요 (5만원 두 장 → 100,000원). 잘못 눌렀으면 아래 알림에서 <b>되돌리기</b>.</p>
+        <p class="hint">버튼을 누르면 바로 적혀요. <b>여러 장이면 이어서 누르면</b> 한 줄로 합쳐져요 (5만원 두 장 → 100,000원). 잘못 적었으면 아래 기록을 <b>눌러서 고치기</b>.</p>
       </section>
 
       <!-- 올해 요약 -->
@@ -94,7 +94,36 @@
         </div>
         <p id="lastBackup" class="hint"></p>
       </details>
+
+      <footer class="foot">
+        <span id="verLabel">버전 -</span>
+        <button id="updateBtn" class="linkBtn">최신 버전 받기</button>
+      </footer>
     </main>
+
+    <!-- 기록 고치기 -->
+    <div id="editSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+      <div class="sheetBox">
+        <h3 id="editTitle">기록 고치기</h3>
+        <div class="seg" id="editType">
+          <button data-type="in">받았어요 💰</button>
+          <button data-type="out">썼어요 🛍️</button>
+        </div>
+        <label class="editField"><span>날짜</span><input id="editDate" type="date" /></label>
+        <label class="editField"><span>금액</span><input id="editAmount" type="text" inputmode="numeric" placeholder="예: 10000, 3만5천" /></label>
+        <label class="editField"><span id="editTagLabel">누가 줬어요?</span><select id="editTag"></select></label>
+        <div class="sheetBtns">
+          <button id="editDelete" class="ghost danger">지우기</button>
+          <button id="editCancel" class="ghost">취소</button>
+          <button id="editSave" class="primaryBtn">저장</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="update" class="bootFail" hidden>
+      새 버전이 있어요!
+      <button id="updateNow">업데이트</button>
+    </div>
 
     <div id="toast" class="toast hidden" role="status">
       <span id="toastText"></span>
@@ -121,6 +150,6 @@
         }, 1500);
       });
     </script>
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=6"></script>
   </body>
 </html>

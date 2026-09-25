@@ -110,6 +110,30 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   await p.click('#undoBtn');
   await p.click('.seg [data-mode="in"]');
 
+  // ---- 기록 고치기 ----
+  const before = await p.locator('.row').count();
+  await p.locator('.row', { hasText: '엄마' }).first().click();
+  check('고치기 창 열림', await p.isVisible('#editSheet'));
+  check('금액 채워짐', (await p.inputValue('#editAmount')) === '60,000', await p.inputValue('#editAmount'));
+  check('준 사람 채워짐', (await p.inputValue('#editTag')) === '엄마');
+  await p.fill('#editAmount', '7만');
+  await p.selectOption('#editTag', '아빠');
+  await p.click('#editSave');
+  check('고치기 창 닫힘', !(await p.isVisible('#editSheet')));
+  check('금액·사람 고쳐짐', (await p.locator('.row', { hasText: '아빠' }).locator('.amt').first().textContent()) === '+70,000원');
+  check('줄 수 그대로', (await p.locator('.row').count()) === before);
+  // 받은 돈 → 쓴 돈으로 바꾸기
+  await p.locator('.row', { hasText: '아빠' }).first().click();
+  await p.click('#editType [data-type="out"]');
+  check('쓴 곳 목록으로 바뀜', (await p.$$eval('#editTag option', o => o.map(x => x.textContent))).includes('장난감'));
+  await p.click('#editCancel');
+  check('취소하면 그대로', (await p.locator('.row.out', { hasText: '아빠' }).count()) === 0);
+  // 되돌려 놓기 (뒤 테스트가 60,000원 기준)
+  await p.locator('.row', { hasText: '아빠' }).first().click();
+  await p.fill('#editAmount', '60000');
+  await p.selectOption('#editTag', '엄마');
+  await p.click('#editSave');
+
   // ---- 연도 ----
   await p.fill('#dateInput', (year - 1) + '-12-31');
   await p.click('.bill.b10000');
@@ -156,6 +180,21 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('백업 복원(쓴 곳 목록)', (await p.locator('#tags [data-tag="포켓몬 카드"]').count()) === 1);
 
   await p.click('.seg [data-mode="in"]');
+
+  // ---- 버전 확인 ----
+  check('버전 표시', /^버전 \d+$/.test(await t('#verLabel')), await t('#verLabel'));
+  // 서버에 더 새 버전이 있다고 속이면: 한 번 자동으로 새로 받고, 그래도 같으면 버튼만
+  await p.route('**/version.json*', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"version":"999"}' }));
+  const nav = p.waitForURL(/\?r=\d+/, { timeout: 5000 }).then(() => true, () => false);
+  await p.reload();
+  check('새 버전 → 자동 새로 받기', await nav);
+  await p.waitForTimeout(1200);
+  check('두 번째는 무한 새로고침 대신 안내', await p.isVisible('#update'));
+  check('자동 업데이트 뒤에도 기록 유지', (await t('#balance')) !== '0원', await t('#balance'));
+  await p.unroute('**/version.json*');
+  await p.goto(BASE + '/index.html');
+  await p.waitForTimeout(800);
+  check('같은 버전이면 안내 없음', !(await p.isVisible('#update')));
   await p.evaluate(() => window.scrollTo(0, 0));
   await p.screenshot({ path: process.env.SHOT || 'shot.png', fullPage: true });
   check('JS 에러 없음', errors.length === 0, errors.join(' | '));
