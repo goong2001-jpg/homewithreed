@@ -97,11 +97,44 @@
     var d = new Date(+p[0], +p[1] - 1, +p[2]);
     return (+p[1]) + '월 ' + (+p[2]) + '일 (' + DOW[d.getDay()] + ')';
   }
-  // "1,500원", "1500" 같은 입력을 숫자로. 못 읽으면 0.
+  // "1,500원", "125000000", "1억 2500만원", "3만5천" 같은 입력을 숫자로. 못 읽으면 0.
+  var AMOUNT_MAX = 1000000000000;   // 1조. 자율주행차도 들어가게 넉넉히
+  var UNIT = { '억': 100000000, '만': 10000, '천': 1000 };
   function parseAmount(v) {
-    if (v === null) return 0;
-    var n = parseInt(String(v).replace(/[^\d]/g, ''), 10);
-    return n > 0 && n <= 100000000 ? n : 0;
+    if (v === null || v === undefined) return 0;
+    var t = String(v).replace(/[,\s원]/g, '');
+    var n = 0;
+    if (/^\d+$/.test(t)) n = parseInt(t, 10);
+    else if (/^(\d*(\.\d+)?[억만천]?)+$/.test(t) && /[억만천]/.test(t)) {
+      // 큰 단위부터: "1억2500만" = 1억 + 2500만
+      var rest = t, total = 0;
+      ['억', '만', '천'].forEach(function (u) {
+        var i = rest.indexOf(u);
+        if (i === -1) return;
+        var head = rest.slice(0, i);
+        total += (head === '' ? 1 : parseFloat(head)) * UNIT[u];
+        rest = rest.slice(i + 1);
+      });
+      if (rest) total += parseFloat(rest) || 0;
+      n = Math.round(total);
+    }
+    return n > 0 && n <= AMOUNT_MAX ? n : 0;
+  }
+  // 금액을 물어본다. 잘못 넣으면 다시 묻고, 취소하면 0.
+  function askAmount(title, current) {
+    var v = current || '';
+    for (;;) {
+      var input = prompt(title, v);
+      if (input === null) return 0;
+      var n = parseAmount(input);
+      if (n) return n;
+      alert('금액을 읽지 못했어요. 숫자로 적거나 "1억 2500만"처럼 적어 주세요.');
+      v = input;
+    }
+  }
+  function billText(bills) {
+    return BILLS.slice().reverse().filter(function (b) { return bills[b.amount]; })   // 큰 지폐부터
+      .map(function (b) { return b.name + (bills[b.amount] > 1 ? '×' + bills[b.amount] : ''); }).join(' + ');
   }
   function balance() { return records.reduce(function (s, r) { return s + signed(r); }, 0); }
 
@@ -151,7 +184,10 @@
 
     // 받은 지폐 장수
     $('billCounts').innerHTML = BILLS.map(function (bill) {
-      var n = yin.filter(function (r) { return r.amount === bill.amount; }).length;
+      var n = yin.reduce(function (s, r) {
+        if (r.bills) return s + (r.bills[bill.amount] || 0);   // 여러 장을 한 번에 적은 기록
+        return s + (r.amount === bill.amount ? 1 : 0);          // 옛 기록·한 장짜리
+      }, 0);
       return '<div class="bc"><div class="name"><span class="dot" style="background:' + bill.color + '"></span>' +
         bill.name + '</div><div class="cnt">' + n + '장</div></div>';
     }).join('');
@@ -203,7 +239,8 @@
       var t = tagOf(r);
       html += '<div class="row' + (out ? ' out' : '') + '"><span class="tag" style="background:' + color + '"></span>' +
         '<div class="info"><div class="date">' + dateLabel(r.date) + '</div>' +
-        '<div class="who">' + (out ? '썼어요' : '받았어요') + (t ? ' · ' + esc(t) : '') + '</div></div>' +
+        '<div class="who">' + (out ? '썼어요' : '받았어요') + (t ? ' · ' + esc(t) : '') +
+        (r.bills && (Object.keys(r.bills).length > 1 || r.bills[r.amount] !== 1) ? ' · ' + billText(r.bills) : '') + '</div></div>' +
         '<span class="amt">' + (out ? '−' : '+') + won(r.amount) + '</span>' +
         '<button class="del" data-id="' + esc(r.id) + '" aria-label="지우기">×</button></div>';
     });
@@ -311,22 +348,42 @@
     $('undoBtn').classList.toggle('hidden', !withUndo);
     $('toast').classList.remove('hidden');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { $('toast').classList.add('hidden'); lastAdded = null; }, 5000);
+    toastTimer = setTimeout(function () { $('toast').classList.add('hidden'); lastAdded = null; mergeable = null; }, 5000);
   }
 
   // ---------- 동작 ----------
+  // 지폐 버튼을 알림이 떠 있는 동안(5초) 이어서 누르면 방금 기록에 합친다.
+  // 5만원 두 장 = 기록 한 줄 100,000원 (오만원×2).
+  var mergeable = null;   // { id, kind, date, label } — 합칠 수 있는 방금 기록
+
   function add(amount, btn, forced) {
     undoGoal = null;
     var kind = forced ? forced.type : mode;
-    var label = forced ? forced.tag : tag;
+    var date = $('dateInput').value || today();
+    var prev = null;
+    // 새 칩을 골랐거나 날짜·받았어요/썼어요를 바꿨으면 새 기록으로 적는다
+    if (btn && !tag && mergeable && lastAdded === mergeable.id && mergeable.kind === kind && mergeable.date === date) {
+      prev = records.filter(function (x) { return x.id === mergeable.id; })[0] || null;
+    }
+    var label = forced ? forced.tag : (prev ? mergeable.label : tag);
     if (kind === 'out' && !forced && amount > balance() &&
         !confirm('가진 돈(' + won(balance()) + ')보다 많아요. 그래도 적을까요?')) return;
-    var date = $('dateInput').value || today();
-    var r = { id: newId(), date: date, amount: amount, type: kind, createdAt: Date.now() };
-    r[TAG_FIELD[kind]] = label;
-    records.push(r);
+
+    var r;
+    if (prev) {
+      r = prev;
+      r.amount += amount;
+      r.bills = r.bills || {};
+      r.bills[amount] = (r.bills[amount] || 0) + 1;
+    } else {
+      r = { id: newId(), date: date, amount: amount, type: kind, createdAt: Date.now() };
+      r[TAG_FIELD[kind]] = label;
+      if (btn) { r.bills = {}; r.bills[amount] = 1; }
+    }
+    if (!prev) records.push(r);
     save();
     lastAdded = r.id;
+    mergeable = btn ? { id: r.id, kind: kind, date: date, label: label } : null;
     viewYear = yearOf(r);   // 다른 해 날짜로 적었으면 그 해로 넘어가서 보여준다
     tag = '';
     editingTags = false;
@@ -334,11 +391,13 @@
     render();
     if (btn) { btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop'); }
     if (navigator.vibrate) navigator.vibrate(30);
-    toast((kind === 'out' ? '−' : '+') + won(amount) + ' 적었어요' + (label ? ' · ' + label : ''), true);
+    var parts = r.bills && (r.bills[amount] > 1 || Object.keys(r.bills).length > 1) ? ' (' + billText(r.bills) + ')' : '';
+    toast((kind === 'out' ? '−' : '+') + won(r.amount) + parts + (label ? ' · ' + label : '') +
+      (btn ? ' · 더 누르면 합쳐져요' : ' 적었어요'), true);
   }
 
   function addCustom() {
-    var n = parseAmount(prompt(mode === 'out' ? '얼마 썼어요? (숫자만, 예: 1500)' : '얼마 받았어요? (숫자만, 예: 3000)', ''));
+    var n = askAmount(mode === 'out' ? '얼마 썼어요? (예: 1500)' : '얼마 받았어요? (예: 3000, 1만5천)', '');
     if (n) add(n, null);
   }
 
@@ -346,6 +405,7 @@
     if (!lastAdded) return;
     records = records.filter(function (r) { return r.id !== lastAdded; });
     lastAdded = null;
+    mergeable = null;
     if (undoGoal) { goal = undoGoal; undoGoal = null; saveGoal(); }
     save();
     render();
@@ -365,8 +425,8 @@
     if (act === 'set') {
       var name = askName('뭘 사고 싶어요? (예: 레고 성)', goal ? goal.name : '');
       if (!name) return;
-      var amount = parseAmount(prompt('얼마예요? (숫자만, 예: 50000)', goal ? String(goal.amount) : ''));
-      if (!amount) { alert('금액을 숫자로 적어 주세요.'); return; }
+      var amount = askAmount('얼마예요? (예: 50000, 1억 2500만)', goal ? String(goal.amount) : '');
+      if (!amount) return;
       goal = { name: name, amount: amount, createdAt: goal ? goal.createdAt : Date.now() };
       saveGoal();
       render();
