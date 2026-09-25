@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="구름이 용돈" />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=4" />
     <title>구름이 용돈기입장</title>
   </head>
   <body>
@@ -101,6 +101,26 @@
       <button id="undoBtn" class="undo">되돌리기</button>
     </div>
 
-    <script src="app.js"></script>
+    <!-- 앱이 안 뜨면(옛 파일이 캐시에 남아 버전이 섞였을 때) 새로 받기 버튼을 보여준다 -->
+    <div id="bootFail" class="bootFail" hidden>
+      화면이 제대로 안 보이나요?
+      <button id="hardReload">새로 받기</button>
+    </div>
+    <script>
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          if (window.__allowanceReady) return;
+          var box = document.getElementById('bootFail');
+          box.hidden = false;
+          document.getElementById('hardReload').onclick = function () {
+            var jobs = [];
+            if (window.caches) jobs.push(caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n); })); }));
+            if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (r) { return Promise.all(r.map(function (x) { return x.unregister(); })); }));
+            Promise.all(jobs).catch(function () {}).then(function () { location.replace(location.pathname + '?r=' + Date.now()); });
+          };
+        }, 1500);
+      });
+    </script>
+    <script src="app.js?v=4"></script>
   </body>
 </html>
