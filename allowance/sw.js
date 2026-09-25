@@ -1,5 +1,5 @@
 /* 앱 껍데기만 캐시합니다. 기록은 localStorage 에 있어서 오프라인에서도 적을 수 있습니다. */
-var CACHE = 'hwr-allowance-v1';
+var CACHE = 'hwr-allowance-v2';
 var SHELL = ['./', './index.html', './style.css', './app.js', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', function (e) {
