@@ -60,6 +60,28 @@
   .pthumb { position:relative; width:78px; height:78px; } .pthumb img { width:78px; height:78px; object-fit:cover; border-radius:8px; border:1px solid #eef1f5; } .pthumb .px { position:absolute; top:-7px; right:-7px; width:22px; height:22px; background:#dc2626; color:#fff; border-radius:50%; font-size:13px; display:flex; align-items:center; justify-content:center; cursor:pointer; } .picadd { width:78px; height:78px; border:1.5px dashed #b9ccf5; border-radius:8px; color:#2563eb; font-size:26px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
   .nav { position:fixed; bottom:0; left:0; right:0; height:60px; border-top:1px solid #eef1f5; background:#fff; display:flex; z-index:30; } .nav div { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:10px; color:#b9c2cf; font-weight:600; cursor:pointer; } .nav div.on { color:#2563eb; } .nav .ic { font-size:18px; }
   .loading { text-align:center; color:#8a97a8; padding:40px; font-size:14px; line-height:1.6; }
+  /* 창고 지도 */
+  .mapwrap { overflow-x:auto; overflow-y:hidden; padding-bottom:4px; -webkit-overflow-scrolling:touch; }
+  .mapcanvas { position:relative; margin:0 auto; }
+  .mtile { position:absolute; border-radius:8px; box-sizing:border-box; padding:3px 4px; overflow:hidden;
+           display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; background:#fff; }
+  .mtile .mt-n { font-size:10px; font-weight:700; line-height:1.15; color:#6b7889; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+  .mtile .mt-q { font-size:13px; font-weight:900; line-height:1.2; }
+  .mtile .mt-k { font-size:9px; opacity:.75; }
+  .mtile.k-rack   { border:1.5px solid #cfd8e6; }
+  .mtile.k-pallet { border:1.5px dashed #b9c2cf; }
+  .mtile.k-corr   { border:1.5px dotted #cbd3de; border-radius:4px; }
+  .mtile.k-mark   { border:none; background:#eef1f5; color:#8a97a8; cursor:default; pointer-events:none; }
+  .mtile.k-mark .mt-n { color:#8a97a8; }
+  .mtile.sel { box-shadow:0 0 0 3px rgba(37,99,235,.35); }
+  .mtile.hit { box-shadow:0 0 0 2.5px #ea580c; }
+  .maplegend { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; font-size:11px; color:#8a97a8; }
+  .maplegend span { display:flex; align-items:center; gap:4px; }
+  .lgb { width:13px; height:13px; border-radius:4px; background:#fff; display:inline-block; }
+  .mapbanner { background:#fff7ed; border:1.5px solid #fed7aa; color:#ea580c; border-radius:10px;
+               padding:9px 12px; font-size:12.5px; font-weight:700; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .mapbanner .x { color:#9a3412; cursor:pointer; text-decoration:underline; }
+  .maphint { font-size:11.5px; color:#8a97a8; margin-top:8px; line-height:1.5; }
 </style>
 </head>
 <body>
@@ -84,7 +106,7 @@
     <div class="rbtns"><button class="ok" onclick="doRename()">저장</button><button class="no" onclick="toggleRename()">취소</button></div>
   </div>
   <div class="io"><button class="in on" id="btnIn" onclick="setType('입고')">＋입고</button><button class="out" id="btnOut" onclick="setType('출고')">－출고</button><button class="adj" id="btnAdj" onclick="setType('조정')">✏조정</button><button class="mov" id="btnMov" onclick="setType('이동')">⇄이동</button></div>
-  <div class="label">위치별 현재고</div><div class="locchips" id="locStock"></div>
+  <div class="label">위치별 현재고 <span class="editlink" onclick="mapForItem()">🗺️ 지도에서 보기</span></div><div class="locchips" id="locStock"></div>
   <div id="ioBox">
     <div class="label">박스 구성 (입수가 달라도 줄을 추가하세요)</div>
     <div id="boxRows"></div><div class="addline" onclick="addLine()">＋ 다른 입수 박스 추가</div>
@@ -125,8 +147,17 @@
 <!-- 현재고 -->
 <div class="body hidden" id="viewStock">
   <input class="search" id="stockSearch" placeholder="🔍 품명 검색" oninput="renderStock()" style="margin-bottom:10px">
-  <div class="toolbar"><div class="filterbar" id="filterBar"></div><div class="sortbtn" id="sortBtn" onclick="toggleSort()">↓ 수량순</div><div class="sortbtn" onclick="go('report')">📅 월별</div><div class="sortbtn" onclick="go('log')">🕒 이력</div></div>
+  <div class="toolbar"><div class="filterbar" id="filterBar"></div><div class="sortbtn" id="sortBtn" onclick="toggleSort()">↓ 수량순</div><div class="sortbtn" onclick="go('map')">🗺️ 지도</div><div class="sortbtn" onclick="go('report')">📅 월별</div><div class="sortbtn" onclick="go('log')">🕒 이력</div></div>
   <div id="stockList"></div>
+</div>
+
+<!-- 창고 지도 -->
+<div class="body hidden" id="viewMap">
+  <div class="toolbar"><div class="filterbar" id="mapZones"></div><div class="sortbtn" id="mapListBtn" onclick="toggleMapList()">📋 목록</div></div>
+  <div id="mapBanner"></div>
+  <div class="mapwrap" id="mapWrap"><div class="mapcanvas" id="mapCanvas"></div></div>
+  <div class="maplegend" id="mapLegend"></div>
+  <div id="mapDetail"></div>
 </div>
 
 <!-- 월별 리포트 -->
@@ -189,8 +220,8 @@
 </div>
 
 <script>
-var HTML_VERSION = 'v9'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
-var DATA = { items: [], staff: [], locations: [] };
+var HTML_VERSION = 'v10'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var cur = null, type = '입고', lines = [{ boxes:'', per:'' }], txImgs = [];
 var stockFilter = '전체', sortMode = 'qty';
@@ -199,10 +230,21 @@ var catColorMap = null;
 var OXF = [['plate','명판'],['bizSticker','상호스티커'],['dateSticker','날짜스티커'],['caseO','전용케이스'],['program','프로그램']];
 
 google.script.run.withSuccessHandler(onBoot).withFailureHandler(onErr).bootstrap();
-function onBoot(d){ DATA=d; fill('staffSel', d.staff&&d.staff.length?d.staff:['담당자']); fill('locSel', d.locations&&d.locations.length?d.locations:['A동1층']); catColorMap=null; fillDatalists(); resetBar(); renderSearch();
+function onBoot(d){ DATA=d; if(!DATA.layout) DATA.layout=[]; fill('staffSel', d.staff&&d.staff.length?d.staff:['담당자']); fillLoc('locSel'); catColorMap=null; fillDatalists(); resetBar(); renderSearch();
   if(d.version && d.version!==HTML_VERSION) alert('⚠️ 버전 불일치!\n화면(Index.html): '+HTML_VERSION+' / 서버(Code.gs): '+d.version+'\n두 파일을 모두 최신으로 교체한 뒤 [배포 관리 > 수정 > 새 버전 > 배포] 하세요.'); }
 function onErr(e){ document.getElementById('searchList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>'; }
 function fill(id,arr){ document.getElementById(id).innerHTML=arr.map(function(s){return '<option>'+esc(s)+'</option>';}).join(''); }
+/** 위치 선택 옵션: 위치 탭의 구역별 optgroup 묶음 (위치가 많아져도 고르기 쉽게) */
+function locOptionsHtml(sel){
+  var names=(DATA.locations&&DATA.locations.length)?DATA.locations:['A동1층'];
+  var zoneOf={}; (DATA.layout||[]).forEach(function(l){ if(l.zone) zoneOf[l.name]=l.zone; });
+  var order=[], groups={};
+  names.forEach(function(n){ var z=zoneOf[n]||'기타'; if(!groups[z]){ groups[z]=[]; order.push(z); } groups[z].push(n); });
+  function opt(n){ return '<option'+(n===sel?' selected':'')+'>'+esc(n)+'</option>'; }
+  if(order.length<=1) return names.map(opt).join('');
+  return order.map(function(z){ return '<optgroup label="'+esc(z)+'">'+groups[z].map(opt).join('')+'</optgroup>'; }).join('');
+}
+function fillLoc(id, sel){ document.getElementById(id).innerHTML=locOptionsHtml(sel); }
 function fillDatalists(){ var names=DATA.items.map(function(i){return i.name;}).filter(uniq); var cats=DATA.items.map(function(i){return i.cat;}).filter(function(v){return v;}).filter(uniq);
   document.getElementById('allNames').innerHTML=names.map(function(n){return '<option value="'+esc(n)+'">';}).join('');
   document.getElementById('allCats').innerHTML=cats.map(function(c){return '<option value="'+esc(c)+'">';}).join(''); }
@@ -264,9 +306,9 @@ function renderInput(){
   if(type==='이동'){ var lset=DATA.locations&&DATA.locations.length?DATA.locations:['A동1층','A동2층'];
     var held=Object.keys(cur.locs||{}).filter(function(k){return (cur.locs[k]||0)>0;}).sort(function(a,b){return cur.locs[b]-cur.locs[a];});
     var fromDef=held[0]||lset[0];
-    document.getElementById('movFrom').innerHTML=lset.map(function(l){return '<option'+(l===fromDef?' selected':'')+'>'+esc(l)+'</option>';}).join('');
+    document.getElementById('movFrom').innerHTML=locOptionsHtml(fromDef); ensureLocOption('movFrom', fromDef); document.getElementById('movFrom').value=fromDef;
     var toDef=lset.filter(function(l){return l!==fromDef;})[0]||lset[0];
-    document.getElementById('movTo').innerHTML=lset.map(function(l){return '<option'+(l===toDef?' selected':'')+'>'+esc(l)+'</option>';}).join('');
+    document.getElementById('movTo').innerHTML=locOptionsHtml(toDef);
   }
   var locs=cur.locs||{}; var keys=Object.keys(locs);
   document.getElementById('locStock').innerHTML=keys.length?keys.map(function(k){return '<span class="locchip">'+esc(k)+' '+fmt(locs[k])+'</span>';}).join(''):'<span class="locchip" style="background:#eef1f5;color:#8a97a8">기록 없음</span>';
@@ -417,7 +459,7 @@ function openBuildRun(bi){ var b=BUILDS[bi]; if(!b)return; BR=b;
   document.getElementById('brName').textContent=b.name; document.getElementById('brBadge').innerHTML=badge(b.cat);
   document.getElementById('brMax').textContent='최대 '+fmt(b.buildable)+'개 가능';
   document.getElementById('brQty').value='';
-  fill('brLoc', DATA.locations&&DATA.locations.length?DATA.locations:['A동1층']);
+  fillLoc('brLoc');
   fill('brStaff', DATA.staff&&DATA.staff.length?DATA.staff:['담당자']);
   renderBrParts(); go('buildRun'); }
 function renderBrParts(){ var q=Number(val('brQty'))||0;
@@ -436,6 +478,201 @@ function runBuildForm(){ var q=Number(val('brQty'))||0; if(q<=0)return;
     google.script.run.withSuccessHandler(function(d){ onBoot(d); go('build'); }).withFailureHandler(function(){ go('build'); }).bootstrap();
   }).withFailureHandler(function(e){ alert(e.message); updateBrBtn(); })
   .runBuild({name:BR.name,cat:BR.cat,qty:q,toLoc:val('brLoc'),staff:val('brStaff'),memo:''}); }
+
+// ---- 창고 지도 ----
+var KIND_PALLET='파렛트', KIND_CORR='복도', KIND_MARK='랜드마크';
+var MAP = { zone:null, tiles:[], sel:-1, hitItem:null, listMode:false };
+var MAP_GAP = 6, MAP_MIN = 34, MAP_MAX = 84, MAP_UNPLACED = '__unplaced__';
+
+/** 위치명 → {qty, items:[{i,q}]} (수량 0 제외) */
+function mapAgg(){
+  var agg = {};
+  DATA.items.forEach(function(it, i){
+    var locs = it.locs||{};
+    Object.keys(locs).forEach(function(k){
+      var q = Number(locs[k])||0; if(!q) return;
+      if(!agg[k]) agg[k] = { qty:0, items:[] };
+      agg[k].qty += q; agg[k].items.push({ i:i, q:q });
+    });
+  });
+  return agg;
+}
+function mapPlaced(){ return (DATA.layout||[]).filter(function(l){ return l.x!=null && l.y!=null; }); }
+function mapPlacedNames(){ var s={}; mapPlaced().forEach(function(l){ s[l.name]=true; }); return s; }
+function mapZoneList(){ var seen={}, out=[];
+  mapPlaced().forEach(function(l){ var z=l.zone||'(구역없음)'; if(!seen[z]){seen[z]=true; out.push(z);} }); return out; }
+/** 좌표 없는 이름에 남아있는 재고 (기존 큰 단위 + '기타' + 오타) */
+function mapUnplaced(){
+  var placed = mapPlacedNames(), agg = mapAgg(), out = [];
+  Object.keys(agg).forEach(function(k){ if(!placed[k]) out.push({ name:k, qty:agg[k].qty, items:agg[k].items }); });
+  out.sort(function(a,b){ return Math.abs(b.qty)-Math.abs(a.qty); });
+  return out;
+}
+function mapShort(name, zone){ var n=(''+name); return (zone && n.indexOf(zone)===0) ? (n.slice(zone.length).trim()||n) : n; }
+function mapQty(n){ n=Number(n)||0; return Math.abs(n)>9999 ? ((n/1000).toFixed(1)+'k') : fmt(n); }
+function mapRamp(q, max){
+  if(q<0) return { bg:'#fdecec', fg:'#dc2626' };
+  if(!q)  return { bg:'#fff',    fg:'#b9c2cf' };
+  var steps=['#eaf1ff','#d3e3ff','#a9c9ff','#7aabff','#4b8bfa'];
+  var i = max>0 ? Math.min(4, Math.floor(q/max*5)) : 0;
+  return { bg:steps[i], fg:(i>=3?'#fff':'#1f2733') };
+}
+function mapKindClass(k){ return k===KIND_PALLET?'k-pallet':(k===KIND_CORR?'k-corr':(k===KIND_MARK?'k-mark':'k-rack')); }
+
+function renderMap(){
+  var zones = mapZoneList(), unplaced = mapUnplaced();
+  if(MAP.zone===null || (MAP.zone!==MAP_UNPLACED && zones.indexOf(MAP.zone)<0)) MAP.zone = zones.length?zones[0]:MAP_UNPLACED;
+  document.getElementById('mapZones').innerHTML =
+    zones.map(function(z,zi){ return '<div class="f '+(MAP.zone===z?'on':'')+'" onclick="setMapZoneAt('+zi+')">'+esc(z)+'</div>'; }).join('')
+    + (unplaced.length ? '<div class="f '+(MAP.zone===MAP_UNPLACED?'on':'')+'"'+(MAP.zone===MAP_UNPLACED?'':' style="color:#dc2626;border-color:#f5c2c2"')+' onclick="setMapZoneAt(-1)">미배치 '+unplaced.length+'</div>' : '');
+
+  var banner = document.getElementById('mapBanner');
+  if(MAP.hitItem){ var hi=itemById(MAP.hitItem);
+    banner.innerHTML = '<div class="mapbanner"><span>🔦 '+esc(hi?hi.name:'')+' 위치 표시 중</span><span class="x" onclick="clearMapHit()">해제</span></div>';
+  } else banner.innerHTML='';
+
+  if(MAP.zone===MAP_UNPLACED){ renderMapUnplaced(unplaced); return; }
+  if(!zones.length){ renderMapEmpty(); return; }
+  renderMapCanvas();
+}
+function setMapZoneAt(zi){ MAP.zone = zi<0 ? MAP_UNPLACED : (mapZoneList()[zi]||MAP_UNPLACED); MAP.sel=-1; renderMap(); }
+function toggleMapList(){ MAP.listMode=!MAP.listMode; renderMap(); }
+
+function renderMapEmpty(){
+  var c=document.getElementById('mapCanvas'); c.innerHTML=''; c.style.height='0px';
+  document.getElementById('mapLegend').innerHTML='';
+  document.getElementById('mapDetail').innerHTML =
+    '<div class="loading">아직 지도 배치가 없습니다.<br><br>' +
+    '시트 <b>위치</b> 탭의 <b>구역 / X / Y</b> 칸을 채우거나,<br>' +
+    '메뉴 <b>📦 재고관리 &gt; 🗺️ 창고 지도 기본 배치 넣기</b> 를 실행하세요.<br><br>' +
+    '<span style="font-size:12px">위치 탭 형식: 위치 · 구역 · X · Y · 폭 · 높이 · 종류(랙/파렛트/복도/랜드마크) · 비고</span></div>';
+}
+function renderMapUnplaced(list){
+  var c=document.getElementById('mapCanvas'); c.innerHTML=''; c.style.height='0px';
+  document.getElementById('mapLegend').innerHTML='';
+  var el=document.getElementById('mapDetail');
+  if(!list.length){ el.innerHTML='<div class="loading">미배치 재고가 없습니다. 👍</div>'; return; }
+  el.innerHTML = '<div class="maphint">아직 지도에 자리가 정해지지 않은 재고입니다. <b>⇄ 배치</b>로 랙·파렛트 자리로 옮기세요.</div>' +
+    list.map(function(u,ui){
+      return '<div class="srow" style="border-left-color:#dc2626"><div class="top">'+
+        '<span class="nm2">'+esc(u.name)+'</span>'+
+        '<span class="q2">'+fmt(u.qty)+'<small> 개</small></span></div>'+
+        '<div class="b2">'+u.items.length+'개 품목 · <span class="editlink" onclick="placeUnplaced('+ui+')">⇄ 배치</span></div></div>';
+    }).join('');
+}
+function placeUnplaced(ui){
+  var u=mapUnplaced()[ui]; if(!u||!u.items.length) return;
+  var best=u.items.slice().sort(function(a,b){ return b.q-a.q; })[0];
+  selectAt(best.i, u.name, '이동');
+}
+
+function renderMapCanvas(){
+  var zone=MAP.zone, agg=mapAgg();
+  var tiles=mapPlaced().filter(function(l){ return (l.zone||'(구역없음)')===zone; });
+  MAP.tiles=tiles;
+  var canvas=document.getElementById('mapCanvas'), wrap=document.getElementById('mapWrap'), detail=document.getElementById('mapDetail');
+  if(!tiles.length){ canvas.innerHTML=''; canvas.style.height='0px'; detail.innerHTML='<div class="loading">이 구역에 배치된 자리가 없습니다.</div>'; return; }
+  if(MAP.listMode){ renderMapList(tiles, agg); return; }
+
+  var minX=Math.min.apply(null,tiles.map(function(t){return t.x;})), minY=Math.min.apply(null,tiles.map(function(t){return t.y;}));
+  var maxX=Math.max.apply(null,tiles.map(function(t){return t.x+t.w-1;})), maxY=Math.max.apply(null,tiles.map(function(t){return t.y+t.h-1;}));
+  var cols=maxX-minX+1, rows=maxY-minY+1;
+  var avail=(wrap.clientWidth||document.body.clientWidth||360);
+  var cell=Math.max(MAP_MIN, Math.min(MAP_MAX, Math.floor((avail-(cols-1)*MAP_GAP)/cols)));
+  var zoneMax=0; tiles.forEach(function(t){ var q=agg[t.name]?agg[t.name].qty:0; if(t.kind!==KIND_MARK && q>zoneMax) zoneMax=q; });
+
+  canvas.style.width=(cols*cell+(cols-1)*MAP_GAP)+'px';
+  canvas.style.height=(rows*cell+(rows-1)*MAP_GAP)+'px';
+  canvas.innerHTML=tiles.map(function(t,ti){
+    var isMark=t.kind===KIND_MARK, a=agg[t.name], q=a?a.qty:0;
+    if(MAP.hitItem && !isMark){ q=(a?a.items:[]).filter(function(x){return DATA.items[x.i]&&DATA.items[x.i].id===MAP.hitItem;}).reduce(function(s,x){return s+x.q;},0); }
+    var ramp=isMark?{bg:'',fg:''}:mapRamp(q, zoneMax);
+    var hit=MAP.hitItem && !isMark && q!==0;
+    var label=isMark ? (t.note||mapShort(t.name,zone)) : mapShort(t.name,zone);
+    return '<div class="mtile '+mapKindClass(t.kind)+(MAP.sel===ti?' sel':'')+(hit?' hit':'')+'"'+
+      ' style="left:'+((t.x-minX)*(cell+MAP_GAP))+'px;top:'+((t.y-minY)*(cell+MAP_GAP))+'px;'+
+      'width:'+(t.w*cell+(t.w-1)*MAP_GAP)+'px;height:'+(t.h*cell+(t.h-1)*MAP_GAP)+'px;'+
+      (isMark?'':'background:'+ramp.bg+';color:'+ramp.fg+';')+'"'+
+      (isMark?'':' onclick="mapPick('+ti+')"')+'>'+
+      '<span class="mt-n">'+esc(label)+'</span>'+
+      (isMark?'':'<span class="mt-q">'+(q?mapQty(q):'')+'</span>'+
+        (a&&a.items.length>1?'<span class="mt-k">'+a.items.length+'종</span>':''))+
+      '</div>';
+  }).join('');
+
+  var dup={}, dupHit=false;
+  tiles.forEach(function(t){ var k=t.x+','+t.y; if(dup[k]) dupHit=true; dup[k]=true; });
+  document.getElementById('mapLegend').innerHTML =
+    '<span><i class="lgb" style="border:1.5px solid #cfd8e6"></i>랙</span>'+
+    '<span><i class="lgb" style="border:1.5px dashed #b9c2cf"></i>파렛트</span>'+
+    '<span><i class="lgb" style="border:1.5px dotted #cbd3de"></i>복도</span>'+
+    '<span><i class="lgb" style="background:#eef1f5"></i>랜드마크</span>'+
+    '<span><i class="lgb" style="background:#4b8bfa"></i>재고 많음</span>'+
+    (dupHit?'<span style="color:#dc2626;font-weight:700">⚠ 좌표 중복</span>':'');
+  if(MAP.sel<0 || MAP.sel>=tiles.length) detail.innerHTML='<div class="maphint">칸을 누르면 그 자리의 품목이 표시됩니다.</div>';
+  else renderMapDetail();
+}
+function renderMapList(tiles, agg){
+  var c=document.getElementById('mapCanvas'); c.innerHTML=''; c.style.height='0px';
+  document.getElementById('mapLegend').innerHTML='';
+  document.getElementById('mapDetail').innerHTML = tiles.map(function(t,ti){
+    if(t.kind===KIND_MARK) return '';
+    var a=agg[t.name], q=a?a.qty:0;
+    return '<div class="srow" style="border-left-color:#cfd8e6" onclick="mapPick('+ti+')"><div class="top">'+
+      '<span class="nm2">'+esc(mapShort(t.name,MAP.zone))+' <span class="badge" style="color:#6b7889;background:#eef1f5">'+esc(t.kind)+'</span></span>'+
+      '<span class="q2">'+fmt(q)+'<small> 개</small></span></div>'+
+      '<div class="b2">'+(a&&a.items.length?(a.items.length+'개 품목'):'빈 자리')+'</div></div>';
+  }).join('') || '<div class="loading">표시할 자리가 없습니다.</div>';
+}
+function mapPick(ti){ MAP.sel=ti; renderMap(); renderMapDetail(); }
+function renderMapDetail(){
+  var t=MAP.tiles[MAP.sel]; if(!t) return;
+  var a=mapAgg()[t.name], el=document.getElementById('mapDetail');
+  var head='<div class="label">📍 '+esc(t.name)+' · '+esc(t.kind)+(a?(' · 총 '+fmt(a.qty)+'개'):'')+'</div>';
+  var foot=t.note?'<div class="maphint">'+esc(t.note)+'</div>':'';
+  if(!a || !a.items.length){ el.innerHTML=head+'<div class="loading">빈 자리입니다.</div>'+foot; return; }
+  el.innerHTML=head+a.items.slice().sort(function(x,y){ return y.q-x.q; }).map(function(x){
+    var it=DATA.items[x.i]; if(!it) return '';
+    return '<div class="srow" style="border-left-color:'+catColor(it.cat)+'" onclick="selectAtTile('+x.i+','+MAP.sel+')"><div class="top">'+
+      '<span class="nm2">'+esc(it.name)+' '+badge(it.cat)+'</span>'+
+      '<span class="q2">'+fmt(x.q)+'<small> 개</small></span></div></div>';
+  }).join('')+foot;
+}
+function selectAtTile(i, ti){ var t=MAP.tiles[ti]; selectAt(i, t?t.name:''); }
+/** 지도 → 입출고로 이동하면서 위치를 미리 지정 */
+function selectAt(i, locName, mode){
+  select(i);
+  setTimeout(function(){
+    if(mode==='이동'){ type='이동'; renderInput(); ensureLocOption('movFrom', locName); document.getElementById('movFrom').value=locName; }
+    else { ensureLocOption('locSel', locName); document.getElementById('locSel').value=locName; }
+    updateTotal();
+  }, 0);
+}
+/** 로그에만 있고 위치 탭엔 없는 이름도 선택할 수 있게 옵션 보강 */
+function ensureLocOption(selId, name){
+  var sel=document.getElementById(selId); if(!sel||!name) return;
+  for(var i=0;i<sel.options.length;i++) if(sel.options[i].value===name || sel.options[i].text===name) return;
+  var o=document.createElement('option'); o.value=name; o.text=name; sel.appendChild(o);
+}
+/** 품목 → 지도에서 위치 표시 */
+function mapForItem(){
+  if(!cur) return;
+  MAP.hitItem=cur.id; MAP.sel=-1;
+  var placed=mapPlacedNames(), best=null, bestQ=-1;
+  Object.keys(cur.locs||{}).forEach(function(k){
+    var q=Math.abs(Number(cur.locs[k])||0); if(!q) return;
+    if(placed[k] && q>bestQ){ bestQ=q; best=k; }
+  });
+  if(best){ var l=mapPlaced().filter(function(x){return x.name===best;})[0]; MAP.zone=l?(l.zone||'(구역없음)'):null; }
+  else MAP.zone=MAP_UNPLACED;
+  go('map');
+}
+function clearMapHit(){ MAP.hitItem=null; renderMap(); }
+var mapRz=null;
+window.addEventListener('resize', function(){
+  if(document.getElementById('viewMap').classList.contains('hidden')) return;
+  clearTimeout(mapRz); mapRz=setTimeout(renderMap, 150);
+});
 
 // 전체 이력
 function loadLog(){ document.getElementById('logList').innerHTML='<div class="loading">불러오는 중…</div>';
@@ -504,13 +741,14 @@ function delMemo(row){ if(!confirm('이 메모를 삭제할까요? (사진도 �
 
 // 전환
 function go(v){
-  ['Search','Input','NewItem','Done','Stock','Report','Build','BomForm','BuildRun','Log','Memo','MemoForm'].forEach(function(n){document.getElementById('view'+n).classList.add('hidden');});
+  ['Search','Input','NewItem','Done','Stock','Map','Report','Build','BomForm','BuildRun','Log','Memo','MemoForm'].forEach(function(n){document.getElementById('view'+n).classList.add('hidden');});
   document.getElementById('saveBtn').classList.add('hidden'); setNav(v);
   if(v==='search'){ show('Search'); resetBar(); renderSearch(); }
   if(v==='input'){ show('Input'); document.getElementById('saveBtn').classList.remove('hidden'); }
   if(v==='newItem'){ show('NewItem'); resetBar('📦','새 품목 추가','품목을 새로 등록합니다'); }
   if(v==='done'){ show('Done'); resetBar(); }
   if(v==='stock'){ show('Stock'); resetBar('📊','현재고','실시간 자동 집계'); renderStock(); }
+  if(v==='map'){ show('Map'); resetBar('🗺️','창고 지도','구역별 적재 위치'); renderMap(); } // show 이후에 그려야 폭이 잡힘
   if(v==='report'){ show('Report'); resetBar('📅','월별 리포트','입고·출고 월별 집계'); loadReport(); }
   if(v==='log'){ show('Log'); resetBar('🕒','전체 이력','최근 입출고 60건'); loadLog(); }
   if(v==='build'){ show('Build'); resetBar('🧩','조립 가능 수량','부품 재고로 만들 수 있는 완제품'); loadBuild(); }
@@ -521,7 +759,7 @@ function go(v){
 }
 function show(n){ document.getElementById('view'+n).classList.remove('hidden'); }
 function setNav(v){ var g=(v==='search'||v==='input'||v==='newItem'||v==='done');
-  document.getElementById('navInput').className=g?'on':''; document.getElementById('navStock').className=(v==='stock'||v==='report'||v==='log')?'on':''; document.getElementById('navBuild').className=(v==='build'||v==='bomForm'||v==='buildRun')?'on':''; document.getElementById('navMemo').className=(v==='memo'||v==='memoForm')?'on':''; }
+  document.getElementById('navInput').className=g?'on':''; document.getElementById('navStock').className=(v==='stock'||v==='report'||v==='log'||v==='map')?'on':''; document.getElementById('navBuild').className=(v==='build'||v==='bomForm'||v==='buildRun')?'on':''; document.getElementById('navMemo').className=(v==='memo'||v==='memoForm')?'on':''; }
 function resetBar(ic,t,s){ document.getElementById('barIcon').textContent=ic||'📦'; document.getElementById('barTitle').textContent=t||'써브텍 재고'; document.getElementById('barSub').textContent=s||('입고 · 출고를 빠르게 기록하세요 · '+HTML_VERSION); }
 </script>
 </body>
