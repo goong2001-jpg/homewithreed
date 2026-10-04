@@ -2,28 +2,33 @@ import React, { useState } from 'react';
 import './App.css';
 import MathScreen from './screens/MathScreen';
 import AlphabetScreen from './screens/AlphabetScreen';
+import WordScreen from './screens/WordScreen';
 import { playClick } from './utils/sounds';
 
 /**
  * ─────────────────────────────────────────────────────────────
- *  수학놀이를 다시 보이게 하려면 아래 값을 true 로만 바꾸면 됩니다.
- *  (코드는 그대로 남아 있어 언제든 되살릴 수 있습니다)
+ *  보여줄 놀이를 켜고 끄는 스위치입니다.
+ *  true 로 바꾸면 그 놀이가 위쪽 탭에 다시 나타납니다.
+ *  (코드는 모두 그대로 남아 있어 언제든 되살릴 수 있습니다)
  * ─────────────────────────────────────────────────────────────
  */
-const SHOW_MATH = false;
+const SHOW_MATH = false;      // 🧮 수학놀이
+const SHOW_ALPHABET = false;  // 🔤 알파벳 쓰기
+const SHOW_WORDS = true;      // 📖 영어 단어
 
-type Tab = 'math' | 'alphabet';
+type Tab = 'math' | 'alphabet' | 'words';
 
 const TAB_KEY = 'active_tab';
 
-const ALL_TABS: { id: Tab; label: string; emoji: string }[] = [
-  { id: 'math', label: '수학놀이', emoji: '🧮' },
-  { id: 'alphabet', label: '알파벳', emoji: '🔤' },
+const ALL_TABS: { id: Tab; label: string; emoji: string; show: boolean }[] = [
+  { id: 'words', label: '영어 단어', emoji: '📖', show: SHOW_WORDS },
+  { id: 'alphabet', label: '알파벳', emoji: '🔤', show: SHOW_ALPHABET },
+  { id: 'math', label: '수학놀이', emoji: '🧮', show: SHOW_MATH },
 ];
 
 // 지금 보여줄 탭만 골라둔다
-const TABS = ALL_TABS.filter(t => t.id !== 'math' || SHOW_MATH);
-const DEFAULT_TAB: Tab = SHOW_MATH ? 'math' : 'alphabet';
+const TABS = ALL_TABS.filter(t => t.show);
+const DEFAULT_TAB: Tab = TABS[0]?.id ?? 'words';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>(() => {
@@ -82,7 +87,9 @@ export default function App() {
       )}
 
       {/* 화면 — 각 놀이는 서로 독립적으로 동작 */}
-      {SHOW_MATH && tab === 'math' ? <MathScreen /> : <AlphabetScreen />}
+      {tab === 'math' && SHOW_MATH && <MathScreen />}
+      {tab === 'alphabet' && SHOW_ALPHABET && <AlphabetScreen />}
+      {tab === 'words' && SHOW_WORDS && <WordScreen />}
     </div>
   );
 }
