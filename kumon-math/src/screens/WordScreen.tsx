@@ -18,9 +18,10 @@ export default function WordScreen() {
   const { gameState, items, buyItem, equipItem, addPoints } = useGameState();
 
   const words = useMemo(() => wordsForRound(progress.round), [progress.round]);
+  // 단어는 묶음(round)이 정하고, 문제는 도전할 때마다(attempt) 달라진다
   const questions = useMemo(
-    () => questionsForDay(words, progress.round),
-    [words, progress.round],
+    () => questionsForDay(words, progress.round * 100 + progress.attempt),
+    [words, progress.round, progress.attempt],
   );
 
   const [picked, setPicked] = useState<string | null>(null);
@@ -359,7 +360,7 @@ export default function WordScreen() {
                 background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white',
                 fontSize: 16, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
               }}
-            >다시 도전! 💪</button>
+            >단어 다시 보고 도전! 💪</button>
           )}
 
           {(rewardedThisRound || drawn) && !drawing && (

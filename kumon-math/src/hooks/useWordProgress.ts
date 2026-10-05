@@ -19,8 +19,10 @@ export interface WordProgress {
   /** 오늘 단어를 몇 개까지 봤는지 */
   learned: number;
   phase: Phase;
-  /** 테스트 회차 (한 번 더 하면 올라가 다른 문제가 나온다) */
+  /** 단어 묶음 번호 — 올라가면 완전히 새로운 단어 10개를 받는다 */
   round: number;
+  /** 같은 단어 묶음으로 다시 도전한 횟수 — 단어는 그대로, 문제만 바뀐다 */
+  attempt: number;
   /** 이번 회차 정답 여부 */
   results: boolean[];
   /** 쿠폰을 받은 날짜 */
@@ -43,7 +45,7 @@ export interface WordProgress {
 export const MAX_COUPONS_PER_DAY = 8;
 
 const DEFAULT: WordProgress = {
-  date: '', learned: 0, phase: 'learn', round: 0, results: [],
+  date: '', learned: 0, phase: 'learn', round: 0, attempt: 0, results: [],
   rewardedDate: '', rewardedRounds: [], totalLearned: 0, coupons: {}, history: [],
 };
 
@@ -56,7 +58,7 @@ function load(): WordProgress {
       if (saved.date !== todayKey()) {
         return {
           ...saved, date: todayKey(), learned: 0, phase: 'learn',
-          round: 0, results: [], rewardedRounds: [],
+          round: 0, attempt: 0, results: [], rewardedRounds: [],
         };
       }
       return saved;
@@ -105,10 +107,13 @@ export function useWordProgress() {
     });
   }, []);
 
-  /** 테스트를 다시 도전 */
+  /**
+   * 다시 도전 — 단어는 그대로 두고 10개를 처음부터 다시 보여준다.
+   * 틀린 아이에게 본 적 없는 단어를 내밀면 더 어려워지기만 한다.
+   */
   const retryTest = useCallback(() => {
-    update({ round: progress.round + 1, results: [] });
-  }, [progress.round, update]);
+    update({ learned: 0, phase: 'learn', attempt: progress.attempt + 1, results: [] });
+  }, [progress.attempt, update]);
 
   /** 쿠폰 받기 — 회차마다 한 장씩, 하루 최대 MAX_COUPONS_PER_DAY 장 */
   const earnCoupon = useCallback((id: CouponId): boolean => {
@@ -146,7 +151,10 @@ export function useWordProgress() {
 
   /** 오늘 것을 또 연습 (쿠폰은 안 나온다) */
   const practiceAgain = useCallback(() => {
-    update({ learned: 0, phase: 'learn', round: progress.round + 1, results: [] });
+    update({
+      learned: 0, phase: 'learn',
+      round: progress.round + 1, attempt: 0, results: [],
+    });
   }, [progress.round, update]);
 
   const totalCoupons = Object.values(progress.coupons).reduce<number>((s, n) => s + (n ?? 0), 0);
