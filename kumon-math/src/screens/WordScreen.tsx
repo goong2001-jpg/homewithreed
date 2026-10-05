@@ -31,7 +31,8 @@ export default function WordScreen() {
   const roundRef = useRef(progress.round);
   const [drawing, setDrawing] = useState(false);
   const [happy, setHappy] = useState(false);
-  const [hintOn, setHintOn] = useState(false);
+  // 보기를 눌러 첫소리를 들어보고, 확인 버튼으로 고른다
+  const [selected, setSelected] = useState<string | null>(null);
   const rewardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { warmUpVoices(); }, []);
@@ -79,7 +80,7 @@ export default function WordScreen() {
     setTimeout(() => {
       setHappy(false);
       setPicked(null);
-      setHintOn(false);
+      setSelected(null);
       answer(correct);
     }, correct ? 900 : 1600);
   }, [picked, question, answer, addPoints]);
@@ -239,51 +240,34 @@ export default function WordScreen() {
                 color: '#7c4dff', cursor: 'pointer', fontFamily: 'inherit',
               }}
             >🔊 다시 듣기</button>
-            {/* 철자만으로 어려우면 첫소리를 들려준다 (moon → 므, 므, 므) */}
-            <button
-              onClick={() => {
-                setHintOn(true);
-                speakPhonics(firstSoundPhrase(question.word.en));
-                playClick();
-              }}
-              style={{
-                border: '2px solid #f0a868', background: hintOn ? '#fff3e0' : 'white',
-                borderRadius: 12, padding: '8px 14px', fontSize: 13, fontWeight: 800,
-                color: '#d2823a', cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >🔉 첫소리 힌트</button>
           </div>
 
-          {hintOn && (
-            <div style={{
-              background: 'linear-gradient(135deg,#fff3e0,#ffe0b2)',
-              borderRadius: 14, padding: '10px 14px', marginBottom: 12,
-              fontSize: 15, fontWeight: 800, color: '#a35f12',
-              animation: 'fadeIn 0.3s ease',
-            }}>
-              <span style={{ fontSize: 26, color: '#e67e22' }}>
-                {firstSoundKo(question.word.en)}
-              </span>
-              {' '}소리로 시작해요! 🔉 를 또 눌러서 들어봐
-            </div>
-          )}
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#a35f12', marginBottom: 8 }}>
+            👆 보기를 누르면 첫소리가 들려요. 고른 뒤 확인!
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {question.choices.map(c => {
               const isPicked = picked === c.en;
               const isAnswer = c.en === question.word.en;
               const show = picked !== null;
+              const isSel = selected === c.en;
               return (
                 <button
                   key={c.en}
-                  onClick={() => handleChoice(c.en)}
+                  onClick={() => {
+                    if (show) return;
+                    setSelected(c.en);
+                    speakPhonics(firstSoundPhrase(c.en));
+                  }}
                   disabled={show}
                   style={{
-                    padding: '15px 6px', borderRadius: 16, border: 'none',
+                    padding: '12px 6px', borderRadius: 16,
+                    border: isSel && !show ? '3px solid #7c4dff' : '3px solid transparent',
                     background: show
                       ? (isAnswer ? 'linear-gradient(135deg,#84fab0,#8fd3f4)'
                         : isPicked ? '#ffd6d6' : '#f2f0fa')
-                      : '#f2f0fa',
+                      : isSel ? '#ede7ff' : '#f2f0fa',
                     color: show && isAnswer ? '#1e5c40' : '#4a4463',
                     fontSize: 17, fontWeight: 800, cursor: show ? 'default' : 'pointer',
                     fontFamily: 'inherit', transition: 'all 0.2s',
@@ -291,10 +275,26 @@ export default function WordScreen() {
                   }}
                 >
                   {c.en}
+                  {isSel && !show && (
+                    <div style={{ fontSize: 12, color: '#e67e22', marginTop: 2 }}>
+                      🔉 {firstSoundKo(c.en)}
+                    </div>
+                  )}
                 </button>
               );
             })}
           </div>
+          <button
+            onClick={() => selected && handleChoice(selected)}
+            disabled={!selected || picked !== null}
+            style={{
+              width: '100%', marginTop: 12, padding: '14px 0', borderRadius: 16, border: 'none',
+              background: selected && picked === null
+                ? 'linear-gradient(135deg,#667eea,#764ba2)' : '#ddd',
+              color: 'white', fontSize: 17, fontWeight: 900,
+              cursor: selected && picked === null ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
+            }}
+          >이걸로 할래! ✅</button>
           {picked !== null && picked !== question.word.en && (
             <div style={{ marginTop: 12, fontSize: 15, fontWeight: 800, color: '#e74c3c' }}>
               아쉬워! 정답은 <b>{question.word.en}</b> 이야
@@ -363,7 +363,7 @@ export default function WordScreen() {
             >단어 다시 보고 도전! 💪</button>
           )}
 
-          {(rewardedThisRound || drawn) && !drawing && (
+          {allCorrect && !drawing && (rewardedThisRound || drawn || couponsLeftToday === 0) && (
             <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
               <button
                 onClick={() => { setShowWallet(true); playClick(); }}
