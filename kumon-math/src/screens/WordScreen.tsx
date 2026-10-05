@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { wordsForDay, questionsForDay, WORDS_PER_DAY, TEST_COUNT } from '../words/dailySet';
+import { wordsForRound, questionsForDay, WORDS_PER_DAY, TEST_COUNT } from '../words/dailySet';
 import { drawCoupon, CouponKind, COUPONS } from '../words/coupons';
 import { useWordProgress } from '../hooks/useWordProgress';
 import { useGameState } from '../hooks/useGameState';
@@ -12,11 +12,11 @@ import { playCorrect, playWrong, playStreak, playClick } from '../utils/sounds';
 export default function WordScreen() {
   const {
     progress, learnNext, answer, retryTest, earnCoupon, useCoupon,
-    practiceAgain, totalCoupons, rewardedToday,
+    practiceAgain, totalCoupons, rewardedThisRound, couponsLeftToday,
   } = useWordProgress();
   const { gameState, items, buyItem, equipItem, addPoints } = useGameState();
 
-  const words = useMemo(() => wordsForDay(), []);
+  const words = useMemo(() => wordsForRound(progress.round), [progress.round]);
   const questions = useMemo(
     () => questionsForDay(words, progress.round),
     [words, progress.round],
@@ -26,11 +26,20 @@ export default function WordScreen() {
   const [showWallet, setShowWallet] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const [drawn, setDrawn] = useState<CouponKind | null>(null);
+  const roundRef = useRef(progress.round);
   const [drawing, setDrawing] = useState(false);
   const [happy, setHappy] = useState(false);
   const rewardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { warmUpVoices(); }, []);
+
+  // 새 회차를 시작하면 지난 회차에서 뽑은 쿠폰 카드를 치운다
+  useEffect(() => {
+    if (roundRef.current !== progress.round) {
+      roundRef.current = progress.round;
+      setDrawn(null);
+    }
+  }, [progress.round]);
 
   const qIndex = progress.results.length;
   const question = questions[Math.min(qIndex, questions.length - 1)];
@@ -269,11 +278,17 @@ export default function WordScreen() {
           </div>
           <div style={{ fontSize: 14, color: '#888', marginBottom: 16, lineHeight: 1.5 }}>
             {allCorrect
-              ? (rewardedToday ? '오늘 쿠폰은 이미 받았어요 😊' : '쿠폰을 뽑을 수 있어요!')
+              ? (rewardedThisRound
+                  ? (couponsLeftToday > 0
+                      ? `한 번 더 하면 쿠폰을 또 받을 수 있어요! (오늘 ${couponsLeftToday}장 남음)`
+                      : '오늘 받을 수 있는 쿠폰을 다 받았어요 😊')
+                  : couponsLeftToday > 0
+                    ? `쿠폰을 뽑을 수 있어요! (오늘 ${couponsLeftToday}장 남음)`
+                    : '오늘 받을 수 있는 쿠폰을 다 받았어요 😊')
               : '다시 도전하면 쿠폰을 받을 수 있어요!'}
           </div>
 
-          {allCorrect && !rewardedToday && !drawn && (
+          {allCorrect && !rewardedThisRound && couponsLeftToday > 0 && !drawn && (
             <button
               onClick={handleDraw}
               style={{
@@ -314,7 +329,7 @@ export default function WordScreen() {
             >다시 도전! 💪</button>
           )}
 
-          {(rewardedToday || drawn) && !drawing && (
+          {(rewardedThisRound || drawn) && !drawing && (
             <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
               <button
                 onClick={() => { setShowWallet(true); playClick(); }}
@@ -331,7 +346,7 @@ export default function WordScreen() {
                   border: '2px solid #7c4dff', background: 'white', color: '#7c4dff',
                   fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
                 }}
-              >한 번 더 ✏️</button>
+              >새 단어로 한 번 더 ✏️</button>
             </div>
           )}
         </div>
@@ -367,14 +382,14 @@ export default function WordScreen() {
         </div>
       )}
 
-      {/* 오늘의 단어 미리보기 */}
-      {progress.phase !== 'learn' && (
+      {/* 배운 단어 다시 듣기 — 문제를 푸는 동안에는 감춘다(답이 보이면 안 되므로) */}
+      {(progress.phase === 'done' || (progress.phase === 'test' && testFinished)) && (
         <div style={{
           marginTop: 16, width: '100%', maxWidth: 360,
           background: 'rgba(255,255,255,0.75)', borderRadius: 18, padding: '12px 14px',
         }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#8a7a9a', marginBottom: 8 }}>
-            오늘 배운 단어
+            방금 배운 단어 (눌러서 다시 듣기)
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {words.map(w => (

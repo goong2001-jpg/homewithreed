@@ -34,16 +34,49 @@ export function todayKey(d: Date = new Date()): string {
 /** 단어장을 한 번 섞어둔 순서 — 이 순서대로 매일 10개씩 끊어서 쓴다 */
 const ORDER = shuffled(WORD_BANK, 20260101);
 
+/** 하루에 새로 배우는 단어 수 (나머지는 지난 며칠 단어를 복습한다) */
+export const NEW_PER_DAY = 3;
+/** 복습으로 꼭 다시 나오는 날 수 */
+export const REVIEW_DAYS = 2;
+
+/** 그날 처음 배우는 단어 3개 */
+function freshWords(day: number): Word[] {
+  const n = ORDER.length;
+  const start = (((day * NEW_PER_DAY) % n) + n) % n;
+  const out: Word[] = [];
+  for (let i = 0; i < NEW_PER_DAY; i++) out.push(ORDER[(start + i) % n]);
+  return out;
+}
+
 /**
- * 오늘의 단어 10개.
- * 섞어둔 순서에서 하루에 10칸씩 옮겨가며 잘라 쓰므로
- * 어제 나온 단어가 오늘 또 나오는 일이 없고,
- * 끝까지 가면 처음으로 돌아와 다시 돈다(약 24일 주기).
+ * 오늘의 단어 10개
+ *   = 새 단어 3개 + 어제 3개 + 그제 3개 + 사흘 전 1개.
+ *
+ * 한 단어를 사흘 내리 만나게 되므로 하루 만에 스쳐 지나가지 않는다.
+ * 사흘 전 자리는 날마다 돌아가며 한 개씩 뽑아 네 번째 복습이 된다.
  */
 export function wordsForDay(d: Date = new Date()): Word[] {
   const day = dayNumber(d);
+  const out: Word[] = [...freshWords(day)];
+  for (let back = 1; back <= REVIEW_DAYS; back++) out.push(...freshWords(day - back));
+  // 사흘 전 단어 중 하나를 더 끼워 넣는다(자리는 날마다 이동)
+  const older = freshWords(day - REVIEW_DAYS - 1);
+  out.push(older[(((day % NEW_PER_DAY) + NEW_PER_DAY) % NEW_PER_DAY)]);
+  // 새 단어와 복습 단어가 섞이도록 순서를 날마다 다르게 한다
+  return shuffled(out, day * 977 + 31);
+}
+
+/**
+ * "한 번 더" 할 때 쓰는 단어 10개.
+ * 회차마다 아직 안 본 단어를 미리 보여줘서 늘 새롭고,
+ * 이 단어들은 나중에 정식으로 배울 때 다시 만나게 된다.
+ */
+export function wordsForRound(round: number, d: Date = new Date()): Word[] {
+  if (round <= 0) return wordsForDay(d);
+  const day = dayNumber(d);
   const n = ORDER.length;
-  const start = (((day * WORDS_PER_DAY) % n) + n) % n;
+  // 오늘 쓰는 구간(day-2 ~ day)에서 넉넉히 떨어뜨려 겹치지 않게 한다
+  const start = ((((day * NEW_PER_DAY) + 40 + (round - 1) * WORDS_PER_DAY) % n) + n) % n;
   const out: Word[] = [];
   for (let i = 0; i < WORDS_PER_DAY; i++) out.push(ORDER[(start + i) % n]);
   return out;
