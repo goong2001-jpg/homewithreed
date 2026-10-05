@@ -69,6 +69,31 @@ export function firstSound(en: string): string {
   return LETTERS[w[0]] ?? w[0];
 }
 
+/**
+ * 화면에 보여줄 한글 소리 (예: moon → "므", airplane → "에어").
+ *
+ * 영어 철자를 그대로 보여주면 아이가 소리를 듣지 않고
+ * 글자만 눈으로 맞춰 버리므로, 소리를 한글로 적어 준다.
+ */
+const KO_SOUND: Record<string, string> = {
+  // 자음
+  buh: '브', kuh: '크', duh: '드', fuh: '프', guh: '그', huh: '흐',
+  juh: '즈', luh: '르', muh: '므', nuh: '느', puh: '프', ruh: '르',
+  suh: '스', tuh: '트', vuh: '브', wuh: '워', yuh: '유', zuh: '즈',
+  ksuh: '크스',
+  // 두 글자 소리
+  chuh: '츄', shuh: '쉬', thuh: '쓰', kwuh: '쿠', skuh: '스크', skwuh: '스쿠',
+  // 모음
+  ah: '아', eh: '에', ih: '이', oh: '오', uh: '어',
+  ay: '에이', ee: '이', eye: '아이', ow: '아우',
+  or: '오', er: '어', air: '에어', ear: '이어',
+};
+
+export function firstSoundKo(en: string): string {
+  const s = firstSound(en);
+  return KO_SOUND[s] ?? s;
+}
+
 /** 읽어주기에 넘길 문장 — 세 번 반복해서 또렷하게 들린다 */
 export function firstSoundPhrase(en: string): string {
   const s = firstSound(en);

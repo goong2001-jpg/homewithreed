@@ -4,7 +4,7 @@ import { drawCoupon, CouponKind, COUPONS } from '../words/coupons';
 import { useWordProgress } from '../hooks/useWordProgress';
 import { useGameState } from '../hooks/useGameState';
 import { speakWord, speakPhonics, warmUpVoices, speechSupported } from '../alphabet/speech';
-import { firstLetters, firstSoundPhrase } from '../words/phonics';
+import { firstSoundKo, firstSoundPhrase } from '../words/phonics';
 import Avatar from '../components/Avatar';
 import Shop from '../components/Shop';
 import CouponWallet from '../components/CouponWallet';
@@ -262,9 +262,9 @@ export default function WordScreen() {
               animation: 'fadeIn 0.3s ease',
             }}>
               <span style={{ fontSize: 26, color: '#e67e22' }}>
-                {firstLetters(question.word.en)}
+                {firstSoundKo(question.word.en)}
               </span>
-              {' '}로 시작해요! 🔉 를 또 눌러서 들어봐
+              {' '}소리로 시작해요! 🔉 를 또 눌러서 들어봐
             </div>
           )}
 
