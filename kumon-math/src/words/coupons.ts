@@ -8,6 +8,11 @@ export interface CouponKind {
   color: string;
   /** 뽑기에서 나올 가능성 (클수록 자주 나옴) */
   weight: number;
+  /**
+   * 교환할 수 있는 쿠폰인지.
+   * 500원 쿠폰은 실제 돈이라 뽑기로만 얻도록 교환에서 뺀다.
+   */
+  tradable: boolean;
 }
 
 /**
@@ -15,10 +20,10 @@ export interface CouponKind {
  * 나머지 셋은 시간 쿠폰이라 고르게 자주 나온다.
  */
 export const COUPONS: CouponKind[] = [
-  { id: 'money500',   name: '500원 쿠폰',      emoji: '💰', color: 'linear-gradient(135deg,#f6d365,#fda085)', weight: 1 },
-  { id: 'roblox',     name: '로블록스 1분',    emoji: '🎮', color: 'linear-gradient(135deg,#a1c4fd,#c2e9fb)', weight: 10 },
-  { id: 'tv',         name: 'TV 1분',          emoji: '📺', color: 'linear-gradient(135deg,#d4a5ff,#c2a0f8)', weight: 10 },
-  { id: 'playground', name: '놀이터 5분',      emoji: '🛝', color: 'linear-gradient(135deg,#84fab0,#8fd3f4)', weight: 10 },
+  { id: 'money500',   name: '500원 쿠폰',      emoji: '💰', color: 'linear-gradient(135deg,#f6d365,#fda085)', weight: 1, tradable: false },
+  { id: 'roblox',     name: '로블록스 1분',    emoji: '🎮', color: 'linear-gradient(135deg,#a1c4fd,#c2e9fb)', weight: 10, tradable: true },
+  { id: 'tv',         name: 'TV 1분',          emoji: '📺', color: 'linear-gradient(135deg,#d4a5ff,#c2a0f8)', weight: 10, tradable: true },
+  { id: 'playground', name: '놀이터 5분',      emoji: '🛝', color: 'linear-gradient(135deg,#84fab0,#8fd3f4)', weight: 10, tradable: true },
 ];
 
 export function couponById(id: CouponId): CouponKind {

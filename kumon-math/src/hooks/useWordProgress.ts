@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { CouponId } from '../words/coupons';
-import { todayKey, TEST_COUNT } from '../words/dailySet';
+import { todayKey, TEST_COUNT, MAX_MISSED_PER_DAY } from '../words/dailySet';
 
 const FRESH_QUEUE = () => Array.from({ length: TEST_COUNT }, (_, i) => i);
 
@@ -10,9 +10,11 @@ export type Phase = 'learn' | 'test' | 'done';
 
 export interface CouponEvent {
   id: CouponId;
-  /** 'earn' = 받음, 'use' = 사용함 */
-  type: 'earn' | 'use';
+  /** 'earn' = 받음, 'use' = 사용함, 'trade' = 다른 쿠폰 두 장과 바꿔서 받음 */
+  type: 'earn' | 'use' | 'trade';
   at: string;
+  /** trade 일 때 내준 쿠폰 */
+  from?: CouponId;
 }
 
 export interface WordProgress {
@@ -42,7 +44,24 @@ export interface WordProgress {
   coupons: Partial<Record<CouponId, number>>;
   /** 받은/쓴 기록 (최근 것부터) */
   history: CouponEvent[];
+  /**
+   * 오답 노트 — 틀린 단어와 틀린 날짜.
+   * 다음 날부터 오늘의 단어와 문제에 먼저 다시 나오고,
+   * 다른 날 한 번에 맞히면 노트에서 빠진다.
+   */
+  missed: Record<string, string>;
+  /**
+   * 오늘 다시 볼 오답 단어 — 날이 바뀔 때 한 번만 정한다.
+   * (퀴즈 도중 노트가 바뀌어도 오늘 단어가 흔들리지 않게)
+   */
+  todayMissed: string[];
 }
+
+/** 오답 노트에 이만큼 오래 남은 단어는 정리한다 */
+const MISSED_KEEP_DAYS = 14;
+
+/** 같은 쿠폰 몇 장을 내면 다른 쿠폰 한 장으로 바꿔 주는지 */
+export const TRADE_COST = 2;
 
 /**
  * 하루에 받을 수 있는 쿠폰 수.
@@ -54,7 +73,18 @@ export const MAX_COUPONS_PER_DAY = 8;
 const DEFAULT: WordProgress = {
   date: '', learned: 0, phase: 'learn', round: 0, attempt: 0, results: [], queue: FRESH_QUEUE(),
   rewardedDate: '', rewardedRounds: [], totalLearned: 0, coupons: {}, history: [],
+  missed: {},
+  todayMissed: [],
 };
+
+function daysAgo(dateKey: string): number {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  if (!y) return Infinity;
+  const then = Date.UTC(y, m - 1, d);
+  const n = new Date();
+  const now = Date.UTC(n.getFullYear(), n.getMonth(), n.getDate());
+  return Math.round((now - then) / 86400000);
+}
 
 function load(): WordProgress {
   try {
@@ -64,11 +94,21 @@ function load(): WordProgress {
       const saved: WordProgress = { ...DEFAULT, ...parsed };
       // 예전 저장 데이터에는 queue 가 없다 — 푼 만큼 빼고 남은 문제로 채운다
       if (!Array.isArray(parsed.queue)) saved.queue = FRESH_QUEUE().slice(saved.results.length);
+      // 너무 오래된 오답은 정리한다
+      saved.missed = Object.fromEntries(
+        Object.entries(saved.missed ?? {}).filter(([, at]) => daysAgo(at) <= MISSED_KEEP_DAYS),
+      );
       // 날이 바뀌면 오늘 치만 초기화한다 (쿠폰과 누적 기록은 그대로)
       if (saved.date !== todayKey()) {
+        // 가장 최근에 틀린 단어부터 오늘 다시 본다
+        const todayMissed = Object.entries(saved.missed)
+          .sort((a, b) => daysAgo(a[1]) - daysAgo(b[1]))
+          .map(([en]) => en)
+          .slice(0, MAX_MISSED_PER_DAY);
         return {
           ...saved, date: todayKey(), learned: 0, phase: 'learn',
           round: 0, attempt: 0, results: [], queue: FRESH_QUEUE(), rewardedRounds: [],
+          todayMissed,
         };
       }
       return saved;
@@ -109,11 +149,16 @@ export function useWordProgress() {
   }, []);
 
   /** 문제 하나를 풀었을 때 */
-  const answer = useCallback((correct: boolean) => {
+  const answer = useCallback((correct: boolean, en: string, firstTry: boolean) => {
     setProgress(prev => {
       const [cur, ...rest] = prev.queue;
       const queue = correct || cur === undefined ? rest : [...rest, cur];
-      const next = { ...prev, results: [...prev.results, correct], queue };
+      // 오답 노트: 틀리면 적고, 지난날 틀린 단어를 오늘 한 번에 맞히면 지운다
+      const missed = { ...prev.missed };
+      const today = todayKey();
+      if (!correct) missed[en] = today;
+      else if (firstTry && missed[en] && missed[en] !== today) delete missed[en];
+      const next = { ...prev, results: [...prev.results, correct], queue, missed };
       try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
       return next;
     });
@@ -141,6 +186,23 @@ export function useWordProgress() {
       // 곧바로 사라져서 아이가 무엇을 받았는지 볼 수 없다.
       coupons: { ...progress.coupons, [id]: (progress.coupons[id] ?? 0) + 1 },
       history: [{ id, type: 'earn' as const, at: today }, ...progress.history].slice(0, 60),
+    };
+    save(next);
+    return true;
+  }, [progress, save]);
+
+  /** 같은 쿠폰 TRADE_COST 장을 내고 다른 쿠폰 한 장을 받는다 */
+  const tradeCoupon = useCallback((from: CouponId, to: CouponId): boolean => {
+    const have = progress.coupons[from] ?? 0;
+    if (from === to || have < TRADE_COST) return false;
+    const next: WordProgress = {
+      ...progress,
+      coupons: {
+        ...progress.coupons,
+        [from]: have - TRADE_COST,
+        [to]: (progress.coupons[to] ?? 0) + 1,
+      },
+      history: [{ id: to, from, type: 'trade' as const, at: todayKey() }, ...progress.history].slice(0, 60),
     };
     save(next);
     return true;
@@ -178,7 +240,7 @@ export function useWordProgress() {
   const couponsLeftToday = Math.max(0, MAX_COUPONS_PER_DAY - couponsToday);
 
   return {
-    progress, learnNext, answer, retryTest, earnCoupon, useCoupon,
+    progress, learnNext, answer, retryTest, earnCoupon, useCoupon, tradeCoupon,
     finishWithoutCoupon, practiceAgain, totalCoupons,
     rewardedThisRound, couponsToday, couponsLeftToday, update,
   };

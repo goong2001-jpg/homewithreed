@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { wordsForRound, questionsForDay, WORDS_PER_DAY, TEST_COUNT } from '../words/dailySet';
+import { WORD_BANK } from '../words/wordBank';
 import { drawCoupon, CouponKind, COUPONS } from '../words/coupons';
 import { useWordProgress } from '../hooks/useWordProgress';
 import { useGameState } from '../hooks/useGameState';
@@ -12,16 +13,26 @@ import { playCorrect, playWrong, playStreak, playClick } from '../utils/sounds';
 
 export default function WordScreen() {
   const {
-    progress, learnNext, answer, earnCoupon, useCoupon,
+    progress, learnNext, answer, earnCoupon, useCoupon, tradeCoupon,
     practiceAgain, totalCoupons, rewardedThisRound, couponsLeftToday,
   } = useWordProgress();
   const { gameState, items, buyItem, equipItem, addPoints } = useGameState();
 
-  const words = useMemo(() => wordsForRound(progress.round), [progress.round]);
-  // 단어는 묶음(round)이 정하고, 문제는 도전할 때마다(attempt) 달라진다
+  // 오답 노트에서 오늘 다시 볼 단어 (날이 바뀔 때 정해져 오늘 하루는 그대로다)
+  const missedKey = progress.todayMissed.join('|');
+  const missedWords = useMemo(
+    () => WORD_BANK.filter(w => missedKey.split('|').includes(w.en)),
+    [missedKey],
+  );
+  const words = useMemo(
+    () => wordsForRound(progress.round, undefined, missedWords),
+    [progress.round, missedWords],
+  );
+  // 단어는 묶음(round)이 정하고, 문제는 도전할 때마다(attempt) 달라진다.
+  // 지난번에 틀렸던 단어는 문제로 먼저 나온다.
   const questions = useMemo(
-    () => questionsForDay(words, progress.round * 100 + progress.attempt),
-    [words, progress.round, progress.attempt],
+    () => questionsForDay(words, progress.round * 100 + progress.attempt, undefined, missedKey.split('|')),
+    [words, progress.round, progress.attempt, missedKey],
   );
 
   const [picked, setPicked] = useState<string | null>(null);
@@ -85,13 +96,15 @@ export default function WordScreen() {
       // 정답을 소리로도 들려줘서 머리에 남게 한다
       setTimeout(() => speakWord(question.word.en), 500);
     }
+    // 처음 세 번은 각 문제를 처음 푸는 것, 그 뒤는 틀린 문제를 다시 푸는 것
+    const firstTry = progress.results.length < TEST_COUNT;
     setTimeout(() => {
       setHappy(false);
       setPicked(null);
       setSelected(null);
-      answer(correct);
+      answer(correct, question.word.en, firstTry);
     }, correct ? 900 : 2600);
-  }, [picked, question, answer, addPoints]);
+  }, [picked, question, answer, addPoints, progress.results.length]);
 
   // 틀린 문제도 결국 다 맞혀야 끝난다 — 끝났다면 모두 맞힌 것
   const testFinished = progress.queue.length === 0;
@@ -233,13 +246,32 @@ export default function WordScreen() {
       {/* ── 테스트 ── */}
       {progress.phase === 'test' && !testFinished && question && (
         <div style={card}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: '#e67e22', marginBottom: 8 }}>
-            이건 영어로 뭘까? 🤔
-          </div>
-          <div style={{ fontSize: 86, lineHeight: 1.1 }}>{question.word.emoji}</div>
-          <div style={{ fontSize: 17, fontWeight: 700, color: '#888', marginBottom: 6 }}>
-            {question.word.ko}
-          </div>
+          {progress.todayMissed.includes(question.word.en) && progress.round === 0 && (
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#c0392b', marginBottom: 4 }}>
+              📒 지난번에 틀렸던 단어!
+            </div>
+          )}
+          {question.kind === 'picture' ? (
+            <>
+              {/* 거꾸로 문제: 영어를 듣고 알맞은 그림을 고른다 */}
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#e67e22', marginBottom: 8 }}>
+                잘 듣고 알맞은 그림을 골라봐! 👂
+              </div>
+              <div style={{ fontSize: 42, fontWeight: 900, color: '#5b4b8a', margin: '10px 0 8px' }}>
+                {question.word.en}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#e67e22', marginBottom: 8 }}>
+                이건 영어로 뭘까? 🤔
+              </div>
+              <div style={{ fontSize: 86, lineHeight: 1.1 }}>{question.word.emoji}</div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#888', marginBottom: 6 }}>
+                {question.word.ko}
+              </div>
+            </>
+          )}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
             <button
               onClick={() => { speakWord(question.word.en); playClick(); }}
@@ -252,7 +284,9 @@ export default function WordScreen() {
           </div>
 
           <div style={{ fontSize: 13, fontWeight: 700, color: '#a35f12', marginBottom: 8 }}>
-            👆 보기를 누르면 첫소리가 들려요. 고른 뒤 확인!
+            {question.kind === 'picture'
+              ? '👆 그림을 골라서 확인을 눌러!'
+              : '👆 보기를 누르면 첫소리가 들려요. 고른 뒤 확인!'}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -267,7 +301,8 @@ export default function WordScreen() {
                   onClick={() => {
                     if (show) return;
                     setSelected(c.en);
-                    speakPhonics(firstSoundPhrase(c.en));
+                    if (question.kind === 'word') speakPhonics(firstSoundPhrase(c.en));
+                    else playClick();
                   }}
                   disabled={show}
                   style={{
@@ -283,8 +318,10 @@ export default function WordScreen() {
                     boxShadow: show && isAnswer ? '0 4px 14px rgba(39,174,96,0.3)' : 'none',
                   }}
                 >
-                  {c.en}
-                  {isSel && !show && (
+                  {question.kind === 'picture'
+                    ? <span style={{ fontSize: 46, lineHeight: 1.1 }}>{c.emoji}</span>
+                    : c.en}
+                  {isSel && !show && question.kind === 'word' && (
                     <div style={{ fontSize: 12, color: '#e67e22', marginTop: 2 }}>
                       🔉 {firstSoundKo(c.en)}
                     </div>
@@ -306,7 +343,7 @@ export default function WordScreen() {
           >이걸로 할래! ✅</button>
           {picked !== null && picked !== question.word.en && (
             <div style={{ marginTop: 12, fontSize: 15, fontWeight: 800, color: '#e74c3c' }}>
-              아쉬워! 정답은 <b>{question.word.en}</b> 이야
+              아쉬워! 정답은 <b>{question.word.emoji} {question.word.en}</b> 이야
               <div style={{ fontSize: 13, color: '#a35f12', marginTop: 4 }}>
                 이 단어는 조금 뒤에 다시 나와요. 기억해 둬! 🧠
               </div>
@@ -456,6 +493,7 @@ export default function WordScreen() {
           coupons={progress.coupons}
           history={progress.history}
           onUse={useCoupon}
+          onTrade={tradeCoupon}
           onClose={() => setShowWallet(false)}
         />
       )}

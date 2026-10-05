@@ -36,6 +36,8 @@ const ORDER = shuffled(WORD_BANK, 20260101);
 
 /** 하루에 새로 배우는 단어 수 (나머지는 지난 며칠 단어를 복습한다) */
 export const NEW_PER_DAY = 3;
+/** 오답 노트에서 하루에 다시 꺼내 오는 단어 수 */
+export const MAX_MISSED_PER_DAY = 3;
 /** 복습으로 꼭 다시 나오는 날 수 */
 export const REVIEW_DAYS = 2;
 
@@ -55,13 +57,21 @@ function freshWords(day: number): Word[] {
  * 한 단어를 사흘 내리 만나게 되므로 하루 만에 스쳐 지나가지 않는다.
  * 사흘 전 자리는 날마다 돌아가며 한 개씩 뽑아 네 번째 복습이 된다.
  */
-export function wordsForDay(d: Date = new Date()): Word[] {
+export function wordsForDay(d: Date = new Date(), priority: Word[] = []): Word[] {
   const day = dayNumber(d);
-  const out: Word[] = [...freshWords(day)];
-  for (let back = 1; back <= REVIEW_DAYS; back++) out.push(...freshWords(day - back));
+  const fresh = freshWords(day);
+  const review: Word[] = [];
+  for (let back = 1; back <= REVIEW_DAYS; back++) review.push(...freshWords(day - back));
   // 사흘 전 단어 중 하나를 더 끼워 넣는다(자리는 날마다 이동)
   const older = freshWords(day - REVIEW_DAYS - 1);
-  out.push(older[(((day % NEW_PER_DAY) + NEW_PER_DAY) % NEW_PER_DAY)]);
+  review.push(older[(((day % NEW_PER_DAY) + NEW_PER_DAY) % NEW_PER_DAY)]);
+
+  // 전에 틀렸던 단어(오답 노트)는 복습 자리를 먼저 차지한다. 새 단어는 그대로 둔다.
+  const taken = new Set(fresh.map(w => w.en));
+  const extra = priority.filter(w => !taken.has(w.en)).slice(0, MAX_MISSED_PER_DAY);
+  extra.forEach(w => taken.add(w.en));
+  const rest = review.filter(w => !taken.has(w.en));
+  const out = [...fresh, ...extra, ...rest].slice(0, WORDS_PER_DAY);
   // 새 단어와 복습 단어가 섞이도록 순서를 날마다 다르게 한다
   return shuffled(out, day * 977 + 31);
 }
@@ -71,8 +81,8 @@ export function wordsForDay(d: Date = new Date()): Word[] {
  * 회차마다 아직 안 본 단어를 미리 보여줘서 늘 새롭고,
  * 이 단어들은 나중에 정식으로 배울 때 다시 만나게 된다.
  */
-export function wordsForRound(round: number, d: Date = new Date()): Word[] {
-  if (round <= 0) return wordsForDay(d);
+export function wordsForRound(round: number, d: Date = new Date(), priority: Word[] = []): Word[] {
+  if (round <= 0) return wordsForDay(d, priority);
   const day = dayNumber(d);
   const n = ORDER.length;
   // 오늘 쓰는 구간(day-2 ~ day)에서 넉넉히 떨어뜨려 겹치지 않게 한다
@@ -82,20 +92,37 @@ export function wordsForRound(round: number, d: Date = new Date()): Word[] {
   return out;
 }
 
+/**
+ * word    = 그림과 뜻을 보고 영어 단어를 고른다
+ * picture = 영어 단어를 듣고(보고) 알맞은 그림을 고른다
+ */
+export type QuestionKind = 'word' | 'picture';
+
 export interface Question {
   word: Word;
   choices: Word[];
+  kind: QuestionKind;
 }
 
 /**
  * 오늘의 단어 중 3개를 문제로 낸다.
  * round를 바꾸면 다른 문제가 나와서 "한 번 더" 연습할 수 있다.
+ * priority(전에 틀린 단어)가 단어 목록에 있으면 그것부터 문제로 낸다.
+ * 가운데 문제는 거꾸로(듣고 그림 고르기) 내서 듣기 연습도 섞는다.
  */
-export function questionsForDay(words: Word[], round = 0, d: Date = new Date()): Question[] {
+export function questionsForDay(
+  words: Word[], round = 0, d: Date = new Date(), priority: string[] = [],
+): Question[] {
   const seed = dayNumber(d) * 131 + round * 7717 + 3;
-  const picked = shuffled(words, seed).slice(0, TEST_COUNT);
+  const first = words.filter(w => priority.includes(w.en));
+  const others = shuffled(words.filter(w => !priority.includes(w.en)), seed);
+  const picked = shuffled([...first, ...others].slice(0, TEST_COUNT), seed + 11);
   return picked.map((word, i) => {
-    const others = shuffled(words.filter(w => w.en !== word.en), seed + i * 31).slice(0, 3);
-    return { word, choices: shuffled([word, ...others], seed + i * 97 + 5) };
+    const wrong = shuffled(words.filter(w => w.en !== word.en), seed + i * 31).slice(0, 3);
+    return {
+      word,
+      choices: shuffled([word, ...wrong], seed + i * 97 + 5),
+      kind: i === 1 ? 'picture' : 'word',
+    };
   });
 }
