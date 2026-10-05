@@ -3,7 +3,8 @@ import { wordsForRound, questionsForDay, WORDS_PER_DAY, TEST_COUNT } from '../wo
 import { drawCoupon, CouponKind, COUPONS } from '../words/coupons';
 import { useWordProgress } from '../hooks/useWordProgress';
 import { useGameState } from '../hooks/useGameState';
-import { speakWord, warmUpVoices, speechSupported } from '../alphabet/speech';
+import { speakWord, speakPhonics, warmUpVoices, speechSupported } from '../alphabet/speech';
+import { firstLetters, firstSoundPhrase } from '../words/phonics';
 import Avatar from '../components/Avatar';
 import Shop from '../components/Shop';
 import CouponWallet from '../components/CouponWallet';
@@ -29,6 +30,7 @@ export default function WordScreen() {
   const roundRef = useRef(progress.round);
   const [drawing, setDrawing] = useState(false);
   const [happy, setHappy] = useState(false);
+  const [hintOn, setHintOn] = useState(false);
   const rewardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { warmUpVoices(); }, []);
@@ -76,6 +78,7 @@ export default function WordScreen() {
     setTimeout(() => {
       setHappy(false);
       setPicked(null);
+      setHintOn(false);
       answer(correct);
     }, correct ? 900 : 1600);
   }, [picked, question, answer, addPoints]);
@@ -226,13 +229,43 @@ export default function WordScreen() {
           <div style={{ fontSize: 17, fontWeight: 700, color: '#888', marginBottom: 6 }}>
             {question.word.ko}
           </div>
-          <button
-            onClick={() => { speakWord(question.word.en); playClick(); }}
-            style={{
-              border: 'none', background: 'none', fontSize: 14, fontWeight: 800,
-              color: '#7c4dff', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 12,
-            }}
-          >🔊 다시 들어보기</button>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
+            <button
+              onClick={() => { speakWord(question.word.en); playClick(); }}
+              style={{
+                border: '2px solid #7c4dff', background: 'white', borderRadius: 12,
+                padding: '8px 14px', fontSize: 13, fontWeight: 800,
+                color: '#7c4dff', cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >🔊 다시 듣기</button>
+            {/* 철자만으로 어려우면 첫소리를 들려준다 (moon → 므, 므, 므) */}
+            <button
+              onClick={() => {
+                setHintOn(true);
+                speakPhonics(firstSoundPhrase(question.word.en));
+                playClick();
+              }}
+              style={{
+                border: '2px solid #f0a868', background: hintOn ? '#fff3e0' : 'white',
+                borderRadius: 12, padding: '8px 14px', fontSize: 13, fontWeight: 800,
+                color: '#d2823a', cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >🔉 첫소리 힌트</button>
+          </div>
+
+          {hintOn && (
+            <div style={{
+              background: 'linear-gradient(135deg,#fff3e0,#ffe0b2)',
+              borderRadius: 14, padding: '10px 14px', marginBottom: 12,
+              fontSize: 15, fontWeight: 800, color: '#a35f12',
+              animation: 'fadeIn 0.3s ease',
+            }}>
+              <span style={{ fontSize: 26, color: '#e67e22' }}>
+                {firstLetters(question.word.en)}
+              </span>
+              {' '}로 시작해요! 🔉 를 또 눌러서 들어봐
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {question.choices.map(c => {
