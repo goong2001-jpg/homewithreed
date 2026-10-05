@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
 import { CouponId } from '../words/coupons';
-import { todayKey } from '../words/dailySet';
+import { todayKey, TEST_COUNT } from '../words/dailySet';
+
+const FRESH_QUEUE = () => Array.from({ length: TEST_COUNT }, (_, i) => i);
 
 const KEY = 'word_progress';
 
@@ -25,6 +27,11 @@ export interface WordProgress {
   attempt: number;
   /** 이번 회차 정답 여부 */
   results: boolean[];
+  /**
+   * 아직 맞혀야 할 문제 번호들(앞에서부터 낸다).
+   * 틀린 문제는 맨 뒤로 다시 넣어서, 다른 문제를 풀고 난 뒤 한 번 더 묻는다.
+   */
+  queue: number[];
   /** 쿠폰을 받은 날짜 */
   rewardedDate: string;
   /** 그날 쿠폰을 받은 회차들 — 같은 회차로 두 번 받지 못하게 한다 */
@@ -45,7 +52,7 @@ export interface WordProgress {
 export const MAX_COUPONS_PER_DAY = 8;
 
 const DEFAULT: WordProgress = {
-  date: '', learned: 0, phase: 'learn', round: 0, attempt: 0, results: [],
+  date: '', learned: 0, phase: 'learn', round: 0, attempt: 0, results: [], queue: FRESH_QUEUE(),
   rewardedDate: '', rewardedRounds: [], totalLearned: 0, coupons: {}, history: [],
 };
 
@@ -53,12 +60,15 @@ function load(): WordProgress {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
-      const saved: WordProgress = { ...DEFAULT, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      const saved: WordProgress = { ...DEFAULT, ...parsed };
+      // 예전 저장 데이터에는 queue 가 없다 — 푼 만큼 빼고 남은 문제로 채운다
+      if (!Array.isArray(parsed.queue)) saved.queue = FRESH_QUEUE().slice(saved.results.length);
       // 날이 바뀌면 오늘 치만 초기화한다 (쿠폰과 누적 기록은 그대로)
       if (saved.date !== todayKey()) {
         return {
           ...saved, date: todayKey(), learned: 0, phase: 'learn',
-          round: 0, attempt: 0, results: [], rewardedRounds: [],
+          round: 0, attempt: 0, results: [], queue: FRESH_QUEUE(), rewardedRounds: [],
         };
       }
       return saved;
@@ -101,7 +111,9 @@ export function useWordProgress() {
   /** 문제 하나를 풀었을 때 */
   const answer = useCallback((correct: boolean) => {
     setProgress(prev => {
-      const next = { ...prev, results: [...prev.results, correct] };
+      const [cur, ...rest] = prev.queue;
+      const queue = correct || cur === undefined ? rest : [...rest, cur];
+      const next = { ...prev, results: [...prev.results, correct], queue };
       try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
       return next;
     });
@@ -112,7 +124,7 @@ export function useWordProgress() {
    * 틀린 아이에게 본 적 없는 단어를 내밀면 더 어려워지기만 한다.
    */
   const retryTest = useCallback(() => {
-    update({ learned: 0, phase: 'learn', attempt: progress.attempt + 1, results: [] });
+    update({ learned: 0, phase: 'learn', attempt: progress.attempt + 1, results: [], queue: FRESH_QUEUE() });
   }, [progress.attempt, update]);
 
   /** 쿠폰 받기 — 회차마다 한 장씩, 하루 최대 MAX_COUPONS_PER_DAY 장 */
@@ -153,7 +165,7 @@ export function useWordProgress() {
   const practiceAgain = useCallback(() => {
     update({
       learned: 0, phase: 'learn',
-      round: progress.round + 1, attempt: 0, results: [],
+      round: progress.round + 1, attempt: 0, results: [], queue: FRESH_QUEUE(),
     });
   }, [progress.round, update]);
 

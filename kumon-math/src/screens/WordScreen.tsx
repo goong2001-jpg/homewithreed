@@ -12,7 +12,7 @@ import { playCorrect, playWrong, playStreak, playClick } from '../utils/sounds';
 
 export default function WordScreen() {
   const {
-    progress, learnNext, answer, retryTest, earnCoupon, useCoupon,
+    progress, learnNext, answer, earnCoupon, useCoupon,
     practiceAgain, totalCoupons, rewardedThisRound, couponsLeftToday,
   } = useWordProgress();
   const { gameState, items, buyItem, equipItem, addPoints } = useGameState();
@@ -45,8 +45,12 @@ export default function WordScreen() {
     }
   }, [progress.round]);
 
-  const qIndex = progress.results.length;
-  const question = questions[Math.min(qIndex, questions.length - 1)];
+  // 틀린 문제는 뒤로 다시 들어가므로, 지금 낼 문제는 queue 맨 앞이다
+  const qIndex = progress.results.length;           // 지금까지 답한 횟수 (바뀔 때마다 새 문제)
+  const solved = TEST_COUNT - progress.queue.length; // 맞힌 문제 수
+  const wrongCount = progress.results.filter(r => !r).length;
+  const question = questions[progress.queue[0] ?? 0];
+  const isRetryQ = progress.results.length >= TEST_COUNT; // 틀렸던 문제를 다시 묻는 중
   const word = words[Math.min(progress.learned, words.length - 1)];
 
   // 단어가 바뀌면 자동으로 읽어준다
@@ -76,17 +80,22 @@ export default function WordScreen() {
     setPicked(en);
     const correct = en === question.word.en;
     if (correct) { playCorrect(); setHappy(true); addPoints(2); }
-    else playWrong();
+    else {
+      playWrong();
+      // 정답을 소리로도 들려줘서 머리에 남게 한다
+      setTimeout(() => speakWord(question.word.en), 500);
+    }
     setTimeout(() => {
       setHappy(false);
       setPicked(null);
       setSelected(null);
       answer(correct);
-    }, correct ? 900 : 1600);
+    }, correct ? 900 : 2600);
   }, [picked, question, answer, addPoints]);
 
-  const allCorrect = progress.results.length === TEST_COUNT && progress.results.every(Boolean);
-  const testFinished = progress.results.length >= TEST_COUNT;
+  // 틀린 문제도 결국 다 맞혀야 끝난다 — 끝났다면 모두 맞힌 것
+  const testFinished = progress.queue.length === 0;
+  const allCorrect = testFinished;
 
   // 다 맞히면 쿠폰 뽑기
   const handleDraw = useCallback(() => {
@@ -164,7 +173,7 @@ export default function WordScreen() {
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 5 }}>
           <span>
             {progress.phase === 'learn' ? `오늘의 단어 ${progress.learned + 1} / ${WORDS_PER_DAY}`
-              : progress.phase === 'test' ? `문제 ${Math.min(qIndex + 1, TEST_COUNT)} / ${TEST_COUNT}`
+              : progress.phase === 'test' ? (isRetryQ ? `틀린 단어 다시! (${solved} / ${TEST_COUNT} 맞힘)` : `문제 ${qIndex + 1} / ${TEST_COUNT}`)
               : '오늘 공부 끝! 🎉'}
           </span>
           <span style={{ color: '#9b59b6', fontWeight: 700 }}>📚 지금까지 {progress.totalLearned}개</span>
@@ -173,7 +182,7 @@ export default function WordScreen() {
           <div style={{
             width: `${progress.phase === 'done' ? 100
               : progress.phase === 'test'
-                ? 60 + (qIndex / TEST_COUNT) * 40
+                ? 60 + (solved / TEST_COUNT) * 40
                 : (progress.learned / WORDS_PER_DAY) * 60}%`,
             height: '100%', borderRadius: 99,
             background: 'linear-gradient(90deg,#a18cd1,#fbc2eb)',
@@ -298,6 +307,9 @@ export default function WordScreen() {
           {picked !== null && picked !== question.word.en && (
             <div style={{ marginTop: 12, fontSize: 15, fontWeight: 800, color: '#e74c3c' }}>
               아쉬워! 정답은 <b>{question.word.en}</b> 이야
+              <div style={{ fontSize: 13, color: '#a35f12', marginTop: 4 }}>
+                이 단어는 조금 뒤에 다시 나와요. 기억해 둬! 🧠
+              </div>
             </div>
           )}
         </div>
@@ -308,7 +320,7 @@ export default function WordScreen() {
         <div style={card}>
           <div style={{ fontSize: 56, marginBottom: 6 }}>{allCorrect ? '🎉' : '💪'}</div>
           <div style={{ fontSize: 20, fontWeight: 900, color: allCorrect ? '#27ae60' : '#e67e22', marginBottom: 6 }}>
-            {allCorrect ? '3개 다 맞았어!' : `${progress.results.filter(Boolean).length}개 맞았어!`}
+            {wrongCount === 0 ? '3개 한 번에 다 맞았어!' : '틀렸던 단어도 다시 맞혔어! 💪'}
           </div>
           <div style={{ fontSize: 14, color: '#888', marginBottom: 16, lineHeight: 1.5 }}>
             {allCorrect
@@ -352,16 +364,6 @@ export default function WordScreen() {
             </div>
           )}
 
-          {!allCorrect && (
-            <button
-              onClick={() => { retryTest(); playClick(); }}
-              style={{
-                width: '100%', padding: '15px 0', borderRadius: 16, border: 'none',
-                background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white',
-                fontSize: 16, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >단어 다시 보고 도전! 💪</button>
-          )}
 
           {allCorrect && !drawing && (rewardedThisRound || drawn || couponsLeftToday === 0) && (
             <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
