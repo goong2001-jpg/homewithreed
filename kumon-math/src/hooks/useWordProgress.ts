@@ -35,8 +35,12 @@ export interface WordProgress {
   history: CouponEvent[];
 }
 
-/** 하루에 받을 수 있는 쿠폰 수 — 너무 많이 쌓이지 않도록 */
-export const MAX_COUPONS_PER_DAY = 5;
+/**
+ * 하루에 받을 수 있는 쿠폰 수.
+ * 쿠폰 때문에 더 하고 싶어 하는 만큼, 하루 여덟 번까지 열어 둔다.
+ * (숫자만 바꾸면 늘리거나 줄일 수 있다)
+ */
+export const MAX_COUPONS_PER_DAY = 8;
 
 const DEFAULT: WordProgress = {
   date: '', learned: 0, phase: 'learn', round: 0, results: [],
