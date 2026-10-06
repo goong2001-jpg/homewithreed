@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { CouponId } from '../words/coupons';
 import { todayKey, TEST_COUNT, MAX_MISSED_PER_DAY, DayPlan } from '../words/dailySet';
-import { UNITS, DAYS_PER_UNIT } from '../words/units';
+import { UNITS, SETS_PER_UNIT } from '../words/units';
 
 const FRESH_QUEUE = () => Array.from({ length: TEST_COUNT }, (_, i) => i);
 
@@ -58,11 +58,14 @@ export interface WordProgress {
   todayMissed: string[];
   /** 지금 배우는 소리 단계 (0부터) */
   unit: number;
-  /** 그 단계에서 공부를 마친 날 수 — DAYS_PER_UNIT 이 되면 다음 단계로 */
+  /** 그 단계에서 끝낸 문제 묶음 수 — SETS_PER_UNIT 이 되면 다음 단계로 */
   unitDays: number;
-  /** 단계 진도를 마지막으로 올린 날 (하루에 한 번만 올린다) */
+  /** 진도를 마지막으로 올린 묶음 ("날짜:묶음번호") — 같은 묶음으로 두 번 올리지 않는다 */
   unitDoneDate: string;
-  /** 오늘 배우는 단계 — 날이 바뀔 때 정해져 오늘 하루는 그대로다 */
+  /**
+   * 지금 묶음에서 배우는 단계 — 묶음을 시작할 때 정해져 그 묶음 동안은 그대로다.
+   * (퀴즈를 끝내 진도가 올라도 방금 푼 단어가 바뀌지 않게)
+   */
   todayPlan: DayPlan;
 }
 
@@ -237,16 +240,16 @@ export function useWordProgress() {
   }, [progress, save]);
 
   /**
-   * 오늘의 첫 묶음 퀴즈를 마쳤을 때 — 하루에 한 번만 단계 진도를 올린다.
-   * 날짜가 아니라 실제로 공부한 날을 세므로, 하루 쉬어도 진도가 그냥 넘어가지 않는다.
+   * 문제 묶음 하나를 끝냈을 때 — 단계 진도를 한 칸 올린다.
+   * 묶음마다 한 번만 올린다. 다음 묶음의 단어는 "새 단어로 한 번 더"에서 정한다.
    */
-  const completeDay = useCallback(() => {
+  const completeSet = useCallback(() => {
     setProgress(prev => {
-      const today = todayKey();
-      if (prev.unitDoneDate === today) return prev;
+      const done = `${todayKey()}:${prev.round}`;
+      if (prev.unitDoneDate === done) return prev;
       let unit = prev.unit, unitDays = prev.unitDays + 1;
-      if (unitDays >= DAYS_PER_UNIT) { unit = (unit + 1) % UNITS.length; unitDays = 0; }
-      const next = { ...prev, unit, unitDays, unitDoneDate: today };
+      if (unitDays >= SETS_PER_UNIT) { unit = (unit + 1) % UNITS.length; unitDays = 0; }
+      const next = { ...prev, unit, unitDays, unitDoneDate: done };
       try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
       return next;
     });
@@ -268,8 +271,10 @@ export function useWordProgress() {
     update({
       learned: 0, phase: 'learn',
       round: progress.round + 1, attempt: 0, results: [], queue: FRESH_QUEUE(),
+      // 다음 묶음은 올라간 진도의 단계로 배운다
+      todayPlan: { unit: progress.unit, unitDay: progress.unitDays },
     });
-  }, [progress.round, update]);
+  }, [progress.round, progress.unit, progress.unitDays, update]);
 
   const totalCoupons = Object.values(progress.coupons).reduce<number>((s, n) => s + (n ?? 0), 0);
   const roundsToday = progress.rewardedDate === todayKey() ? progress.rewardedRounds : [];
@@ -281,7 +286,7 @@ export function useWordProgress() {
 
   return {
     progress, learnNext, answer, retryTest, earnCoupon, useCoupon, tradeCoupon,
-    completeDay, chooseUnit,
+    completeSet, chooseUnit,
     finishWithoutCoupon, practiceAgain, totalCoupons,
     rewardedThisRound, couponsToday, couponsLeftToday, update,
   };

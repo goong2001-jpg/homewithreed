@@ -1,5 +1,5 @@
 import React from 'react';
-import { UNITS, DAYS_PER_UNIT, SoundDef } from '../words/units';
+import { UNITS, SETS_PER_UNIT, SoundDef } from '../words/units';
 import { wordsOfSound } from '../words/dailySet';
 import { firstLetters } from '../words/phonics';
 import { speakPhonics, speakWord } from '../alphabet/speech';
@@ -39,7 +39,7 @@ export function SoundIntro({ unit, unitDay, onStart }: IntroProps) {
       boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
     }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: '#9b59b6' }}>
-        {unit % UNITS.length + 1}단계 · {DAYS_PER_UNIT}일 중 {unitDay + 1}일째
+        {unit % UNITS.length + 1}단계 · {SETS_PER_UNIT}번 중 {unitDay + 1}번째
       </div>
       <div style={{ fontSize: 21, fontWeight: 900, color: '#44405e', margin: '4px 0 14px' }}>
         오늘의 소리 🔤
@@ -113,7 +113,7 @@ export function UnitPicker({ current, onChoose, onClose }: PickerProps) {
           }}>✕</button>
         </div>
         <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
-          단계를 고르면 오늘 단어가 그 소리로 바뀌어요. 한 단계는 {DAYS_PER_UNIT}일 동안 해요.
+          단계를 고르면 단어가 그 소리로 바뀌어요. 한 단계는 문제 묶음 {SETS_PER_UNIT}번이에요.
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {UNITS.map(([a, b], i) => {

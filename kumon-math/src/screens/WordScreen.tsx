@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { wordsForRound, questionsForDay, WORDS_PER_DAY, TEST_COUNT } from '../words/dailySet';
+import { wordsForDay, questionsForDay, WORDS_PER_DAY, TEST_COUNT } from '../words/dailySet';
 import { WORD_BANK } from '../words/wordBank';
 import { drawCoupon, CouponKind, COUPONS } from '../words/coupons';
 import { useWordProgress } from '../hooks/useWordProgress';
@@ -17,7 +17,7 @@ export default function WordScreen() {
   const {
     progress, learnNext, answer, earnCoupon, useCoupon, tradeCoupon,
     practiceAgain, totalCoupons, rewardedThisRound, couponsLeftToday,
-    completeDay, chooseUnit,
+    completeSet, chooseUnit,
   } = useWordProgress();
   const { gameState, items, buyItem, equipItem, addPoints } = useGameState();
 
@@ -30,7 +30,8 @@ export default function WordScreen() {
   // 오늘 배우는 소리 단계 (날이 바뀔 때 정해진다)
   const plan = progress.todayPlan;
   const words = useMemo(
-    () => wordsForRound(progress.round, { unit: plan.unit, unitDay: plan.unitDay }, undefined, missedWords),
+    // 오답 노트 단어는 그날 첫 묶음에만 넣는다
+    () => wordsForDay({ unit: plan.unit, unitDay: plan.unitDay }, undefined, progress.round === 0 ? missedWords : []),
     [progress.round, plan.unit, plan.unitDay, missedWords],
   );
   const [introOpen, setIntroOpen] = useState(
@@ -63,8 +64,10 @@ export default function WordScreen() {
     if (roundRef.current !== progress.round) {
       roundRef.current = progress.round;
       setDrawn(null);
+      // 새 소리 단계로 넘어갔으면 소리 카드부터 보여준다
+      if (plan.unitDay === 0) setIntroOpen(true);
     }
-  }, [progress.round]);
+  }, [progress.round, plan.unitDay]);
 
   // 틀린 문제는 뒤로 다시 들어가므로, 지금 낼 문제는 queue 맨 앞이다
   const qIndex = progress.results.length;           // 지금까지 답한 횟수 (바뀔 때마다 새 문제)
@@ -119,8 +122,8 @@ export default function WordScreen() {
   // 틀린 문제도 결국 다 맞혀야 끝난다 — 끝났다면 모두 맞힌 것
   const testFinished = progress.queue.length === 0;
   useEffect(() => {
-    if (progress.phase === 'test' && testFinished && progress.round === 0) completeDay();
-  }, [progress.phase, testFinished, progress.round, completeDay]);
+    if (progress.phase === 'test' && testFinished) completeSet();
+  }, [progress.phase, testFinished, completeSet]);
   const allCorrect = testFinished;
 
   // 다 맞히면 쿠폰 뽑기

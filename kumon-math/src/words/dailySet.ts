@@ -99,29 +99,6 @@ export function wordsForDay(plan: DayPlan, d: Date = new Date(), priority: Word[
 }
 
 /**
- * "한 번 더" 할 때 쓰는 단어 10개.
- * 오늘의 소리와 지난 소리의 단어 중에서 회차마다 다르게 뽑아,
- * 같은 소리를 계속 연습하면서도 늘 새로운 단어를 만나게 한다.
- */
-export function wordsForRound(round: number, plan: DayPlan, d: Date = new Date(), priority: Word[] = []): Word[] {
-  const today = wordsForDay(plan, d, priority);
-  if (round <= 0) return today;
-  const day = dayNumber(d);
-  const [a, b] = UNITS[plan.unit % UNITS.length];
-  const pool = [...wordsOfSound(a), ...wordsOfSound(b), ...pastWords(plan.unit % UNITS.length)];
-  const seen = new Set(today.map(w => w.en));
-  const fresh = shuffled(pool.filter(w => !seen.has(w.en)), day * 31 + round * 7919);
-  const reuse = shuffled(pool.filter(w => seen.has(w.en)), day * 17 + round * 101);
-  const out: Word[] = [];
-  const used = new Set<string>();
-  for (const w of [...fresh, ...reuse, ...shuffled(WORD_BANK, round)]) {
-    if (out.length >= WORDS_PER_DAY) break;
-    if (!used.has(w.en)) { out.push(w); used.add(w.en); }
-  }
-  return out;
-}
-
-/**
  * word    = 그림과 뜻을 보고 영어 단어를 고른다
  * picture = 영어 단어를 듣고(보고) 알맞은 그림을 고른다
  */
