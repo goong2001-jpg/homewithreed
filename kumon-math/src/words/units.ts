@@ -39,6 +39,6 @@ export const UNITS: [SoundDef, SoundDef][] = [
 /**
  * 한 단계를 문제 묶음 몇 번으로 하는지.
  * 묶음 하나(단어 10개 + 문제)를 끝낼 때마다 진도가 오르고,
- * 같은 소리를 두 번 연습하면 다음 소리로 넘어간다.
+ * 같은 소리를 세 번 연습하면 다음 소리로 넘어간다.
  */
-export const SETS_PER_UNIT = 2;
+export const SETS_PER_UNIT = 3;
