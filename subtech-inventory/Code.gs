@@ -6,7 +6,7 @@
  * - 메모(업체 사양), 조립 가능 수량(BOM), 월별 입출고 리포트 포함.
  */
 
-var APP_VERSION = 'v10'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
+var APP_VERSION = 'v11'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
 
 var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
@@ -170,9 +170,8 @@ function setup() {
   if (config.getLastRow() < 2) config.getRange(2, 1, 3, 1).setValues([['김반장'], ['이사원'], ['관리자']]);
   // 위치: 가산적으로만 채움 — 손으로 입력한 지도 좌표가 재실행 때 지워지지 않도록 절대 clear 하지 않습니다.
   appendLocations_(locSh, DEFAULT_LOCATIONS.map(function (x) { return [x, '', '', '', 1, 1, KIND_RACK, '']; }));
-  // 지도 좌표가 하나도 없으면(첫 실행) 기본 배치를 시드
-  var placedNow = readLocations_(ss).layout.filter(function (l) { return l.x != null && l.y != null; });
-  if (!placedNow.length) appendLocations_(locSh, defaultLayoutRows_());
+  // 예시 랙·파렛트 칸은 자동으로 넣지 않음 — 실제 위치(A동1층 등)가 지도에 '구역 전체'로 바로 보이므로,
+  // 칸이 필요할 때만 메뉴 "🗺️ 창고 지도 기본 배치 넣기"로 추가합니다.
 
   // ※ 재고 가져오기는 더 이상 자동으로 하지 않습니다(재실행 시 재고가 꼬이는 것 방지).
   //    기존 써브텍에서 가져오려면 메뉴의 "(선택) 기존 써브텍에서 한 번 가져오기"를 사용하세요.

@@ -82,6 +82,21 @@
                padding:9px 12px; font-size:12.5px; font-weight:700; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
   .mapbanner .x { color:#9a3412; cursor:pointer; text-decoration:underline; }
   .maphint { font-size:11.5px; color:#8a97a8; margin-top:8px; line-height:1.5; }
+  .mtile.dim, .mzone.dim, .srow.dim { opacity:.35; }
+  .mzone { display:flex; justify-content:space-between; align-items:center; gap:10px; border:1.5px solid #cfd8e6; border-radius:12px;
+           padding:12px 14px; margin-bottom:8px; cursor:pointer; }
+  .mzone.sel { box-shadow:0 0 0 3px rgba(37,99,235,.35); }
+  .mzone.hit { box-shadow:0 0 0 2.5px #ea580c; }
+  .mzone .mz-n { font-size:14.5px; font-weight:900; }
+  .mzone .mz-s { font-size:11px; opacity:.75; margin-top:2px; }
+  .mzone .mz-q { font-size:20px; font-weight:900; white-space:nowrap; }
+  .mzone .mz-q small { font-size:11px; opacity:.75; }
+  .mapres { max-height:42vh; overflow-y:auto; margin-bottom:10px; -webkit-overflow-scrolling:touch; }
+  .mres-it { background:#fff; border:1.5px solid #fed7aa; border-radius:11px; padding:10px 12px; margin-bottom:7px; }
+  .mres-it .top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .mres-it .nm2 { font-size:14px; font-weight:700; }
+  .mres-it .locchip { cursor:pointer; }
+  .locchip.un { background:#fdecec; color:#dc2626; }
 </style>
 </head>
 <body>
@@ -153,8 +168,11 @@
 
 <!-- 창고 지도 -->
 <div class="body hidden" id="viewMap">
+  <input class="search" id="mapSearch" type="search" placeholder="🔍 품목 검색 — 어디에 있는지 찾기" oninput="onMapSearch()" style="margin-bottom:8px">
+  <div id="mapResults"></div>
   <div class="toolbar"><div class="filterbar" id="mapZones"></div><div class="sortbtn" id="mapListBtn" onclick="toggleMapList()">📋 목록</div></div>
   <div id="mapBanner"></div>
+  <div id="mapZoneBlocks"></div>
   <div class="mapwrap" id="mapWrap"><div class="mapcanvas" id="mapCanvas"></div></div>
   <div class="maplegend" id="mapLegend"></div>
   <div id="mapDetail"></div>
@@ -220,7 +238,7 @@
 </div>
 
 <script>
-var HTML_VERSION = 'v10'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v11'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var cur = null, type = '입고', lines = [{ boxes:'', per:'' }], txImgs = [];
@@ -480,8 +498,9 @@ function runBuildForm(){ var q=Number(val('brQty'))||0; if(q<=0)return;
   .runBuild({name:BR.name,cat:BR.cat,qty:q,toLoc:val('brLoc'),staff:val('brStaff'),memo:''}); }
 
 // ---- 창고 지도 ----
-var KIND_PALLET='파렛트', KIND_CORR='복도', KIND_MARK='랜드마크';
-var MAP = { zone:null, tiles:[], sel:-1, hitItem:null, listMode:false };
+var KIND_PALLET='파렛트', KIND_CORR='복도', KIND_MARK='랜드마크', KIND_ZONE='구역 전체';
+// picks = 지금 구역에서 누를 수 있는 자리 목록 (좌표 있는 칸 + 구역 전체 블록), sel 은 그 인덱스
+var MAP = { zone:null, tiles:[], picks:[], sel:-1, hitItem:null, listMode:false, q:'', pendingLoc:null };
 var MAP_GAP = 6, MAP_MIN = 34, MAP_MAX = 84, MAP_UNPLACED = '__unplaced__';
 
 /** 위치명 → {qty, items:[{i,q}]} (수량 0 제외) */
@@ -497,14 +516,31 @@ function mapAgg(){
   });
   return agg;
 }
-function mapPlaced(){ return (DATA.layout||[]).filter(function(l){ return l.x!=null && l.y!=null; }); }
-function mapPlacedNames(){ var s={}; mapPlaced().forEach(function(l){ s[l.name]=true; }); return s; }
+function mapIsPlaced(l){ return l.x!=null && l.y!=null; }
+function mapPlaced(){ return (DATA.layout||[]).filter(mapIsPlaced); }
+/** 위치 탭에 등록됐지만 좌표가 없는 위치(A동1층 등) → 그 구역의 '구역 전체' 블록으로 표시 */
+function mapZoneLevel(){
+  return (DATA.layout||[]).filter(function(l){ return !mapIsPlaced(l) && l.kind!==KIND_MARK; })
+    .map(function(l){ return { name:l.name, zone:(l.zone||l.name), kind:KIND_ZONE, note:l.note, zl:true }; });
+}
+/** 위치명 → 구역 (위치 탭에 없으면 null = 미배치) */
+function mapZoneOfName(name){
+  var lay=DATA.layout||[];
+  for(var i=0;i<lay.length;i++){ var l=lay[i]; if(l.name!==name) continue;
+    if(mapIsPlaced(l)) return l.zone||'(구역없음)';
+    if(l.kind!==KIND_MARK) return l.zone||l.name; }
+  return null;
+}
+/** 구역 목록: 위치 탭 행 순서대로 */
 function mapZoneList(){ var seen={}, out=[];
-  mapPlaced().forEach(function(l){ var z=l.zone||'(구역없음)'; if(!seen[z]){seen[z]=true; out.push(z);} }); return out; }
-/** 좌표 없는 이름에 남아있는 재고 (기존 큰 단위 + '기타' + 오타) */
+  (DATA.layout||[]).forEach(function(l){
+    var z = mapIsPlaced(l) ? (l.zone||'(구역없음)') : (l.kind!==KIND_MARK ? (l.zone||l.name) : null);
+    if(z && !seen[z]){ seen[z]=true; out.push(z); } });
+  return out; }
+/** 위치 탭에 아예 없는 이름에 남아있는 재고 (옛 이름 '1층', 빈칸 '기타', 오타 등) */
 function mapUnplaced(){
-  var placed = mapPlacedNames(), agg = mapAgg(), out = [];
-  Object.keys(agg).forEach(function(k){ if(!placed[k]) out.push({ name:k, qty:agg[k].qty, items:agg[k].items }); });
+  var agg = mapAgg(), out = [];
+  Object.keys(agg).forEach(function(k){ if(mapZoneOfName(k)===null) out.push({ name:k, qty:agg[k].qty, items:agg[k].items }); });
   out.sort(function(a,b){ return Math.abs(b.qty)-Math.abs(a.qty); });
   return out;
 }
@@ -518,47 +554,101 @@ function mapRamp(q, max){
   return { bg:steps[i], fg:(i>=3?'#fff':'#1f2733') };
 }
 function mapKindClass(k){ return k===KIND_PALLET?'k-pallet':(k===KIND_CORR?'k-corr':(k===KIND_MARK?'k-mark':'k-rack')); }
+function mapNorm(s){ return (''+(s||'')).replace(/\s+/g,'').toLowerCase(); }
+
+/** 강조할 품목 id 집합 (지도에서 보기 1개 품목 > 검색어 일치 품목). 없으면 null */
+function mapHitIds(){
+  if(MAP.hitItem){ var o={}; o[MAP.hitItem]=true; return o; }
+  var q=mapNorm(MAP.q); if(!q) return null;
+  var o2={}; DATA.items.forEach(function(it){ if(mapNorm(it.name).indexOf(q)>=0 || mapNorm(it.cat)===q) o2[it.id]=true; });
+  return o2;
+}
+/** 그 위치의 수량 (강조 중이면 강조 품목만 합산) */
+function mapLocQty(a, hits){
+  if(!a) return 0; if(!hits) return a.qty;
+  return a.items.reduce(function(s,x){ var it=DATA.items[x.i]; return s+(it&&hits[it.id]?x.q:0); },0);
+}
 
 function renderMap(){
-  var zones = mapZoneList(), unplaced = mapUnplaced();
+  var zones = mapZoneList(), unplaced = mapUnplaced(), agg = mapAgg(), hits = mapHitIds();
   if(MAP.zone===null || (MAP.zone!==MAP_UNPLACED && zones.indexOf(MAP.zone)<0)) MAP.zone = zones.length?zones[0]:MAP_UNPLACED;
+  // 구역별 일치 위치 수 (검색 중일 때 pill 옆 숫자)
+  var zoneHits={}, unHits=0;
+  if(hits) Object.keys(agg).forEach(function(k){ if(!mapLocQty(agg[k],hits)) return;
+    var z=mapZoneOfName(k); if(z===null) unHits++; else zoneHits[z]=(zoneHits[z]||0)+1; });
+  function dot(n){ return n?' <b style="color:#ea580c">•'+n+'</b>':''; }
   document.getElementById('mapZones').innerHTML =
-    zones.map(function(z,zi){ return '<div class="f '+(MAP.zone===z?'on':'')+'" onclick="setMapZoneAt('+zi+')">'+esc(z)+'</div>'; }).join('')
-    + (unplaced.length ? '<div class="f '+(MAP.zone===MAP_UNPLACED?'on':'')+'"'+(MAP.zone===MAP_UNPLACED?'':' style="color:#dc2626;border-color:#f5c2c2"')+' onclick="setMapZoneAt(-1)">미배치 '+unplaced.length+'</div>' : '');
+    zones.map(function(z,zi){ return '<div class="f '+(MAP.zone===z?'on':'')+'" onclick="setMapZoneAt('+zi+')">'+esc(z)+dot(zoneHits[z])+'</div>'; }).join('')
+    + (unplaced.length ? '<div class="f '+(MAP.zone===MAP_UNPLACED?'on':'')+'"'+(MAP.zone===MAP_UNPLACED?'':' style="color:#dc2626;border-color:#f5c2c2"')+' onclick="setMapZoneAt(-1)">미배치 '+unplaced.length+dot(unHits)+'</div>' : '');
 
   var banner = document.getElementById('mapBanner');
   if(MAP.hitItem){ var hi=itemById(MAP.hitItem);
     banner.innerHTML = '<div class="mapbanner"><span>🔦 '+esc(hi?hi.name:'')+' 위치 표시 중</span><span class="x" onclick="clearMapHit()">해제</span></div>';
   } else banner.innerHTML='';
+  renderMapResults();
 
-  if(MAP.zone===MAP_UNPLACED){ renderMapUnplaced(unplaced); return; }
+  if(MAP.zone===MAP_UNPLACED){ renderMapUnplaced(unplaced, hits); return; }
   if(!zones.length){ renderMapEmpty(); return; }
-  renderMapCanvas();
+  renderMapZone(agg, hits);
 }
 function setMapZoneAt(zi){ MAP.zone = zi<0 ? MAP_UNPLACED : (mapZoneList()[zi]||MAP_UNPLACED); MAP.sel=-1; renderMap(); }
 function toggleMapList(){ MAP.listMode=!MAP.listMode; renderMap(); }
+function onMapSearch(){ MAP.q=val('mapSearch'); MAP.hitItem=null; renderMap(); }
 
+/** 검색 결과: 품목별로 어디에 몇 개 있는지 + 누르면 그 자리로 이동 */
+function renderMapResults(){
+  var el=document.getElementById('mapResults'), q=mapNorm(MAP.q);
+  if(!q){ el.innerHTML=''; return; }
+  var list=DATA.items.map(function(it,i){ return {it:it,i:i}; })
+    .filter(function(x){ return mapNorm(x.it.name).indexOf(q)>=0 || mapNorm(x.it.cat)===q; })
+    .sort(function(a,b){ return (b.it.total||0)-(a.it.total||0); });
+  if(!list.length){ el.innerHTML='<div class="maphint">"'+esc(MAP.q)+'" 품목을 찾을 수 없습니다.</div>'; return; }
+  var more=list.length>30?'<div class="maphint">'+(list.length-30)+'개 더 있음 — 검색어를 더 길게 입력하세요</div>':'';
+  el.innerHTML='<div class="mapres">'+list.slice(0,30).map(function(x){
+    var locs=Object.keys(x.it.locs||{}).filter(function(k){ return Number(x.it.locs[k]); })
+      .sort(function(a,b){ return x.it.locs[b]-x.it.locs[a]; });
+    var chips=locs.map(function(k){
+      var z=mapZoneOfName(k), lab = z===null ? (k+' · 미배치') : (k===z ? k : (z+' '+mapShort(k,z)));
+      return '<span class="locchip'+(z===null?' un':'')+'" onclick="mapGoLoc('+x.i+','+JSON.stringify(k).replace(/"/g,'&quot;')+')">📍 '+esc(lab)+' '+fmt(x.it.locs[k])+'</span>';
+    }).join('');
+    return '<div class="mres-it"><div class="top"><span class="nm2">'+esc(x.it.name)+' '+badge(x.it.cat)+'</span>'+
+      '<span class="q2" style="font-size:15px">'+fmt(x.it.total)+'<small> 개</small></span></div>'+
+      '<div class="locchips" style="margin-top:6px">'+(chips||'<span class="locchip" style="background:#eef1f5;color:#8a97a8">재고 없음</span>')+'</div></div>';
+  }).join('')+more+'</div>';
+}
+/** 검색 결과 위치 칩 → 그 구역으로 가서 그 자리 선택 + 그 품목만 강조 */
+function mapGoLoc(i, locName){
+  var it=DATA.items[i]; if(!it) return;
+  var z=mapZoneOfName(locName);
+  MAP.hitItem=it.id; MAP.zone = z===null ? MAP_UNPLACED : z; MAP.pendingLoc = locName; MAP.sel=-1;
+  renderMap();
+  var w=document.getElementById(MAP.zone===MAP_UNPLACED?'mapDetail':'mapZoneBlocks');
+  if(w && w.scrollIntoView) w.scrollIntoView({block:'start', behavior:'smooth'});
+}
+
+function mapClearCanvas(){ var c=document.getElementById('mapCanvas'); c.innerHTML=''; c.style.height='0px'; c.style.width='0px';
+  document.getElementById('mapZoneBlocks').innerHTML=''; document.getElementById('mapLegend').innerHTML=''; }
 function renderMapEmpty(){
-  var c=document.getElementById('mapCanvas'); c.innerHTML=''; c.style.height='0px';
-  document.getElementById('mapLegend').innerHTML='';
+  mapClearCanvas();
   document.getElementById('mapDetail').innerHTML =
-    '<div class="loading">아직 지도 배치가 없습니다.<br><br>' +
-    '시트 <b>위치</b> 탭의 <b>구역 / X / Y</b> 칸을 채우거나,<br>' +
+    '<div class="loading">아직 지도에 표시할 위치가 없습니다.<br><br>' +
+    '시트 <b>위치</b> 탭에 위치를 적거나(예: A동1층),<br>' +
     '메뉴 <b>📦 재고관리 &gt; 🗺️ 창고 지도 기본 배치 넣기</b> 를 실행하세요.<br><br>' +
     '<span style="font-size:12px">위치 탭 형식: 위치 · 구역 · X · Y · 폭 · 높이 · 종류(랙/파렛트/복도/랜드마크) · 비고</span></div>';
 }
-function renderMapUnplaced(list){
-  var c=document.getElementById('mapCanvas'); c.innerHTML=''; c.style.height='0px';
-  document.getElementById('mapLegend').innerHTML='';
+function renderMapUnplaced(list, hits){
+  mapClearCanvas(); MAP.picks=[];
   var el=document.getElementById('mapDetail');
   if(!list.length){ el.innerHTML='<div class="loading">미배치 재고가 없습니다. 👍</div>'; return; }
-  el.innerHTML = '<div class="maphint">아직 지도에 자리가 정해지지 않은 재고입니다. <b>⇄ 배치</b>로 랙·파렛트 자리로 옮기세요.</div>' +
+  el.innerHTML = '<div class="maphint">위치 탭에 없는 이름(예: 옛 이름 "1층", 위치 빈칸 "기타")에 남은 재고입니다. <b>⇄ 배치</b>로 등록된 위치로 옮기세요.</div>' +
     list.map(function(u,ui){
-      return '<div class="srow" style="border-left-color:#dc2626"><div class="top">'+
+      var hq=hits?mapLocQty(u,hits):0, focus=MAP.pendingLoc===u.name;
+      return '<div class="srow'+(hits&&!hq?' dim':'')+'" style="border-left-color:'+(hq||focus?'#ea580c':'#dc2626')+'"><div class="top">'+
         '<span class="nm2">'+esc(u.name)+'</span>'+
-        '<span class="q2">'+fmt(u.qty)+'<small> 개</small></span></div>'+
+        '<span class="q2">'+fmt(hits?hq:u.qty)+'<small> 개</small></span></div>'+
         '<div class="b2">'+u.items.length+'개 품목 · <span class="editlink" onclick="placeUnplaced('+ui+')">⇄ 배치</span></div></div>';
     }).join('');
+  MAP.pendingLoc=null;
 }
 function placeUnplaced(ui){
   var u=mapUnplaced()[ui]; if(!u||!u.items.length) return;
@@ -566,37 +656,56 @@ function placeUnplaced(ui){
   selectAt(best.i, u.name, '이동');
 }
 
-function renderMapCanvas(){
-  var zone=MAP.zone, agg=mapAgg();
+/** 한 구역 그리기: 구역 전체 블록(좌표 없는 위치) + 좌표 칸 */
+function renderMapZone(agg, hits){
+  var zone=MAP.zone;
   var tiles=mapPlaced().filter(function(l){ return (l.zone||'(구역없음)')===zone; });
-  MAP.tiles=tiles;
+  var zl=mapZoneLevel().filter(function(l){ return l.zone===zone; });
+  MAP.tiles=tiles; MAP.picks=tiles.concat(zl);
+  if(MAP.pendingLoc){ for(var p=0;p<MAP.picks.length;p++) if(MAP.picks[p].name===MAP.pendingLoc){ MAP.sel=p; break; } MAP.pendingLoc=null; }
   var canvas=document.getElementById('mapCanvas'), wrap=document.getElementById('mapWrap'), detail=document.getElementById('mapDetail');
-  if(!tiles.length){ canvas.innerHTML=''; canvas.style.height='0px'; detail.innerHTML='<div class="loading">이 구역에 배치된 자리가 없습니다.</div>'; return; }
-  if(MAP.listMode){ renderMapList(tiles, agg); return; }
+  var zoneMax=0; MAP.picks.forEach(function(t){ var q=mapLocQty(agg[t.name],hits); if(t.kind!==KIND_MARK && q>zoneMax) zoneMax=q; });
+  if(MAP.listMode){ mapClearCanvas(); renderMapList(agg, hits); return; }
+
+  // 구역 전체 블록: 좌표 칸이 없으면 항상, 있으면 재고가 있을 때만
+  document.getElementById('mapZoneBlocks').innerHTML = zl.map(function(t,j){
+    var a=agg[t.name], q=mapLocQty(a,hits), pi=tiles.length+j;
+    if(tiles.length && !(a&&a.qty)) return '';
+    var ramp=mapRamp(q, zoneMax), dim=hits&&!q;
+    return '<div class="mzone'+(MAP.sel===pi?' sel':'')+(hits&&q?' hit':'')+(dim?' dim':'')+'" style="background:'+ramp.bg+';color:'+ramp.fg+'" onclick="mapPick('+pi+')">'+
+      '<div><div class="mz-n">📦 '+esc(t.name)+'</div><div class="mz-s">'+(tiles.length?'세부 위치 미지정':'구역 전체')+(a&&a.items.length?' · '+a.items.length+'종':'')+'</div></div>'+
+      '<div class="mz-q">'+(a&&a.qty?mapQty(q)+'<small> 개</small>':'재고 없음')+'</div></div>';
+  }).join('');
+
+  if(!tiles.length){
+    canvas.innerHTML=''; canvas.style.height='0px'; canvas.style.width='0px';
+    document.getElementById('mapLegend').innerHTML='';
+    if(MAP.sel<0||MAP.sel>=MAP.picks.length) detail.innerHTML='<div class="maphint">이 구역은 아직 랙·파렛트 칸이 없어 구역 전체로 표시됩니다. 블록을 누르면 품목이 보입니다.<br>위치 탭에 X·Y 좌표를 넣으면 칸으로 나눠 보입니다.</div>';
+    else renderMapDetail();
+    return;
+  }
 
   var minX=Math.min.apply(null,tiles.map(function(t){return t.x;})), minY=Math.min.apply(null,tiles.map(function(t){return t.y;}));
   var maxX=Math.max.apply(null,tiles.map(function(t){return t.x+t.w-1;})), maxY=Math.max.apply(null,tiles.map(function(t){return t.y+t.h-1;}));
   var cols=maxX-minX+1, rows=maxY-minY+1;
   var avail=(wrap.clientWidth||document.body.clientWidth||360);
   var cell=Math.max(MAP_MIN, Math.min(MAP_MAX, Math.floor((avail-(cols-1)*MAP_GAP)/cols)));
-  var zoneMax=0; tiles.forEach(function(t){ var q=agg[t.name]?agg[t.name].qty:0; if(t.kind!==KIND_MARK && q>zoneMax) zoneMax=q; });
 
   canvas.style.width=(cols*cell+(cols-1)*MAP_GAP)+'px';
   canvas.style.height=(rows*cell+(rows-1)*MAP_GAP)+'px';
   canvas.innerHTML=tiles.map(function(t,ti){
-    var isMark=t.kind===KIND_MARK, a=agg[t.name], q=a?a.qty:0;
-    if(MAP.hitItem && !isMark){ q=(a?a.items:[]).filter(function(x){return DATA.items[x.i]&&DATA.items[x.i].id===MAP.hitItem;}).reduce(function(s,x){return s+x.q;},0); }
+    var isMark=t.kind===KIND_MARK, a=agg[t.name], q=mapLocQty(a,hits);
     var ramp=isMark?{bg:'',fg:''}:mapRamp(q, zoneMax);
-    var hit=MAP.hitItem && !isMark && q!==0;
+    var hit=hits && !isMark && q!==0, dim=hits && !isMark && !q;
     var label=isMark ? (t.note||mapShort(t.name,zone)) : mapShort(t.name,zone);
-    return '<div class="mtile '+mapKindClass(t.kind)+(MAP.sel===ti?' sel':'')+(hit?' hit':'')+'"'+
+    return '<div class="mtile '+mapKindClass(t.kind)+(MAP.sel===ti?' sel':'')+(hit?' hit':'')+(dim?' dim':'')+'"'+
       ' style="left:'+((t.x-minX)*(cell+MAP_GAP))+'px;top:'+((t.y-minY)*(cell+MAP_GAP))+'px;'+
       'width:'+(t.w*cell+(t.w-1)*MAP_GAP)+'px;height:'+(t.h*cell+(t.h-1)*MAP_GAP)+'px;'+
       (isMark?'':'background:'+ramp.bg+';color:'+ramp.fg+';')+'"'+
       (isMark?'':' onclick="mapPick('+ti+')"')+'>'+
       '<span class="mt-n">'+esc(label)+'</span>'+
       (isMark?'':'<span class="mt-q">'+(q?mapQty(q):'')+'</span>'+
-        (a&&a.items.length>1?'<span class="mt-k">'+a.items.length+'종</span>':''))+
+        (a&&a.items.length>1&&!hits?'<span class="mt-k">'+a.items.length+'종</span>':''))+
       '</div>';
   }).join('');
 
@@ -609,36 +718,39 @@ function renderMapCanvas(){
     '<span><i class="lgb" style="background:#eef1f5"></i>랜드마크</span>'+
     '<span><i class="lgb" style="background:#4b8bfa"></i>재고 많음</span>'+
     (dupHit?'<span style="color:#dc2626;font-weight:700">⚠ 좌표 중복</span>':'');
-  if(MAP.sel<0 || MAP.sel>=tiles.length) detail.innerHTML='<div class="maphint">칸을 누르면 그 자리의 품목이 표시됩니다.</div>';
+  if(MAP.sel<0 || MAP.sel>=MAP.picks.length) detail.innerHTML='<div class="maphint">칸을 누르면 그 자리의 품목이 표시됩니다.</div>';
   else renderMapDetail();
 }
-function renderMapList(tiles, agg){
-  var c=document.getElementById('mapCanvas'); c.innerHTML=''; c.style.height='0px';
-  document.getElementById('mapLegend').innerHTML='';
-  document.getElementById('mapDetail').innerHTML = tiles.map(function(t,ti){
+function renderMapList(agg, hits){
+  document.getElementById('mapDetail').innerHTML = MAP.picks.map(function(t,pi){
     if(t.kind===KIND_MARK) return '';
-    var a=agg[t.name], q=a?a.qty:0;
-    return '<div class="srow" style="border-left-color:#cfd8e6" onclick="mapPick('+ti+')"><div class="top">'+
-      '<span class="nm2">'+esc(mapShort(t.name,MAP.zone))+' <span class="badge" style="color:#6b7889;background:#eef1f5">'+esc(t.kind)+'</span></span>'+
+    var a=agg[t.name], q=mapLocQty(a,hits);
+    if(hits && !q) return '';
+    return '<div class="srow" style="border-left-color:'+(hits?'#ea580c':'#cfd8e6')+'" onclick="mapPick('+pi+')"><div class="top">'+
+      '<span class="nm2">'+esc(t.zl?t.name:mapShort(t.name,MAP.zone))+' <span class="badge" style="color:#6b7889;background:#eef1f5">'+esc(t.kind)+'</span></span>'+
       '<span class="q2">'+fmt(q)+'<small> 개</small></span></div>'+
       '<div class="b2">'+(a&&a.items.length?(a.items.length+'개 품목'):'빈 자리')+'</div></div>';
-  }).join('') || '<div class="loading">표시할 자리가 없습니다.</div>';
+  }).join('') || '<div class="loading">'+(hits?'이 구역에는 해당 품목이 없습니다.':'표시할 자리가 없습니다.')+'</div>';
 }
-function mapPick(ti){ MAP.sel=ti; renderMap(); renderMapDetail(); }
+function mapPick(pi){ MAP.sel=pi; renderMap(); if(MAP.listMode) renderMapDetail(); }
 function renderMapDetail(){
-  var t=MAP.tiles[MAP.sel]; if(!t) return;
-  var a=mapAgg()[t.name], el=document.getElementById('mapDetail');
+  var t=MAP.picks[MAP.sel]; if(!t) return;
+  var a=mapAgg()[t.name], el=document.getElementById('mapDetail'), hits=mapHitIds();
   var head='<div class="label">📍 '+esc(t.name)+' · '+esc(t.kind)+(a?(' · 총 '+fmt(a.qty)+'개'):'')+'</div>';
   var foot=t.note?'<div class="maphint">'+esc(t.note)+'</div>':'';
   if(!a || !a.items.length){ el.innerHTML=head+'<div class="loading">빈 자리입니다.</div>'+foot; return; }
-  el.innerHTML=head+a.items.slice().sort(function(x,y){ return y.q-x.q; }).map(function(x){
+  el.innerHTML=head+a.items.slice().sort(function(x,y){
+      var hx=hits&&DATA.items[x.i]&&hits[DATA.items[x.i].id]?1:0, hy=hits&&DATA.items[y.i]&&hits[DATA.items[y.i].id]?1:0;
+      return (hy-hx) || (y.q-x.q); })   // 검색·강조 품목을 맨 위로
+    .map(function(x){
     var it=DATA.items[x.i]; if(!it) return '';
-    return '<div class="srow" style="border-left-color:'+catColor(it.cat)+'" onclick="selectAtTile('+x.i+','+MAP.sel+')"><div class="top">'+
-      '<span class="nm2">'+esc(it.name)+' '+badge(it.cat)+'</span>'+
+    var on=hits&&hits[it.id];
+    return '<div class="srow" style="border-left-color:'+(on?'#ea580c':catColor(it.cat))+'" onclick="selectAtTile('+x.i+','+MAP.sel+')"><div class="top">'+
+      '<span class="nm2">'+(on?'🔦 ':'')+esc(it.name)+' '+badge(it.cat)+'</span>'+
       '<span class="q2">'+fmt(x.q)+'<small> 개</small></span></div></div>';
   }).join('')+foot;
 }
-function selectAtTile(i, ti){ var t=MAP.tiles[ti]; selectAt(i, t?t.name:''); }
+function selectAtTile(i, pi){ var t=MAP.picks[pi]; selectAt(i, t?t.name:''); }
 /** 지도 → 입출고로 이동하면서 위치를 미리 지정 */
 function selectAt(i, locName, mode){
   select(i);
@@ -654,17 +766,17 @@ function ensureLocOption(selId, name){
   for(var i=0;i<sel.options.length;i++) if(sel.options[i].value===name || sel.options[i].text===name) return;
   var o=document.createElement('option'); o.value=name; o.text=name; sel.appendChild(o);
 }
-/** 품목 → 지도에서 위치 표시 */
+/** 품목 → 지도에서 위치 표시 (재고가 가장 많은 위치의 구역으로 이동해 그 자리 선택) */
 function mapForItem(){
   if(!cur) return;
-  MAP.hitItem=cur.id; MAP.sel=-1;
-  var placed=mapPlacedNames(), best=null, bestQ=-1;
+  MAP.hitItem=cur.id; MAP.sel=-1; MAP.pendingLoc=null;
+  var best=null, bestQ=-1, fallback=null;
   Object.keys(cur.locs||{}).forEach(function(k){
     var q=Math.abs(Number(cur.locs[k])||0); if(!q) return;
-    if(placed[k] && q>bestQ){ bestQ=q; best=k; }
+    if(mapZoneOfName(k)!==null){ if(q>bestQ){ bestQ=q; best=k; } } else if(!fallback) fallback=k;
   });
-  if(best){ var l=mapPlaced().filter(function(x){return x.name===best;})[0]; MAP.zone=l?(l.zone||'(구역없음)'):null; }
-  else MAP.zone=MAP_UNPLACED;
+  if(best){ MAP.zone=mapZoneOfName(best); MAP.pendingLoc=best; }
+  else { MAP.zone=MAP_UNPLACED; MAP.pendingLoc=fallback; }
   go('map');
 }
 function clearMapHit(){ MAP.hitItem=null; renderMap(); }
