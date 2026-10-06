@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { CouponId } from '../words/coupons';
-import { todayKey, TEST_COUNT, MAX_MISSED_PER_DAY } from '../words/dailySet';
+import { todayKey, TEST_COUNT, MAX_MISSED_PER_DAY, DayPlan } from '../words/dailySet';
+import { UNITS, DAYS_PER_UNIT } from '../words/units';
 
 const FRESH_QUEUE = () => Array.from({ length: TEST_COUNT }, (_, i) => i);
 
@@ -55,6 +56,14 @@ export interface WordProgress {
    * (퀴즈 도중 노트가 바뀌어도 오늘 단어가 흔들리지 않게)
    */
   todayMissed: string[];
+  /** 지금 배우는 소리 단계 (0부터) */
+  unit: number;
+  /** 그 단계에서 공부를 마친 날 수 — DAYS_PER_UNIT 이 되면 다음 단계로 */
+  unitDays: number;
+  /** 단계 진도를 마지막으로 올린 날 (하루에 한 번만 올린다) */
+  unitDoneDate: string;
+  /** 오늘 배우는 단계 — 날이 바뀔 때 정해져 오늘 하루는 그대로다 */
+  todayPlan: DayPlan;
 }
 
 /** 오답 노트에 이만큼 오래 남은 단어는 정리한다 */
@@ -75,6 +84,10 @@ const DEFAULT: WordProgress = {
   rewardedDate: '', rewardedRounds: [], totalLearned: 0, coupons: {}, history: [],
   missed: {},
   todayMissed: [],
+  unit: 0,
+  unitDays: 0,
+  unitDoneDate: '',
+  todayPlan: { unit: 0, unitDay: 0 },
 };
 
 function daysAgo(dateKey: string): number {
@@ -109,6 +122,8 @@ function load(): WordProgress {
           ...saved, date: todayKey(), learned: 0, phase: 'learn',
           round: 0, attempt: 0, results: [], queue: FRESH_QUEUE(), rewardedRounds: [],
           todayMissed,
+          // 오늘 배울 소리 단계를 정해 둔다
+          todayPlan: { unit: saved.unit, unitDay: saved.unitDays },
         };
       }
       return saved;
@@ -221,6 +236,31 @@ export function useWordProgress() {
     return true;
   }, [progress, save]);
 
+  /**
+   * 오늘의 첫 묶음 퀴즈를 마쳤을 때 — 하루에 한 번만 단계 진도를 올린다.
+   * 날짜가 아니라 실제로 공부한 날을 세므로, 하루 쉬어도 진도가 그냥 넘어가지 않는다.
+   */
+  const completeDay = useCallback(() => {
+    setProgress(prev => {
+      const today = todayKey();
+      if (prev.unitDoneDate === today) return prev;
+      let unit = prev.unit, unitDays = prev.unitDays + 1;
+      if (unitDays >= DAYS_PER_UNIT) { unit = (unit + 1) % UNITS.length; unitDays = 0; }
+      const next = { ...prev, unit, unitDays, unitDoneDate: today };
+      try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+
+  /** 소리 단계를 직접 고른다 (처음부터 다시 하거나 건너뛸 때) — 오늘 단어도 그 단계로 바뀐다 */
+  const chooseUnit = useCallback((unit: number) => {
+    update({
+      unit, unitDays: 0, unitDoneDate: '',
+      todayPlan: { unit, unitDay: 0 },
+      learned: 0, phase: 'learn', round: 0, attempt: 0, results: [], queue: FRESH_QUEUE(),
+    });
+  }, [update]);
+
   const finishWithoutCoupon = useCallback(() => update({ phase: 'done' }), [update]);
 
   /** 오늘 것을 또 연습 (쿠폰은 안 나온다) */
@@ -241,6 +281,7 @@ export function useWordProgress() {
 
   return {
     progress, learnNext, answer, retryTest, earnCoupon, useCoupon, tradeCoupon,
+    completeDay, chooseUnit,
     finishWithoutCoupon, practiceAgain, totalCoupons,
     rewardedThisRound, couponsToday, couponsLeftToday, update,
   };

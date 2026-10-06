@@ -1,4 +1,6 @@
 import { WORD_BANK, Word } from './wordBank';
+import { firstSound, firstLetters, isIrregular } from './phonics';
+import { UNITS, SoundDef } from './units';
 
 export const WORDS_PER_DAY = 10;
 export const TEST_COUNT = 3;
@@ -12,7 +14,7 @@ function makeRandom(seed: number) {
   };
 }
 
-function shuffled<T>(items: T[], seed: number): T[] {
+export function shuffled<T>(items: T[], seed: number): T[] {
   const out = items.slice();
   const rnd = makeRandom(seed);
   for (let i = out.length - 1; i > 0; i--) {
@@ -31,64 +33,91 @@ export function todayKey(d: Date = new Date()): string {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
-/** 단어장을 한 번 섞어둔 순서 — 이 순서대로 매일 10개씩 끊어서 쓴다 */
-const ORDER = shuffled(WORD_BANK, 20260101);
-
-/** 하루에 새로 배우는 단어 수 (나머지는 지난 며칠 단어를 복습한다) */
-export const NEW_PER_DAY = 3;
 /** 오답 노트에서 하루에 다시 꺼내 오는 단어 수 */
-export const MAX_MISSED_PER_DAY = 3;
-/** 복습으로 꼭 다시 나오는 날 수 */
-export const REVIEW_DAYS = 2;
+export const MAX_MISSED_PER_DAY = 2;
+/** 소리 하나에서 하루에 배우는 단어 수 (두 소리 × 4 = 8, 나머지 2개는 복습) */
+const PER_SOUND = 4;
 
-/** 그날 처음 배우는 단어 3개 */
-function freshWords(day: number): Word[] {
-  const n = ORDER.length;
-  const start = (((day * NEW_PER_DAY) % n) + n) % n;
+/** 이 단어가 해당 소리로 시작하는지 (불규칙한 단어는 제외) */
+export function hasSound(w: Word, sound: SoundDef): boolean {
+  return !isIrregular(w.en)
+    && firstSound(w.en) === sound.key
+    && sound.letters.includes(firstLetters(w.en));
+}
+
+/** 해당 소리로 시작하는 단어들 — 늘 같은 순서로 */
+export function wordsOfSound(sound: SoundDef): Word[] {
+  return shuffled(WORD_BANK.filter(w => hasSound(w, sound)), sound.key.length * 101 + sound.key.charCodeAt(0));
+}
+
+export interface DayPlan {
+  /** 몇 번째 소리 단계인지 (0부터) */
+  unit: number;
+  /** 그 단계의 며칠째인지 (0부터) */
+  unitDay: number;
+}
+
+/** 소리 하나에서 오늘 쓸 단어 — 단계의 이틀째에는 다른 단어부터 보여준다 */
+function pickFromSound(sound: SoundDef, unitDay: number, count: number): Word[] {
+  const list = wordsOfSound(sound);
+  if (list.length <= count) return list;
+  const start = (unitDay * count) % list.length;
   const out: Word[] = [];
-  for (let i = 0; i < NEW_PER_DAY; i++) out.push(ORDER[(start + i) % n]);
+  for (let i = 0; i < count; i++) out.push(list[(start + i) % list.length]);
+  return out;
+}
+
+/** 지난 단계에서 배운 소리의 단어들 (복습용) */
+function pastWords(unit: number): Word[] {
+  const out: Word[] = [];
+  for (let u = 0; u < unit; u++) for (const s of UNITS[u]) out.push(...wordsOfSound(s));
   return out;
 }
 
 /**
  * 오늘의 단어 10개
- *   = 새 단어 3개 + 어제 3개 + 그제 3개 + 사흘 전 1개.
- *
- * 한 단어를 사흘 내리 만나게 되므로 하루 만에 스쳐 지나가지 않는다.
- * 사흘 전 자리는 날마다 돌아가며 한 개씩 뽑아 네 번째 복습이 된다.
+ *   = 오늘의 소리 A 4개 + 소리 B 4개 + 복습 2개.
+ * 복습 자리는 오답 노트 단어가 먼저 차지하고, 남으면 지난 단계 소리의 단어로 채운다.
+ * 첫 단계라 지난 소리가 없으면 오늘의 소리 단어를 더 넣는다.
  */
-export function wordsForDay(d: Date = new Date(), priority: Word[] = []): Word[] {
+export function wordsForDay(plan: DayPlan, d: Date = new Date(), priority: Word[] = []): Word[] {
   const day = dayNumber(d);
-  const fresh = freshWords(day);
-  const review: Word[] = [];
-  for (let back = 1; back <= REVIEW_DAYS; back++) review.push(...freshWords(day - back));
-  // 사흘 전 단어 중 하나를 더 끼워 넣는다(자리는 날마다 이동)
-  const older = freshWords(day - REVIEW_DAYS - 1);
-  review.push(older[(((day % NEW_PER_DAY) + NEW_PER_DAY) % NEW_PER_DAY)]);
-
-  // 전에 틀렸던 단어(오답 노트)는 복습 자리를 먼저 차지한다. 새 단어는 그대로 둔다.
-  const taken = new Set(fresh.map(w => w.en));
-  const extra = priority.filter(w => !taken.has(w.en)).slice(0, MAX_MISSED_PER_DAY);
-  extra.forEach(w => taken.add(w.en));
-  const rest = review.filter(w => !taken.has(w.en));
-  const out = [...fresh, ...extra, ...rest].slice(0, WORDS_PER_DAY);
-  // 새 단어와 복습 단어가 섞이도록 순서를 날마다 다르게 한다
+  const [a, b] = UNITS[plan.unit % UNITS.length];
+  const main = [...pickFromSound(a, plan.unitDay, PER_SOUND), ...pickFromSound(b, plan.unitDay, PER_SOUND)];
+  const taken = new Set(main.map(w => w.en));
+  const out = [...main];
+  const add = (w: Word) => {
+    if (out.length < WORDS_PER_DAY && !taken.has(w.en)) { out.push(w); taken.add(w.en); }
+  };
+  priority.slice(0, MAX_MISSED_PER_DAY).forEach(add);
+  shuffled(pastWords(plan.unit % UNITS.length), day * 13 + 7).forEach(add);
+  // 지난 소리가 없을 때(첫 단계): 오늘의 소리 단어를 더 꺼낸다
+  [...wordsOfSound(a), ...wordsOfSound(b)].forEach(add);
+  WORD_BANK.forEach(add);
+  // 소리끼리 몰려 있지 않게 섞는다
   return shuffled(out, day * 977 + 31);
 }
 
 /**
  * "한 번 더" 할 때 쓰는 단어 10개.
- * 회차마다 아직 안 본 단어를 미리 보여줘서 늘 새롭고,
- * 이 단어들은 나중에 정식으로 배울 때 다시 만나게 된다.
+ * 오늘의 소리와 지난 소리의 단어 중에서 회차마다 다르게 뽑아,
+ * 같은 소리를 계속 연습하면서도 늘 새로운 단어를 만나게 한다.
  */
-export function wordsForRound(round: number, d: Date = new Date(), priority: Word[] = []): Word[] {
-  if (round <= 0) return wordsForDay(d, priority);
+export function wordsForRound(round: number, plan: DayPlan, d: Date = new Date(), priority: Word[] = []): Word[] {
+  const today = wordsForDay(plan, d, priority);
+  if (round <= 0) return today;
   const day = dayNumber(d);
-  const n = ORDER.length;
-  // 오늘 쓰는 구간(day-2 ~ day)에서 넉넉히 떨어뜨려 겹치지 않게 한다
-  const start = ((((day * NEW_PER_DAY) + 40 + (round - 1) * WORDS_PER_DAY) % n) + n) % n;
+  const [a, b] = UNITS[plan.unit % UNITS.length];
+  const pool = [...wordsOfSound(a), ...wordsOfSound(b), ...pastWords(plan.unit % UNITS.length)];
+  const seen = new Set(today.map(w => w.en));
+  const fresh = shuffled(pool.filter(w => !seen.has(w.en)), day * 31 + round * 7919);
+  const reuse = shuffled(pool.filter(w => seen.has(w.en)), day * 17 + round * 101);
   const out: Word[] = [];
-  for (let i = 0; i < WORDS_PER_DAY; i++) out.push(ORDER[(start + i) % n]);
+  const used = new Set<string>();
+  for (const w of [...fresh, ...reuse, ...shuffled(WORD_BANK, round)]) {
+    if (out.length >= WORDS_PER_DAY) break;
+    if (!used.has(w.en)) { out.push(w); used.add(w.en); }
+  }
   return out;
 }
 
@@ -118,11 +147,15 @@ export function questionsForDay(
   const others = shuffled(words.filter(w => !priority.includes(w.en)), seed);
   const picked = shuffled([...first, ...others].slice(0, TEST_COUNT), seed + 11);
   return picked.map((word, i) => {
-    const wrong = shuffled(words.filter(w => w.en !== word.en), seed + i * 31).slice(0, 3);
+    // 뜻 고르기 문제는 첫소리가 다른 단어를 보기로 낸다 — 들은 소리로 가려낼 수 있게
+    const kind: QuestionKind = i === 1 ? 'picture' : 'word';
+    const others = shuffled(words.filter(w => w.en !== word.en), seed + i * 31);
+    const differ = others.filter(w => firstSound(w.en) !== firstSound(word.en));
+    const wrong = (kind === 'word' ? [...differ, ...others.filter(w => !differ.includes(w))] : others).slice(0, 3);
     return {
       word,
       choices: shuffled([word, ...wrong], seed + i * 97 + 5),
-      kind: i === 1 ? 'picture' : 'word',
+      kind,
     };
   });
 }

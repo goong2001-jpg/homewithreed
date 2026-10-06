@@ -18,7 +18,8 @@ const LETTERS: Record<string, string> = {
   b: 'buh', c: 'kuh', d: 'duh', f: 'fuh', g: 'guh', h: 'huh', j: 'juh',
   k: 'kuh', l: 'luh', m: 'muh', n: 'nuh', p: 'puh', r: 'ruh', s: 'suh',
   t: 'tuh', v: 'vuh', w: 'wuh', x: 'ksuh', y: 'yuh', z: 'zuh',
-  a: 'ah', e: 'eh', i: 'ih', o: 'oh', u: 'uh',
+  // 짧은 모음 (apple 애, egg 에, igloo 이, octopus 아, umbrella 어)
+  a: 'ah', e: 'eh', i: 'ih', o: 'aw', u: 'uh',
 };
 
 /** 규칙에서 벗어나는 단어들 (묵음·예외 발음) */
@@ -39,7 +40,7 @@ const EXCEPTIONS: Record<string, { sound: string; letters: string }> = {
   ice:         { sound: 'eye', letters: 'i' },
   island:      { sound: 'eye', letters: 'is' },
   owl:         { sound: 'ow', letters: 'ow' },
-  octopus:     { sound: 'ah', letters: 'o' },
+  arm:         { sound: 'ar', letters: 'ar' },
   onion:       { sound: 'uh', letters: 'o' },
   orange:      { sound: 'or', letters: 'or' },
   airplane:    { sound: 'air', letters: 'ai' },
@@ -47,6 +48,15 @@ const EXCEPTIONS: Record<string, { sound: string; letters: string }> = {
 
 function key(en: string): string {
   return en.trim().toLowerCase();
+}
+
+/**
+ * 규칙대로 읽히지 않는 단어인지 (묵음, 긴 모음 등).
+ * 소리를 처음 배울 때는 헷갈리므로 "오늘의 소리" 단어로는 쓰지 않는다.
+ */
+export function isIrregular(en: string): boolean {
+  const w = key(en);
+  return Boolean(EXCEPTIONS[w] ?? EXCEPTIONS[w.split(' ')[0]]);
 }
 
 /** 화면에 보여줄 첫 글자 (예: moon → "m", chair → "ch") */
@@ -84,7 +94,7 @@ const KO_SOUND: Record<string, string> = {
   // 두 글자 소리
   chuh: '츄', shuh: '쉬', thuh: '쓰', kwuh: '쿠', skuh: '스크', skwuh: '스쿠',
   // 모음
-  ah: '아', eh: '에', ih: '이', oh: '오', uh: '어',
+  ah: '애', eh: '에', ih: '이', aw: '아', uh: '어', ar: '아',
   ay: '에이', ee: '이', eye: '아이', ow: '아우',
   or: '오', er: '어', air: '에어', ear: '이어',
 };

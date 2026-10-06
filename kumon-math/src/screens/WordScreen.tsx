@@ -10,11 +10,14 @@ import Avatar from '../components/Avatar';
 import Shop from '../components/Shop';
 import CouponWallet from '../components/CouponWallet';
 import { playCorrect, playWrong, playStreak, playClick } from '../utils/sounds';
+import { SoundIntro, UnitPicker, ColoredWord } from '../components/SoundIntro';
+import { UNITS } from '../words/units';
 
 export default function WordScreen() {
   const {
     progress, learnNext, answer, earnCoupon, useCoupon, tradeCoupon,
     practiceAgain, totalCoupons, rewardedThisRound, couponsLeftToday,
+    completeDay, chooseUnit,
   } = useWordProgress();
   const { gameState, items, buyItem, equipItem, addPoints } = useGameState();
 
@@ -24,10 +27,17 @@ export default function WordScreen() {
     () => WORD_BANK.filter(w => missedKey.split('|').includes(w.en)),
     [missedKey],
   );
+  // 오늘 배우는 소리 단계 (날이 바뀔 때 정해진다)
+  const plan = progress.todayPlan;
   const words = useMemo(
-    () => wordsForRound(progress.round, undefined, missedWords),
-    [progress.round, missedWords],
+    () => wordsForRound(progress.round, { unit: plan.unit, unitDay: plan.unitDay }, undefined, missedWords),
+    [progress.round, plan.unit, plan.unitDay, missedWords],
   );
+  const [introOpen, setIntroOpen] = useState(
+    progress.phase === 'learn' && progress.learned === 0 && progress.round === 0,
+  );
+  const [showUnits, setShowUnits] = useState(false);
+  const todaySounds = UNITS[plan.unit % UNITS.length];
   // 단어는 묶음(round)이 정하고, 문제는 도전할 때마다(attempt) 달라진다.
   // 지난번에 틀렸던 단어는 문제로 먼저 나온다.
   const questions = useMemo(
@@ -66,11 +76,11 @@ export default function WordScreen() {
 
   // 단어가 바뀌면 자동으로 읽어준다
   useEffect(() => {
-    if (progress.phase === 'learn' && word) {
+    if (progress.phase === 'learn' && word && !introOpen) {
       const t = setTimeout(() => speakWord(word.en), 300);
       return () => clearTimeout(t);
     }
-  }, [progress.phase, progress.learned, word]);
+  }, [progress.phase, progress.learned, word, introOpen]);
 
   // 문제가 바뀌면 그 단어를 읽어준다 (듣고 고르기)
   useEffect(() => {
@@ -108,6 +118,9 @@ export default function WordScreen() {
 
   // 틀린 문제도 결국 다 맞혀야 끝난다 — 끝났다면 모두 맞힌 것
   const testFinished = progress.queue.length === 0;
+  useEffect(() => {
+    if (progress.phase === 'test' && testFinished && progress.round === 0) completeDay();
+  }, [progress.phase, testFinished, progress.round, completeDay]);
   const allCorrect = testFinished;
 
   // 다 맞히면 쿠폰 뽑기
@@ -204,17 +217,41 @@ export default function WordScreen() {
         </div>
       </div>
 
+      {/* 오늘의 소리 — 누르면 단계를 고를 수 있다 */}
+      <button
+        onClick={() => { setShowUnits(true); playClick(); }}
+        style={{
+          width: '100%', maxWidth: 380, marginBottom: 10, padding: '9px 14px',
+          borderRadius: 14, border: 'none', background: 'rgba(255,255,255,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 3px 10px rgba(0,0,0,0.06)',
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 800, color: '#9b59b6' }}>
+          🔤 오늘의 소리 ({plan.unit % UNITS.length + 1}단계)
+        </span>
+        <span style={{ fontSize: 17, fontWeight: 900, color: '#44405e' }}>
+          {todaySounds[0].label} <span style={{ color: '#e67e22' }}>{todaySounds[0].ko}</span>
+          {'  ·  '}
+          {todaySounds[1].label} <span style={{ color: '#e67e22' }}>{todaySounds[1].ko}</span>
+        </span>
+      </button>
+
       {/* 아바타 */}
       <div className={happy ? 'avatar-bounce' : ''} style={{ marginBottom: 10 }}>
         <Avatar items={items} mood={happy ? 'happy' : 'idle'} size="small" />
       </div>
 
       {/* ── 단어 배우기 ── */}
-      {progress.phase === 'learn' && word && (
+      {progress.phase === 'learn' && introOpen && (
+        <SoundIntro unit={plan.unit} unitDay={plan.unitDay} onStart={() => setIntroOpen(false)} />
+      )}
+
+      {progress.phase === 'learn' && word && !introOpen && (
         <div style={card}>
           <div style={{ fontSize: 96, lineHeight: 1.1, marginBottom: 6 }}>{word.emoji}</div>
           <div style={{ fontSize: 38, fontWeight: 900, color: '#5b4b8a', letterSpacing: 1 }}>
-            {word.en}
+            <ColoredWord en={word.en} />
           </div>
           <div style={{ fontSize: 19, fontWeight: 700, color: '#888', marginTop: 4, marginBottom: 16 }}>
             {word.ko}
@@ -486,6 +523,14 @@ export default function WordScreen() {
         <div style={{ marginTop: 12, fontSize: 12, color: '#8a7aa8', textAlign: 'center' }}>
           이 브라우저는 읽어주기를 지원하지 않아요.
         </div>
+      )}
+
+      {showUnits && (
+        <UnitPicker
+          current={plan.unit}
+          onChoose={u => { chooseUnit(u); setIntroOpen(true); }}
+          onClose={() => setShowUnits(false)}
+        />
       )}
 
       {showWallet && (
