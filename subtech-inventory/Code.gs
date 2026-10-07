@@ -6,7 +6,7 @@
  * - 메모(업체 사양), 조립 가능 수량(BOM), 월별 입출고 리포트 포함.
  */
 
-var APP_VERSION = 'v12'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
+var APP_VERSION = 'v13'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
 
 var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
@@ -282,7 +282,8 @@ function bootstrap() {
   }
   var appUrl = '';
   try { appUrl = ScriptApp.getService().getUrl() || ''; } catch (e) {}
-  return { items: items, staff: staff, locations: locs, layout: layout, version: APP_VERSION, appUrl: appUrl };
+  var locMap = (typeof locSlotsForApp_ === 'function') ? locSlotsForApp_() : { sheets: [], slots: [] }; // Location.gs
+  return { items: items, staff: staff, locations: locs, layout: layout, version: APP_VERSION, appUrl: appUrl, locMap: locMap };
 }
 function computeStock_() {
   var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG), map = {};

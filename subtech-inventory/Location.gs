@@ -102,3 +102,65 @@ function locUrl() {
 function locInclude() {
   return HtmlService.createHtmlOutputFromFile('Location').getContent();
 }
+
+// ---------------------------------------------------------------------------
+// 재고앱 연동: 위치도 칸 = 보관 위치
+//   위치 이름(거래로그 E열) = "시트이름 칸코드" (예: "A동1층 A3"), 2층 이상은 "A동1층 A3 2층".
+//   칸 이름(선반1 등)은 키에 넣지 않으므로 이름을 바꿔도 재고가 끊기지 않습니다.
+//   시트 이름 자체(예: "A동1층")에 있는 재고는 그 시트의 "칸 미지정" 재고로 보입니다.
+//   ※ Location.html 의 slotsOf() 와 같은 규칙을 써야 합니다.
+// ---------------------------------------------------------------------------
+function locCode_(r, c) { return String.fromCharCode(65 + r) + (c + 1); }
+
+/** 위치도 JSON → 보관칸 목록 [{key, sheet, code, label, layer, n, note(손으로 적은 첫 자재)}] (시트·줄·칸 순) */
+function locSlots_(obj) {
+  const out = [];
+  ((obj && obj.sheets) || []).forEach(s => {
+    const sheet = String(s.name || '').trim();
+    if (!sheet) return;
+    Object.keys(s.cells || {}).map(k => k.split(',').map(Number))
+      .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+      .forEach(rc => {
+        const x = s.cells[rc[0] + ',' + rc[1]];
+        if (!x || x.type !== 'slot') return;
+        const code = locCode_(rc[0], rc[1]), n = Math.max(1, (x.layers || []).length);
+        for (let i = 0; i < n; i++)
+          out.push({ key: sheet + ' ' + code + (i ? ' ' + (i + 1) + '층' : ''), sheet: sheet, code: code,
+                     label: String(x.label || '').trim(), layer: i, n: n,
+                     note: String(((x.layers || [])[i] || {}).t || '').split('\n').map(t => t.trim()).filter(Boolean)[0] || '' });
+      });
+  });
+  return out;
+}
+
+/** 재고앱 bootstrap 용: {sheets:[시트이름], slots:[...]} — 위치도가 없으면 빈 목록 */
+function locSlotsForApp_() {
+  try {
+    const g = locGet();
+    const obj = g.data ? JSON.parse(g.data) : null;
+    return { sheets: ((obj && obj.sheets) || []).map(s => String(s.name || '').trim()).filter(String), slots: locSlots_(obj) };
+  } catch (e) {
+    return { sheets: [], slots: [] };
+  }
+}
+
+/** 위치도 화면용: 위치 이름별 현재 재고 {stock:{위치:[{id,name,cat,qty}]}, appUrl} */
+function locStock() {
+  const names = {};
+  const m = SpreadsheetApp.getActive().getSheetByName(TAB_MASTER);
+  if (m && m.getLastRow() >= 2)
+    m.getRange(2, 1, m.getLastRow() - 1, 3).getValues().forEach(r => { if (r[0]) names[r[0]] = { name: String(r[1]), cat: String(r[2] || '') }; });
+  const st = computeStock_(), stock = {};
+  Object.keys(st).forEach(id => {
+    const it = names[id] || { name: String(id).split('||')[0], cat: '' };
+    Object.keys(st[id].locs || {}).forEach(loc => {
+      const q = Number(st[id].locs[loc]) || 0;
+      if (!q) return;
+      (stock[loc] = stock[loc] || []).push({ id: id, name: it.name, cat: it.cat, qty: q });
+    });
+  });
+  Object.keys(stock).forEach(k => stock[k].sort((a, b) => b.qty - a.qty));
+  let appUrl = '';
+  try { appUrl = ScriptApp.getService().getUrl() || ''; } catch (e) {}
+  return { stock: stock, appUrl: appUrl };
+}

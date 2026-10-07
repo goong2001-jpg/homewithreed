@@ -59,6 +59,7 @@
   .picsec { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:11px 14px; margin-bottom:10px; } .picsec .k2 { font-size:12px; font-weight:700; color:#37475a; margin-bottom:8px; } .picwrap { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .pthumb { position:relative; width:78px; height:78px; } .pthumb img { width:78px; height:78px; object-fit:cover; border-radius:8px; border:1px solid #eef1f5; } .pthumb .px { position:absolute; top:-7px; right:-7px; width:22px; height:22px; background:#dc2626; color:#fff; border-radius:50%; font-size:13px; display:flex; align-items:center; justify-content:center; cursor:pointer; } .picadd { width:78px; height:78px; border:1.5px dashed #b9ccf5; border-radius:8px; color:#2563eb; font-size:26px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
   .nav { position:fixed; bottom:0; left:0; right:0; height:60px; border-top:1px solid #eef1f5; background:#fff; display:flex; z-index:30; } .nav div { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:10px; color:#b9c2cf; font-weight:600; cursor:pointer; } .nav div.on { color:#2563eb; } .nav .ic { font-size:18px; }
+  .pendbar { background:#eff6ff; border:1.5px solid #bfdbfe; color:#1d4ed8; border-radius:10px; padding:9px 12px; font-size:13px; font-weight:700; display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; } .pendbar .x { color:#64748b; cursor:pointer; text-decoration:underline; white-space:nowrap; }
   .loading { text-align:center; color:#8a97a8; padding:40px; font-size:14px; line-height:1.6; }
 </style>
 </head>
@@ -70,6 +71,7 @@
 <!-- 검색 -->
 <div class="body" id="viewSearch">
   <input class="search" id="searchInput" placeholder="🔍 품명 검색 (예: STT1.3)" oninput="renderSearch()">
+  <div id="pendBar"></div>
   <div class="label">품목</div><div id="searchList"><div class="loading">불러오는 중…</div></div>
   <button class="addnew" onclick="openNewItem()">＋ 새 품목 추가</button>
 </div>
@@ -84,7 +86,7 @@
     <div class="rbtns"><button class="ok" onclick="doRename()">저장</button><button class="no" onclick="toggleRename()">취소</button></div>
   </div>
   <div class="io"><button class="in on" id="btnIn" onclick="setType('입고')">＋입고</button><button class="out" id="btnOut" onclick="setType('출고')">－출고</button><button class="adj" id="btnAdj" onclick="setType('조정')">✏조정</button><button class="mov" id="btnMov" onclick="setType('이동')">⇄이동</button></div>
-  <div class="label">위치별 현재고</div><div class="locchips" id="locStock"></div>
+  <div class="label">위치별 현재고 <span class="editlink" onclick="openLocation(cur&&cur.name)">📍 위치도에서 보기</span></div><div class="locchips" id="locStock"></div>
   <div id="ioBox">
     <div class="label">박스 구성 (입수가 달라도 줄을 추가하세요)</div>
     <div id="boxRows"></div><div class="addline" onclick="addLine()">＋ 다른 입수 박스 추가</div>
@@ -190,7 +192,7 @@
 </div>
 
 <script>
-var HTML_VERSION = 'v12'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v13'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var cur = null, type = '입고', lines = [{ boxes:'', per:'' }], txImgs = [];
@@ -200,19 +202,39 @@ var catColorMap = null;
 var OXF = [['plate','명판'],['bizSticker','상호스티커'],['dateSticker','날짜스티커'],['caseO','전용케이스'],['program','프로그램']];
 
 google.script.run.withSuccessHandler(onBoot).withFailureHandler(onErr).bootstrap();
-function onBoot(d){ DATA=d; if(!DATA.layout) DATA.layout=[]; fill('staffSel', d.staff&&d.staff.length?d.staff:['담당자']); fillLoc('locSel'); catColorMap=null; fillDatalists(); resetBar(); renderSearch();
+function onBoot(d){ DATA=d; if(!DATA.layout) DATA.layout=[]; if(!DATA.locMap) DATA.locMap={sheets:[],slots:[]}; indexSlots(); fill('staffSel', d.staff&&d.staff.length?d.staff:['담당자']); fillLoc('locSel'); catColorMap=null; fillDatalists(); resetBar(); renderSearch();
+  applyDeepLink();
   if(d.version && d.version!==HTML_VERSION) alert('⚠️ 버전 불일치!\n화면(Index.html): '+HTML_VERSION+' / 서버(Code.gs): '+d.version+'\n두 파일을 모두 최신으로 교체한 뒤 [배포 관리 > 수정 > 새 버전 > 배포] 하세요.'); }
 function onErr(e){ document.getElementById('searchList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>'; }
 function fill(id,arr){ document.getElementById(id).innerHTML=arr.map(function(s){return '<option>'+esc(s)+'</option>';}).join(''); }
-/** 위치 선택 옵션: 위치 탭의 구역별 optgroup 묶음 (위치가 많아져도 고르기 쉽게) */
+// ---- 위치: 위치 탭 + 자재 위치도(Location.gs) 칸 ----
+// 위치도 칸의 위치 이름 = "시트이름 칸코드"(+ " N층"). 칸 이름(선반1 등)은 화면 표시용.
+var SLOT = {};
+function indexSlots(){ SLOT={}; (DATA.locMap.slots||[]).forEach(function(sl){ SLOT[sl.key]=sl; }); }
+function slotText(sl){ return sl.code+(sl.n>1?' '+(sl.layer+1)+'층':'')+(sl.label?' · '+sl.label:(sl.note?' · ('+sl.note+')':'')); }
+/** 화면에 보일 위치 이름 (위치도 칸이면 칸 이름까지) */
+function locDisp(name){ var sl=SLOT[name]; return sl ? (sl.sheet+' '+slotText(sl)) : (''+(name||'')); }
+function stockLocSet(){ var o={}; DATA.items.forEach(function(it){ Object.keys(it.locs||{}).forEach(function(k){ if(Number(it.locs[k])) o[k]=true; }); }); return o; }
+/** 위치 선택 옵션: 위치도 시트별 묶음(칸 미지정 + 이름 있는 칸) → 나머지 위치 탭 이름 */
 function locOptionsHtml(sel){
   var names=(DATA.locations&&DATA.locations.length)?DATA.locations:['A동1층'];
+  if(!sel) sel=names[0];
+  var lm=DATA.locMap||{sheets:[],slots:[]}, has=lm.sheets.length?stockLocSet():{}, used={}, html='';
+  function opt(v,t){ used[v]=true; return '<option value="'+esc(v)+'"'+(v===sel?' selected':'')+'>'+esc(t)+'</option>'; }
+  lm.sheets.forEach(function(sheet){
+    var parts=[];
+    if(names.indexOf(sheet)>=0 || has[sheet]) parts.push(opt(sheet, sheet+' (칸 미지정)'));
+    lm.slots.forEach(function(sl){ if(sl.sheet===sheet && !used[sl.key] && (sl.label||sl.note||has[sl.key])) parts.push(opt(sl.key, slotText(sl))); });
+    if(parts.length) html+='<optgroup label="📍 '+esc(sheet)+'">'+parts.join('')+'</optgroup>';
+  });
+  if(html){ var rest=names.filter(function(n){ return !used[n]; });
+    return html+(rest.length?'<optgroup label="기타 위치">'+rest.map(function(n){ return opt(n,n); }).join('')+'</optgroup>':''); }
+  // 위치도가 비어 있으면 예전처럼 위치 탭의 구역별 묶음
   var zoneOf={}; (DATA.layout||[]).forEach(function(l){ if(l.zone) zoneOf[l.name]=l.zone; });
   var order=[], groups={};
   names.forEach(function(n){ var z=zoneOf[n]||'기타'; if(!groups[z]){ groups[z]=[]; order.push(z); } groups[z].push(n); });
-  function opt(n){ return '<option'+(n===sel?' selected':'')+'>'+esc(n)+'</option>'; }
-  if(order.length<=1) return names.map(opt).join('');
-  return order.map(function(z){ return '<optgroup label="'+esc(z)+'">'+groups[z].map(opt).join('')+'</optgroup>'; }).join('');
+  if(order.length<=1) return names.map(function(n){ return opt(n,n); }).join('');
+  return order.map(function(z){ return '<optgroup label="'+esc(z)+'">'+groups[z].map(function(n){ return opt(n,n); }).join('')+'</optgroup>'; }).join('');
 }
 function fillLoc(id, sel){ document.getElementById(id).innerHTML=locOptionsHtml(sel); }
 function fillDatalists(){ var names=DATA.items.map(function(i){return i.name;}).filter(uniq); var cats=DATA.items.map(function(i){return i.cat;}).filter(function(v){return v;}).filter(uniq);
@@ -234,7 +256,8 @@ function renderSearch(){ var q=val('searchInput').toLowerCase();
   document.getElementById('searchList').innerHTML=list.length?list.map(function(it){var idx=DATA.items.indexOf(it); var bt=(it.boxes>0)?(fmt(it.boxes)+'박스'):'';
     return '<div class="item" onclick="select('+idx+')"><div><div class="nm">'+esc(it.name)+'</div><div class="meta">현재 '+fmt(it.total)+'개'+(bt?(' · '+bt):'')+'</div></div>'+badge(it.cat)+'</div>';
   }).join(''):'<div class="loading">검색 결과가 없습니다.</div>'; }
-function select(i){ cur=DATA.items[i]; type='입고'; lines=[{boxes:'',per:String(cur.unit||'')}]; txImgs=[]; document.getElementById('renameBox').classList.add('hidden'); document.getElementById('adjTarget').value=''; renderInput(); go('input'); loadHistory(); }
+function select(i){ cur=DATA.items[i]; type='입고'; lines=[{boxes:'',per:String(cur.unit||'')}]; txImgs=[]; document.getElementById('renameBox').classList.add('hidden'); document.getElementById('adjTarget').value=''; renderInput(); go('input'); loadHistory();
+  if(PEND){ var pd=PEND; PEND=null; renderPend(); applyLoc(pd.loc, pd.mode); } }
 function loadHistory(){ document.getElementById('histList').innerHTML='<div class="loading">불러오는 중…</div>';
   google.script.run.withSuccessHandler(renderHistory).withFailureHandler(function(){renderHistory([]);}).getHistory(cur.id); }
 
@@ -281,7 +304,7 @@ function renderInput(){
     document.getElementById('movTo').innerHTML=locOptionsHtml(toDef);
   }
   var locs=cur.locs||{}; var keys=Object.keys(locs);
-  document.getElementById('locStock').innerHTML=keys.length?keys.map(function(k){return '<span class="locchip">'+esc(k)+' '+fmt(locs[k])+'</span>';}).join(''):'<span class="locchip" style="background:#eef1f5;color:#8a97a8">기록 없음</span>';
+  document.getElementById('locStock').innerHTML=keys.length?keys.map(function(k){return '<span class="locchip">'+esc(locDisp(k))+' '+fmt(locs[k])+'</span>';}).join(''):'<span class="locchip" style="background:#eef1f5;color:#8a97a8">기록 없음</span>';
   document.getElementById('boxRows').innerHTML=lines.map(function(l,i){
     return '<div class="boxrow"><div class="field"><div class="k">박스수</div><input type="number" inputmode="numeric" value="'+esc(l.boxes)+'" oninput="onInput('+i+',\'boxes\',this.value)"></div><div class="x">×</div><div class="field"><div class="k">박스당 수량</div><input type="number" inputmode="numeric" value="'+esc(l.per)+'" oninput="onInput('+i+',\'per\',this.value)"></div><div class="eq">합계<b>'+fmt(lineTotal(l))+'</b></div>'+(lines.length>1?'<span class="del" onclick="delLine('+i+')">✕</span>':'')+'</div>';
   }).join(''); renderTxPic(); updateTotal();
@@ -298,17 +321,17 @@ function updateTotal(){
   if(type==='이동'){
     var from=val('movFrom'), to=val('movTo'), mq=Number(val('movQty'))||0, hasQ=val('movQty')!=='';
     var fromCur=(cur.locs&&cur.locs[from])||0;
-    document.getElementById('curLbl').textContent=from+' 현재'; document.getElementById('curVal').textContent=fmt(fromCur);
-    document.getElementById('resLbl').textContent='이동 후 '+from; var rvM=document.getElementById('resVal'); rvM.textContent=hasQ?fmt(fromCur-mq):'–'; rvM.className='pv'+((fromCur-mq)<0?' neg':'');
+    document.getElementById('curLbl').textContent=locDisp(from)+' 현재'; document.getElementById('curVal').textContent=fmt(fromCur);
+    document.getElementById('resLbl').textContent='이동 후 '+locDisp(from); var rvM=document.getElementById('resVal'); rvM.textContent=hasQ?fmt(fromCur-mq):'–'; rvM.className='pv'+((fromCur-mq)<0?' neg':'');
     var dlM=document.getElementById('deltaLine'); dlM.className='deltaline in';
-    dlM.textContent=(mq>0&&from!==to)?(from+' → '+to+'  '+fmt(mq)+'개'):(from===to?'보내는 위치와 받는 위치가 같습니다':'');
+    dlM.textContent=(mq>0&&from!==to)?(locDisp(from)+' → '+locDisp(to)+'  '+fmt(mq)+'개'):(from===to?'보내는 위치와 받는 위치가 같습니다':'');
     var wM=document.getElementById('warnLine'); wM.classList.toggle('hidden', !(mq>fromCur));
-    wM.textContent='⚠️ '+from+' 재고보다 많이 옮기려고 해요';
+    wM.textContent='⚠️ '+locDisp(from)+' 재고보다 많이 옮기려고 해요';
     var bM=document.getElementById('saveBtn'); bM.className='savebtn purple'; bM.textContent='⇄ 이동 저장'; bM.disabled=!(mq>0&&from!==to); return;
   }
   if(type==='조정'){
     var curLoc=(cur.locs&&cur.locs[loc])||0, has=val('adjTarget')!=='', target=Number(val('adjTarget'))||0, d=target-curLoc;
-    document.getElementById('curLbl').textContent=loc+' 현재'; document.getElementById('curVal').textContent=fmt(curLoc);
+    document.getElementById('curLbl').textContent=locDisp(loc)+' 현재'; document.getElementById('curVal').textContent=fmt(curLoc);
     document.getElementById('resLbl').textContent='조정 후'; var rv=document.getElementById('resVal'); rv.textContent=has?fmt(target):'–'; rv.className='pv';
     var dl=document.getElementById('deltaLine'); dl.className='deltaline '+(d>=0?'in':'out'); dl.textContent=(has&&d!==0)?((d>0?'＋':'−')+fmt(Math.abs(d))+'개 조정'):'';
     document.getElementById('warnLine').classList.add('hidden');
@@ -335,7 +358,7 @@ function renderHistory(rows){
     var bx=h.boxes>0?(' ('+fmt(h.boxes)+'박스)'):'';
     var qty=h.type==='기록'?'—':((inMode?'＋':'−')+fmt(Math.abs(h.delta))+bx);
     var im=(h.imgs&&h.imgs.length)?h.imgs.map(function(p){return '<a href="'+esc(p.url)+'" target="_blank"><img src="'+esc(p.thumb)+'" style="width:30px;height:30px;object-fit:cover;border-radius:6px;margin-left:4px;vertical-align:middle"></a>';}).join(''):'';
-    return '<div class="hrow"><span class="ht" style="color:'+color+'">'+esc(h.type)+'</span><span class="hq" style="color:'+color+'">'+qty+'</span><span class="hmeta">'+esc(h.loc||'')+(h.staff?(' · '+esc(h.staff)):'')+'</span>'+im+'<span class="hd">'+esc(h.date)+'</span><span class="undo" onclick="undoTx('+h.row+')">취소</span></div>';
+    return '<div class="hrow"><span class="ht" style="color:'+color+'">'+esc(h.type)+'</span><span class="hq" style="color:'+color+'">'+qty+'</span><span class="hmeta">'+esc(locDisp(h.loc))+(h.staff?(' · '+esc(h.staff)):'')+'</span>'+im+'<span class="hd">'+esc(h.date)+'</span><span class="undo" onclick="undoTx('+h.row+')">취소</span></div>';
   }).join(''):'<div style="color:#8a97a8;font-size:12px;padding:6px 2px">기록 없음</div>'; }
 function undoTx(row){ if(!confirm('이 거래를 취소(삭제)할까요? 재고가 원복됩니다.'))return;
   google.script.run.withSuccessHandler(function(res){ cur.total=res.total; cur.locs=res.locs; var it=DATA.items.filter(function(x){return x.id===res.id;})[0]; if(it){it.total=res.total;it.locs=res.locs;} renderInput(); loadHistory(); })
@@ -376,7 +399,7 @@ function renderStock(){
   document.getElementById('stockList').innerHTML=list.length?list.map(function(it){
     var idx=DATA.items.indexOf(it), low=it.safe>0&&it.total<it.safe, color=catColor(it.cat);
     var bxs=(it.boxes>0)?'<span class="bx">'+fmt(it.boxes)+'박스</span>':'';
-    var locs=Object.keys(it.locs||{}).map(function(k){return k+' '+fmt(it.locs[k]);}).join(' · ')||'-';
+    var locs=Object.keys(it.locs||{}).map(function(k){return locDisp(k)+' '+fmt(it.locs[k]);}).join(' · ')||'-';
     return '<div class="srow" style="border-left-color:'+color+'" onclick="select('+idx+')"><div class="top"><span class="nm2">'+esc(it.name)+' '+badge(it.cat)+'</span><span class="q2'+(low?' low':'')+'">'+fmt(it.total)+'<small> 개</small>'+bxs+(low?' <span class="warn">안전재고↓</span>':'')+'</span></div><div class="b2">📍 '+esc(locs)+(it.safe>0?(' · 안전재고 '+fmt(it.safe)):'')+'</div></div>';
   }).join(''):'<div class="loading">품목이 없습니다.</div>';
 }
@@ -451,17 +474,42 @@ function runBuildForm(){ var q=Number(val('brQty'))||0; if(q<=0)return;
 
 // ---- 자재 위치도 (Location.html, 별도 화면) ----
 /** 위치도 화면으로 이동. 주소는 bootstrap에서 받아 둠 (누르는 즉시 열어야 폰에서 막히지 않음) */
-function locPageUrl(u){ return u ? (u+(u.indexOf('?')<0?'?':'&')+'page=location') : ''; }
-function openLocation(){
-  if(DATA.appUrl){ window.open(locPageUrl(DATA.appUrl),'_top'); return; }
-  google.script.run.withSuccessHandler(function(u){ if(u) window.open(locPageUrl(u),'_top'); else alert('웹앱 주소를 찾지 못했습니다. 배포 후 다시 시도하세요.'); })
+function locPageUrl(u, q){ return u ? (u+(u.indexOf('?')<0?'?':'&')+'page=location'+(q?'&q='+encodeURIComponent(q):'')) : ''; }
+function openLocation(q){
+  if(DATA.appUrl){ window.open(locPageUrl(DATA.appUrl, q),'_top'); return; }
+  google.script.run.withSuccessHandler(function(u){ if(u) window.open(locPageUrl(u, q),'_top'); else alert('웹앱 주소를 찾지 못했습니다. 배포 후 다시 시도하세요.'); })
     .withFailureHandler(function(e){ alert(e.message); }).locUrl();
+}
+/** 위치도에서 넘어온 경우: ?item=품목ID&loc=위치&mode=입고|출고|이동 (item 없으면 품목을 고르면 적용) */
+var PEND = null, DEEP_DONE = false;
+function applyDeepLink(){
+  if(DEEP_DONE) return; DEEP_DONE=true;
+  if(!(window.google && google.script && google.script.url)) return;
+  google.script.url.getLocation(function(l){
+    var p=(l&&l.parameter)||{}; if(!p.loc && !p.item) return;
+    var mode=['입고','출고','이동'].indexOf(p.mode)>=0 ? p.mode : '입고';
+    var idx=-1; DATA.items.forEach(function(it,i){ if(it.id===p.item) idx=i; });
+    if(idx>=0){ select(idx); if(p.loc) applyLoc(p.loc, mode); return; }
+    if(p.loc){ PEND={loc:p.loc, mode:mode}; go('search'); renderPend(); }
+  });
+}
+function renderPend(){ var el=document.getElementById('pendBar'); if(!el) return;
+  el.innerHTML=PEND?'<div class="pendbar"><span>📍 '+esc(locDisp(PEND.loc))+' 에 '+esc(PEND.mode)+'할 품목을 고르세요</span><span class="x" onclick="PEND=null;renderPend()">취소</span></div>':''; }
+/** 지금 품목의 입출고 화면에서 위치·구분 미리 지정 */
+function applyLoc(loc, mode){
+  type=mode||'입고'; renderInput();
+  if(type==='이동'){
+    ensureLocOption('movFrom', loc); document.getElementById('movFrom').value=loc;
+    var to=document.getElementById('movTo');
+    if(to.value===loc) for(var i=0;i<to.options.length;i++) if(to.options[i].value!==loc){ to.value=to.options[i].value; break; }
+  } else { ensureLocOption('locSel', loc); document.getElementById('locSel').value=loc; }
+  updateTotal();
 }
 /** 로그에만 있고 위치 탭엔 없는 이름도 선택할 수 있게 옵션 보강 */
 function ensureLocOption(selId, name){
   var sel=document.getElementById(selId); if(!sel||!name) return;
   for(var i=0;i<sel.options.length;i++) if(sel.options[i].value===name || sel.options[i].text===name) return;
-  var o=document.createElement('option'); o.value=name; o.text=name; sel.appendChild(o);
+  var o=document.createElement('option'); o.value=name; o.text=locDisp(name); sel.appendChild(o);
 }
 
 // 전체 이력
@@ -476,7 +524,7 @@ function renderLog(rows){
     var inMode=h.delta>=0, color=typeColor(h.type);
     var qty=h.type==='기록'?'—':((inMode?'＋':'−')+fmt(Math.abs(h.delta)));
     var im=(h.imgs&&h.imgs.length)?h.imgs.map(function(p){return '<a href="'+esc(p.url)+'" target="_blank"><img src="'+esc(p.thumb)+'" style="width:26px;height:26px;object-fit:cover;border-radius:5px;margin-left:3px;vertical-align:middle"></a>';}).join(''):'';
-    html+='<div class="hrow"><span class="ht" style="color:'+color+'">'+esc(h.type)+'</span><span class="hq" style="color:'+color+'">'+qty+'</span><span class="hmeta"><b style="color:#1f2733">'+esc(h.name)+'</b> '+esc(h.loc||'')+(h.staff?(' · '+esc(h.staff)):'')+'</span>'+im+'<span class="hd">'+esc((h.date||'').slice(11))+'</span><span class="undo" onclick="undoLogTx('+h.row+')">취소</span></div>';
+    html+='<div class="hrow"><span class="ht" style="color:'+color+'">'+esc(h.type)+'</span><span class="hq" style="color:'+color+'">'+qty+'</span><span class="hmeta"><b style="color:#1f2733">'+esc(h.name)+'</b> '+esc(locDisp(h.loc))+(h.staff?(' · '+esc(h.staff)):'')+'</span>'+im+'<span class="hd">'+esc((h.date||'').slice(11))+'</span><span class="undo" onclick="undoLogTx('+h.row+')">취소</span></div>';
   });
   document.getElementById('logList').innerHTML=html;
 }
