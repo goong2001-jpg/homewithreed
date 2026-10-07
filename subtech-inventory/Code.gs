@@ -6,7 +6,7 @@
  * - 메모(업체 사양), 조립 가능 수량(BOM), 월별 입출고 리포트 포함.
  */
 
-var APP_VERSION = 'v11'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
+var APP_VERSION = 'v12'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
 
 var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
@@ -26,34 +26,7 @@ var DEFAULT_LOCATIONS = ['A동1층', 'A동2층', 'A동3층', 'B동1층', 'B동2�
 
 // 위치 탭: A위치(=거래로그에 기록되는 이름, 조인 키) B구역 C가로 D세로 E폭 F높이 G종류 H비고
 var LOC_HEADERS = ['위치', '구역', 'X', 'Y', '폭', '높이', '종류', '비고'];
-var KIND_RACK = '랙', KIND_PALLET = '파렛트', KIND_CORR = '복도', KIND_MARK = '랜드마크';
-
-/** 창고 지도 기본 배치(시드). 사용자가 시트에서 자유롭게 고치는 출발점. */
-function defaultLayoutRows_() {
-  var out = [];
-  function rack(zone, cols, rows) {
-    for (var c = 0; c < cols.length; c++)
-      for (var r = 1; r <= rows; r++)
-        out.push([zone + ' ' + cols[c] + r, zone, c + 1, r, 1, 1, KIND_RACK, '']);
-  }
-  function pallet(zone, n, x0, y) {
-    for (var i = 1; i <= n; i++)
-      out.push([zone + ' 복도P' + i, zone, x0 + i - 1, y, 1, 1, KIND_PALLET, '복도 적재']);
-  }
-  rack('A동1층', ['A', 'B', 'C'], 4);
-  out.push(['A동1층 복도', 'A동1층', 1, 5, 3, 1, KIND_CORR, '통로']);
-  pallet('A동1층', 3, 1, 6);
-  out.push(['A동1층 지게차', 'A동1층', 4, 5, 1, 1, KIND_MARK, '🚜 지게차']);
-  out.push(['A동1층 출입구', 'A동1층', 4, 6, 1, 1, KIND_MARK, '🚪 출입구']);
-  rack('A동2층', ['A', 'B'], 3);
-  pallet('A동2층', 2, 1, 4);
-  rack('A동3층', ['A'], 2);
-  rack('B동1층', ['A', 'B'], 3);
-  pallet('B동1층', 2, 1, 4);
-  out.push(['B동1층 디핑기', 'B동1층', 3, 4, 1, 1, KIND_MARK, '🔥 디핑기']);
-  rack('B동2층', ['A'], 2);
-  return out;
-}
+var KIND_RACK = '랙', KIND_MARK = '랜드마크';
 
 /** 위치 탭을 읽어 {names(보관 위치 선택지), layout(지도 배치)} 반환. 구버전 1열 시트도 그대로 동작. */
 function readLocations_(ss) {
@@ -86,14 +59,12 @@ function writeLocHeaders_(sh) {
   sh.getRange(1, 1, 1, LOC_HEADERS.length).setValues([LOC_HEADERS]).setFontWeight('bold');
   sh.setFrozenRows(1);
   sh.getRange('A1').setNote(
-    '창고 지도용 위치 목록입니다.\n' +
-    'A 위치: 거래로그에 기록되는 이름(필수)\n' +
-    'B 구역: 지도 페이지(예: A동1층). 비우면 지도에 안 나옴\n' +
-    'C X / D Y: 칸 좌표(1부터). 비우면 지도에 안 나옴\n' +
-    'E 폭 / F 높이: 차지하는 칸 수(기본 1)\n' +
-    'G 종류: 랙 / 파렛트 / 복도 / 랜드마크\n' +
-    'H 비고: 메모(랜드마크는 타일 이름으로 표시)\n\n' +
-    '※ 폰 화면에 맞추려면 X는 1~8 사이를 권장합니다.');
+    '보관 위치 목록입니다.\n' +
+    'A 위치: 거래로그에 기록되는 이름(필수). 입출고 화면의 위치 선택지가 됩니다.\n' +
+    'B 구역: 위치 선택지를 묶어 보여줄 그룹(선택)\n' +
+    'C~F, H: 예전 창고 지도용 칸 — 지금은 쓰지 않습니다\n' +
+    'G 종류: 랜드마크로 적으면 위치 선택지에서 빠집니다\n\n' +
+    '※ 자재 위치도는 앱 아래 📍위치도 메뉴(위치도·위치목록 탭)에서 관리합니다.');
 }
 
 /** 위치 탭에 없는 이름만 덧붙임 (기존 행/좌표는 절대 건드리지 않음) */
@@ -107,19 +78,6 @@ function appendLocations_(sh, rows) {
   return add.length;
 }
 
-/** 메뉴: 창고 지도 기본 배치 넣기 (가산적 — 기존 배치는 유지) */
-function seedMapLayout() {
-  var ui = SpreadsheetApp.getUi(), ss = SpreadsheetApp.getActive();
-  var resp = ui.alert('창고 지도 기본 배치 넣기',
-    '랙·복도 파렛트·랜드마크 기본 배치를 위치 탭에 추가합니다.\n' +
-    '이미 있는 위치와 직접 입력한 좌표는 그대로 유지됩니다.\n\n계속할까요?', ui.ButtonSet.YES_NO);
-  if (resp !== ui.Button.YES) return;
-  var sh = getOrCreateSheet_(ss, TAB_LOCATION);
-  writeLocHeaders_(sh);
-  var n = appendLocations_(sh, defaultLayoutRows_());
-  ui.alert(n + '개 위치를 추가했습니다.\n위치 탭에서 구역·X·Y를 실제 창고에 맞게 고치세요.');
-}
-
 // 메모: 1일시 2업체 3명판 4상호스티커 5날짜스티커 6전용케이스 7프로그램 8프로그램명
 //       9비고 10상호스티커사진 11명판사진 12날짜스티커사진 13추가사진 14작성자
 var MEMO_HEADERS = ['일시', '업체', '명판', '상호스티커', '날짜스티커', '전용케이스', '프로그램', '프로그램명',
@@ -130,13 +88,14 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('📦 재고관리')
     .addItem('① 초기 설정 (탭/구조 생성)', 'setup')
     .addItem('🧹 전체 재고 0으로 초기화', 'resetStock')
-    .addItem('🗺️ 창고 지도 기본 배치 넣기', 'seedMapLayout')
     .addSeparator()
     .addItem('(선택) 기존 써브텍에서 한 번 가져오기', 'importFromOld')
     .addItem('웹앱(폰 화면) 주소 보기', 'showUrl')
     .addToUi();
 }
-function doGet() {
+function doGet(e) {
+  // ?page=location → 자재 위치도 화면 (Location.gs / Location.html)
+  if (e && e.parameter && e.parameter.page === 'location') return locPage();
   return HtmlService.createHtmlOutputFromFile('Index').setTitle('써브텍 재고')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1');
 }
@@ -170,8 +129,7 @@ function setup() {
   if (config.getLastRow() < 2) config.getRange(2, 1, 3, 1).setValues([['김반장'], ['이사원'], ['관리자']]);
   // 위치: 가산적으로만 채움 — 손으로 입력한 지도 좌표가 재실행 때 지워지지 않도록 절대 clear 하지 않습니다.
   appendLocations_(locSh, DEFAULT_LOCATIONS.map(function (x) { return [x, '', '', '', 1, 1, KIND_RACK, '']; }));
-  // 예시 랙·파렛트 칸은 자동으로 넣지 않음 — 실제 위치(A동1층 등)가 지도에 '구역 전체'로 바로 보이므로,
-  // 칸이 필요할 때만 메뉴 "🗺️ 창고 지도 기본 배치 넣기"로 추가합니다.
+  // 자재 위치도(칸·층 배치)는 Location.gs 가 '위치도'·'위치목록' 탭에 따로 저장합니다.
 
   // ※ 재고 가져오기는 더 이상 자동으로 하지 않습니다(재실행 시 재고가 꼬이는 것 방지).
   //    기존 써브텍에서 가져오려면 메뉴의 "(선택) 기존 써브텍에서 한 번 가져오기"를 사용하세요.
@@ -322,7 +280,9 @@ function bootstrap() {
       locs = DEFAULT_LOCATIONS.slice();
     }
   }
-  return { items: items, staff: staff, locations: locs, layout: layout, version: APP_VERSION };
+  var appUrl = '';
+  try { appUrl = ScriptApp.getService().getUrl() || ''; } catch (e) {}
+  return { items: items, staff: staff, locations: locs, layout: layout, version: APP_VERSION, appUrl: appUrl };
 }
 function computeStock_() {
   var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG), map = {};
