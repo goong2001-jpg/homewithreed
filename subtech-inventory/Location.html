@@ -1,0 +1,498 @@
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+#locApp{
+  --bg:#D8DAD5;--paper:#ECEDE9;--ink:#1F2326;--sub:#5B6367;--line:#979D99;
+  --slot:#FFFFFF;--label:#2F3639;--labelink:#EEEFEA;--sel:#F2C230;--hitbg:#FFEFB8;--hitline:#B98C08;
+  background:var(--bg);color:var(--ink);
+  font-family:"IBM Plex Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) #locApp{
+    --bg:#191C1E;--paper:#232729;--ink:#E3E5E0;--sub:#9AA09C;--line:#4B5155;
+    --slot:#2C3134;--label:#C8CBC5;--labelink:#191C1E;--hitbg:#4A3F17;--hitline:#F2C230;
+  }
+}
+:root[data-theme="dark"] #locApp{
+  --bg:#191C1E;--paper:#232729;--ink:#E3E5E0;--sub:#9AA09C;--line:#4B5155;
+  --slot:#2C3134;--label:#C8CBC5;--labelink:#191C1E;--hitbg:#4A3F17;--hitline:#F2C230;
+}
+#locApp.solo{min-height:100vh}
+#locApp *,#locApp *::before,#locApp *::after{box-sizing:border-box}
+#locApp button,#locApp input,#locApp textarea{font:inherit;color:inherit}
+#locApp button{cursor:pointer}
+#locApp :focus-visible{outline:2px solid var(--hitline);outline-offset:2px}
+
+#locApp .top{padding:14px 12px 8px;display:flex;flex-direction:column;gap:8px}
+#locApp .titleRow{display:flex;align-items:baseline;gap:10px}
+#locApp h1{margin:0;font-size:19px;font-weight:700;flex:1}
+#locApp .status{font-size:12px;color:var(--sub)}
+#locApp .back{background:none;border:0;padding:0;color:var(--sub);font-size:13px;text-decoration:underline}
+#locApp .search{position:relative}
+#locApp .search input{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:4px;background:var(--paper)}
+#locApp .results{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:20;background:var(--paper);
+  border:1.5px solid var(--line);border-radius:4px;max-height:50vh;overflow:auto}
+#locApp .results[hidden]{display:none}
+#locApp .results button{display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:8px 12px;
+  background:none;border:0;border-bottom:1px solid var(--line);text-align:left}
+#locApp .results .rw{font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
+#locApp .results .none{margin:0;padding:10px 12px;color:var(--sub)}
+
+#locApp .tabs{display:flex;gap:4px;overflow-x:auto;padding:0 12px;scrollbar-width:none}
+#locApp .tabs::-webkit-scrollbar{display:none}
+#locApp .tab{flex:0 0 auto;padding:8px 12px;border:1.5px solid var(--line);border-bottom:0;border-radius:4px 4px 0 0;background:transparent;white-space:nowrap}
+#locApp .tab.on{background:var(--paper);font-weight:700;border-color:var(--ink)}
+#locApp .tab.add{border-style:dashed;color:var(--sub)}
+
+#locApp .floor{background:var(--paper);border-top:1.5px solid var(--ink)}
+#locApp .floor.merging{border-top:6px solid transparent;
+  border-image:repeating-linear-gradient(-45deg,var(--sel) 0 10px,#1F2326 10px 20px) 6}
+#locApp .tools{display:flex;gap:6px;padding:10px 12px 4px;flex-wrap:wrap}
+#locApp .tools button{padding:7px 11px;border:1.5px solid var(--line);border-radius:4px;background:var(--bg)}
+#locApp .tools button.on{background:var(--sel);border-color:#1F2326;color:#1F2326;font-weight:700}
+#locApp .hint{margin:0;padding:2px 12px 0;font-size:12.5px;color:var(--sub)}
+#locApp .hint[hidden]{display:none}
+#locApp .mergeBar{display:flex;align-items:center;gap:8px;padding:8px 12px 0}
+#locApp .mergeBar[hidden]{display:none}
+#locApp .mergeBar span{flex:1;font-size:13.5px}
+#locApp .mergeBar button{padding:7px 12px;border-radius:4px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);font-weight:700}
+#locApp .mergeBar button.ghost{background:transparent;color:var(--ink);border-color:var(--line);font-weight:400}
+
+#locApp .wrap{overflow-x:auto;padding:10px 12px 28px}
+#locApp .grid{display:grid;gap:4px;grid-auto-rows:minmax(70px,auto);min-width:min-content}
+#locApp .cell{position:relative;min-height:70px;border:1.5px solid var(--line);background:var(--slot);border-radius:3px;
+  text-align:left;padding:4px 5px;display:flex;flex-direction:column;gap:2px;overflow:hidden}
+#locApp .cell .code{font-size:10.5px;color:var(--sub);font-weight:500;font-variant-numeric:tabular-nums;line-height:1.2}
+#locApp .cell .name{font-weight:700;font-size:13px;line-height:1.25;word-break:keep-all}
+#locApp .layers{display:flex;flex-direction:column;flex:1}
+#locApp .layer{flex:1;font-size:12px;line-height:1.3;padding:2px 0;border-top:1px dashed var(--line);word-break:keep-all}
+#locApp .layer:first-child{border-top:0}
+#locApp .layer b{display:block;font-size:10.5px;font-weight:500;color:var(--sub)}
+#locApp .layer i,#locApp .cell .lbl i{font-style:normal;color:var(--sub);opacity:.75}
+#locApp .cell.label{background:var(--label);border-color:var(--label);color:var(--labelink);align-items:center;justify-content:center;text-align:center}
+#locApp .cell.label .lbl{font-weight:700;font-size:16px;word-break:keep-all}
+#locApp .cell.label .lbl i{color:inherit}
+#locApp .cell.void{background:transparent;border-style:dashed}
+#locApp .cell.void .code{opacity:.6}
+#locApp .cell.void .name{color:var(--sub)}
+
+/* 합친 칸: 이름을 가운데, 크게, 칸 수만큼 자간을 벌림 (복   도) */
+#locApp .cell.big{align-items:center;justify-content:center;text-align:center;padding-top:18px}
+#locApp .cell.big .code{position:absolute;top:4px;left:5px}
+#locApp .cell.big .name,#locApp .cell.big .lbl{font-size:var(--fs);letter-spacing:var(--ls);text-indent:var(--ls);line-height:1.2}
+#locApp .cell.big.tall .name,#locApp .cell.big.tall .lbl{writing-mode:vertical-rl;text-orientation:upright;text-indent:0;padding-top:var(--ls)}
+#locApp .cell.big .layers{flex:0 0 auto;width:100%;margin-top:6px}
+#locApp .cell.big .layer{text-align:center}
+
+#locApp .cell.hit{background:var(--hitbg);border-color:var(--hitline)}
+#locApp .cell.sel{box-shadow:inset 0 0 0 3px var(--sel);border-color:#1F2326}
+#locApp .cell.flash{animation:locFlash 1.4s ease-out}
+@keyframes locFlash{0%,40%{box-shadow:inset 0 0 0 4px var(--hitline)}100%{box-shadow:inset 0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){#locApp .cell.flash{animation:none;box-shadow:inset 0 0 0 3px var(--hitline)}}
+
+#locApp .shade{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:30}
+#locApp .shade[hidden],#locApp .panel[hidden],#locApp .toast[hidden]{display:none}
+#locApp .panel{position:fixed;left:0;right:0;bottom:0;z-index:31;background:var(--paper);border-top:2px solid var(--ink);
+  max-height:78vh;overflow:auto;padding:14px 14px calc(18px + env(safe-area-inset-bottom,0px))}
+#locApp .ph{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px}
+#locApp .ph h2{margin:0;font-size:18px}
+#locApp .ph small{font-size:12.5px;font-weight:400;color:var(--sub);margin-left:4px}
+#locApp .x{background:none;border:0;color:var(--sub);padding:4px 2px}
+#locApp .seg{display:flex;border:1.5px solid var(--ink);border-radius:4px;overflow:hidden;margin-bottom:12px}
+#locApp .seg button{flex:1;padding:8px 4px;border:0;background:transparent}
+#locApp .seg button+button{border-left:1.5px solid var(--ink)}
+#locApp .seg button.on{background:var(--ink);color:var(--paper);font-weight:700}
+#locApp .f{display:block;font-size:13px;color:var(--sub);margin-bottom:10px}
+#locApp .f input,#locApp .f textarea{display:block;width:100%;margin-top:4px;padding:9px 10px;border:1.5px solid var(--line);
+  border-radius:4px;background:var(--slot);color:var(--ink);font-size:15px;resize:vertical}
+#locApp .acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+#locApp .acts button{padding:8px 12px;border:1.5px solid var(--ink);border-radius:4px;background:transparent}
+#locApp .acts button.danger{border-color:#B3412E;color:#B3412E}
+#locApp .acts button.danger.arm{background:#B3412E;color:#fff}
+#locApp .step{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+#locApp .step span{flex:1;font-size:14px}
+#locApp .step button{width:40px;height:36px;border:1.5px solid var(--ink);border-radius:4px;background:transparent;font-size:18px}
+#locApp .step b{min-width:28px;text-align:center;font-variant-numeric:tabular-nums}
+#locApp .note{font-size:12.5px;color:var(--sub);margin:6px 0 10px}
+/* 재고 연동 */
+#locApp .layer em{font-style:normal;font-weight:700;font-variant-numeric:tabular-nums}
+#locApp .cell.stocked{border-color:var(--ink)}
+#locApp .stkbar{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px 0}
+#locApp .stkbar:empty{display:none}
+#locApp .stkbar button{padding:7px 11px;border:1.5px solid var(--hitline);border-radius:4px;background:var(--hitbg);font-size:13.5px;text-align:left}
+#locApp .stkbar button.warn{border-color:#B3412E;background:transparent;color:#B3412E}
+#locApp .sk{margin:4px 0 12px}
+#locApp .sk h3{margin:0 0 6px;font-size:14px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+#locApp .sk h3 small{font-size:11.5px;font-weight:400;color:var(--sub)}
+#locApp .srow{display:flex;align-items:center;gap:6px;padding:7px 0;border-top:1px dashed var(--line)}
+#locApp .srow:first-of-type{border-top:0}
+#locApp .srow .nm{flex:1;min-width:0;word-break:keep-all}
+#locApp .srow .nm small{color:var(--sub);margin-left:4px}
+#locApp .srow b{font-variant-numeric:tabular-nums;white-space:nowrap}
+#locApp .srow button,#locApp .sk .in{padding:5px 9px;border:1.5px solid var(--ink);border-radius:4px;background:transparent;font-size:13px;white-space:nowrap}
+#locApp .sk .in{margin-top:6px;background:var(--ink);color:var(--paper);font-weight:700}
+#locApp .sk .none{color:var(--sub);font-size:13px;margin:2px 0}
+#locApp .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
+  background:var(--ink);color:var(--paper);padding:9px 14px;border-radius:4px;font-size:13.5px;z-index:40;max-width:90vw}
+</style>
+
+<div id="locApp">
+  <div class="top">
+    <div class="titleRow"><h1>써브텍 자재 위치도</h1><span class="status" data-el="status"></span><button class="back" data-el="back" hidden>재고앱으로</button></div>
+    <div class="search">
+      <input data-el="q" type="search" placeholder="자재 이름으로 위치 찾기" autocomplete="off">
+      <div class="results" data-el="results" hidden></div>
+    </div>
+  </div>
+  <nav class="tabs" data-el="tabs"></nav>
+  <main class="floor" data-el="floor">
+    <div class="tools">
+      <button data-el="bMerge">칸 합치기</button>
+      <button data-el="bSheet">시트 설정</button>
+      <button data-el="bBackup">가져오기·내보내기</button>
+    </div>
+    <p class="hint" data-el="hint">칸을 누르면 이름과 자재를 적을 수 있어요.</p>
+    <div class="stkbar" data-el="stkBar"></div>
+    <div class="mergeBar" data-el="mergeBar" hidden><span data-el="mergeInfo"></span><button class="ghost" data-el="bCancel">취소</button><button data-el="bDoMerge">합치기</button></div>
+    <div class="wrap"><div class="grid" data-el="grid"></div></div>
+  </main>
+  <div class="shade" data-el="shade" hidden></div>
+  <section class="panel" data-el="panel" hidden><div data-el="panelBody"></div></section>
+  <div class="toast" data-el="toast" hidden></div>
+</div>
+
+<script>
+(function(){
+const root=document.getElementById('locApp');
+const E=n=>root.querySelector('[data-el="'+n+'"]');
+const KEY='subtek-map-v1';
+const GAS=(typeof google!=='undefined'&&google.script&&google.script.run)?google.script.run:null;
+const K=(r,c)=>r+','+c;
+const code=(r,c)=>String.fromCharCode(65+r)+(c+1);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+const lines=t=>String(t||'').split('\n').map(v=>v.trim()).filter(Boolean);
+const uid=()=>Math.random().toString(36).slice(2,9);
+const def=()=>({type:'slot',label:'',layers:[{t:''}],rs:1,cs:1});
+
+let S=null,mergeMode=false,sel=new Set(),cur=null,flashKey=null,delArm=false;
+let version=0,dirty=false,saving=false,saveTimer=null;
+/* 재고앱 연동: STK = {위치이름: [{id,name,cat,qty}]}, APP = 재고앱 주소 */
+let STK={},APP='',stockLoaded=false,pendingQ='';
+
+/* 단독 화면이면 전체 높이 사용 */
+if(root.parentElement===document.body&&document.body.querySelectorAll(':scope > div,:scope > main,:scope > section').length===1){
+  root.classList.add('solo');document.body.style.margin='0';
+}
+
+function blank(name,rows,cols){return{id:uid(),name,rows,cols,cells:{}}}
+function seed(){
+  const a=blank('시트 1',4,6),c=a.cells;
+  c[K(0,0)]=Object.assign(def(),{type:'label',label:'현관'});
+  c[K(1,0)]=Object.assign(def(),{type:'label'});
+  c[K(1,1)]=Object.assign(def(),{layers:[{t:''},{t:''}]});
+  c[K(2,0)]=Object.assign(def(),{type:'label'});
+  c[K(3,0)]=Object.assign(def(),{type:'label'});
+  [2,3].forEach(r=>[3,4,5].forEach(k=>c[K(r,k)]=Object.assign(def(),{type:'void'})));
+  const s=[a];for(let i=2;i<=5;i++)s.push(blank('시트 '+i,5,6));
+  return{sheets:s,cur:0};
+}
+function valid(o){return o&&Array.isArray(o.sheets)&&o.sheets.length}
+function parse(j){try{const o=JSON.parse(j);return valid(o)?o:null}catch(e){return null}}
+function fixCur(){S.cur=Math.min(Math.max(0,S.cur||0),S.sheets.length-1)}
+const sh=()=>S.sheets[S.cur];
+const get=(s,r,c)=>s.cells[K(r,c)]||def();
+function ensure(s,r,c){const k=K(r,c);if(!s.cells[k])s.cells[k]=def();return s.cells[k]}
+const hasContent=x=>String(x.label||'').trim()||(x.layers||[]).some(L=>String(L.t||'').trim());
+
+/* ---------- 재고 연동 ----------
+   위치 이름 = "시트이름 칸코드" (+ 2층 이상은 " N층"). Location.gs 의 locSlots_ 와 같은 규칙. */
+const fmtN=n=>(Number(n)||0).toLocaleString();
+const slotKey=(s,r,c,i)=>String(s.name||'').trim()+' '+code(r,c)+(i?' '+(i+1)+'층':'');
+const stockAt=k=>STK[k]||[];
+function keysAt(s,r,c){const x=get(s,r,c);return x.type==='slot'?x.layers.map((L,i)=>slotKey(s,r,c,i)):[]}
+function covered(s){const cov={};for(const k in s.cells){const x=s.cells[k];if(x.rs>1||x.cs>1){const[r,c]=k.split(',').map(Number);
+  for(let i=r;i<r+x.rs;i++)for(let j=c;j<c+x.cs;j++)if(i!==r||j!==c)cov[K(i,j)]=1}}return cov}
+/** 시트의 모든 보관칸 위치 이름 → {key:[r,c,layer]} */
+function sheetKeys(s){const cov=covered(s),o={};for(let r=0;r<s.rows;r++)for(let c=0;c<s.cols;c++){if(cov[K(r,c)])continue;
+  keysAt(s,r,c).forEach((k,i)=>o[k]=[r,c,i])}return o}
+const cellHasStock=(s,r,c,from)=>keysAt(s,r,c).slice(from||0).some(k=>stockAt(k).length);
+function sheetHasStock(s){if(stockAt(String(s.name||'').trim()).length)return true;return Object.keys(sheetKeys(s)).some(k=>stockAt(k).length)}
+/** 어느 시트에도 연결되지 않은 재고 위치 (예: 옛 이름 "1층", 시트 이름과 다른 "A동2층") */
+function orphanLocs(){const known={};S.sheets.forEach(s=>{known[String(s.name||'').trim()]=1;Object.assign(known,sheetKeys(s))});
+  return Object.keys(STK).filter(k=>!known[k]&&STK[k].length).sort((a,b)=>sum(STK[b])-sum(STK[a]))}
+const sum=a=>a.reduce((t,x)=>t+x.qty,0);
+/** 재고 때문에 막아야 하면 안내하고 true */
+function guard(cond,msg){if(GAS&&!stockLoaded){toast('재고 정보를 불러오는 중이에요. 잠시 후 다시 해주세요');return true}
+  if(cond){toast(msg);return true}return false}
+function loadStock(){if(!GAS)return;GAS.withSuccessHandler(res=>{STK=(res&&res.stock)||{};APP=(res&&res.appUrl)||APP;stockLoaded=true;
+  if(S){renderGrid();renderStockBar();const kind=E('panelBody').dataset.kind;
+    if(!E('panel').hidden){if(kind==='cell'&&cur)drawCell();else if(kind==='loose')openLoose();else if(kind==='orph')openOrphans()}}})
+  .withFailureHandler(()=>toast('재고를 불러오지 못했어요. 새로고침해 주세요')).locStock()}
+/** 재고앱 열기 (item/loc/mode). 저장 중이면 먼저 저장 */
+function openApp(p){
+  if(dirty||saving){flush();toast('위치도를 저장 중이에요. 잠시 후 다시 눌러주세요');return}
+  if(!APP){toast('재고앱 주소를 불러오는 중이에요. 잠시 후 다시 눌러주세요');return}
+  const qs=Object.keys(p||{}).filter(k=>p[k]).map(k=>k+'='+encodeURIComponent(p[k])).join('&');
+  window.open(APP+(qs?(APP.indexOf('?')<0?'?':'&')+qs:''),'_top');
+}
+function stockRows(list,loc){return list.length?list.map(a=>`<div class="srow"><span class="nm">${esc(a.name)}${a.cat?`<small>${esc(a.cat)}</small>`:''}</span><b>${fmtN(a.qty)}</b>`+
+  `<button data-go="출고" data-id="${esc(a.id)}" data-loc="${esc(loc)}">출고</button><button data-go="이동" data-id="${esc(a.id)}" data-loc="${esc(loc)}">이동</button></div>`).join('')
+  :'<p class="none">재고 없음</p>'}
+function bindGo(P){P.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>openApp({item:b.dataset.id,loc:b.dataset.loc,mode:b.dataset.go}))}
+function renderStockBar(){
+  const bar=E('stkBar');if(!S||!stockLoaded){bar.innerHTML='';return}
+  const nm=String(sh().name||'').trim(),loose=stockAt(nm),orph=orphanLocs();
+  bar.innerHTML=(loose.length?`<button data-b="loose">📦 칸 미지정 재고 ${fmtN(sum(loose))}개 (${loose.length}종)</button>`:'')+
+    (orph.length?`<button class="warn" data-b="orph">시트에 연결 안 된 재고 ${orph.length}곳</button>`:'');
+  bar.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>b.dataset.b==='loose'?openLoose():openOrphans());
+}
+function openLoose(){const nm=String(sh().name||'').trim(),P=E('panelBody');P.dataset.kind='loose';
+  P.innerHTML=`<div class="ph"><h2>${esc(nm)}<small>칸 미지정</small></h2><button class="x" data-a="close">닫기</button></div>
+  <p class="note">"${esc(nm)}" 이름으로만 기록된 재고예요. <b>이동</b>을 눌러 보관칸으로 옮기면 칸에 표시돼요. (총량은 그대로, 이력에 남아요)</p>
+  <div class="sk">${stockRows(stockAt(nm),nm)}</div>`;
+  P.querySelector('[data-a="close"]').onclick=closePanel;bindGo(P);openPanel()}
+function openOrphans(){const P=E('panelBody'),o=orphanLocs();P.dataset.kind='orph';
+  P.innerHTML=`<div class="ph"><h2>연결 안 된 재고</h2><button class="x" data-a="close">닫기</button></div>
+  <p class="note">위치 이름이 어느 시트·칸과도 맞지 않는 재고예요. 시트 이름을 그 위치 이름(예: A동1층)으로 바꾸면 그 시트의 "칸 미지정"으로 붙고, <b>이동</b>으로 칸에 옮길 수도 있어요.</p>
+  ${o.map(k=>`<div class="sk"><h3>${esc(k)}<small>${fmtN(sum(STK[k]))}개</small></h3>${stockRows(STK[k],k)}</div>`).join('')}`;
+  P.querySelector('[data-a="close"]').onclick=closePanel;bindGo(P);openPanel()}
+
+let tt;function toast(m){const t=E('toast');t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,3000)}
+function setStatus(m){E('status').textContent=m}
+
+/* ---------- 저장 (재고앱: 구글시트 / 그 외: 이 기기) ---------- */
+function save(){
+  if(!GAS){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('이 기기에 저장하지 못했어요')}return}
+  dirty=true;setStatus('저장 대기');clearTimeout(saveTimer);saveTimer=setTimeout(flush,700);
+}
+function flush(){
+  if(!GAS||!dirty)return;
+  if(saving){clearTimeout(saveTimer);saveTimer=setTimeout(flush,500);return}
+  saving=true;dirty=false;setStatus('저장 중');
+  GAS.withSuccessHandler(res=>{
+    saving=false;
+    if(res&&res.ok){version=res.version;setStatus(dirty?'저장 대기':'저장됨');if(dirty)flush();return}
+    if(res&&res.conflict){
+      const o=parse(res.data);if(o){const c=S.cur;S=o;S.cur=c;fixCur()}
+      version=res.version;dirty=false;closePanel();render();setStatus('저장됨');
+      toast('다른 사람이 먼저 고쳐서 최신 내용으로 바꿨어요. 방금 적은 칸을 다시 확인해 주세요');
+    }
+  }).withFailureHandler(()=>{
+    saving=false;dirty=true;setStatus('저장 실패, 다시 시도 중');clearTimeout(saveTimer);saveTimer=setTimeout(flush,5000);
+  }).locSave(JSON.stringify(S),version);
+}
+function loadServer(quiet){
+  if(!quiet)setStatus('불러오는 중');
+  GAS.withSuccessHandler(res=>{
+    const o=res&&res.data?parse(res.data):null;version=(res&&res.version)||0;
+    const c=S?S.cur:0;
+    if(o){S=o;S.cur=c;fixCur();setStatus('저장됨');render()}
+    else if(!S){S=seed();render();save()}
+    applyPendingQ();
+  }).withFailureHandler(()=>{setStatus('불러오기 실패');if(!S){S=seed();render()}toast('시트를 불러오지 못했어요. 새로고침해 주세요')}).locGet();
+}
+document.addEventListener('visibilitychange',()=>{
+  if(GAS&&S&&document.visibilityState==='visible'&&!dirty&&!saving&&E('panel').hidden){loadServer(true);loadStock()}
+});
+
+/* ---------- 그리기 ---------- */
+function render(){if(!S)return;renderTabs();renderGrid();renderMerge();renderStockBar()}
+function renderTabs(){
+  const t=E('tabs');t.innerHTML='';
+  S.sheets.forEach((s,i)=>{const b=document.createElement('button');b.className='tab'+(i===S.cur?' on':'');b.textContent=s.name;
+    b.onclick=()=>{if(i===S.cur){openSheet();return}S.cur=i;sel.clear();render()};t.appendChild(b)});
+  const a=document.createElement('button');a.className='tab add';a.textContent='+ 시트';
+  a.onclick=()=>{let n=S.sheets.length+1;while(S.sheets.some(s=>String(s.name).trim()==='시트 '+n))n++;S.sheets.push(blank('시트 '+n,5,6));S.cur=S.sheets.length-1;save();render();setTimeout(()=>t.scrollLeft=9999,0)};
+  t.appendChild(a);
+}
+const query=()=>E('q').value.trim().toLowerCase();
+const matches=(x,q)=>String(x.label||'').toLowerCase().includes(q)||(x.type==='slot'&&x.layers.some(L=>String(L.t||'').toLowerCase().includes(q)));
+const stockMatch=(s,r,c,q)=>keysAt(s,r,c).some(k=>stockAt(k).some(a=>String(a.name).toLowerCase().includes(q)));
+function cellHTML(x,r,c,s){
+  const cd=`<span class="code">${code(r,c)}</span>`;
+  if(x.type==='label')return `${x.rs*x.cs>1?cd:''}<span class="lbl">${x.label?esc(x.label):'<i>이름표</i>'}</span>`;
+  if(x.type==='void')return cd+(x.label?`<span class="name">${esc(x.label)}</span>`:'');
+  let h=cd+(x.label?`<span class="name">${esc(x.label)}</span>`:'');
+  const split=x.layers.length>1;
+  const st=x.layers.map((L,i)=>s?stockAt(slotKey(s,r,c,i)):[]);
+  const anyItem=x.layers.some(L=>lines(L.t).length)||st.some(a=>a.length);
+  if(x.rs*x.cs>1&&x.label&&!anyItem&&!split)return h; // 이름만 있는 합친 칸은 이름만 크게
+  h+='<span class="layers">'+x.layers.map((L,i)=>{
+    // 실제 재고(굵은 수량) 먼저, 그 다음 손으로 적은 자재
+    const ls=st[i].map(a=>esc(a.name)+' <em>'+fmtN(a.qty)+'</em>').concat(lines(L.t).map(esc));
+    const body=ls.length?ls.slice(0,3).join(', ')+(ls.length>3?` 외 ${ls.length-3}`:''):'<i>비어 있음</i>';
+    return `<span class="layer">${split?`<b>${i+1}층</b>`:''}${body}</span>`}).join('')+'</span>';
+  return h;
+}
+function bigStyle(d,x){
+  const n=x.rs*x.cs;if(n<=1)return;
+  d.classList.add('big');
+  const name=String(x.label||'').trim(),len=[...name].length,long=Math.max(x.rs,x.cs);
+  const fs=(x.type==='label'?17:15)+Math.min(long,5)*1.6;
+  const ls=len&&len<=6?Math.min(0.2+0.3*(long-1),1.4):0.02;
+  d.style.setProperty('--fs',fs.toFixed(1)+'px');
+  d.style.setProperty('--ls',ls.toFixed(2)+'em');
+  if(x.rs>x.cs&&len&&len<=6)d.classList.add('tall');
+}
+function renderGrid(){
+  const s=sh(),g=E('grid'),q=query(),cov=covered(s);
+  g.style.gridTemplateColumns=`repeat(${s.cols},minmax(70px,1fr))`;g.innerHTML='';
+  for(let r=0;r<s.rows;r++)for(let c=0;c<s.cols;c++){
+    const k=K(r,c);if(cov[k])continue;const x=get(s,r,c);
+    const d=document.createElement('button');
+    d.className='cell '+x.type+(sel.has(k)?' sel':'')+(q&&(matches(x,q)||stockMatch(s,r,c,q))?' hit':'')+(flashKey===k?' flash':'')+(cellHasStock(s,r,c)?' stocked':'');
+    d.style.gridRow=`${r+1} / span ${x.rs}`;d.style.gridColumn=`${c+1} / span ${x.cs}`;d.dataset.k=k;
+    d.setAttribute('aria-label',code(r,c)+(x.label?' '+x.label:''));
+    d.innerHTML=cellHTML(x,r,c,s);bigStyle(d,x);d.onclick=()=>tap(r,c);g.appendChild(d);
+  }
+}
+function renderMerge(){
+  E('floor').classList.toggle('merging',mergeMode);E('bMerge').classList.toggle('on',mergeMode);
+  E('mergeBar').hidden=!mergeMode;E('hint').hidden=mergeMode;
+  E('mergeInfo').textContent=sel.size?`${sel.size}칸 선택됨 (선택한 칸을 감싸는 네모로 합쳐요)`:'합칠 칸을 차례로 누르세요';
+}
+
+/* ---------- 칸 ---------- */
+function tap(r,c){const k=K(r,c);if(mergeMode){sel.has(k)?sel.delete(k):sel.add(k);render();return}cur={r,c};openCell()}
+function doMerge(){
+  if(sel.size<2){toast('두 칸 이상 골라주세요');return}
+  const s=sh();let r0=99,c0=99,r1=-1,c1=-1;
+  sel.forEach(k=>{const[r,c]=k.split(',').map(Number);const x=get(s,r,c);r0=Math.min(r0,r);c0=Math.min(c0,c);r1=Math.max(r1,r+x.rs-1);c1=Math.max(c1,c+x.cs-1)});
+  for(const k in s.cells){const x=s.cells[k];const[r,c]=k.split(',').map(Number);const er=r+x.rs-1,ec=c+x.cs-1;
+    const hit=!(er<r0||r>r1||ec<c0||c>c1),inside=r>=r0&&c>=c0&&er<=r1&&ec<=c1;
+    if(hit&&!inside){toast('이미 합친 칸이 범위 밖으로 걸쳐 있어요. 그 칸을 먼저 풀어주세요');return}}
+  for(let i=r0;i<=r1;i++)for(let j=c0;j<=c1;j++)if((i!==r0||j!==c0)&&guard(cellHasStock(s,i,j),
+    `${code(i,j)} 칸에 재고가 있어요. 재고를 옮긴 뒤 합쳐주세요`))return;
+  const base=ensure(s,r0,c0),extra=[];
+  for(let i=r0;i<=r1;i++)for(let j=c0;j<=c1;j++){if(i===r0&&j===c0)continue;const k=K(i,j),x=s.cells[k];if(!x)continue;
+    if(x.type==='slot')x.layers.forEach(L=>{if(String(L.t).trim())extra.push(String(L.t).trim())});
+    if(x.label&&!base.label)base.label=x.label;delete s.cells[k]}
+  if(extra.length){if(base.type!=='slot')base.type='slot';base.layers[0].t=[String(base.layers[0].t).trim(),...extra].filter(Boolean).join('\n')}
+  base.rs=r1-r0+1;base.cs=c1-c0+1;sel.clear();mergeMode=false;save();render();
+  toast(`${code(r0,c0)} 기준으로 ${base.rs*base.cs}칸을 합쳤어요. 눌러서 이름을 적어보세요`);
+}
+
+/* ---------- 패널 ---------- */
+function openPanel(){E('shade').hidden=false;E('panel').hidden=false}
+function closePanel(){E('shade').hidden=true;E('panel').hidden=true;delArm=false}
+E('shade').onclick=closePanel;
+
+function openCell(){drawCell();openPanel()}
+function drawCell(){
+  const s=sh(),{r,c}=cur,x=get(s,r,c),P=E('panelBody'),big=x.rs*x.cs>1;P.dataset.kind='cell';
+  const ph={slot:'예: 선반1, 파레트',label:'예: 현관, 벽쪽, 가운데',void:'예: 복도, 통로'}[x.type];
+  P.innerHTML=`<div class="ph"><h2>${code(r,c)}${big?`<small>${x.rs}×${x.cs} 합친 칸</small>`:''}</h2><button class="x" data-a="close">닫기</button></div>
+  <div class="seg">${[['slot','보관칸'],['label','이름표'],['void','빈 공간']].map(([v,t])=>`<button data-type="${v}" class="${x.type===v?'on':''}">${t}</button>`).join('')}</div>
+  <label class="f">이름${big?' (합친 칸은 가운데에 크게 보여요)':''}<input data-f="label" value="${esc(x.label)}" placeholder="${ph}"></label>
+  ${x.type==='slot'?x.layers.map((L,i)=>{const k=slotKey(s,r,c,i),list=stockAt(k);return `<div class="sk"><h3>현재 재고${x.layers.length>1?' · '+(i+1)+'층':''}<small>${esc(k)}</small></h3>
+    ${stockLoaded||!GAS?stockRows(list,k):'<p class="none">불러오는 중…</p>'}<button class="in" data-go="입고" data-loc="${esc(k)}">＋ 이 칸에 입고</button></div>`}).join(''):''}
+  ${x.type==='slot'?x.layers.map((L,i)=>`<label class="f">${x.layers.length>1?(i+1)+'층 메모':'메모 (직접 적는 자재)'}<textarea data-i="${i}" rows="3" placeholder="자재명을 한 줄에 하나씩">${esc(L.t)}</textarea></label>`).join(''):''}
+  <div class="acts">
+    ${x.type==='slot'?(x.layers.length===1?'<button data-a="split">1층·2층으로 나누기</button>':`${x.layers.length<4?'<button data-a="addL">층 추가</button>':''}<button data-a="joinL">층 없애기</button>`):''}
+    ${big?'<button data-a="unmerge">합친 칸 풀기</button>':''}
+  </div>`;
+  bindGo(P);
+  P.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>{if(b.dataset.type!=='slot'&&guard(cellHasStock(s,r,c),'이 칸에 재고가 있어 종류를 바꿀 수 없어요. 재고를 옮긴 뒤 바꿔주세요'))return;const y=ensure(s,r,c);y.type=b.dataset.type;if(!y.layers||!y.layers.length)y.layers=[{t:''}];save();renderGrid();drawCell()});
+  const fl=P.querySelector('[data-f="label"]');fl.oninput=()=>{ensure(s,r,c).label=fl.value;save();renderGrid()};
+  P.querySelectorAll('textarea').forEach(t=>t.oninput=()=>{ensure(s,r,c).layers[+t.dataset.i].t=t.value;save();renderGrid()});
+  P.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='close'){closePanel();return}
+    if(a==='joinL'&&guard(cellHasStock(s,r,c,1),'2층 이상에 재고가 있어 층을 없앨 수 없어요. 재고를 옮긴 뒤 해주세요'))return;
+    const y=ensure(s,r,c);
+    if(a==='split')y.layers=[{t:y.layers[0].t},{t:''}];
+    if(a==='addL')y.layers.push({t:''});
+    if(a==='joinL')y.layers=[{t:y.layers.map(L=>String(L.t).trim()).filter(Boolean).join('\n')}];
+    if(a==='unmerge'){y.rs=1;y.cs=1}
+    save();renderGrid();drawCell()});
+}
+
+function openSheet(){delArm=false;drawSheet();openPanel()}
+function drawSheet(){
+  const s=sh(),P=E('panelBody');P.dataset.kind='sheet';
+  P.innerHTML=`<div class="ph"><h2>시트 설정</h2><button class="x" data-a="close">닫기</button></div>
+  <label class="f">시트 이름<input data-f="name" value="${esc(s.name)}" placeholder="예: A동1층"${GAS&&(!stockLoaded||sheetHasStock(s))?' readonly':''}></label>
+  <p class="note">${GAS&&!stockLoaded?'재고 정보를 불러오는 중이에요.':GAS&&sheetHasStock(s)?'이 시트에 재고가 있어 이름을 바꿀 수 없어요. (칸 위치 이름 = 시트 이름 + 칸 코드)':'시트 이름이 재고앱 위치 이름의 앞부분이 돼요. 기존 위치 이름(예: A동1층)과 같게 하면 그 재고가 이 시트의 "칸 미지정"으로 붙어요.'}</p>
+  <div class="step"><span>줄 (A부터)</span><button data-d="r-1" aria-label="줄 줄이기">−</button><b>${s.rows}</b><button data-d="r1" aria-label="줄 늘리기">+</button></div>
+  <div class="step"><span>칸 (1부터)</span><button data-d="c-1" aria-label="칸 줄이기">−</button><b>${s.cols}</b><button data-d="c1" aria-label="칸 늘리기">+</button></div>
+  <p class="note">줄이기는 맨 아래 줄, 맨 오른쪽 칸부터 지워져요. 내용이 있으면 멈춰요.</p>
+  <div class="acts">${S.sheets.length>1?`<button class="danger${delArm?' arm':''}" data-a="del">${delArm?'한 번 더 누르면 삭제':'이 시트 삭제'}</button>`:''}</div>`;
+  P.querySelector('[data-f="name"]').oninput=e=>{const v=e.target.value.trim()||'이름 없음';
+    if(S.sheets.some(o=>o!==s&&String(o.name).trim()===v)){toast('같은 이름의 시트가 이미 있어요');return}
+    s.name=v;save();renderTabs();renderGrid();renderStockBar()};
+  P.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const d=b.dataset.d;resize(d[0]==='r'?+d.slice(1):0,d[0]==='c'?+d.slice(1):0)});
+  P.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{if(b.dataset.a==='close'){closePanel();return}
+    if(guard(sheetHasStock(s),'이 시트에 재고가 있어 삭제할 수 없어요. 재고를 옮긴 뒤 삭제해주세요'))return;
+    if(!delArm){delArm=true;drawSheet();return}
+    S.sheets.splice(S.cur,1);fixCur();save();closePanel();render();toast('시트를 삭제했어요')});
+}
+function resize(dr,dc){
+  const s=sh(),nr=s.rows+dr,nc=s.cols+dc;if(nr<1||nc<1||nr>26||nc>20){toast('줄은 1~26, 칸은 1~20까지 돼요');return}
+  if(dr<0||dc<0){
+    for(const k in s.cells){const[r,c]=k.split(',').map(Number);if((r>=nr||c>=nc)&&hasContent(s.cells[k])){toast('지울 자리에 내용이 있어요. 먼저 비워주세요');return}}
+    for(let r=0;r<s.rows;r++)for(let c=0;c<s.cols;c++)if((r>=nr||c>=nc)&&guard(cellHasStock(s,r,c),`${code(r,c)} 칸에 재고가 있어요. 재고를 옮긴 뒤 줄여주세요`))return;
+    for(const k in s.cells){const[r,c]=k.split(',').map(Number);const x=s.cells[k];
+      if(r>=nr||c>=nc){delete s.cells[k];continue}x.rs=Math.min(x.rs,nr-r);x.cs=Math.min(x.cs,nc-c)}
+  }
+  s.rows=nr;s.cols=nc;save();renderGrid();drawSheet();
+}
+
+function openBackup(){
+  const P=E('panelBody');P.dataset.kind='backup';
+  P.innerHTML=`<div class="ph"><h2>가져오기·내보내기</h2><button class="x" data-a="close">닫기</button></div>
+  <p class="note">${GAS?'평소엔 구글시트에 자동 저장돼요. Claude 미리보기에서 입력해 둔 내용이 있으면, 그쪽 백업 내용을 아래에 붙여넣고 불러오세요.':'이 화면은 이 기기에만 저장돼요. 복사해서 재고앱 위치도의 같은 메뉴에 붙여넣으면 옮겨져요.'}</p>
+  <label class="f">위치도 데이터<textarea data-f="json" rows="8"></textarea></label>
+  <div class="acts"><button data-a="copy">복사</button><button data-a="load">붙여넣은 내용 불러오기</button></div>`;
+  const t=P.querySelector('[data-f="json"]');t.value=JSON.stringify(S);
+  P.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const a=b.dataset.a;
+    if(a==='close'){closePanel();return}
+    if(a==='copy'){try{await navigator.clipboard.writeText(t.value);toast('복사했어요')}catch(e){t.focus();t.select();toast('선택해 두었어요. 길게 눌러 복사하세요')}}
+    if(a==='load'){const o=parse(t.value);if(!o){toast('형식이 맞지 않아요. 복사한 내용 전체를 붙여넣어 주세요');return}
+      S=o;fixCur();save();closePanel();render();toast('불러왔어요')}
+  });
+  openPanel();
+}
+
+/* ---------- 검색 ---------- */
+function renderResults(){
+  const q=query(),box=E('results');renderGrid();if(!q){box.hidden=true;return}
+  const out=[];
+  S.sheets.forEach((s,si)=>{for(const k in s.cells){const x=s.cells[k];const[r,c]=k.split(',').map(Number);
+    if(String(x.label||'').toLowerCase().includes(q))out.push({si,r,c,w:'',t:x.label});
+    if(x.type==='slot')x.layers.forEach((L,i)=>lines(L.t).forEach(t=>{if(t.toLowerCase().includes(q))out.push({si,r,c,w:x.layers.length>1?(i+1)+'층':'',t})}))}
+    // 실제 재고 (빈 칸·합친 칸 포함 전체 격자)
+    const ks=sheetKeys(s);Object.keys(ks).forEach(k=>stockAt(k).forEach(a=>{if(String(a.name).toLowerCase().includes(q)){const[r,c,i]=ks[k],x=get(s,r,c);
+      out.unshift({si,r,c,w:(x.layers.length>1?(i+1)+'층 ':'')+(x.label?x.label:''),t:a.name+' · '+fmtN(a.qty)+'개'})}}));
+    stockAt(String(s.name||'').trim()).forEach(a=>{if(String(a.name).toLowerCase().includes(q))out.push({si,loose:1,t:a.name+' · '+fmtN(a.qty)+'개'})})});
+  if(stockLoaded)orphanLocs().forEach(k=>STK[k].forEach(a=>{if(String(a.name).toLowerCase().includes(q))out.push({orph:k,t:a.name+' · '+fmtN(a.qty)+'개'})}));
+  box.hidden=false;
+  box.innerHTML=out.length?out.slice(0,40).map((o,n)=>`<button data-n="${n}"><span class="rw">${o.orph?esc(o.orph)+' (연결 안 됨)':esc(S.sheets[o.si].name)+' '+(o.loose?'칸 미지정':code(o.r,o.c)+' '+esc(o.w))}</span><span>${esc(o.t)}</span></button>`).join('')
+    :`<p class="none">"${esc(E('q').value.trim())}"이(가) 적힌 칸이 없어요</p>`;
+  box.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{const o=out[+b.dataset.n];box.hidden=true;
+    if(o.orph){openOrphans();return}
+    if(o.loose){S.cur=o.si;render();openLoose();return}
+    S.cur=o.si;flashKey=K(o.r,o.c);render();
+    const el=root.querySelector(`.cell[data-k="${flashKey}"]`);if(el)el.scrollIntoView({block:'center',inline:'center',behavior:'smooth'});
+    setTimeout(()=>{flashKey=null},1500)});
+}
+E('q').oninput=renderResults;
+E('q').onfocus=()=>{if(query())renderResults()};
+document.addEventListener('click',e=>{if(!e.target.closest('#locApp .search'))E('results').hidden=true});
+
+/* ---------- 버튼 ---------- */
+E('bMerge').onclick=()=>{mergeMode=!mergeMode;sel.clear();render()};
+E('bCancel').onclick=()=>{mergeMode=false;sel.clear();render()};
+E('bDoMerge').onclick=doMerge;
+E('bSheet').onclick=openSheet;
+E('bBackup').onclick=openBackup;
+if(GAS&&root.classList.contains('solo')){
+  const bk=E('back');bk.hidden=false;
+  bk.onclick=()=>{if(APP){openApp({});return}GAS.withSuccessHandler(u=>window.open(u,'_top')).locUrl()};
+}
+
+/* ---------- 시작 ---------- */
+/* 재고앱에서 "위치도에서 보기"로 왔으면 ?q=품명 으로 바로 검색 */
+function applyPendingQ(){if(!pendingQ||!S)return;E('q').value=pendingQ;pendingQ='';renderResults()}
+if(GAS){loadServer(false);loadStock();
+  try{google.script.url.getLocation(l=>{const q=l&&l.parameter&&l.parameter.q;if(q){pendingQ=q;applyPendingQ()}})}catch(e){}}
+else{try{const v=localStorage.getItem(KEY);S=v?parse(v):null}catch(e){}if(!S)S=seed();fixCur();render()}
+})();
+</script>
