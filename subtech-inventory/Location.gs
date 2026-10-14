@@ -167,5 +167,47 @@ function locStock() {
   Object.keys(stock).forEach(k => stock[k].sort((a, b) => b.qty - a.qty));
   let appUrl = '';
   try { appUrl = ScriptApp.getService().getUrl() || ''; } catch (e) {}
-  return { stock: stock, appUrl: appUrl };
+  const staff = [], cf = SpreadsheetApp.getActive().getSheetByName(TAB_CONFIG);
+  if (cf && cf.getLastRow() >= 2) cf.getRange(2, 1, cf.getLastRow() - 1, 1).getValues().forEach(r => { if (r[0]) staff.push(String(r[0])); });
+  return { stock: stock, appUrl: appUrl, staff: staff };
+}
+
+/**
+ * 위치도에서 이동 (품목 하나 / 층 전체 / 칸 전체). 거래로그에 품목마다 '이동' 2행 — 앱의 moveStock 과 같은 형식.
+ * p = {staff, memo, groups:[{fromLoc, toLoc, moves:[{id, qty}]}]}
+ * 전부 검사한 뒤 한 번에 기록합니다(하나라도 틀리면 아무것도 안 씀). → 갱신된 locStock() 반환
+ */
+function locMove(p) {
+  p = p || {};
+  const groups = (p.groups || []).map(g => ({
+    from: String(g.fromLoc || '').trim(), to: String(g.toLoc || '').trim(),
+    moves: (g.moves || []).map(m => ({ id: m.id, qty: Number(m.qty) || 0 })).filter(m => m.id && m.qty > 0)
+  })).filter(g => g.moves.length);
+  if (!groups.length) throw new Error('옮길 수량을 입력하세요.');
+  groups.forEach(g => { if (!g.from || !g.to || g.from === g.to) throw new Error('보내는 칸과 받는 칸을 다르게 골라주세요.'); });
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const ss = SpreadsheetApp.getActive(), log = ss.getSheetByName(TAB_LOG), m = ss.getSheetByName(TAB_MASTER);
+    const info = {};
+    if (m && m.getLastRow() >= 2)
+      m.getRange(2, 1, m.getLastRow() - 1, 3).getValues().forEach(r => { if (r[0]) info[r[0]] = { name: r[1], cat: r[2] }; });
+    const st = computeStock_(), used = {}, now = new Date(), rows = [];
+    groups.forEach(g => {
+      const route = g.from + '→' + g.to, memo = (p.memo ? route + ' / ' + p.memo : route) + ' (위치도)';
+      g.moves.forEach(mv => {
+        const it = info[mv.id];
+        if (!it) throw new Error('품목을 찾을 수 없어요: ' + mv.id);
+        const k = mv.id + '\n' + g.from, have = (((st[mv.id] || {}).locs || {})[g.from] || 0) - (used[k] || 0);
+        if (mv.qty > have) throw new Error(it.name + ': ' + g.from + ' 재고(' + have + '개)보다 많이 옮길 수 없어요. 새로고침 후 다시 해주세요.');
+        used[k] = (used[k] || 0) + mv.qty;
+        rows.push([now, mv.id, it.name, it.cat, g.from, '이동', '', '', mv.qty, -mv.qty, p.staff || '', memo, '']);
+        rows.push([now, mv.id, it.name, it.cat, g.to,   '이동', '', '', mv.qty,  mv.qty, p.staff || '', memo, '']);
+      });
+    });
+    log.getRange(log.getLastRow() + 1, 1, rows.length, 13).setValues(rows);
+  } finally {
+    lock.releaseLock();
+  }
+  return locStock();
 }
