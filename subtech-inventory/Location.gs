@@ -72,7 +72,7 @@ function locWriteList_(obj) {
       const x = s.cells[k];
       if (!x || x.type !== 'slot') return;
       const rc = k.split(',').map(Number);
-      const code = String.fromCharCode(65 + rc[0]) + (rc[1] + 1);
+      const code = locCode_(rc[0], rc[1]);
       const split = (x.layers || []).length > 1;
       (x.layers || []).forEach((L, i) => {
         String(L.t || '').split('\n').map(t => t.trim()).filter(Boolean)
@@ -110,7 +110,12 @@ function locInclude() {
 //   시트 이름 자체(예: "A동1층")에 있는 재고는 그 시트의 "칸 미지정" 재고로 보입니다.
 //   ※ Location.html 의 slotsOf() 와 같은 규칙을 써야 합니다.
 // ---------------------------------------------------------------------------
-function locCode_(r, c) { return String.fromCharCode(65 + r) + (c + 1); }
+/** 칸 코드: 줄은 A~Z 다음 AA, AB … (엑셀식), 칸은 1부터. Location.html 의 code() 와 같은 규칙 */
+function locCode_(r, c) {
+  let s = '', n = r + 1;
+  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+  return s + (c + 1);
+}
 
 /** 위치도 JSON → 보관칸 목록 [{key, sheet, code, label, layer, n, note(손으로 적은 첫 자재)}] (시트·줄·칸 순) */
 function locSlots_(obj) {

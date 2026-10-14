@@ -168,7 +168,10 @@ const E=n=>root.querySelector('[data-el="'+n+'"]');
 const KEY='subtek-map-v1';
 const GAS=(typeof google!=='undefined'&&google.script&&google.script.run)?google.script.run:null;
 const K=(r,c)=>r+','+c;
-const code=(r,c)=>String.fromCharCode(65+r)+(c+1);
+/* 줄 코드: A~Z 다음은 AA, AB … (엑셀식). A~Z 칸은 예전과 같아서 기존 재고 위치 이름이 그대로 유지됨 */
+const MAXR=50,MAXC=50;
+const rowCode=r=>{let s='';r++;while(r>0){const m=(r-1)%26;s=String.fromCharCode(65+m)+s;r=Math.floor((r-1)/26)}return s};
+const code=(r,c)=>rowCode(r)+(c+1);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const lines=t=>String(t||'').split('\n').map(v=>v.trim()).filter(Boolean);
 const uid=()=>Math.random().toString(36).slice(2,9);
@@ -411,8 +414,8 @@ function drawSheet(){
   P.innerHTML=`<div class="ph"><h2>시트 설정</h2><button class="x" data-a="close">닫기</button></div>
   <label class="f">시트 이름<input data-f="name" value="${esc(s.name)}" placeholder="예: A동1층"${GAS&&(!stockLoaded||sheetHasStock(s))?' readonly':''}></label>
   <p class="note">${GAS&&!stockLoaded?'재고 정보를 불러오는 중이에요.':GAS&&sheetHasStock(s)?'이 시트에 재고가 있어 이름을 바꿀 수 없어요. (칸 위치 이름 = 시트 이름 + 칸 코드)':'시트 이름이 재고앱 위치 이름의 앞부분이 돼요. 기존 위치 이름(예: A동1층)과 같게 하면 그 재고가 이 시트의 "칸 미지정"으로 붙어요.'}</p>
-  <div class="step"><span>줄 (A부터)</span><button data-d="r-1" aria-label="줄 줄이기">−</button><b>${s.rows}</b><button data-d="r1" aria-label="줄 늘리기">+</button></div>
-  <div class="step"><span>칸 (1부터)</span><button data-d="c-1" aria-label="칸 줄이기">−</button><b>${s.cols}</b><button data-d="c1" aria-label="칸 늘리기">+</button></div>
+  <div class="step"><span>줄 (A부터)</span><button data-d="r-5" aria-label="줄 5개 줄이기">−5</button><button data-d="r-1" aria-label="줄 줄이기">−</button><b>${s.rows}</b><button data-d="r1" aria-label="줄 늘리기">+</button><button data-d="r5" aria-label="줄 5개 늘리기">+5</button></div>
+  <div class="step"><span>칸 (1부터)</span><button data-d="c-5" aria-label="칸 5개 줄이기">−5</button><button data-d="c-1" aria-label="칸 줄이기">−</button><b>${s.cols}</b><button data-d="c1" aria-label="칸 늘리기">+</button><button data-d="c5" aria-label="칸 5개 늘리기">+5</button></div>
   <p class="note">줄이기는 맨 아래 줄, 맨 오른쪽 칸부터 지워져요. 내용이 있으면 멈춰요.</p>
   <div class="acts">${S.sheets.length>1?`<button class="danger${delArm?' arm':''}" data-a="del">${delArm?'한 번 더 누르면 삭제':'이 시트 삭제'}</button>`:''}</div>`;
   P.querySelector('[data-f="name"]').oninput=e=>{const v=e.target.value.trim()||'이름 없음';
@@ -425,7 +428,9 @@ function drawSheet(){
     S.sheets.splice(S.cur,1);fixCur();save();closePanel();render();toast('시트를 삭제했어요')});
 }
 function resize(dr,dc){
-  const s=sh(),nr=s.rows+dr,nc=s.cols+dc;if(nr<1||nc<1||nr>26||nc>20){toast('줄은 1~26, 칸은 1~20까지 돼요');return}
+  const s=sh(),nr=Math.min(MAXR,Math.max(1,s.rows+dr)),nc=Math.min(MAXC,Math.max(1,s.cols+dc));
+  if(nr===s.rows&&nc===s.cols){toast('줄과 칸은 1~'+MAXR+'까지 돼요');return}
+  dr=nr-s.rows;dc=nc-s.cols;
   if(dr<0||dc<0){
     for(const k in s.cells){const[r,c]=k.split(',').map(Number);if((r>=nr||c>=nc)&&hasContent(s.cells[k])){toast('지울 자리에 내용이 있어요. 먼저 비워주세요');return}}
     for(let r=0;r<s.rows;r++)for(let c=0;c<s.cols;c++)if((r>=nr||c>=nc)&&guard(cellHasStock(s,r,c),`${code(r,c)} 칸에 재고가 있어요. 재고를 옮긴 뒤 줄여주세요`))return;
