@@ -192,7 +192,7 @@
 </div>
 
 <script>
-var HTML_VERSION = 'v13'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v14'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var cur = null, type = '입고', lines = [{ boxes:'', per:'' }], txImgs = [];
@@ -209,8 +209,9 @@ function onErr(e){ document.getElementById('searchList').innerHTML='<div class="
 function fill(id,arr){ document.getElementById(id).innerHTML=arr.map(function(s){return '<option>'+esc(s)+'</option>';}).join(''); }
 // ---- 위치: 위치 탭 + 자재 위치도(Location.gs) 칸 ----
 // 위치도 칸의 위치 이름 = "시트이름 칸코드"(+ " N층"). 칸 이름(선반1 등)은 화면 표시용.
-var SLOT = {};
-function indexSlots(){ SLOT={}; (DATA.locMap.slots||[]).forEach(function(sl){ SLOT[sl.key]=sl; }); }
+var SLOT = {}, ASSIGN = {};   // ASSIGN[품목ID] = [위치도에서 📌지정한 칸 위치들]
+function indexSlots(){ SLOT={}; ASSIGN={}; (DATA.locMap.slots||[]).forEach(function(sl){ SLOT[sl.key]=sl;
+  (sl.p||[]).forEach(function(id){ (ASSIGN[id]=ASSIGN[id]||[]).push(sl.key); }); }); }
 function slotText(sl){ return sl.code+(sl.n>1?' '+(sl.layer+1)+'층':'')+(sl.label?' · '+sl.label:(sl.note?' · ('+sl.note+')':'')); }
 /** 화면에 보일 위치 이름 (위치도 칸이면 칸 이름까지) */
 function locDisp(name){ var sl=SLOT[name]; return sl ? (sl.sheet+' '+slotText(sl)) : (''+(name||'')); }
@@ -257,6 +258,7 @@ function renderSearch(){ var q=val('searchInput').toLowerCase();
     return '<div class="item" onclick="select('+idx+')"><div><div class="nm">'+esc(it.name)+'</div><div class="meta">현재 '+fmt(it.total)+'개'+(bt?(' · '+bt):'')+'</div></div>'+badge(it.cat)+'</div>';
   }).join(''):'<div class="loading">검색 결과가 없습니다.</div>'; }
 function select(i){ cur=DATA.items[i]; type='입고'; lines=[{boxes:'',per:String(cur.unit||'')}]; txImgs=[]; document.getElementById('renameBox').classList.add('hidden'); document.getElementById('adjTarget').value=''; renderInput(); go('input'); loadHistory();
+  var asg=ASSIGN[cur.id]; if(asg&&asg.length){ ensureLocOption('locSel', asg[0]); document.getElementById('locSel').value=asg[0]; updateTotal(); } // 📌지정 칸을 기본 보관 위치로
   if(PEND){ var pd=PEND; PEND=null; renderPend(); applyLoc(pd.loc, pd.mode); } }
 function loadHistory(){ document.getElementById('histList').innerHTML='<div class="loading">불러오는 중…</div>';
   google.script.run.withSuccessHandler(renderHistory).withFailureHandler(function(){renderHistory([]);}).getHistory(cur.id); }
@@ -304,7 +306,9 @@ function renderInput(){
     document.getElementById('movTo').innerHTML=locOptionsHtml(toDef);
   }
   var locs=cur.locs||{}; var keys=Object.keys(locs);
-  document.getElementById('locStock').innerHTML=keys.length?keys.map(function(k){return '<span class="locchip">'+esc(locDisp(k))+' '+fmt(locs[k])+'</span>';}).join(''):'<span class="locchip" style="background:#eef1f5;color:#8a97a8">기록 없음</span>';
+  var asg=(ASSIGN[cur.id]||[]).filter(function(k){ return !locs[k]; });
+  document.getElementById('locStock').innerHTML=(keys.length?keys.map(function(k){return '<span class="locchip">'+((ASSIGN[cur.id]||[]).indexOf(k)>=0?'📌':'')+esc(locDisp(k))+' '+fmt(locs[k])+'</span>';}).join(''):(asg.length?'':'<span class="locchip" style="background:#eef1f5;color:#8a97a8">기록 없음</span>'))+
+    asg.map(function(k){ return '<span class="locchip" style="background:#fff7ed;color:#c2410c">📌 '+esc(locDisp(k))+' (지정)</span>'; }).join('');
   document.getElementById('boxRows').innerHTML=lines.map(function(l,i){
     return '<div class="boxrow"><div class="field"><div class="k">박스수</div><input type="number" inputmode="numeric" value="'+esc(l.boxes)+'" oninput="onInput('+i+',\'boxes\',this.value)"></div><div class="x">×</div><div class="field"><div class="k">박스당 수량</div><input type="number" inputmode="numeric" value="'+esc(l.per)+'" oninput="onInput('+i+',\'per\',this.value)"></div><div class="eq">합계<b>'+fmt(lineTotal(l))+'</b></div>'+(lines.length>1?'<span class="del" onclick="delLine('+i+')">✕</span>':'')+'</div>';
   }).join(''); renderTxPic(); updateTotal();

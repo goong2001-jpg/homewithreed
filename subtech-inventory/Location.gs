@@ -47,16 +47,50 @@ function locSave(json, baseVersion) {
       const g = locGet();
       return { ok: false, conflict: true, version: g.version, data: g.data };
     }
-    const obj = JSON.parse(json); // 형식 검사
-    const chunks = [];
-    for (let i = 0; i < json.length; i += LOC_CHUNK) chunks.push(["'" + json.slice(i, i + LOC_CHUNK)]);
-    const last = sh.getLastRow();
-    if (last > 1) sh.getRange(2, 1, last - 1, 1).clearContent();
-    sh.getRange(2, 1, chunks.length, 1).setValues(chunks);
-    const v = cur + 1;
-    sh.getRange(1, 1, 1, 3).setValues([[v, new Date(), '← 위치도 앱 데이터. 직접 수정하지 마세요']]);
-    locWriteList_(obj);
-    return { ok: true, version: v };
+    return { ok: true, version: locWrite_(sh, json, cur) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** 위치도 JSON 저장 (잠금·버전 검사는 호출하는 쪽에서) → 새 버전 */
+function locWrite_(sh, json, cur) {
+  const obj = JSON.parse(json); // 형식 검사
+  const chunks = [];
+  for (let i = 0; i < json.length; i += LOC_CHUNK) chunks.push(["'" + json.slice(i, i + LOC_CHUNK)]);
+  const last = sh.getLastRow();
+  if (last > 1) sh.getRange(2, 1, last - 1, 1).clearContent();
+  sh.getRange(2, 1, chunks.length, 1).setValues(chunks);
+  const v = cur + 1;
+  sh.getRange(1, 1, 1, 3).setValues([[v, new Date(), '← 위치도 앱 데이터. 직접 수정하지 마세요']]);
+  locWriteList_(obj);
+  return v;
+}
+
+/**
+ * 위치도 저장 + 재고 이동을 한 번에 (줄·칸 옮기기, 메모·지정 제품까지 옮기는 이동).
+ * 다른 사람이 먼저 저장했으면 아무것도 안 하고 최신본을 돌려줌. 재고가 모자라면 오류(역시 아무것도 안 씀).
+ * mv = {staff, memo, groups:[...]} (locMove 와 같은 형식, 없어도 됨) → {ok, version, stock}
+ */
+function locApply(json, baseVersion, mv) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sh = locSheet_();
+    const cur = Number(sh.getRange(1, 1).getValue()) || 0;
+    if (cur !== Number(baseVersion)) {
+      const g = locGet();
+      return { ok: false, conflict: true, version: g.version, data: g.data };
+    }
+    JSON.parse(json);
+    const hasMoves = mv && (mv.groups || []).some(g => (g.moves || []).some(m => Number(m.qty) > 0));
+    const rows = hasMoves ? locMoveRows_(mv) : [];   // 검사 먼저 (틀리면 여기서 오류)
+    if (rows.length) {
+      const log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
+      log.getRange(log.getLastRow() + 1, 1, rows.length, 13).setValues(rows);
+    }
+    const v = locWrite_(sh, json, cur);
+    return { ok: true, version: v, stock: locStock().stock };
   } finally {
     lock.releaseLock();
   }
@@ -75,6 +109,7 @@ function locWriteList_(obj) {
       const code = locCode_(rc[0], rc[1]);
       const split = (x.layers || []).length > 1;
       (x.layers || []).forEach((L, i) => {
+        (L.p || []).forEach(pr => rows.push([s.name, code, x.label || '', split ? (i + 1) + '층' : '', '[제품] ' + (pr.name || pr.id)]));
         String(L.t || '').split('\n').map(t => t.trim()).filter(Boolean)
           .forEach(t => rows.push([s.name, code, x.label || '', split ? (i + 1) + '층' : '', t]));
       });
@@ -117,7 +152,7 @@ function locCode_(r, c) {
   return s + (c + 1);
 }
 
-/** 위치도 JSON → 보관칸 목록 [{key, sheet, code, label, layer, n, note(손으로 적은 첫 자재)}] (시트·줄·칸 순) */
+/** 위치도 JSON → 보관칸 목록 [{key, sheet, code, label, layer, n, p(지정 제품 id들), note(첫 지정 제품명 또는 손으로 적은 첫 자재)}] (시트·줄·칸 순) */
 function locSlots_(obj) {
   const out = [];
   ((obj && obj.sheets) || []).forEach(s => {
@@ -132,7 +167,9 @@ function locSlots_(obj) {
         for (let i = 0; i < n; i++)
           out.push({ key: sheet + ' ' + code + (i ? ' ' + (i + 1) + '층' : ''), sheet: sheet, code: code,
                      label: String(x.label || '').trim(), layer: i, n: n,
-                     note: String(((x.layers || [])[i] || {}).t || '').split('\n').map(t => t.trim()).filter(Boolean)[0] || '' });
+                     p: (((x.layers || [])[i] || {}).p || []).map(pr => pr.id),
+                     note: ((((x.layers || [])[i] || {}).p || [])[0] || {}).name ||
+                           String(((x.layers || [])[i] || {}).t || '').split('\n').map(t => t.trim()).filter(Boolean)[0] || '' });
       });
   });
   return out;
@@ -151,10 +188,14 @@ function locSlotsForApp_() {
 
 /** 위치도 화면용: 위치 이름별 현재 재고 {stock:{위치:[{id,name,cat,qty}]}, appUrl} */
 function locStock() {
-  const names = {};
+  const names = {}, items = [];
   const m = SpreadsheetApp.getActive().getSheetByName(TAB_MASTER);
   if (m && m.getLastRow() >= 2)
-    m.getRange(2, 1, m.getLastRow() - 1, 3).getValues().forEach(r => { if (r[0]) names[r[0]] = { name: String(r[1]), cat: String(r[2] || '') }; });
+    m.getRange(2, 1, m.getLastRow() - 1, 3).getValues().forEach(r => {
+      if (!r[0]) return;
+      names[r[0]] = { name: String(r[1]), cat: String(r[2] || '') };
+      items.push({ id: String(r[0]), name: String(r[1]), cat: String(r[2] || '') });
+    });
   const st = computeStock_(), stock = {};
   Object.keys(st).forEach(id => {
     const it = names[id] || { name: String(id).split('||')[0], cat: '' };
@@ -169,7 +210,7 @@ function locStock() {
   try { appUrl = ScriptApp.getService().getUrl() || ''; } catch (e) {}
   const staff = [], cf = SpreadsheetApp.getActive().getSheetByName(TAB_CONFIG);
   if (cf && cf.getLastRow() >= 2) cf.getRange(2, 1, cf.getLastRow() - 1, 1).getValues().forEach(r => { if (r[0]) staff.push(String(r[0])); });
-  return { stock: stock, appUrl: appUrl, staff: staff };
+  return { stock: stock, appUrl: appUrl, staff: staff, items: items };
 }
 
 /**
@@ -178,6 +219,20 @@ function locStock() {
  * 전부 검사한 뒤 한 번에 기록합니다(하나라도 틀리면 아무것도 안 씀). → 갱신된 locStock() 반환
  */
 function locMove(p) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const rows = locMoveRows_(p);
+    const log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
+    log.getRange(log.getLastRow() + 1, 1, rows.length, 13).setValues(rows);
+  } finally {
+    lock.releaseLock();
+  }
+  return locStock();
+}
+
+/** 이동 요청 검사 → 거래로그 행들 (하나라도 틀리면 오류, 아무것도 안 씀). 잠금은 호출하는 쪽에서 */
+function locMoveRows_(p) {
   p = p || {};
   const groups = (p.groups || []).map(g => ({
     from: String(g.fromLoc || '').trim(), to: String(g.toLoc || '').trim(),
@@ -185,29 +240,22 @@ function locMove(p) {
   })).filter(g => g.moves.length);
   if (!groups.length) throw new Error('옮길 수량을 입력하세요.');
   groups.forEach(g => { if (!g.from || !g.to || g.from === g.to) throw new Error('보내는 칸과 받는 칸을 다르게 골라주세요.'); });
-  const lock = LockService.getScriptLock();
-  lock.waitLock(15000);
-  try {
-    const ss = SpreadsheetApp.getActive(), log = ss.getSheetByName(TAB_LOG), m = ss.getSheetByName(TAB_MASTER);
-    const info = {};
-    if (m && m.getLastRow() >= 2)
-      m.getRange(2, 1, m.getLastRow() - 1, 3).getValues().forEach(r => { if (r[0]) info[r[0]] = { name: r[1], cat: r[2] }; });
-    const st = computeStock_(), used = {}, now = new Date(), rows = [];
-    groups.forEach(g => {
-      const route = g.from + '→' + g.to, memo = (p.memo ? route + ' / ' + p.memo : route) + ' (위치도)';
-      g.moves.forEach(mv => {
-        const it = info[mv.id];
-        if (!it) throw new Error('품목을 찾을 수 없어요: ' + mv.id);
-        const k = mv.id + '\n' + g.from, have = (((st[mv.id] || {}).locs || {})[g.from] || 0) - (used[k] || 0);
-        if (mv.qty > have) throw new Error(it.name + ': ' + g.from + ' 재고(' + have + '개)보다 많이 옮길 수 없어요. 새로고침 후 다시 해주세요.');
-        used[k] = (used[k] || 0) + mv.qty;
-        rows.push([now, mv.id, it.name, it.cat, g.from, '이동', '', '', mv.qty, -mv.qty, p.staff || '', memo, '']);
-        rows.push([now, mv.id, it.name, it.cat, g.to,   '이동', '', '', mv.qty,  mv.qty, p.staff || '', memo, '']);
-      });
+  const ss = SpreadsheetApp.getActive(), m = ss.getSheetByName(TAB_MASTER);
+  const info = {};
+  if (m && m.getLastRow() >= 2)
+    m.getRange(2, 1, m.getLastRow() - 1, 3).getValues().forEach(r => { if (r[0]) info[r[0]] = { name: r[1], cat: r[2] }; });
+  const st = computeStock_(), used = {}, now = new Date(), rows = [];
+  groups.forEach(g => {
+    const route = g.from + '→' + g.to, memo = (p.memo ? route + ' / ' + p.memo : route) + ' (위치도)';
+    g.moves.forEach(mv => {
+      const it = info[mv.id];
+      if (!it) throw new Error('품목을 찾을 수 없어요: ' + mv.id);
+      const k = mv.id + '\n' + g.from, have = (((st[mv.id] || {}).locs || {})[g.from] || 0) - (used[k] || 0);
+      if (mv.qty > have) throw new Error(it.name + ': ' + g.from + ' 재고(' + have + '개)보다 많이 옮길 수 없어요. 새로고침 후 다시 해주세요.');
+      used[k] = (used[k] || 0) + mv.qty;
+      rows.push([now, mv.id, it.name, it.cat, g.from, '이동', '', '', mv.qty, -mv.qty, p.staff || '', memo, '']);
+      rows.push([now, mv.id, it.name, it.cat, g.to,   '이동', '', '', mv.qty,  mv.qty, p.staff || '', memo, '']);
     });
-    log.getRange(log.getLastRow() + 1, 1, rows.length, 13).setValues(rows);
-  } finally {
-    lock.releaseLock();
-  }
-  return locStock();
+  });
+  return rows;
 }

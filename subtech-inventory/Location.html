@@ -139,6 +139,14 @@
 #locApp .srow input{width:76px;padding:5px 6px;border:1.5px solid var(--line);border-radius:4px;background:var(--slot);text-align:right;font-variant-numeric:tabular-nums}
 #locApp .f select{display:block;width:100%;margin-top:4px;padding:9px 10px;border:1.5px solid var(--line);border-radius:4px;background:var(--slot);color:var(--ink);font-size:15px}
 #locApp .chk{display:flex;gap:8px;align-items:center;font-size:14px;margin:0 0 12px}
+#locApp .layer em.z{opacity:.45}
+#locApp .pp{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+#locApp .pp .pk{font-size:12.5px;color:var(--sub)}
+#locApp .chip{display:inline-flex;align-items:center;gap:2px;padding:3px 3px 3px 9px;border:1.5px solid var(--hitline);background:var(--hitbg);border-radius:999px;font-size:13px}
+#locApp .chip button{border:0;background:none;padding:0 5px;color:var(--sub);font-size:13px}
+#locApp .pick{display:flex;justify-content:space-between;gap:8px;width:100%;padding:10px 4px;border:0;border-top:1px dashed var(--line);background:none;text-align:left}
+#locApp .pick small{color:var(--sub)}
+#locApp .acts button:disabled{opacity:.4;cursor:default}
 #locApp .sk .none{color:var(--sub);font-size:13px;margin:2px 0}
 #locApp .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
   background:var(--ink);color:var(--paper);padding:9px 14px;border-radius:4px;font-size:13.5px;z-index:40;max-width:90vw}
@@ -156,6 +164,7 @@
   <main class="floor" data-el="floor">
     <div class="tools">
       <button data-el="bMerge">칸 합치기</button>
+      <button data-el="bLine">줄·칸 옮기기</button>
       <button data-el="bSheet">시트 설정</button>
       <button data-el="bBackup">가져오기·내보내기</button>
     </div>
@@ -189,7 +198,7 @@ const def=()=>({type:'slot',label:'',layers:[{t:''}],rs:1,cs:1});
 let S=null,mergeMode=false,sel=new Set(),cur=null,flashKey=null,delArm=false;
 let version=0,dirty=false,saving=false,saveTimer=null;
 /* 재고앱 연동: STK = {위치이름: [{id,name,cat,qty}]}, APP = 재고앱 주소 */
-let STK={},APP='',stockLoaded=false,pendingQ='',STAFF=[];
+let STK={},APP='',stockLoaded=false,pendingQ='',STAFF=[],ITEMS=[],ITEMMAP={};
 /* 위치도 안 이동: MV = {label, parts:[{from, layer(원래 칸의 층 번호|null), items:[{id,name,cat,qty}], to}], src:{si,r,c}|null} */
 let MV=null;
 
@@ -216,7 +225,11 @@ function fixCur(){S.cur=Math.min(Math.max(0,S.cur||0),S.sheets.length-1)}
 const sh=()=>S.sheets[S.cur];
 const get=(s,r,c)=>s.cells[K(r,c)]||def();
 function ensure(s,r,c){const k=K(r,c);if(!s.cells[k])s.cells[k]=def();return s.cells[k]}
-const hasContent=x=>String(x.label||'').trim()||(x.layers||[]).some(L=>String(L.t||'').trim());
+const hasContent=x=>String(x.label||'').trim()||(x.layers||[]).some(L=>String(L.t||'').trim()||(L.p||[]).length);
+/* 지정 제품: 칸의 층마다 L.p = [{id, name}] (재고가 0이어도 칸에 이름이 보임) */
+const prodName=pr=>(ITEMMAP[pr.id]&&ITEMMAP[pr.id].name)||pr.name||pr.id;
+const uniqP=a=>a.filter((x,i)=>a.findIndex(y=>y.id===x.id)===i);
+const clone=o=>JSON.parse(JSON.stringify(o));
 
 /* ---------- 재고 연동 ----------
    위치 이름 = "시트이름 칸코드" (+ 2층 이상은 " N층"). Location.gs 의 locSlots_ 와 같은 규칙. */
@@ -238,7 +251,7 @@ const sum=a=>a.reduce((t,x)=>t+x.qty,0);
 /** 재고 때문에 막아야 하면 안내하고 true */
 function guard(cond,msg){if(GAS&&!stockLoaded){toast('재고 정보를 불러오는 중이에요. 잠시 후 다시 해주세요');return true}
   if(cond){toast(msg);return true}return false}
-function loadStock(){if(!GAS)return;GAS.withSuccessHandler(res=>{STK=(res&&res.stock)||{};APP=(res&&res.appUrl)||APP;STAFF=(res&&res.staff)||STAFF;stockLoaded=true;
+function loadStock(){if(!GAS)return;GAS.withSuccessHandler(res=>{STK=(res&&res.stock)||{};APP=(res&&res.appUrl)||APP;STAFF=(res&&res.staff)||STAFF;if(res&&res.items){ITEMS=res.items;ITEMMAP={};ITEMS.forEach(it=>ITEMMAP[it.id]=it)}stockLoaded=true;
   if(S){renderGrid();renderStockBar();const kind=E('panelBody').dataset.kind;
     if(!E('panel').hidden){if(kind==='cell'&&cur)drawCell();else if(kind==='loose')openLoose();else if(kind==='orph')openOrphans()}}})
   .withFailureHandler(()=>toast('재고를 불러오지 못했어요. 새로고침해 주세요')).locStock()}
@@ -324,7 +337,7 @@ function renderTabs(){
   t.appendChild(a);
 }
 const query=()=>E('q').value.trim().toLowerCase();
-const matches=(x,q)=>String(x.label||'').toLowerCase().includes(q)||(x.type==='slot'&&x.layers.some(L=>String(L.t||'').toLowerCase().includes(q)));
+const matches=(x,q)=>String(x.label||'').toLowerCase().includes(q)||(x.type==='slot'&&x.layers.some(L=>String(L.t||'').toLowerCase().includes(q)||(L.p||[]).some(pr=>prodName(pr).toLowerCase().includes(q))));
 const stockMatch=(s,r,c,q)=>keysAt(s,r,c).some(k=>stockAt(k).some(a=>String(a.name).toLowerCase().includes(q)));
 function cellHTML(x,r,c,s){
   const cd=`<span class="code">${code(r,c)}</span>`;
@@ -333,11 +346,14 @@ function cellHTML(x,r,c,s){
   let h=cd+(x.label?`<span class="name">${esc(x.label)}</span>`:'');
   const split=x.layers.length>1;
   const st=x.layers.map((L,i)=>s?stockAt(slotKey(s,r,c,i)):[]);
-  const anyItem=x.layers.some(L=>lines(L.t).length)||st.some(a=>a.length);
+  const anyItem=x.layers.some(L=>lines(L.t).length||(L.p||[]).length)||st.some(a=>a.length);
   if(x.rs*x.cs>1&&x.label&&!anyItem&&!split)return h; // 이름만 있는 합친 칸은 이름만 크게
   h+='<span class="layers">'+x.layers.map((L,i)=>{
     // 실제 재고(굵은 수량) 먼저, 그 다음 손으로 적은 자재
-    const ls=st[i].map(a=>esc(a.name)+' <em>'+fmtN(a.qty)+'</em>').concat(lines(L.t).map(esc));
+    // 📌지정 제품(수량, 0이면 흐리게) → 그 밖의 재고 → 손으로 적은 메모
+    const pp=L.p||[];
+    const ls=pp.map(pr=>{const a=st[i].find(z=>z.id===pr.id);return '📌'+esc(prodName(pr))+' <em'+(a?'':' class="z"')+'>'+fmtN(a?a.qty:0)+'</em>'})
+      .concat(st[i].filter(a=>!pp.some(pr=>pr.id===a.id)).map(a=>esc(a.name)+' <em>'+fmtN(a.qty)+'</em>'),lines(L.t).map(esc));
     const body=ls.length?ls.slice(0,3).join(', ')+(ls.length>3?` 외 ${ls.length-3}`:''):'<i>비어 있음</i>';
     return `<span class="layer">${split?`<b>${i+1}층</b>`:''}${body}</span>`}).join('')+'</span>';
   return h;
@@ -381,11 +397,12 @@ function doMerge(){
     if(hit&&!inside){toast('이미 합친 칸이 범위 밖으로 걸쳐 있어요. 그 칸을 먼저 풀어주세요');return}}
   for(let i=r0;i<=r1;i++)for(let j=c0;j<=c1;j++)if((i!==r0||j!==c0)&&guard(cellHasStock(s,i,j),
     `${code(i,j)} 칸에 재고가 있어요. 재고를 옮긴 뒤 합쳐주세요`))return;
-  const base=ensure(s,r0,c0),extra=[];
+  const base=ensure(s,r0,c0),extra=[],extraP=[];
   for(let i=r0;i<=r1;i++)for(let j=c0;j<=c1;j++){if(i===r0&&j===c0)continue;const k=K(i,j),x=s.cells[k];if(!x)continue;
-    if(x.type==='slot')x.layers.forEach(L=>{if(String(L.t).trim())extra.push(String(L.t).trim())});
+    if(x.type==='slot')x.layers.forEach(L=>{if(String(L.t).trim())extra.push(String(L.t).trim());if((L.p||[]).length)extraP.push(...L.p)});
     if(x.label&&!base.label)base.label=x.label;delete s.cells[k]}
   if(extra.length){if(base.type!=='slot')base.type='slot';base.layers[0].t=[String(base.layers[0].t).trim(),...extra].filter(Boolean).join('\n')}
+  if(extraP.length){if(base.type!=='slot')base.type='slot';base.layers[0].p=uniqP((base.layers[0].p||[]).concat(extraP))}
   base.rs=r1-r0+1;base.cs=c1-c0+1;sel.clear();mergeMode=false;save();render();
   toast(`${code(r0,c0)} 기준으로 ${base.rs*base.cs}칸을 합쳤어요. 눌러서 이름을 적어보세요`);
 }
@@ -394,7 +411,20 @@ function doMerge(){
    1) 품목 '이동' / '층 전체 이동' / '칸째로 이동' → 2) 받을 칸 누르기 (층이 나뉜 칸이면 층 고르기)
    3) 수량·담당자 확인 → 거래로그에 '이동' 기록(locMove). 직접 적은 메모는 원하면 같이 옮김 */
 const layerText=(s,r,c,i)=>String((get(s,r,c).layers[i]||{}).t||'').trim();
-const layerMovable=(s,r,c,i)=>stockAt(slotKey(s,r,c,i)).length>0||!!layerText(s,r,c,i);
+const layerNote=(s,r,c,i)=>!!layerText(s,r,c,i)||((get(s,r,c).layers[i]||{}).p||[]).length>0; // 메모 또는 지정 제품
+const layerMovable=(s,r,c,i)=>stockAt(slotKey(s,r,c,i)).length>0||layerNote(s,r,c,i);
+/** 위치도 변경(newS = S 복사본에 적용)과 재고 이동(mv)을 한 번에 저장 — 둘 중 하나만 되는 일이 없게 */
+function commit(newS,mv,done,fail){
+  if(!GAS){const c=S.cur;S=newS;S.cur=c;save();done();return}
+  if(dirty||saving){flush();toast('위치도를 저장 중이에요. 잠시 후 다시 눌러주세요');fail&&fail();return}
+  clearTimeout(saveTimer);saving=true;setStatus('저장 중');
+  GAS.withSuccessHandler(res=>{saving=false;
+    if(res&&res.ok){const c=S.cur;S=newS;S.cur=c;version=res.version;if(res.stock)STK=res.stock;setStatus('저장됨');done();if(dirty)flush();return}
+    if(res&&res.conflict){const o=parse(res.data);if(o){const c=S.cur;S=o;S.cur=c;fixCur()}version=res.version;MV=null;closePanel();render();setStatus('저장됨');
+      toast('다른 사람이 먼저 위치도를 고쳐서 아무것도 바꾸지 않았어요. 다시 해주세요');fail&&fail()}
+  }).withFailureHandler(e=>{saving=false;setStatus('저장됨');toast((e&&e.message)||'저장하지 못했어요');loadStock();fail&&fail()})
+    .locApply(JSON.stringify(newS),version,mv||null);
+}
 function startCellMove(s,r,c,layers){
   if(!layers.length)return;const x=get(s,r,c);
   startMove({label:code(r,c)+(x.label?' '+x.label:'')+(x.layers.length>1?' '+layers.map(i=>(i+1)+'층').join('·'):'')+' 전체',
@@ -424,13 +454,13 @@ function lastStaff(){try{return localStorage.getItem('subtek-staff')||''}catch(e
 function confirmMove(){
   if(MV.parts.some(p=>p.to===p.from)){closePanel();toast('보내는 칸과 받는 칸이 같아요. 다른 칸(또는 층)을 골라주세요');return}
   const P=E('panelBody');P.dataset.kind='mvconfirm';
-  const memo=MV.src&&MV.parts.some(p=>p.layer!=null&&layerText(S.sheets[MV.src.si],MV.src.r,MV.src.c,p.layer));
+  const memo=MV.src&&MV.parts.some(p=>p.layer!=null&&layerNote(S.sheets[MV.src.si],MV.src.r,MV.src.c,p.layer));
   const st=lastStaff(),staff=STAFF.length?STAFF:[''];
   P.innerHTML=`<div class="ph"><h2>이동 확인</h2><button class="x" data-a="close">닫기</button></div>
   ${MV.parts.map((p,pi)=>`<div class="sk"><p class="mvto">${esc(p.from)} → <b>${esc(p.to)}</b></p>
     ${p.items.length?p.items.map((a,ii)=>`<div class="srow"><span class="nm">${esc(a.name)}${a.cat?`<small>${esc(a.cat)}</small>`:''}</span>
       <input type="number" inputmode="numeric" min="0" max="${a.qty}" value="${a.qty}" data-q="${pi},${ii}" aria-label="${esc(a.name)} 옮길 수량"><small>/ ${fmtN(a.qty)}</small></div>`).join(''):'<p class="none">재고 없음 (메모만)</p>'}</div>`).join('')}
-  ${memo?'<label class="chk"><input type="checkbox" data-f="memo" checked> 직접 적은 메모도 같이 옮기기</label>':''}
+  ${memo?'<label class="chk"><input type="checkbox" data-f="memo" checked> 직접 적은 메모·📌지정 제품도 같이 옮기기</label>':''}
   ${MV.parts.some(p=>p.items.length)&&GAS?`<label class="f">담당자<select data-f="staff">${staff.map(n=>`<option${n===st?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
   <div class="acts"><button class="ghost" data-a="cancel">취소</button><button data-a="go" style="background:var(--ink);color:var(--paper);font-weight:700">⇄ 이동 저장</button></div>`;
   P.querySelector('[data-a="close"]').onclick=closePanel;
@@ -449,20 +479,85 @@ function doMove(btn){
   if(!send.length&&!withMemo){toast('옮길 수량을 입력하세요');return}
   const staffSel=P.querySelector('[data-f="staff"]'),staff=staffSel?staffSel.value:'';
   try{if(staff)localStorage.setItem('subtek-staff',staff)}catch(e){}
-  const finish=()=>{
-    const d=MV.dest,ds=S.sheets[d.si];ensure(ds,d.r,d.c); // 받는 칸을 저장해 두면 재고앱 위치 목록에도 나옴
-    if(withMemo&&MV.src){const ss=S.sheets[MV.src.si];MV.parts.forEach(p=>{if(p.layer==null)return;const t=layerText(ss,MV.src.r,MV.src.c,p.layer);if(!t)return;
-      const to=+(p.to.match(/ (\d+)층$/)||[0,1])[1]-1,dl=ensure(ds,d.r,d.c).layers[Math.max(0,to)];
-      dl.t=[String(dl.t||'').trim(),t].filter(Boolean).join('\n');ensure(ss,MV.src.r,MV.src.c).layers[p.layer].t=''})}
-    save();S.cur=d.si;flashKey=K(d.r,d.c);MV=null;closePanel();render();setTimeout(()=>{flashKey=null},1500);
-    toast(send.length?`${send.reduce((t,g)=>t+g.moves.length,0)}개 품목을 옮겼어요 (재고앱 이력에 '이동'으로 남아요)`:'메모를 옮겼어요');
-  };
-  if(!send.length){finish();return}
-  if(!GAS){toast('재고 이동은 재고앱의 위치도에서만 돼요');return}
+  if(send.length&&!GAS){toast('재고 이동은 재고앱의 위치도에서만 돼요');return}
+  const d=MV.dest,N=clone(S),ds=N.sheets[d.si];ensure(ds,d.r,d.c); // 받는 칸을 저장해 두면 재고앱 위치 목록에도 나옴
+  if(withMemo&&MV.src){const ss=N.sheets[MV.src.si];MV.parts.forEach(p=>{if(p.layer==null)return;
+    const src=ensure(ss,MV.src.r,MV.src.c).layers[p.layer],t=String(src.t||'').trim(),pp=src.p||[];if(!t&&!pp.length)return;
+    const to=+(p.to.match(/ (\d+)층$/)||[0,1])[1]-1,dl=ensure(ds,d.r,d.c).layers[Math.max(0,to)];
+    if(t){dl.t=[String(dl.t||'').trim(),t].filter(Boolean).join('\n');src.t=''}
+    if(pp.length){dl.p=uniqP((dl.p||[]).concat(pp));delete src.p}})}
   btn.disabled=true;btn.textContent='저장 중…';
-  GAS.withSuccessHandler(res=>{STK=(res&&res.stock)||STK;finish()})
-    .withFailureHandler(e=>{btn.disabled=false;btn.textContent='⇄ 이동 저장';toast((e&&e.message)||'이동하지 못했어요');loadStock()})
-    .locMove({groups:send,staff:staff,memo:''});
+  commit(N,send.length?{groups:send,staff:staff,memo:''}:null,()=>{
+    S.cur=d.si;flashKey=K(d.r,d.c);MV=null;closePanel();render();setTimeout(()=>{flashKey=null},1500);
+    toast(send.length?`${send.reduce((t,g)=>t+g.moves.length,0)}개 품목을 옮겼어요 (재고앱 이력에 '이동'으로 남아요)`:'메모·지정 제품을 옮겼어요');
+  },()=>{btn.disabled=false;btn.textContent='⇄ 이동 저장'});
+}
+
+/* ---------- 제품 지정 ---------- */
+function openPick(i){
+  const s=sh(),{r,c}=cur,x=get(s,r,c),P=E('panelBody');P.dataset.kind='pick';
+  P.innerHTML=`<div class="ph"><h2>${code(r,c)}${x.label?' '+esc(x.label):''}${x.layers.length>1?' · '+(i+1)+'층':''}<small>제품 지정</small></h2><button class="x" data-a="back">← 돌아가기</button></div>
+  <label class="f">품목 검색<input data-f="pq" type="search" placeholder="품명 일부 입력 (예: sv7)" autocomplete="off"></label><div data-f="plist"></div>`;
+  const inp=P.querySelector('[data-f="pq"]'),box=P.querySelector('[data-f="plist"]');
+  const norm=v=>String(v||'').replace(/\s+/g,'').toLowerCase();
+  const draw=()=>{const L=get(s,r,c).layers[i]||{},have=L.p||[],here=stockAt(slotKey(s,r,c,i)).map(a=>a.id),q=norm(inp.value);
+    if(!ITEMS.length){box.innerHTML='<p class="none">품목 목록을 불러오는 중…</p>';return}
+    const list=ITEMS.filter(it=>!have.some(pr=>pr.id===it.id)&&(!q||norm(it.name).includes(q)))
+      .sort((a,b)=>(here.includes(b.id)-here.includes(a.id))||String(a.name).localeCompare(String(b.name))).slice(0,40);
+    box.innerHTML=list.length?list.map(it=>`<button class="pick" data-id="${esc(it.id)}"><span>${esc(it.name)}${here.includes(it.id)?' <small>· 이 칸에 재고 있음</small>':''}</span><small>${esc(it.cat||'')}</small></button>`).join('')
+      :'<p class="none">맞는 품목이 없어요</p>';
+    box.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{const it=ITEMMAP[b.dataset.id];if(!it)return;
+      const y=ensure(s,r,c).layers[i];y.p=uniqP((y.p||[]).concat({id:it.id,name:it.name}));save();renderGrid();drawCell();toast(it.name+' 지정했어요')})};
+  inp.oninput=draw;P.querySelector('[data-a="back"]').onclick=()=>drawCell();draw();setTimeout(()=>inp.focus(),50);
+}
+
+/* ---------- 줄·칸 통째로 옮기기 (받는 줄에 내용이 있으면 서로 자리 바꾸기) ---------- */
+let LN={axis:'r',a:0,b:1};
+const lineName=(axis,i)=>axis==='r'?rowCode(i)+'줄':(i+1)+'번 칸';
+function linePlan(axis,a,b){
+  const s=sh(),cov=covered(s),n=axis==='r'?s.cols:s.rows,pos=(line,j)=>axis==='r'?[line,j]:[j,line];
+  for(const k in s.cells){const x=s.cells[k],[r,c]=k.split(',').map(Number);
+    if(axis==='r'&&x.rs>1&&((a>=r&&a<r+x.rs)||(b>=r&&b<r+x.rs)))return{err:`${code(r,c)} 합친 칸이 여러 줄에 걸쳐 있어요. 먼저 "합친 칸 풀기"를 해주세요`};
+    if(axis==='c'&&x.cs>1&&((a>=c&&a<c+x.cs)||(b>=c&&b<c+x.cs)))return{err:`${code(r,c)} 합친 칸이 여러 칸에 걸쳐 있어요. 먼저 "합친 칸 풀기"를 해주세요`}}
+  const has=line=>{for(let j=0;j<n;j++){const[r,c]=pos(line,j);if(s.cells[K(r,c)]||(!cov[K(r,c)]&&cellHasStock(s,r,c)))return true}return false};
+  const groups=[];let neg=false;
+  const add=(from,to)=>{for(let j=0;j<n;j++){const[r,c]=pos(from,j),[r2,c2]=pos(to,j);if(cov[K(r,c)])continue;
+    keysAt(s,r,c).forEach((k,i)=>{const list=stockAt(k);if(!list.length)return;if(list.some(z=>z.qty<0))neg=true;
+      groups.push({fromLoc:k,toLoc:slotKey(s,r2,c2,i),moves:list.map(z=>({id:z.id,qty:z.qty}))})})}};
+  const hasA=has(a),swap=has(b);
+  add(a,b);if(swap)add(b,a);
+  if(neg)return{err:'재고가 마이너스인 칸이 있어요. 재고앱에서 조정한 뒤 옮겨주세요'};
+  const N=clone(S),ns=N.sheets[S.cur];
+  for(let j=0;j<n;j++){const ka=K(...pos(a,j)),kb=K(...pos(b,j)),xa=ns.cells[ka],xb=ns.cells[kb];
+    if(xb)ns.cells[ka]=xb;else delete ns.cells[ka];if(xa)ns.cells[kb]=xa;else delete ns.cells[kb]}
+  return{hasA,swap,groups,N};
+}
+function openLine(){if(MV)endMove();mergeMode=false;sel.clear();render();drawLine();openPanel()}
+function drawLine(){
+  const s=sh(),P=E('panelBody');P.dataset.kind='line';
+  const n=LN.axis==='r'?s.rows:s.cols;LN.a=Math.min(LN.a,n-1);LN.b=Math.min(LN.b,n-1);
+  const opts=v=>Array.from({length:n},(_,i)=>`<option value="${i}"${i===v?' selected':''}>${esc(lineName(LN.axis,i))}</option>`).join('');
+  const pl=LN.a===LN.b?{err:'보낼 자리를 다르게 골라주세요'}:(GAS&&!stockLoaded)?{err:'재고 정보를 불러오는 중이에요'}:linePlan(LN.axis,LN.a,LN.b);
+  const A=lineName(LN.axis,LN.a),B=lineName(LN.axis,LN.b),ok=!pl.err&&pl.hasA,st=lastStaff(),staff=STAFF.length?STAFF:[''];
+  P.innerHTML=`<div class="ph"><h2>줄·칸 옮기기<small>${esc(s.name)}</small></h2><button class="x" data-a="close">닫기</button></div>
+  <div class="seg"><button data-ax="r" class="${LN.axis==='r'?'on':''}">줄 (A·B·C…)</button><button data-ax="c" class="${LN.axis==='c'?'on':''}">칸 (1·2·3…)</button></div>
+  <label class="f">옮길 ${LN.axis==='r'?'줄':'칸'}<select data-f="a">${opts(LN.a)}</select></label>
+  <label class="f">보낼 자리<select data-f="b">${opts(LN.b)}</select></label>
+  <p class="note"${pl.err?' style="color:#B3412E"':''}>${pl.err?esc(pl.err):!pl.hasA?esc(A)+'에는 옮길 내용이 없어요':
+    `<b>${esc(A)}${pl.swap?' ↔ '+esc(B)+'</b> 자리를 서로 바꿔요 ('+esc(B)+'에도 내용이 있어요)':' → '+esc(B)+'</b>로 옮겨요'}. 칸 이름·메모·층·📌지정 제품이 같이 가요.`+
+    (pl.groups.length?` 재고 ${pl.groups.length}곳도 같이 옮겨지고 재고앱 이력에 '이동'으로 남아요.`:'')}</p>
+  ${ok&&pl.groups.length&&GAS?`<label class="f">담당자<select data-f="staff">${staff.map(v=>`<option${v===st?' selected':''}>${esc(v)}</option>`).join('')}</select></label>`:''}
+  <div class="acts"><button data-a="go"${ok?'':' disabled'} style="background:var(--ink);color:var(--paper);font-weight:700">${pl.swap?'⇄ 자리 바꾸기':'⇄ 옮기기'}</button></div>`;
+  P.querySelector('[data-a="close"]').onclick=closePanel;
+  P.querySelectorAll('[data-ax]').forEach(b=>b.onclick=()=>{if(LN.axis===b.dataset.ax)return;LN={axis:b.dataset.ax,a:0,b:1};drawLine()});
+  P.querySelector('[data-f="a"]').onchange=e=>{LN.a=+e.target.value;drawLine()};
+  P.querySelector('[data-f="b"]').onchange=e=>{LN.b=+e.target.value;drawLine()};
+  P.querySelector('[data-a="go"]').onclick=e=>{if(!ok)return;const btn=e.target;
+    if(pl.groups.length&&!GAS){toast('재고 이동은 재고앱의 위치도에서만 돼요');return}
+    const ss=P.querySelector('[data-f="staff"]'),staffV=ss?ss.value:'';try{if(staffV)localStorage.setItem('subtek-staff',staffV)}catch(er){}
+    btn.disabled=true;btn.textContent='저장 중…';
+    commit(pl.N,pl.groups.length?{groups:pl.groups,staff:staffV,memo:A+(pl.swap?'↔':'→')+B}:null,()=>{closePanel();render();
+      toast(pl.swap?`${A}와 ${B} 자리를 바꿨어요`:`${A}를 ${B}로 옮겼어요`)},()=>{btn.disabled=false;btn.textContent='⇄ 옮기기'})};
 }
 
 /* ---------- 패널 ---------- */
@@ -479,7 +574,8 @@ function drawCell(){
   <label class="f">이름${big?' (합친 칸은 가운데에 크게 보여요)':''}<input data-f="label" value="${esc(x.label)}" placeholder="${ph}"></label>
   ${x.type==='slot'&&x.layers.length>1&&x.layers.some((L,i)=>layerMovable(s,r,c,i))?`<button class="mvall" data-mvcell="1">⇄ 칸째로 이동 (${x.layers.map((L,i)=>(i+1)+'층').join('·')} 모두)</button>`:''}
   ${x.type==='slot'?x.layers.map((L,i)=>{const k=slotKey(s,r,c,i),list=stockAt(k);return `<div class="sk"><h3>현재 재고${x.layers.length>1?' · '+(i+1)+'층':''}<small>${esc(k)}</small></h3>
-    ${stockLoaded||!GAS?stockRows(list,k):'<p class="none">불러오는 중…</p>'}<button class="in" data-go="입고" data-loc="${esc(k)}">＋ 이 칸에 입고</button>${layerMovable(s,r,c,i)?`<button class="mv" data-mvl="${i}">⇄ ${x.layers.length>1?(i+1)+'층':'칸'} 전체 이동</button>`:''}</div>`}).join(''):''}
+    ${stockLoaded||!GAS?stockRows(list,k):'<p class="none">불러오는 중…</p>'}<button class="in" data-go="입고" data-loc="${esc(k)}">＋ 이 칸에 입고</button>${layerMovable(s,r,c,i)?`<button class="mv" data-mvl="${i}">⇄ ${x.layers.length>1?(i+1)+'층':'칸'} 전체 이동</button>`:''}
+    ${GAS?`<div class="pp"><span class="pk">📌 지정 제품</span>${(L.p||[]).map((pr,pi)=>`<span class="chip">${esc(prodName(pr))}<button data-unp="${i},${pi}" aria-label="${esc(prodName(pr))} 지정 해제">✕</button></span>`).join('')}<button class="mv" data-pick="${i}">＋ 제품 지정</button></div>`:''}</div>`}).join(''):''}
   ${x.type==='slot'?x.layers.map((L,i)=>`<label class="f">${x.layers.length>1?(i+1)+'층 메모':'메모 (직접 적는 자재)'}<textarea data-i="${i}" rows="3" placeholder="자재명을 한 줄에 하나씩">${esc(L.t)}</textarea></label>`).join(''):''}
   <div class="acts">
     ${x.type==='slot'?(x.layers.length===1?'<button data-a="split">1층·2층으로 나누기</button>':`${x.layers.length<4?'<button data-a="addL">층 추가</button>':''}<button data-a="joinL">층 없애기</button>`):''}
@@ -487,6 +583,9 @@ function drawCell(){
   </div>`;
   bindGo(P);
   P.querySelectorAll('[data-mvl]').forEach(b=>b.onclick=()=>startCellMove(s,r,c,[+b.dataset.mvl]));
+  P.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>openPick(+b.dataset.pick));
+  P.querySelectorAll('[data-unp]').forEach(b=>b.onclick=()=>{const[i,pi]=b.dataset.unp.split(',').map(Number),L=ensure(s,r,c).layers[i];
+    L.p.splice(pi,1);if(!L.p.length)delete L.p;save();renderGrid();drawCell()});
   P.querySelectorAll('[data-mvcell]').forEach(b=>b.onclick=()=>startCellMove(s,r,c,x.layers.map((L,i)=>i).filter(i=>layerMovable(s,r,c,i))));
   P.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>{if(b.dataset.type!=='slot'&&guard(cellHasStock(s,r,c),'이 칸에 재고가 있어 종류를 바꿀 수 없어요. 재고를 옮긴 뒤 바꿔주세요'))return;const y=ensure(s,r,c);y.type=b.dataset.type;if(!y.layers||!y.layers.length)y.layers=[{t:''}];save();renderGrid();drawCell()});
   const fl=P.querySelector('[data-f="label"]');fl.oninput=()=>{ensure(s,r,c).label=fl.value;save();renderGrid()};
@@ -496,7 +595,7 @@ function drawCell(){
     const y=ensure(s,r,c);
     if(a==='split')y.layers=[{t:y.layers[0].t},{t:''}];
     if(a==='addL')y.layers.push({t:''});
-    if(a==='joinL')y.layers=[{t:y.layers.map(L=>String(L.t).trim()).filter(Boolean).join('\n')}];
+    if(a==='joinL'){const pp=uniqP([].concat(...y.layers.map(L=>L.p||[])));y.layers=[Object.assign({t:y.layers.map(L=>String(L.t).trim()).filter(Boolean).join('\n')},pp.length?{p:pp}:{})]}
     if(a==='unmerge'){y.rs=1;y.cs=1}
     save();renderGrid();drawCell()});
 }
@@ -555,7 +654,9 @@ function renderResults(){
   const out=[];
   S.sheets.forEach((s,si)=>{for(const k in s.cells){const x=s.cells[k];const[r,c]=k.split(',').map(Number);
     if(String(x.label||'').toLowerCase().includes(q))out.push({si,r,c,w:'',t:x.label});
-    if(x.type==='slot')x.layers.forEach((L,i)=>lines(L.t).forEach(t=>{if(t.toLowerCase().includes(q))out.push({si,r,c,w:x.layers.length>1?(i+1)+'층':'',t})}))}
+    if(x.type==='slot')x.layers.forEach((L,i)=>lines(L.t).forEach(t=>{if(t.toLowerCase().includes(q))out.push({si,r,c,w:x.layers.length>1?(i+1)+'층':'',t})}))
+    if(x.type==='slot')x.layers.forEach((L,i)=>(L.p||[]).forEach(pr=>{const nm=prodName(pr);
+      if(nm.toLowerCase().includes(q)&&!stockAt(slotKey(s,r,c,i)).some(a=>a.id===pr.id))out.push({si,r,c,w:(x.layers.length>1?(i+1)+'층 ':'')+(x.label||''),t:'📌'+nm+' · 지정 (재고 0)'})}))}
     // 실제 재고 (빈 칸·합친 칸 포함 전체 격자)
     const ks=sheetKeys(s);Object.keys(ks).forEach(k=>stockAt(k).forEach(a=>{if(String(a.name).toLowerCase().includes(q)){const[r,c,i]=ks[k],x=get(s,r,c);
       out.unshift({si,r,c,w:(x.layers.length>1?(i+1)+'층 ':'')+(x.label?x.label:''),t:a.name+' · '+fmtN(a.qty)+'개'})}}));
@@ -582,6 +683,7 @@ E('bCancel').onclick=()=>{mergeMode=false;sel.clear();render()};
 E('bDoMerge').onclick=doMerge;
 E('bSheet').onclick=openSheet;
 E('bBackup').onclick=openBackup;
+E('bLine').onclick=openLine;
 if(GAS&&root.classList.contains('solo')){
   const bk=E('back');bk.hidden=false;
   bk.onclick=()=>{if(APP){openApp({});return}GAS.withSuccessHandler(u=>window.open(u,'_top')).locUrl()};
