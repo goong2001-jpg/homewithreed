@@ -3,6 +3,7 @@ import './App.css';
 import MathScreen from './screens/MathScreen';
 import AlphabetScreen from './screens/AlphabetScreen';
 import WordScreen from './screens/WordScreen';
+import PlayScreen from './screens/PlayScreen';
 import { playClick } from './utils/sounds';
 
 /**
@@ -15,13 +16,15 @@ import { playClick } from './utils/sounds';
 const SHOW_MATH = false;      // 🧮 수학놀이
 const SHOW_ALPHABET = false;  // 🔤 알파벳 쓰기
 const SHOW_WORDS = true;      // 📖 영어 단어
+const SHOW_PLAY = true;       // 🎮 놀이터 (배운 단어로 하는 놀이)
 
-type Tab = 'math' | 'alphabet' | 'words';
+type Tab = 'math' | 'alphabet' | 'words' | 'play';
 
 const TAB_KEY = 'active_tab';
 
 const ALL_TABS: { id: Tab; label: string; emoji: string; show: boolean }[] = [
   { id: 'words', label: '영어 단어', emoji: '📖', show: SHOW_WORDS },
+  { id: 'play', label: '놀이터', emoji: '🎮', show: SHOW_PLAY },
   { id: 'alphabet', label: '알파벳', emoji: '🔤', show: SHOW_ALPHABET },
   { id: 'math', label: '수학놀이', emoji: '🧮', show: SHOW_MATH },
 ];
@@ -90,6 +93,7 @@ export default function App() {
       {tab === 'math' && SHOW_MATH && <MathScreen />}
       {tab === 'alphabet' && SHOW_ALPHABET && <AlphabetScreen />}
       {tab === 'words' && SHOW_WORDS && <WordScreen />}
+      {tab === 'play' && SHOW_PLAY && <PlayScreen />}
     </div>
   );
 }

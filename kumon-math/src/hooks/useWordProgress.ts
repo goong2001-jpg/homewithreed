@@ -69,6 +69,10 @@ export interface WordProgress {
    * (퀴즈를 끝내 진도가 올라도 방금 푼 단어가 바뀌지 않게)
    */
   todayPlan: DayPlan;
+  /** 배운 단어와 본 횟수 — 놀이터와 그림책은 이 단어들로 만든다 */
+  seen: Record<string, number>;
+  /** 문제에서 한 번에 맞힌 횟수 — 그림책 별(⭐)로 보여준다 */
+  known: Record<string, number>;
 }
 
 /** 오답 노트에 이만큼 오래 남은 단어는 정리한다 */
@@ -93,6 +97,8 @@ const DEFAULT: WordProgress = {
   unitDays: 0,
   unitDoneDate: '',
   todayPlan: { unit: 0, unitDay: 0 },
+  seen: {},
+  known: {},
 };
 
 function daysAgo(dateKey: string): number {
@@ -154,11 +160,12 @@ export function useWordProgress() {
   }, []);
 
   /** 단어 하나를 다 봤을 때 */
-  const learnNext = useCallback((perDay: number) => {
+  const learnNext = useCallback((perDay: number, en?: string) => {
     setProgress(prev => {
       const learned = Math.min(prev.learned + 1, perDay);
       const next: WordProgress = {
         ...prev,
+        seen: en ? { ...prev.seen, [en]: (prev.seen[en] ?? 0) + 1 } : prev.seen,
         learned,
         totalLearned: prev.totalLearned + 1,
         phase: learned >= perDay ? 'test' : 'learn',
@@ -178,7 +185,8 @@ export function useWordProgress() {
       const today = todayKey();
       if (!correct) missed[en] = today;
       else if (firstTry && missed[en] && missed[en] !== today) delete missed[en];
-      const next = { ...prev, results: [...prev.results, correct], queue, missed };
+      const known = correct && firstTry ? { ...prev.known, [en]: (prev.known[en] ?? 0) + 1 } : prev.known;
+      const next = { ...prev, results: [...prev.results, correct], queue, missed, known };
       try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
       return next;
     });

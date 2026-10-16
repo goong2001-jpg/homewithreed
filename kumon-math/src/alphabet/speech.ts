@@ -88,6 +88,11 @@ export function speakWord(word: string): void {
   speak(word, { rate: 0.7 });
 }
 
+/** 문장 읽기 — 아이가 알아듣게 천천히 */
+export function speakSentence(text: string): void {
+  speak(text, { rate: 0.72 });
+}
+
 /** 첫소리 힌트 — 아이가 따라 들을 수 있게 아주 천천히 */
 export function speakPhonics(phrase: string): void {
   speak(phrase, { rate: 0.55, pitch: 1.05 });

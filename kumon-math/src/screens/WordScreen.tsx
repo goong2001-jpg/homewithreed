@@ -4,7 +4,7 @@ import { WORD_BANK } from '../words/wordBank';
 import { drawCoupon, CouponKind, COUPONS } from '../words/coupons';
 import { useWordProgress } from '../hooks/useWordProgress';
 import { useGameState } from '../hooks/useGameState';
-import { speakWord, speakPhonics, warmUpVoices, speechSupported } from '../alphabet/speech';
+import { speakWord, speakSentence, speakPhonics, warmUpVoices, speechSupported } from '../alphabet/speech';
 import { firstSoundKo, firstSoundPhrase } from '../words/phonics';
 import Avatar from '../components/Avatar';
 import Shop from '../components/Shop';
@@ -12,6 +12,7 @@ import CouponWallet from '../components/CouponWallet';
 import { playCorrect, playWrong, playStreak, playClick } from '../utils/sounds';
 import { SoundIntro, UnitPicker, ColoredWord } from '../components/SoundIntro';
 import { UNITS } from '../words/units';
+import { sentenceFor, splitSentence } from '../words/sentences';
 
 export default function WordScreen() {
   const {
@@ -96,8 +97,8 @@ export default function WordScreen() {
   const handleNextWord = useCallback(() => {
     playClick();
     addPoints(1);              // 단어 하나 볼 때마다 별 1개
-    learnNext(WORDS_PER_DAY);
-  }, [learnNext, addPoints]);
+    learnNext(WORDS_PER_DAY, word?.en);
+  }, [learnNext, addPoints, word]);
 
   const handleChoice = useCallback((en: string) => {
     if (picked !== null || !question) return;
@@ -256,9 +257,31 @@ export default function WordScreen() {
           <div style={{ fontSize: 38, fontWeight: 900, color: '#5b4b8a', letterSpacing: 1 }}>
             <ColoredWord en={word.en} />
           </div>
-          <div style={{ fontSize: 19, fontWeight: 700, color: '#888', marginTop: 4, marginBottom: 16 }}>
+          <div style={{ fontSize: 19, fontWeight: 700, color: '#888', marginTop: 4, marginBottom: 10 }}>
             {word.ko}
           </div>
+          {/* 요정이 이 단어로 문장을 말한다 — 누르면 들려준다 */}
+          {(() => {
+            const sentence = sentenceFor(word);
+            const [pre, mid, post] = splitSentence(sentence, word.en);
+            return (
+              <button
+                onClick={() => { speakSentence(sentence); playClick(); }}
+                style={{
+                  width: '100%', marginBottom: 14, padding: '10px 12px', borderRadius: 16,
+                  border: '2px dashed #f3c4e3', background: '#fff5fb', cursor: 'pointer',
+                  fontFamily: 'inherit', textAlign: 'left',
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#c06aa0', marginBottom: 2 }}>
+                  🧚 요정이 말해요 (눌러서 듣기 🔊)
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#5b4b8a' }}>
+                  {pre}<span style={{ color: '#e67e22' }}>{mid}</span>{post}
+                </div>
+              </button>
+            );
+          })()}
           <div style={{ display: 'flex', gap: 10 }}>
             <button
               onClick={() => { speakWord(word.en); playClick(); }}
