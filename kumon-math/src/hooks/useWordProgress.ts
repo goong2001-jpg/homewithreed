@@ -16,6 +16,8 @@ export interface CouponEvent {
   at: string;
   /** trade 일 때 내준 쿠폰 */
   from?: CouponId;
+  /** trade 일 때 내준 장수 (예전 기록은 2장이었다) */
+  cost?: number;
 }
 
 export interface WordProgress {
@@ -72,8 +74,8 @@ export interface WordProgress {
 /** 오답 노트에 이만큼 오래 남은 단어는 정리한다 */
 const MISSED_KEEP_DAYS = 14;
 
-/** 같은 쿠폰 몇 장을 내면 다른 쿠폰 한 장으로 바꿔 주는지 */
-export const TRADE_COST = 2;
+/** 쿠폰 몇 장을 내면 다른 쿠폰 한 장으로 바꿔 주는지 (1:1) */
+export const TRADE_COST = 1;
 
 /**
  * 하루에 받을 수 있는 쿠폰 수.
@@ -220,7 +222,7 @@ export function useWordProgress() {
         [from]: have - TRADE_COST,
         [to]: (progress.coupons[to] ?? 0) + 1,
       },
-      history: [{ id: to, from, type: 'trade' as const, at: todayKey() }, ...progress.history].slice(0, 60),
+      history: [{ id: to, from, cost: TRADE_COST, type: 'trade' as const, at: todayKey() }, ...progress.history].slice(0, 60),
     };
     save(next);
     return true;

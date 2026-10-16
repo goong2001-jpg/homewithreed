@@ -21,8 +21,8 @@ export interface CouponKind {
  */
 export const COUPONS: CouponKind[] = [
   { id: 'money500',   name: '500원 쿠폰',      emoji: '💰', color: 'linear-gradient(135deg,#f6d365,#fda085)', weight: 1, tradable: false },
-  { id: 'roblox',     name: '로블록스 1분',    emoji: '🎮', color: 'linear-gradient(135deg,#a1c4fd,#c2e9fb)', weight: 10, tradable: true },
-  { id: 'tv',         name: 'TV 1분',          emoji: '📺', color: 'linear-gradient(135deg,#d4a5ff,#c2a0f8)', weight: 10, tradable: true },
+  { id: 'roblox',     name: '로블록스 3분',    emoji: '🎮', color: 'linear-gradient(135deg,#a1c4fd,#c2e9fb)', weight: 10, tradable: true },
+  { id: 'tv',         name: 'TV 3분',          emoji: '📺', color: 'linear-gradient(135deg,#d4a5ff,#c2a0f8)', weight: 10, tradable: true },
   { id: 'playground', name: '놀이터 5분',      emoji: '🛝', color: 'linear-gradient(135deg,#84fab0,#8fd3f4)', weight: 10, tradable: true },
 ];
 

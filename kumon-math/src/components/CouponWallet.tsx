@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function CouponWallet({ coupons, history, onUse, onTrade, onClose }: Props) {
-  // 교환: 같은 쿠폰 TRADE_COST 장 → 다른 쿠폰 1장
+  // 교환: 쿠폰 TRADE_COST 장 → 다른 쿠폰 1장
   const [tradeFrom, setTradeFrom] = useState<CouponId | null>(null);
   const [tradeTo, setTradeTo] = useState<CouponId | null>(null);
   const tradable = COUPONS.filter(c => c.tradable);
@@ -22,7 +22,7 @@ export default function CouponWallet({ coupons, history, onUse, onTrade, onClose
     if (!tradeFrom || !tradeTo) return;
     if (onTrade(tradeFrom, tradeTo)) {
       playPurchase();
-      setUsedMsg(`${couponById(tradeFrom).name} ${TRADE_COST}장 → ${couponById(tradeTo).name} 1장으로 바꿨어요! 🔄`);
+      setUsedMsg(`${couponById(tradeFrom).name} → ${couponById(tradeTo).name}(으)로 바꿨어요! 🔄`);
       setTimeout(() => setUsedMsg(null), 2600);
     }
     setTradeFrom(null);
@@ -122,15 +122,15 @@ export default function CouponWallet({ coupons, history, onUse, onTrade, onClose
             🔄 쿠폰 바꾸기
           </div>
           <div style={{ fontSize: 12, color: '#8a7a9a', marginBottom: 10 }}>
-            같은 쿠폰 {TRADE_COST}장을 다른 쿠폰 1장으로 바꿀 수 있어요 (500원 쿠폰은 빼고)
+            쿠폰 1장을 다른 쿠폰 1장으로 바꿀 수 있어요 (500원 쿠폰은 빼고)
           </div>
           {canGive.length === 0 ? (
             <div style={{ fontSize: 13, color: '#aaa', fontWeight: 700 }}>
-              같은 쿠폰이 {TRADE_COST}장 모이면 바꿀 수 있어요!
+              바꿀 수 있는 쿠폰이 아직 없어요!
             </div>
           ) : (
             <>
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#888', marginBottom: 6 }}>① 낼 쿠폰 ({TRADE_COST}장)</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#888', marginBottom: 6 }}>① 낼 쿠폰</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
                 {canGive.map(c => (
                   <button key={c.id}
@@ -174,7 +174,7 @@ export default function CouponWallet({ coupons, history, onUse, onTrade, onClose
                   cursor: tradeFrom && tradeTo ? 'pointer' : 'not-allowed',
                 }}>
                 {tradeFrom && tradeTo
-                  ? `${couponById(tradeFrom).emoji}×${TRADE_COST} → ${couponById(tradeTo).emoji}×1 바꾸기`
+                  ? `${couponById(tradeFrom).emoji} → ${couponById(tradeTo).emoji} 바꾸기`
                   : '바꿀 쿠폰을 골라주세요'}
               </button>
             </>
@@ -196,7 +196,7 @@ export default function CouponWallet({ coupons, history, onUse, onTrade, onClose
                 }}>
                   <span>
                     {h.type === 'trade' && h.from
-                      ? `🔄 ${couponById(h.from).name} ${TRADE_COST}장 → ${couponById(h.id).name}`
+                      ? `🔄 ${couponById(h.from).name}${(h.cost ?? 2) > 1 ? ` ${h.cost ?? 2}장` : ''} → ${couponById(h.id).name}`
                       : `${couponById(h.id).emoji} ${couponById(h.id).name} ${h.type === 'earn' ? '받음' : '사용'}`}
                   </span>
                   <span style={{ color: '#aaa', fontWeight: 600 }}>{h.at}</span>
