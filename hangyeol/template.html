@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<link rel="stylesheet" href="fonts/local.css">
+<style>
+  :root{--paper:#F5EEE2;--ink:#3A2E26;--sub:#7A6A5C;--line:#D9CBB6;--seal:#B3402A;--note:#EDE2CF;}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1080px;height:1350px;background:var(--paper)}
+  body{font-family:'Gowun Batang',serif;color:var(--ink);padding:72px 96px;position:relative;display:flex;flex-direction:column;
+    background-image:radial-gradient(rgba(120,90,60,.05) 1px,transparent 1px);background-size:6px 6px}
+  .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--ink);padding-bottom:28px}
+  .date{font-family:'Gowun Dodum',sans-serif;font-size:26px;color:var(--sub);letter-spacing:.04em}
+  .title{font-size:30px;font-weight:700;margin-top:8px;letter-spacing:.08em}
+  .seal{width:104px;height:104px;border:5px solid var(--seal);border-radius:10px;color:var(--seal);
+    display:flex;align-items:center;justify-content:center;font-size:62px;font-weight:700;transform:rotate(-6deg);
+    box-shadow:inset 0 0 0 4px var(--paper),inset 0 0 0 6px var(--seal)}
+  .greet{font-size:48px;line-height:1.4;font-weight:700;margin:44px 0 14px}
+  .lead{font-family:'Gowun Dodum',sans-serif;font-size:30px;color:var(--sub);margin-bottom:22px}
+  ol{list-style:none}
+  li{display:flex;gap:28px;padding:22px 0;border-bottom:1px dashed var(--line)}
+  .n{font-size:46px;font-weight:700;color:var(--seal);width:44px;line-height:1.1}
+  .h{font-size:34px;font-weight:700;line-height:1.4}
+  .d{font-family:'Gowun Dodum',sans-serif;font-size:26px;color:var(--sub);line-height:1.6;margin-top:8px}
+  .note{margin-top:34px;background:var(--note);border-left:6px solid var(--seal);padding:28px 34px}
+  .note b{display:block;font-size:26px;color:var(--seal);letter-spacing:.1em;margin-bottom:10px}
+  .note p{font-size:28px;line-height:1.6}
+  .sign{margin-top:auto;font-size:30px;text-align:right;line-height:1.6}
+  .sign span{font-size:36px;font-weight:700}
+</style></head><body>
+  <div class="top">
+    <div><div class="date">{{date}}</div><div class="title">아침 보고</div></div>
+    <div class="seal">결</div>
+  </div>
+  <div class="greet">{{greet}}<br>한결입니다.</div>
+  <div class="lead">{{lead}}</div>
+  <ol>{{items}}</ol>
+  <div class="note"><b>한결의 직언</b><p>{{note}}</p></div>
+  <div class="sign">{{sign}}<br><span>— 한결</span></div>
+</body></html>
