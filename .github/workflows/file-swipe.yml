@@ -1,0 +1,77 @@
+name: file-swipe APK
+
+# file-swipe 폴더가 바뀌어 푸시되면 APK를 만들어
+# 'file-swipe' 릴리스에 같은 이름으로 덮어 올린다.
+on:
+  push:
+    paths:
+      - 'file-swipe/**'
+      - '.github/workflows/file-swipe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: file-swipe
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.14.3
+
+      # 서명 키: Secret이 있으면 그걸 쓰고(덮어 설치 가능),
+      # 없으면 이번 빌드만 쓰는 임시 키를 만든다(업데이트 때 지우고 재설치 필요).
+      - name: Prepare signing key
+        env:
+          KEY_B64: ${{ secrets.FILE_SWIPE_KEYSTORE }}
+          KEY_PASS: ${{ secrets.FILE_SWIPE_KEY_PASSWORD }}
+        run: |
+          KEY="$RUNNER_TEMP/release.keystore"
+          if [ -n "$KEY_B64" ] && [ -n "$KEY_PASS" ]; then
+            echo "$KEY_B64" | base64 -d > "$KEY"
+            PASS="$KEY_PASS"
+          else
+            PASS=$(openssl rand -hex 16)
+            keytool -genkeypair -keystore "$KEY" -storetype PKCS12 -alias fileswipe \
+              -keyalg RSA -keysize 2048 -validity 20000 \
+              -storepass "$PASS" -keypass "$PASS" -dname "CN=file-swipe"
+            echo "::warning::FILE_SWIPE_KEYSTORE secret is not set; signed with a one-off key, so this APK cannot update an earlier install in place."
+          fi
+          echo "::add-mask::$PASS"
+          echo "SIGNING_STORE_FILE=$KEY" >> "$GITHUB_ENV"
+          echo "SIGNING_PASSWORD=$PASS" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        working-directory: file-swipe
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ github.run_number }}
+        run: |
+          cp file-swipe/app/build/outputs/apk/release/app-release.apk file-swipe.apk
+          NOTES="v${VERSION} · $(git log -1 --pretty=%s)
+
+          폰에서 아래 file-swipe.apk 를 눌러 받은 뒤 설치하세요.
+          고정 주소: https://github.com/${GH_REPO}/releases/download/file-swipe/file-swipe.apk"
+          if ! gh release view file-swipe >/dev/null 2>&1; then
+            gh release create file-swipe --target "$GITHUB_SHA" --title "v${VERSION}" --notes "$NOTES"
+          fi
+          gh release upload file-swipe file-swipe.apk --clobber
+          gh release edit file-swipe --title "v${VERSION}" --notes "$NOTES"
