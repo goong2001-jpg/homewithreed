@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { WORD_BANK, Word } from '../../words/wordBank';
 import { wordsOfSound } from '../../words/dailySet';
 import { UNITS } from '../../words/units';
-import { sentenceFor, splitSentence } from '../../words/sentences';
-import { speakWord, speakSentence } from '../../alphabet/speech';
+import FairyBubble from '../FairyBubble';
+import { speakWord } from '../../alphabet/speech';
 import { playClick } from '../../utils/sounds';
 import { card, lineBtn } from './common';
 
@@ -84,18 +84,10 @@ export default function PictureBook({ seen, known, onBack }: {
         </div>
       </div>
 
-      {picked && (() => {
-        const s = sentenceFor(picked);
-        const [pre, mid, post] = splitSentence(s, picked.en);
-        return (
-          <button onClick={() => { speakSentence(s); playClick(); }}
-            style={{ width: '100%', marginTop: 10, padding: '10px 12px', borderRadius: 16, border: '2px dashed #f3c4e3',
-              background: '#fff5fb', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#c06aa0' }}>🧚 {picked.emoji} {picked.ko} — 눌러서 문장 듣기 🔊</div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: '#5b4b8a' }}>{pre}<span style={{ color: '#e67e22' }}>{mid}</span>{post}</div>
-          </button>
-        );
-      })()}
+      {picked && (
+        <FairyBubble word={picked} style={{ marginTop: 10 }}
+          label={`🧚 ${picked.emoji} ${picked.ko} — 눌러서 문장 듣기 🔊`} />
+      )}
 
       <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
         <button disabled={pi === 0} onClick={() => { setPi(pi - 1); setPicked(null); playClick(); }}
