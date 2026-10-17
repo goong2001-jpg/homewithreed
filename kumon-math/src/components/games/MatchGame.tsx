@@ -32,18 +32,20 @@ export default function MatchGame({ pool, onStars, onBack }: GameProps) {
   useEffect(() => { if (done) { playStreak(); onStars(3); } }, [done, onStars]);
 
   const flip = useCallback((c: Card) => {
-    if (open.length >= 2 || open.includes(c.id) || found.includes(c.word.en)) return;
+    // 이미 찾은 짝은 누르면 다시 읽어만 준다
+    if (found.includes(c.word.en)) { speakWord(c.word.en); return; }
+    if (open.length >= 2 || open.includes(c.id)) return;
     playClick();
     const next = [...open, c.id];
     setOpen(next);
-    if (c.face === 'pic') speakWord(c.word.en);
+    // 그림 카드든 단어 카드든 뒤집으면 읽어 준다 — 글자를 못 읽어도 소리로 짝을 찾을 수 있게
+    speakWord(c.word.en);
     if (next.length === 2) {
       setTries(t => t + 1);
       const [a, b] = next.map(id => cards.find(x => x.id === id)!);
       if (a.word.en === b.word.en) {
         setTimeout(() => {
           playCorrect();
-          speakWord(a.word.en);
           setFound(f => [...f, a.word.en]);
           setOpen([]);
         }, 400);
