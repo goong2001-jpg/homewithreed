@@ -3,13 +3,14 @@
  *
  * 통장 한 줄: { id, date, type: 'in'|'out'|'interest'|'tax', amount, memo, createdAt }
  * 이자: 하루 끝 잔액 × 연 이자율 ÷ 365 를 한 달 모아서, 다음 달 1일에 원 단위 버림으로 넣는다.
- *       실제 은행처럼 일부러 연 이자율로 낮게 둔다 (나중에 "예금만으로는 물가를 못 이긴다"를 보여주려고).
+ *       기본은 시중은행 1년 정기예금 수준(연 3.5%). 세금을 떼면 물가와 겨우 비기는 수준이라
+ *       나중에 "예금만으로는 돈이 크게 늘지 않는다"를 보여줄 수 있다.
  */
 (function () {
   'use strict';
 
   // 배포할 때마다 index.html 의 ?v=, sw.js, version.json 과 같이 올린다
-  var APP_VERSION = '1';
+  var APP_VERSION = '2';
 
   var STORE_KEY = 'hwr-bank-v1';
   var BACKUP_KEY = 'hwr-bank-last-backup';
@@ -101,7 +102,7 @@
   function freshState() {
     var m = prevMonth(today().slice(0, 7));
     return {
-      rate: 2.0, tax: false, showInflation: false, inflation: 2.9, pin: null,
+      rate: 3.5, tax: false, showInflation: false, inflation: 2.9, pin: null,
       kids: [
         { id: 'k1', name: '구름', opened: today(), settled: m, tx: [], requests: [] },
         { id: 'k2', name: '열매', opened: today(), settled: m, tx: [], requests: [] }
@@ -123,7 +124,7 @@
       k.tx = k.tx.filter(isTx);
       k.requests = Array.isArray(k.requests) ? k.requests.filter(function (r) { return r && r.id && r.amount > 0; }) : [];
     });
-    if (parseRate(s.rate) === null) s.rate = 2.0;
+    if (parseRate(s.rate) === null) s.rate = 3.5;
     if (parseRate(s.inflation) === null) s.inflation = 2.9;
     return s;
   }
@@ -301,7 +302,9 @@
       '<div><span>같은 물건 값 (물가 연 ' + pct(state.inflation) + ')</span><b>' + won(price) + '</b></div></div>' +
       '<p class="cmpMsg ' + (gap > 0 ? 'lose' : 'win') + '">' + (gap > 0
         ? '이자보다 물건 값이 더 많이 올라요. 지금 ' + won(base) + '으로 살 수 있는 물건을 1년 뒤엔 ' + won(gap) + ' 모자라서 못 사요.'
-        : '이자가 물가보다 조금 더 많아요. 1년 뒤 ' + won(-gap) + '만큼 더 살 수 있어요.') + '</p>';
+        : -gap < base * 0.01
+          ? '이자가 물가를 겨우 따라가요. 1년 동안 맡겨도 ' + won(-gap) + '어치만 더 살 수 있어요.'
+          : '이자가 물가보다 많아요. 1년 뒤 ' + won(-gap) + '어치 더 살 수 있어요.') + '</p>';
   }
 
   function renderLedger(k) {

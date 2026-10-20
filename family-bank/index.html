@@ -6,12 +6,12 @@
     <meta name="theme-color" content="#fbf6ec" />
     <meta name="description" content="구름·열매가 받은 돈을 엄마아빠 은행에 맡기고, 연 이자와 출금 승인으로 은행이 어떻게 돌아가는지 배우는 가족은행." />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="icon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
     <link rel="manifest" href="manifest.json" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="가족은행" />
-    <link rel="stylesheet" href="style.css?v=1" />
+    <link rel="stylesheet" href="style.css?v=2" />
     <title>엄마아빠 은행</title>
   </head>
   <body>
@@ -81,11 +81,11 @@
       <!-- 엄마아빠 설정 -->
       <section id="admin" class="card admin" hidden>
         <h2>엄마아빠 설정</h2>
-        <label class="editField"><span>연 이자율 (%)</span><input id="rateInput" type="text" inputmode="decimal" /></label>
+        <label class="editField"><span>연 이자율 (%, 정기예금 기준)</span><input id="rateInput" type="text" inputmode="decimal" /></label>
         <label class="checkRow"><input id="taxInput" type="checkbox" /> <span>이자에서 세금 15.4% 떼기</span></label>
         <label class="checkRow"><input id="inflInput" type="checkbox" /> <span>물가 비교 카드 보여주기</span></label>
         <label class="editField"><span>물가 상승률 (연 %)</span><input id="inflRateInput" type="text" inputmode="decimal" /></label>
-        <p class="hint">기본 물가 상승률 2.9%는 2026년 9월 소비자물가(국가데이터처, 10월 2일 발표) 기준이에요.</p>
+        <p class="hint">기본 이자율 3.5%는 시중은행 1년 정기예금 수준(2026년 10월 초 연 3.4~3.6%), 기본 물가 상승률 2.9%는 2026년 9월 소비자물가(국가데이터처, 10월 2일 발표) 기준이에요.</p>
         <div class="subHead">아이 이름</div>
         <div id="nameInputs"></div>
         <div class="adminBtns">
@@ -147,6 +147,6 @@
         }, 1500);
       });
     </script>
-    <script src="app.js?v=1"></script>
+    <script src="app.js?v=2"></script>
   </body>
 </html>

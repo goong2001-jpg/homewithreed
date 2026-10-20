@@ -22,7 +22,7 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   // ---- 처음 ----
   check('처음엔 0원', (await t('#balance')) === '0원');
   check('아이 둘', (await p.locator('#kids button').count()) === 2);
-  check('연 2% 기본', (await t('#rate')) === '연 2%', await t('#rate'));
+  check('연 3.5% 기본', (await t('#rate')) === '연 3.5%', await t('#rate'));
   check('설정은 잠겨 있음', !(await p.isVisible('#admin')));
 
   // ---- 맡기기: 이어 누르면 한 줄 ----
@@ -82,8 +82,9 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   const m3 = new Date(now.getFullYear(), now.getMonth() - 3, 1);
   const days2 = new Date(m2.getFullYear(), m2.getMonth() + 1, 0).getDate();
   const days1 = new Date(m1.getFullYear(), m1.getMonth() + 1, 0).getDate();
-  const i2 = Math.floor(1000000 * days2 * 0.02 / 365);
-  const i1 = Math.floor((1000000 + i2) * days1 * 0.02 / 365);
+  const i2 = Math.floor(1000000 * days2 * 0.035 / 365);
+  // 둘째 달 이자는 첫 달 이자에서 세금을 뗀 잔액에 붙는다
+  const i1 = Math.floor((1000000 + i2 - Math.floor(i2 * 0.154)) * days1 * 0.035 / 365);
   await p.evaluate(([opened, settled]) => {
     const s = JSON.parse(localStorage.getItem('hwr-bank-v1'));
     s.kids[1].opened = opened;
@@ -113,7 +114,7 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   await p.check('#inflInput');
   await p.click('#saveSettings');
   check('물가 카드 보임', await p.isVisible('#inflation'));
-  check('예금이 물가에 짐', (await t('.cmpMsg')).includes('모자라서'), await t('.cmpMsg'));
+  check('세금 떼면 물가를 겨우 따라감', (await t('.cmpMsg')).includes('겨우'), await t('.cmpMsg'));
 
   // ---- 용돈기입장 잔액 옮기기 ----
   await p.click('#kids [data-kid="0"]');
