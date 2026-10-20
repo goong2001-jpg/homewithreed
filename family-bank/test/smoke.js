@@ -34,13 +34,18 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   check('내역에 준 사람', (await t('.lrow .memo')) === '할머니');
   await p.click('#undoBtn');
   check('되돌리기 → 0원', (await t('#balance')) === '0원');
+  await p.fill('#noteInput', '생일 선물');
   await p.click('.bill.b50000');
   check('다시 50,000원', (await t('#balance')) === '50,000원');
+  check('이유가 내역에', (await p.locator('.lrow .memo').last().textContent()) === '생일 선물');
+  check('이유 칸 비워짐', (await p.inputValue('#noteInput')) === '');
 
   // ---- 찾기 신청 ----
   await p.click('#modeSeg [data-mode="out"]');
   await p.click('#tags [data-tag="과자·간식"]');
+  await p.fill('#noteInput', '친구랑 아이스크림');
   await p.click('.bill.b10000');
+  check('찾기 이유 표시', (await t('.reqInfo span')).includes('과자·간식 · 친구랑 아이스크림'), await t('.reqInfo span'));
   check('신청만 되고 잔액 그대로', (await t('#balance')) === '50,000원');
   check('승인 대기 보임', await p.isVisible('#pendingCard'));
   check('탭에 배지', (await t('#kids .badge')) === '1');
@@ -69,6 +74,19 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   check('틀린 비밀번호', (await t('#pinMsg')).includes('달라요'));
   await pin('1234');
   check('거절 → 잔액 그대로', (await t('#balance')) === '40,000원' && !(await p.isVisible('#pendingCard')));
+
+  // ---- 갖고 싶은 것 ----
+  answers.push('레고', '5만');
+  await p.click('[data-goal="set"]');
+  check('목표 80%', (await t('.jar span')) === '80%', await t('.jar span'));
+  check('남은 돈', (await t('.goalMsg')).includes('10,000원 더'), await t('.goalMsg'));
+  await p.click('#modeSeg [data-mode="in"]');
+  await p.click('.bill.b10000');
+  check('다 모음', (await t('.goalMsg')).includes('다 모았어요'));
+  await p.click('[data-goal="buy"]');
+  check('목표로 찾기 신청', (await t('.reqInfo span')).includes('레고 사려고'), await t('.reqInfo span'));
+  await p.click('[data-reject]');
+  await p.click('#lockBtn');
 
   // ---- 호윤 통장은 따로 ----
   await p.click('#kids [data-kid="1"]');
@@ -102,6 +120,11 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   await p.reload();
   check('옛 기본 이름 → 하율·호윤', (await p.locator('#kids button').allTextContents()).join(',') === '하율,호윤');
   await p.click('#kids [data-kid="1"]');
+  check('이자 축하 창', await p.isVisible('#giftSheet'));
+  check('축하 금액 = 세금 뗀 이자', (await t('#giftAmount')) === '+' + (i2 - Math.floor(i2 * 0.154) + i1 - Math.floor(i1 * 0.154)).toLocaleString('ko-KR') + '원', await t('#giftAmount'));
+  await p.click('#giftOk');
+  check('호윤이에게', (await t('#giftTitle')) === '은행이 호윤이에게 이자를 줬어요!', await t('#giftTitle'));
+  check('축하 닫힘', !(await p.isVisible('#giftSheet')));
   const rows = await p.locator('.lrow.interest').allTextContents();
   check('두 달치 이자 줄', rows.length === 2, rows.join(' | '));
   check('첫 달 이자 금액', rows[0] && rows[0].includes(i2.toLocaleString('ko-KR')), i2 + ' / ' + rows[0]);
@@ -111,6 +134,7 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   check('이자·세금 반영 잔액', (await t('#balance')) === expect.toLocaleString('ko-KR') + '원', await t('#balance') + ' vs ' + expect);
   await p.reload();
   await p.click('#kids [data-kid="1"]');
+  check('축하는 한 번만', !(await p.isVisible('#giftSheet')));
   check('다시 열어도 이자 두 번 안 줌', (await p.locator('.lrow.interest').count()) === 2);
   check('이번 달 쌓이는 이자 표시', /원$/.test(await t('#accrued')) && (await t('#accrued')) !== '0.0원', await t('#accrued'));
 
@@ -128,7 +152,7 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   await p.evaluate(() => localStorage.setItem('hwr-allowance-v1', JSON.stringify([
     { id: 'a', date: '2026-01-01', amount: 30000 }, { id: 'b', date: '2026-02-01', amount: 5000, type: 'out' }])));
   await p.click('#importAllowance');
-  check('25,000원 옮김', (await t('#balance')) === '65,000원', await t('#balance'));
+  check('25,000원 옮김', (await t('#balance')) === '75,000원', await t('#balance'));
 
   // ---- 이자율 바꾸기 ----
   await p.fill('#rateInput', '0.1');
@@ -141,6 +165,13 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   await p.click('#lockBtn');
   await p.click('#kids [data-kid="1"]');
   await p.screenshot({ path: 'test/shot.png', fullPage: true });
+  // 하율 화면 + 이자 축하 창
+  await p.click('#kids [data-kid="0"]');
+  await p.screenshot({ path: 'test/shot-kid.png' });
+  await p.evaluate(() => { const s = JSON.parse(localStorage.getItem('hwr-bank-v1')); s.kids[0].gift = 37; localStorage.setItem('hwr-bank-v1', JSON.stringify(s)); });
+  await p.reload();
+  await p.waitForTimeout(600);
+  await p.screenshot({ path: 'test/shot-gift.png' });
 
   check('스크립트 오류 없음', errors.length === 0, errors.join(' / '));
   await browser.close();

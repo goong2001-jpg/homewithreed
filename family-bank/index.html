@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="가족은행" />
-    <link rel="stylesheet" href="style.css?v=3" />
+    <link rel="stylesheet" href="style.css?v=4" />
     <title>엄마아빠 은행</title>
   </head>
   <body>
@@ -32,7 +32,7 @@
           <span id="bookName" class="bookName">입출금통장</span>
           <span id="bookNo" class="bookNo"></span>
         </div>
-        <div class="bookLabel">지금 통장에 있는 돈</div>
+        <div class="bookLabel">지금 통장에 있는 돈 <button id="speakBtn" class="speakBtn">소리로 듣기</button></div>
         <div id="balance" class="balance">0원</div>
         <div class="bookStats">
           <div><div class="bsLabel">이자율</div><div id="rate" class="bsNum">연 0%</div></div>
@@ -40,6 +40,9 @@
         </div>
         <p id="nextPay" class="hint"></p>
       </section>
+
+      <!-- 갖고 싶은 것 모으기 -->
+      <section id="goalCard" class="card goal"></section>
 
       <!-- 물가 비교 (엄마아빠가 켜면 보임) -->
       <section id="inflation" class="card inflation" hidden></section>
@@ -58,6 +61,7 @@
         </div>
         <div class="fieldLabel"><span id="tagLabel">누가 줬어요?</span> <small>(안 골라도 돼요)</small></div>
         <div id="tags" class="chips"></div>
+        <input id="noteInput" class="noteInput" type="text" maxlength="20" autocomplete="off" />
         <div class="bills">
           <button class="bill b1000" data-amount="1000"><span class="billNum">1,000</span><span class="billWon">천원</span></button>
           <button class="bill b5000" data-amount="5000"><span class="billNum">5,000</span><span class="billWon">오천원</span></button>
@@ -83,7 +87,8 @@
         <h2>엄마아빠 설정</h2>
         <label class="editField"><span>연 이자율 (%, 정기예금 기준)</span><input id="rateInput" type="text" inputmode="decimal" /></label>
         <label class="checkRow"><input id="taxInput" type="checkbox" /> <span>이자에서 세금 15.4% 떼기</span></label>
-        <label class="checkRow"><input id="inflInput" type="checkbox" /> <span>물가 비교 카드 보여주기</span></label>
+        <label class="checkRow"><input id="inflInput" type="checkbox" /> <span>물가 비교 카드 보여주기 (목표에 "이자로만 모으면 몇 년"도 같이 보여요)</span></label>
+        <label class="checkRow"><input id="soundInput" type="checkbox" /> <span>동전 소리</span></label>
         <label class="editField"><span>물가 상승률 (연 %)</span><input id="inflRateInput" type="text" inputmode="decimal" /></label>
         <p class="hint">기본 이자율 3.5%는 시중은행 1년 정기예금 수준(2026년 10월 초 연 3.4~3.6%), 기본 물가 상승률 2.9%는 2026년 9월 소비자물가(국가데이터처, 10월 2일 발표) 기준이에요.</p>
         <div class="subHead">아이 이름</div>
@@ -104,6 +109,17 @@
         <button id="updateBtn" class="linkBtn">최신 버전 받기</button>
       </footer>
     </main>
+
+    <!-- 이자 받은 날 -->
+    <div id="giftSheet" class="sheet mid hidden" role="dialog" aria-modal="true" aria-labelledby="giftTitle">
+      <div class="sheetBox gift">
+        <div class="stamp">이자</div>
+        <h3 id="giftTitle"></h3>
+        <div id="giftAmount" class="giftAmount"></div>
+        <p id="giftMsg" class="hint"></p>
+        <button id="giftOk" class="primaryBtn">고마워요!</button>
+      </div>
+    </div>
 
     <!-- 비밀번호 -->
     <div id="pinSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
@@ -147,6 +163,6 @@
         }, 1500);
       });
     </script>
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
   </body>
 </html>
