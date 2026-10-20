@@ -10,7 +10,7 @@
   'use strict';
 
   // 배포할 때마다 index.html 의 ?v=, sw.js, version.json 과 같이 올린다
-  var APP_VERSION = '3';
+  var APP_VERSION = '4';
 
   var STORE_KEY = 'hwr-bank-v1';
   var BACKUP_KEY = 'hwr-bank-last-backup';
@@ -25,8 +25,8 @@
     out: ['과자·간식', '장난감', '책·문구', '선물', '놀이', '기타']
   };
   var MODE_TEXT = {
-    in: { label: '누가 줬어요?', hint: '지폐를 누르면 바로 통장에 들어가요. 이어서 누르면 한 줄로 합쳐져요. 진짜 돈은 엄마아빠가 보관해요.' },
-    out: { label: '어디에 쓸 거예요?', hint: '찾기는 신청만 돼요. 엄마아빠가 승인하면 통장에서 빠지고 진짜 돈을 받아요.' }
+    in: { label: '누가 줬어요?', note: '왜 받았어요? (예: 생일 선물, 심부름)', hint: '지폐를 누르면 바로 통장에 들어가요. 이어서 누르면 한 줄로 합쳐져요. 진짜 돈은 엄마아빠가 보관해요.' },
+    out: { label: '어디에 쓸 거예요?', note: '왜 찾아요? (예: 포켓몬 카드 사려고)', hint: '찾기는 신청만 돼요. 엄마아빠가 승인하면 통장에서 빠지고 진짜 돈을 받아요.' }
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -126,6 +126,8 @@
       if (o && k.name === o[0]) k.name = o[1];
       k.tx = k.tx.filter(isTx);
       k.requests = Array.isArray(k.requests) ? k.requests.filter(function (r) { return r && r.id && r.amount > 0; }) : [];
+      if (!(k.goal && typeof k.goal.name === 'string' && k.goal.amount > 0)) k.goal = null;
+      k.gift = k.gift > 0 ? Math.floor(k.gift) : 0;
     });
     if (parseRate(s.rate) === null) s.rate = 3.5;
     if (parseRate(s.inflation) === null) s.inflation = 2.9;
@@ -186,6 +188,7 @@
         k.tx.push({ id: newId(), date: pay, type: 'interest', amount: amt, memo: label, createdAt: Date.now() });
         var tax = state.tax ? Math.floor(amt * TAX_RATE) : 0;
         if (tax > 0) k.tx.push({ id: newId(), date: pay, type: 'tax', amount: tax, memo: '이자 세금', createdAt: Date.now() + 1 });
+        k.gift = (k.gift || 0) + amt - tax;   // 아이 화면에서 한 번 축하하고 0으로
       }
       k.settled = m;
       changed = true;
@@ -261,6 +264,7 @@
     $('bookName').textContent = k.name + ' 입출금통장';
     $('bookNo').textContent = 'No. ' + k.opened.replace(/-/g, '') + '-' + pad(kidIdx + 1);
     $('balance').textContent = won(bal);
+    renderGoal(k, bal);
     $('rate').textContent = '연 ' + pct(state.rate);
     var acc = interestBetween(k, cur + '-01', now);
     $('accrued').textContent = wonFine(acc);
@@ -283,12 +287,125 @@
     $('recordCard').classList.toggle('modeOut', mode === 'out');
     $('tagLabel').textContent = MODE_TEXT[mode].label;
     $('modeHint').textContent = MODE_TEXT[mode].hint;
+    $('noteInput').placeholder = MODE_TEXT[mode].note;
     $('tags').innerHTML = TAGS[mode].map(function (g) {
       return '<button class="chip' + (g === tag ? ' on' : '') + '" data-tag="' + esc(g) + '">' + esc(g) + '</button>';
     }).join('');
 
     renderLedger(k);
     renderAdmin(isParent);
+    renderGift(k);
+  }
+
+  // 갖고 싶은 것: 이름과 금액만. 다 모으면 바로 찾기 신청으로 이어진다.
+  function renderGoal(k, bal) {
+    var g = k.goal, box = $('goalCard');
+    if (!g) {
+      box.innerHTML = '<h2>갖고 싶은 게 있어요?</h2><p class="hint goalHint">목표를 정하면 얼마나 모았는지 보여줘요.</p>' +
+        '<button class="primaryBtn" data-goal="set">목표 정하기</button>';
+      return;
+    }
+    var p = Math.min(100, Math.floor(bal / g.amount * 100)), left = g.amount - bal;
+    var slow = '';
+    if (state.showInflation && left > 0 && bal > 0 && state.rate > 0) {
+      // 더 넣지 않고 이자로만 모으면 걸리는 시간 (월복리로 어림)
+      var months = Math.ceil(Math.log(g.amount / bal) / Math.log(1 + state.rate / 1200));
+      slow = '<p class="hint">돈을 더 넣지 않고 이자로만 모으면 ' +
+        (months >= 24 ? '약 ' + Math.round(months / 12) + '년' : '약 ' + months + '개월') + ' 걸려요.</p>';
+    }
+    box.innerHTML = '<div class="goalTop"><h2>' + esc(g.name) + '</h2><span class="goalAmt">' + won(g.amount) + '</span></div>' +
+      '<div class="jar"><i style="width:' + p + '%"></i><span>' + p + '%</span></div>' +
+      (left > 0
+        ? '<p class="goalMsg">' + won(left) + ' 더 모으면 돼요!</p>' + slow
+        : '<p class="goalMsg done">다 모았어요! 엄마아빠한테 찾기 신청해 볼까요?</p>' +
+          '<button class="primaryBtn" data-goal="buy">' + won(g.amount) + ' 찾기 신청하기</button>') +
+      '<div class="goalTools"><button class="linkBtn" data-goal="set">바꾸기</button><button class="linkBtn" data-goal="clear">지우기</button></div>';
+  }
+
+  function goalAction(act) {
+    var k = kid();
+    if (act === 'set') {
+      var name = prompt('갖고 싶은 게 뭐예요? (예: 레고, 인형)', k.goal ? k.goal.name : '');
+      if (name === null || !name.trim()) return;
+      var amount = askAmount(name.trim() + ' 얼마예요?');
+      if (!amount) return;
+      k.goal = { name: name.trim().slice(0, 12), amount: amount };
+    } else if (act === 'clear') {
+      if (!confirm('목표를 지울까요?')) return;
+      k.goal = null;
+    } else if (act === 'buy') {
+      mode = 'out';
+      tag = '';
+      $('noteInput').value = k.goal.name + ' 사려고';
+      mergeable = null;
+      return request(k.goal.amount, null);
+    }
+    save();
+    render();
+  }
+
+  function renderGift(k) {
+    var show = k.gift > 0;
+    $('giftSheet').classList.toggle('hidden', !show);
+    if (!show) return;
+    $('giftTitle').textContent = '은행이 ' + callName(k.name) + '에게 이자를 줬어요!';
+    $('giftAmount').textContent = '+' + won(k.gift);
+    $('giftMsg').textContent = '돈을 은행에 맡겨 줘서 고맙다고 주는 돈이에요. 많이 맡길수록, 오래 맡길수록 이자도 커져요.';
+  }
+  function closeGift() {
+    var k = kid();
+    k.gift = 0;
+    save();
+    render();
+  }
+
+  // ---------- 소리 ----------
+  var audio = null;
+  function coinSound() {
+    if (state.sound === false) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      [[1568, 0], [2093, 0.09]].forEach(function (n) {   // 짤랑: 높은 음 두 개
+        var o = audio.createOscillator(), g = audio.createGain(), t0 = audio.currentTime + n[1];
+        o.type = 'triangle';
+        o.frequency.value = n[0];
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
+        o.connect(g).connect(audio.destination);
+        o.start(t0);
+        o.stop(t0 + 0.4);
+      });
+    } catch (e) {}
+  }
+  // 동전이 통장으로 떨어지는 그림
+  function coinDrop() {
+    var c = document.createElement('i');
+    c.className = 'coin';
+    document.querySelector('.book').appendChild(c);
+    setTimeout(function () { c.remove(); }, 900);
+    $('balance').classList.remove('bump');
+    void $('balance').offsetWidth;
+    $('balance').classList.add('bump');
+  }
+  // 받침 있는 이름은 '하율이', 없는 이름은 그대로 (아이를 부를 때처럼)
+  function callName(n) {
+    var c = n.charCodeAt(n.length - 1);
+    return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 ? n + '이' : n;
+  }
+  function speak(text) {
+    if (!window.speechSynthesis) { alert(text); return; }
+    speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR';
+    u.rate = 0.9;
+    speechSynthesis.speak(u);
+  }
+  function speakBalance() {
+    var k = kid(), bal = balance(k), text = callName(k.name) + ' 통장에는 ' + bal + '원이 있어요.';
+    if (k.goal) text += bal >= k.goal.amount ? ' ' + k.goal.name + ' 살 돈을 다 모았어요!'
+      : ' ' + k.goal.name + ' 사려면 ' + (k.goal.amount - bal) + '원 더 모아야 해요.';
+    speak(text);
   }
 
   function renderInflation(bal) {
@@ -332,6 +449,7 @@
     $('rateInput').value = state.rate;
     $('taxInput').checked = !!state.tax;
     $('inflInput').checked = !!state.showInflation;
+    $('soundInput').checked = state.sound !== false;
     $('inflRateInput').value = state.inflation;
     $('nameInputs').innerHTML = state.kids.map(function (x, i) {
       return '<label class="editField"><span>' + (i + 1) + '번째</span><input data-name="' + i + '" type="text" maxlength="6" value="' + esc(x.name) + '" /></label>';
@@ -348,28 +466,38 @@
   }
 
   // ---------- 동작 ----------
+  // 칩(누가/어디)과 이유 칸을 합쳐 한 줄 메모로. 둘 다 없으면 기본 말.
+  function memoOf(fallback) {
+    var note = $('noteInput').value.trim();
+    return [tag, note].filter(Boolean).join(' · ') || fallback;
+  }
+  function freshEntry() { return !!(tag || $('noteInput').value.trim()); }
+
   function deposit(amount, btn) {
     var k = kid(), t = null;
-    if (btn && !tag && mergeable && mergeable.kidId === k.id) {
+    if (btn && !freshEntry() && mergeable && mergeable.kidId === k.id) {
       t = k.tx.filter(function (x) { return x.id === mergeable.txId; })[0] || null;
     }
     if (t) t.amount += amount;
     else {
-      t = { id: newId(), date: today(), type: 'in', amount: amount, memo: tag || '맡김', createdAt: Date.now() };
+      t = { id: newId(), date: today(), type: 'in', amount: amount, memo: memoOf('맡김'), createdAt: Date.now() };
       k.tx.push(t);
     }
     save();
     lastAdded = { kidId: k.id, txId: t.id, kind: 'tx' };
     mergeable = btn ? { kidId: k.id, txId: t.id } : null;
     tag = '';
+    $('noteInput').value = '';
     render();
     pop(btn);
+    coinSound();
+    coinDrop();
     toast('+' + won(t.amount) + ' 맡겼어요' + (btn ? ' · 더 누르면 합쳐져요' : ''), true);
   }
 
   function request(amount, btn) {
     var k = kid(), r = null;
-    if (btn && !tag && mergeable && mergeable.kidId === k.id && mergeable.reqId) {
+    if (btn && !freshEntry() && mergeable && mergeable.kidId === k.id && mergeable.reqId) {
       r = k.requests.filter(function (x) { return x.id === mergeable.reqId; })[0] || null;
     }
     var want = (r ? r.amount : 0) + amount;
@@ -382,13 +510,14 @@
     }
     if (r) r.amount = want;
     else {
-      r = { id: newId(), date: today(), amount: amount, memo: tag || '찾기' };
+      r = { id: newId(), date: today(), amount: amount, memo: memoOf('찾기') };
       k.requests.push(r);
     }
     save();
     lastAdded = { kidId: k.id, reqId: r.id, kind: 'req' };
     mergeable = btn ? { kidId: k.id, reqId: r.id } : null;
     tag = '';
+    $('noteInput').value = '';
     render();
     pop(btn);
     toast(won(r.amount) + ' 찾기 신청했어요. 엄마아빠 승인을 기다려요', true);
@@ -459,6 +588,7 @@
     state.inflation = infl;
     state.tax = $('taxInput').checked;
     state.showInflation = $('inflInput').checked;
+    state.sound = $('soundInput').checked;
     names.forEach(function (n, i) { state.kids[i].name = n; });
     save();
     if (document.activeElement) document.activeElement.blur();
@@ -550,6 +680,7 @@
     if (!b) return;
     kidIdx = +b.dataset.kid;
     tag = '';
+    $('noteInput').value = '';
     mergeable = null;
     ledgerShown = LEDGER_STEP;
     render();
@@ -559,6 +690,7 @@
     if (!b || b.dataset.mode === mode) return;
     mode = b.dataset.mode;
     tag = '';
+    $('noteInput').value = '';
     mergeable = null;
     render();
   });
@@ -589,6 +721,12 @@
     var row = e.target.closest('.lrow');
     if (row) removeTx(row.dataset.id);
   });
+  $('goalCard').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-goal]');
+    if (b) goalAction(b.dataset.goal);
+  });
+  $('speakBtn').addEventListener('click', speakBalance);
+  $('giftOk').addEventListener('click', function () { coinSound(); closeGift(); });
   $('moreBtn').addEventListener('click', function () { ledgerShown += LEDGER_STEP; render(); });
   $('lockBtn').addEventListener('click', function () { if (unlocked()) lock(); else asParent(null); });
   $('pinOk').addEventListener('click', submitPin);
