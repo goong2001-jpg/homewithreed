@@ -10,7 +10,7 @@
   'use strict';
 
   // 배포할 때마다 index.html 의 ?v=, sw.js, version.json 과 같이 올린다
-  var APP_VERSION = '2';
+  var APP_VERSION = '3';
 
   var STORE_KEY = 'hwr-bank-v1';
   var BACKUP_KEY = 'hwr-bank-last-backup';
@@ -104,8 +104,8 @@
     return {
       rate: 3.5, tax: false, showInflation: false, inflation: 2.9, pin: null,
       kids: [
-        { id: 'k1', name: '구름', opened: today(), settled: m, tx: [], requests: [] },
-        { id: 'k2', name: '열매', opened: today(), settled: m, tx: [], requests: [] }
+        { id: 'k1', name: '하율', opened: today(), settled: m, tx: [], requests: [] },
+        { id: 'k2', name: '호윤', opened: today(), settled: m, tx: [], requests: [] }
       ]
     };
   }
@@ -119,8 +119,11 @@
         /^\d{4}-\d{2}-\d{2}$/.test(k.opened) && /^\d{4}-\d{2}$/.test(k.settled);
     });
   }
+  var OLD_NAMES = { k1: ['구름', '하율'], k2: ['열매', '호윤'] };   // 버전 2까지의 기본 이름 → 실제 이름
   function clean(s) {
     s.kids.forEach(function (k) {
+      var o = OLD_NAMES[k.id];
+      if (o && k.name === o[0]) k.name = o[1];
       k.tx = k.tx.filter(isTx);
       k.requests = Array.isArray(k.requests) ? k.requests.filter(function (r) { return r && r.id && r.amount > 0; }) : [];
     });

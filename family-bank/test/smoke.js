@@ -70,10 +70,11 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   await pin('1234');
   check('거절 → 잔액 그대로', (await t('#balance')) === '40,000원' && !(await p.isVisible('#pendingCard')));
 
-  // ---- 열매 통장은 따로 ----
+  // ---- 호윤 통장은 따로 ----
   await p.click('#kids [data-kid="1"]');
-  check('열매는 0원', (await t('#balance')) === '0원');
-  check('열매 통장 이름', (await t('#bookName')) === '열매 입출금통장');
+  check('호윤은 0원', (await t('#balance')) === '0원');
+  check('호윤 통장 이름', (await t('#bookName')) === '호윤 입출금통장');
+  check('하율 탭', (await p.locator('#kids button').first().textContent()).startsWith('하율'));
 
   // ---- 이자: 두 달 전 1일에 100만원 맡긴 상태를 넣고 다시 연다 ----
   const now = new Date();
@@ -93,7 +94,13 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
     s.tax = true;
     localStorage.setItem('hwr-bank-v1', JSON.stringify(s));
   }, [ds(m2), ds(m3).slice(0, 7)]);
+  await p.evaluate(() => {   // 버전 2 기본 이름으로 저장돼 있던 기기
+    const s = JSON.parse(localStorage.getItem('hwr-bank-v1'));
+    s.kids[0].name = '구름'; s.kids[1].name = '열매';
+    localStorage.setItem('hwr-bank-v1', JSON.stringify(s));
+  });
   await p.reload();
+  check('옛 기본 이름 → 하율·호윤', (await p.locator('#kids button').allTextContents()).join(',') === '하율,호윤');
   await p.click('#kids [data-kid="1"]');
   const rows = await p.locator('.lrow.interest').allTextContents();
   check('두 달치 이자 줄', rows.length === 2, rows.join(' | '));
