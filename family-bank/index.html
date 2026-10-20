@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fbf6ec" />
+    <meta name="description" content="구름·열매가 받은 돈을 엄마아빠 은행에 맡기고, 연 이자와 출금 승인으로 은행이 어떻게 돌아가는지 배우는 가족은행." />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="가족은행" />
+    <link rel="stylesheet" href="style.css?v=2" />
+    <title>엄마아빠 은행</title>
+  </head>
+  <body>
+    <noscript>이 앱을 실행하려면 JavaScript가 필요합니다.</noscript>
+
+    <main id="app">
+      <header class="top">
+        <h1>엄마아빠 은행</h1>
+        <button id="lockBtn" class="lockBtn">엄마아빠</button>
+      </header>
+
+      <!-- 아이 고르기 -->
+      <div id="kids" class="seg kids" role="tablist"></div>
+
+      <!-- 통장 -->
+      <section class="card book">
+        <div class="bookHead">
+          <span id="bookName" class="bookName">입출금통장</span>
+          <span id="bookNo" class="bookNo"></span>
+        </div>
+        <div class="bookLabel">지금 통장에 있는 돈</div>
+        <div id="balance" class="balance">0원</div>
+        <div class="bookStats">
+          <div><div class="bsLabel">이자율</div><div id="rate" class="bsNum">연 0%</div></div>
+          <div><div class="bsLabel">이번 달 쌓이는 이자</div><div id="accrued" class="bsNum">0원</div></div>
+        </div>
+        <p id="nextPay" class="hint"></p>
+      </section>
+
+      <!-- 물가 비교 (엄마아빠가 켜면 보임) -->
+      <section id="inflation" class="card inflation" hidden></section>
+
+      <!-- 출금 승인 대기 -->
+      <section id="pendingCard" class="card pending" hidden>
+        <h2>승인 기다리는 출금</h2>
+        <div id="pending"></div>
+      </section>
+
+      <!-- 맡기기 / 찾기 -->
+      <section id="recordCard" class="card">
+        <div class="seg" id="modeSeg" role="tablist">
+          <button data-mode="in" class="on">맡기기</button>
+          <button data-mode="out">찾기 신청</button>
+        </div>
+        <div class="fieldLabel"><span id="tagLabel">누가 줬어요?</span> <small>(안 골라도 돼요)</small></div>
+        <div id="tags" class="chips"></div>
+        <div class="bills">
+          <button class="bill b1000" data-amount="1000"><span class="billNum">1,000</span><span class="billWon">천원</span></button>
+          <button class="bill b5000" data-amount="5000"><span class="billNum">5,000</span><span class="billWon">오천원</span></button>
+          <button class="bill b10000" data-amount="10000"><span class="billNum">10,000</span><span class="billWon">만원</span></button>
+          <button class="bill b50000" data-amount="50000"><span class="billNum">50,000</span><span class="billWon">오만원</span></button>
+        </div>
+        <button id="customBtn" class="customBtn">금액 직접 입력 (예: 1,500원 · 3만5천)</button>
+        <p id="modeHint" class="hint"></p>
+      </section>
+
+      <!-- 통장 내역 -->
+      <section class="card">
+        <h2>통장 내역</h2>
+        <div class="ledgerHead">
+          <span>날짜</span><span>내용</span><span>찾으신 돈</span><span>맡기신 돈</span><span>남은 돈</span>
+        </div>
+        <div id="ledger"></div>
+        <button id="moreBtn" class="linkBtn more" hidden>이전 내역 더 보기</button>
+      </section>
+
+      <!-- 엄마아빠 설정 -->
+      <section id="admin" class="card admin" hidden>
+        <h2>엄마아빠 설정</h2>
+        <label class="editField"><span>연 이자율 (%, 정기예금 기준)</span><input id="rateInput" type="text" inputmode="decimal" /></label>
+        <label class="checkRow"><input id="taxInput" type="checkbox" /> <span>이자에서 세금 15.4% 떼기</span></label>
+        <label class="checkRow"><input id="inflInput" type="checkbox" /> <span>물가 비교 카드 보여주기</span></label>
+        <label class="editField"><span>물가 상승률 (연 %)</span><input id="inflRateInput" type="text" inputmode="decimal" /></label>
+        <p class="hint">기본 이자율 3.5%는 시중은행 1년 정기예금 수준(2026년 10월 초 연 3.4~3.6%), 기본 물가 상승률 2.9%는 2026년 9월 소비자물가(국가데이터처, 10월 2일 발표) 기준이에요.</p>
+        <div class="subHead">아이 이름</div>
+        <div id="nameInputs"></div>
+        <div class="adminBtns">
+          <button id="saveSettings" class="primaryBtn">설정 저장</button>
+          <button id="importAllowance" class="ghost">용돈기입장 잔액 옮겨오기</button>
+          <button id="changePin" class="ghost">비밀번호 바꾸기</button>
+          <button id="exportBtn" class="ghost">백업 파일 저장</button>
+          <label class="ghost fileBtn">백업 불러오기<input id="importInput" type="file" accept="application/json,.json" hidden /></label>
+        </div>
+        <p id="lastBackup" class="hint"></p>
+        <p class="hint">기록은 이 기기 브라우저에만 저장돼요. 은행 기기는 한 대로 정해서 쓰고, 가끔 백업 파일을 저장해 두세요. 엄마아빠 모드에서 통장 내역 한 줄을 누르면 지울 수 있어요.</p>
+      </section>
+
+      <footer class="foot">
+        <span id="verLabel">버전 -</span>
+        <button id="updateBtn" class="linkBtn">최신 버전 받기</button>
+      </footer>
+    </main>
+
+    <!-- 비밀번호 -->
+    <div id="pinSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
+      <div class="sheetBox">
+        <h3 id="pinTitle">엄마아빠 비밀번호</h3>
+        <p id="pinMsg" class="hint"></p>
+        <input id="pinInput" class="pinInput" type="password" inputmode="numeric" maxlength="8" autocomplete="off" />
+        <div class="sheetBtns two">
+          <button id="pinCancel" class="ghost">취소</button>
+          <button id="pinOk" class="primaryBtn">확인</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="update" class="bootFail" hidden>
+      새 버전이 있어요!
+      <button id="updateNow">업데이트</button>
+    </div>
+
+    <div id="toast" class="toast hidden" role="status">
+      <span id="toastText"></span>
+      <button id="undoBtn" class="undo">되돌리기</button>
+    </div>
+
+    <div id="bootFail" class="bootFail" hidden>
+      화면이 제대로 안 보이나요?
+      <button id="hardReload">새로 받기</button>
+    </div>
+    <script>
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          if (window.__bankReady) return;
+          var box = document.getElementById('bootFail');
+          box.hidden = false;
+          document.getElementById('hardReload').onclick = function () {
+            var jobs = [];
+            if (window.caches) jobs.push(caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n); })); }));
+            if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (r) { return Promise.all(r.map(function (x) { return x.unregister(); })); }));
+            Promise.all(jobs).catch(function () {}).then(function () { location.replace(location.pathname + '?r=' + Date.now()); });
+          };
+        }, 1500);
+      });
+    </script>
+    <script src="app.js?v=2"></script>
+  </body>
+</html>
