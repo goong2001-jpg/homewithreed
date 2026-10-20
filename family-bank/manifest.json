@@ -1,0 +1,13 @@
+{
+  "short_name": "가족은행",
+  "name": "엄마아빠 은행",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#fbf6ec",
+  "background_color": "#fbf6ec"
+}
