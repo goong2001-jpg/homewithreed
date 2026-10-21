@@ -119,6 +119,10 @@ jobs:
           mkdir -p site/tech-coach
           cp -r tech-coach/. site/tech-coach/
           rm -rf site/tech-coach/test site/tech-coach/*.md
+          # handwriting(바른 글씨 연습장)은 index.html 하나짜리 정적 앱이다. 문서는 빼고 올린다.
+          mkdir -p site/handwriting
+          cp -r handwriting/. site/handwriting/
+          rm -f site/handwriting/*.md
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
