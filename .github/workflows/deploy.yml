@@ -115,6 +115,10 @@ jobs:
           mkdir -p site/japanese-learn
           cp -r japanese-learn/. site/japanese-learn/
           rm -rf site/japanese-learn/test
+          # tech-coach(기술 설명 8주)도 빌드 없는 정적 앱이다. 테스트 폴더와 코칭용 문서는 빼고 올린다.
+          mkdir -p site/tech-coach
+          cp -r tech-coach/. site/tech-coach/
+          rm -rf site/tech-coach/test site/tech-coach/*.md
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
