@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f6f1e7" />
+    <meta name="description" content="레벨테스트로 시작점을 정하고, 초급·중급·상급 커리큘럼을 하루 한 단원씩 단어·문형·퀴즈로 익히는 어른용 일본어 앱." />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="일본어" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@500;700&display=swap" />
+    <link rel="stylesheet" href="style.css?v=1" />
+    <title>일본어 한 걸음</title>
+  </head>
+  <body>
+    <noscript>이 앱을 실행하려면 JavaScript가 필요합니다.</noscript>
+
+    <main id="app">
+      <header class="top">
+        <h1><span class="mark">日</span>일본어 한 걸음</h1>
+        <span id="streak" class="streak"></span>
+      </header>
+      <div id="view"></div>
+    </main>
+
+    <nav class="tabs" id="tabs">
+      <button data-act="tab" data-tab="home" class="on"><span class="tk">今</span><span>오늘</span></button>
+      <button data-act="tab" data-tab="course"><span class="tk">道</span><span>커리큘럼</span></button>
+      <button data-act="tab" data-tab="review"><span class="tk">復</span><span>복습</span></button>
+      <button data-act="tab" data-tab="record"><span class="tk">記</span><span>기록</span></button>
+    </nav>
+
+    <!-- 레벨테스트·학습·복습은 전체 화면으로 덮어서 진행한다 -->
+    <section id="session" class="session" hidden></section>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <div id="bootFail" class="bootFail" hidden>
+      화면이 제대로 안 보이나요?
+      <button id="hardReload">새로 받기</button>
+    </div>
+    <script>
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          if (window.__jpReady) return;
+          var box = document.getElementById('bootFail');
+          box.hidden = false;
+          document.getElementById('hardReload').onclick = function () {
+            var jobs = [];
+            if (window.caches) jobs.push(caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n); })); }));
+            if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (r) { return Promise.all(r.map(function (x) { return x.unregister(); })); }));
+            Promise.all(jobs).catch(function () {}).then(function () { location.replace(location.pathname + '?r=' + Date.now()); });
+          };
+        }, 2500);
+      });
+    </script>
+    <script src="data.js?v=1"></script>
+    <script src="app.js?v=1"></script>
+  </body>
+</html>

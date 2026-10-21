@@ -111,6 +111,10 @@ jobs:
           mkdir -p site/family-bank
           cp -r family-bank/. site/family-bank/
           rm -rf site/family-bank/test
+          # japanese-learn(일본어 한 걸음)도 빌드 없는 정적 앱이다. 테스트 폴더는 빼고 올린다.
+          mkdir -p site/japanese-learn
+          cp -r japanese-learn/. site/japanese-learn/
+          rm -rf site/japanese-learn/test
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
