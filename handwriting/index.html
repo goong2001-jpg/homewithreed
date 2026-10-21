@@ -20,16 +20,17 @@
   --red:#C2412D;        /* 채점 색연필 */
   --chip:#EEF1EA;
   --line:#E2E4DC;
+  --star:#C9921A;       /* 칭찬 별 */
   --f-display:"Gowun Batang","Noto Serif KR",serif;
   --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --f-model:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --paper:#1D201E;--ink:#ECEDE6;--muted:#A3A89F;--grid:#4F8A77;--grid-soft:#2D3D36;
-  --guide:#3A3F3B;--red:#EE7A63;--chip:#2A2E2B;--line:#343833;color-scheme:dark}}
+  --guide:#3A3F3B;--red:#EE7A63;--chip:#2A2E2B;--line:#343833;--star:#E8B84A;color-scheme:dark}}
 :root[data-theme="dark"]{
   --paper:#1D201E;--ink:#ECEDE6;--muted:#A3A89F;--grid:#4F8A77;--grid-soft:#2D3D36;
-  --guide:#3A3F3B;--red:#EE7A63;--chip:#2A2E2B;--line:#343833;color-scheme:dark}
+  --guide:#3A3F3B;--red:#EE7A63;--chip:#2A2E2B;--line:#343833;--star:#E8B84A;color-scheme:dark}
 
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -86,16 +87,49 @@ details p{margin:8px 0 0;font-size:14px;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .score svg path{stroke-dasharray:320;stroke-dashoffset:0;transition:stroke-dashoffset .6s ease-out}
 .score.draw svg path{stroke-dashoffset:320}
+
+/* 구름이 모드 */
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.stars{font:700 20px/1 var(--f-display);color:var(--star);font-variant-numeric:tabular-nums;white-space:nowrap}
+.strip{display:flex;flex-wrap:wrap;gap:6px}
+.strip button{width:44px;height:48px;border:1px solid var(--line);background:transparent;border-radius:8px;font:400 22px/1 var(--f-model);position:relative;padding:0}
+.strip button[aria-current="true"]{border-color:var(--ink);border-width:2px}
+.strip button i{position:absolute;right:2px;bottom:1px;font-style:normal;font-size:10px;color:var(--star);letter-spacing:-1px}
+#soWrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+#so{display:block;touch-action:none;max-width:100%}
+#soMsg{margin:0;min-height:1.5em;text-align:center;font-size:15px;color:var(--ink)}
+#soMsg.warn{color:var(--red)}
+.say{display:flex;gap:8px;justify-content:center}
+#cheer{border:2px solid var(--star);border-radius:14px;padding:16px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
+#cheer b{font:700 22px/1.3 var(--f-display)}
+#cheer .big{font-size:30px;color:var(--star);letter-spacing:4px}
+body.kid .btn{padding-block:14px;font-size:16px}
 </style>
 </head>
 <body>
 <main>
   <header>
-    <h1>바른 글씨 연습장</h1>
-    <p class="sub">모범 글씨 위에 손가락이나 펜으로 쓰고 채점을 누르면, 크기·위치·기울기·빠진 획을 짚어 줍니다.</p>
+    <div class="top">
+      <h1>바른 글씨 연습장</h1>
+      <div class="seg" role="group" aria-label="누가 쓰나요">
+        <button type="button" id="w-adult" aria-pressed="true">어른</button>
+        <button type="button" id="w-kid" aria-pressed="false">구름이</button>
+      </div>
+    </div>
+    <p class="sub" data-who="adult">모범 글씨 위에 손가락이나 펜으로 쓰고 채점을 누르면, 크기·위치·기울기·빠진 획을 짚어 줍니다.</p>
+    <p class="sub" data-who="kid" hidden>초록 점에서 시작해 순서대로 긋고, 다음엔 흐린 글씨 위에 따라 써요. 잘 쓰면 별을 받아요.</p>
   </header>
 
-  <section aria-labelledby="h-what">
+  <section data-who="kid" hidden aria-labelledby="h-kid">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <h2 id="h-kid" style="margin:0">오늘 쓸 글자</h2>
+      <span class="stars" id="stars">★ 0</span>
+    </div>
+    <div class="chips" id="kcourse"></div>
+    <div class="strip" id="kstrip" style="margin-top:10px"></div>
+  </section>
+
+  <section data-who="adult" aria-labelledby="h-what">
     <h2 id="h-what">무엇을 쓸까요</h2>
     <div class="chips" id="presets"></div>
     <div class="row" style="margin-top:10px">
@@ -108,7 +142,11 @@ details p{margin:8px 0 0;font-size:14px;color:var(--muted)}
   <section aria-labelledby="h-write">
     <div class="row" style="justify-content:space-between;margin-bottom:10px">
       <h2 id="h-write" style="margin:0">연습</h2>
-      <div class="row">
+      <div class="seg" role="group" aria-label="연습 단계" id="kstep" data-who="kid" hidden>
+        <button type="button" id="k-stroke" aria-pressed="true">① 획순</button>
+        <button type="button" id="k-trace" aria-pressed="false">② 따라쓰기</button>
+      </div>
+      <div class="row" data-who="adult">
         <div class="seg" role="group" aria-label="연습 방법">
           <button type="button" id="m-trace" aria-pressed="true">따라쓰기</button>
           <button type="button" id="m-look" aria-pressed="false">보고쓰기</button>
@@ -126,14 +164,24 @@ details p{margin:8px 0 0;font-size:14px;color:var(--muted)}
       <button type="button" id="next" aria-label="다음 글자">›</button>
     </div>
     <div id="wrap"><canvas id="cv" aria-label="글씨 쓰는 칸"></canvas></div>
-    <div class="actions" style="margin-top:12px">
+    <div id="soWrap" hidden>
+      <svg id="so" viewBox="0 0 100 100" role="img" aria-label="획순 따라 긋기"></svg>
+      <p id="soMsg"></p>
+      <div class="say">
+        <button class="btn" id="demo" type="button">어떻게 써요?</button>
+        <button class="btn" id="soReset" type="button">처음부터</button>
+      </div>
+    </div>
+    <div class="say" data-who="kid" hidden style="margin-top:10px"><button class="btn" id="sayIt" type="button">소리 듣기</button></div>
+    <div id="cheer" hidden style="margin-top:12px"></div>
+    <div class="actions" id="actions" style="margin-top:12px">
       <button class="btn" id="undo" type="button">한 획 지우기</button>
       <button class="btn" id="clear" type="button">다 지우기</button>
       <button class="btn primary" id="grade" type="button">채점하기</button>
     </div>
   </section>
 
-  <section aria-labelledby="h-res">
+  <section id="resSec" aria-labelledby="h-res">
     <h2 id="h-res">채점</h2>
     <div id="result">
       <div class="score" id="score"><svg viewBox="0 0 96 96" aria-hidden="true"><path d="M60 8 C 26 2, 6 30, 10 54 C 14 82, 52 94, 76 78 C 96 64, 92 26, 66 12 C 58 8, 48 8, 40 10" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg><span id="scoreNum">–</span></div>
@@ -141,12 +189,12 @@ details p{margin:8px 0 0;font-size:14px;color:var(--muted)}
     </div>
   </section>
 
-  <section aria-labelledby="h-log">
+  <section data-who="adult" aria-labelledby="h-log">
     <h2 id="h-log">기록</h2>
     <div class="log" id="log"><p class="hint" style="margin:0">채점하면 여기에 쌓입니다. 이 기기 브라우저에만 저장됩니다.</p></div>
   </section>
 
-  <details>
+  <details data-who="adult">
     <summary>채점은 어떻게 하나요</summary>
     <p>내 글씨를 모범 글씨 크기에 맞춰 겹친 뒤 모양이 얼마나 겹치는지(75%)와 크기·위치·가로세로 비율(25%)로 점수를 냅니다. 획 순서와 필압은 보지 않습니다. 점수는 연습 방향을 잡는 참고값입니다.</p>
   </details>
@@ -163,6 +211,43 @@ const PRESETS = [
   ['서류용', '위내용을확인했습니다'],
   ['우리 가족', '구름열매사랑해'],
 ];
+// 구름이 코스. 자음·모음은 획순부터, 글자는 따라쓰기만
+const KCOURSES = [
+  ['자음', 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ'],
+  ['모음', 'ㅏㅑㅓㅕㅗㅛㅜㅠㅡㅣ'],
+  ['가나다', '가나다라마바사아자차카타파하'],
+  ['우리 가족', '구름열매아빠엄마'],
+  ['인사', '안녕하세요고마워요'],
+];
+// 획순: 100x100 상자, 문자열 하나가 한 획, 배열 순서가 쓰는 순서(시작점이 붓 대는 곳)
+const STROKES = {
+  'ㄱ': ['M24,24 L74,24 L74,82'],
+  'ㄴ': ['M28,18 L28,76 L80,76'],
+  'ㄷ': ['M26,22 L76,22', 'M26,22 L26,78 L78,78'],
+  'ㄹ': ['M26,18 L72,18 L72,48', 'M28,48 L72,48', 'M28,48 L28,82 L76,82'],
+  'ㅁ': ['M26,22 L26,78', 'M26,22 L74,22 L74,78', 'M26,78 L74,78'],
+  'ㅂ': ['M28,18 L28,82', 'M72,18 L72,82', 'M28,48 L72,48', 'M28,82 L72,82'],
+  'ㅅ': ['M50,18 L22,82', 'M46,48 L78,82'],
+  'ㅇ': ['M50,20 C31,20 22,35 22,50 C22,66 32,80 50,80 C68,80 78,66 78,50 C78,35 69,20 50,20'],
+  'ㅈ': ['M24,22 L74,22 L26,82', 'M50,48 L78,82'],
+  'ㅊ': ['M42,8 L58,15', 'M24,28 L74,28 L26,84', 'M50,54 L78,84'],
+  'ㅋ': ['M24,22 L74,22 L74,82', 'M28,50 L74,50'],
+  'ㅌ': ['M26,20 L76,20', 'M26,48 L72,48', 'M26,20 L26,80 L78,80'],
+  'ㅍ': ['M22,22 L78,22', 'M38,22 L40,78', 'M62,22 L60,78', 'M20,78 L80,78'],
+  'ㅎ': ['M42,8 L58,15', 'M24,30 L76,30', 'M50,46 C37,46 30,55 30,64 C30,74 38,84 50,84 C62,84 70,74 70,64 C70,55 63,46 50,46'],
+  'ㅏ': ['M42,12 L42,88', 'M42,50 L70,50'],
+  'ㅑ': ['M42,12 L42,88', 'M42,38 L70,38', 'M42,62 L70,62'],
+  'ㅓ': ['M30,50 L58,50', 'M58,12 L58,88'],
+  'ㅕ': ['M30,38 L58,38', 'M30,62 L58,62', 'M58,12 L58,88'],
+  'ㅗ': ['M50,30 L50,62', 'M16,62 L84,62'],
+  'ㅛ': ['M38,30 L38,62', 'M62,30 L62,62', 'M16,62 L84,62'],
+  'ㅜ': ['M16,38 L84,38', 'M50,38 L50,80'],
+  'ㅠ': ['M16,38 L84,38', 'M38,38 L38,80', 'M62,38 L62,80'],
+  'ㅡ': ['M14,50 L86,50'],
+  'ㅣ': ['M50,12 L50,88'],
+};
+const NAMES = { 'ㄱ':'기역','ㄴ':'니은','ㄷ':'디귿','ㄹ':'리을','ㅁ':'미음','ㅂ':'비읍','ㅅ':'시옷','ㅇ':'이응','ㅈ':'지읒','ㅊ':'치읓','ㅋ':'키읔','ㅌ':'티읕','ㅍ':'피읖','ㅎ':'히읗',
+  'ㅏ':'아','ㅑ':'야','ㅓ':'어','ㅕ':'여','ㅗ':'오','ㅛ':'요','ㅜ':'우','ㅠ':'유','ㅡ':'으','ㅣ':'이' };
 const $ = (id) => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d');
 const store = {
@@ -171,6 +256,14 @@ const store = {
 };
 const S = Object.assign({ text: PRESETS[1][1], mode: 'trace', layout: 'one', idx: 0 }, store.get('hw.state', {}));
 S.strokes = []; S.graded = null;
+const K = Object.assign({ kc: 0, ki: 0, step: 'stroke', stars: 0, best: {} }, store.get('hw.kid', {}));
+S.adult = { text: S.text, mode: S.mode, layout: S.layout, idx: S.idx };
+if (S.who === 'kid') enterKid();
+function enterKid(){
+  if (S.who !== 'kid' || !S.adult) S.adult = { text: S.text, mode: S.mode, layout: S.layout, idx: S.idx };
+  S.who = 'kid'; S.text = KCOURSES[K.kc][1]; S.layout = 'one'; S.mode = 'trace'; S.idx = K.ki;
+}
+function enterAdult(){ S.who = 'adult'; Object.assign(S, S.adult); }
 let G = { cols: 1, cell: 300, n: 1, chars: [] };
 let cur = null;
 
@@ -179,7 +272,12 @@ const chars = () => [...S.text.replace(/\s+/g, '')].slice(0, 24);
 const pageChars = () => { const c = chars(); return S.layout === 'one' ? [c[Math.min(S.idx, c.length - 1)]] : c; };
 const penW = () => S.layout === 'one' ? 0.04 : 0.05;   // 칸 너비 대비 펜 굵기
 
-function save(){ store.set('hw.state', { text: S.text, mode: S.mode, layout: S.layout, idx: S.idx }); }
+function save(){
+  const a = S.who === 'kid' ? S.adult : S;
+  store.set('hw.state', { text: a.text, mode: a.mode, layout: a.layout, idx: a.idx, who: S.who });
+  if (S.who === 'kid') K.ki = S.idx;
+  store.set('hw.kid', { kc: K.kc, ki: K.ki, step: K.step, stars: K.stars, best: K.best });
+}
 
 // 글자의 실제 잉크 영역을 칸 가운데에 맞춰 그린다 (화면·채점 공통)
 function drawGlyph(c, ch, x, y, size, color){
@@ -353,6 +451,7 @@ function grade(){
   }
   const empty = cells.length - done.length;
   if (empty) out.push(`안 쓴 칸 ${empty}개는 점수에서 뺐어요.`);
+  if (S.who === 'kid'){ kidResult(total, done); return; }
   if (!out.length) out.push(total >= 85 ? '균형이 좋아요. <b>보고쓰기</b>로 바꿔 모범 글씨 없이 써 보세요.' : '큰 문제는 없어요. 빨간 모범 글씨와 겹쳐 보며 획 길이를 다듬어 보세요.');
   showTips(total, out);
   const log = store.get('hw.log', []);
@@ -385,6 +484,10 @@ function renderLog(){
 
 // ---- 화면 상태 ----
 function sync(){
+  const kid = S.who === 'kid';
+  document.body.classList.toggle('kid', kid);
+  document.querySelectorAll('[data-who]').forEach((el) => { el.hidden = el.dataset.who !== S.who; });
+  $('w-adult').setAttribute('aria-pressed', !kid); $('w-kid').setAttribute('aria-pressed', kid);
   const cs = chars();
   S.idx = Math.min(S.idx, Math.max(0, cs.length - 1));
   $('text').value = S.text;
@@ -396,6 +499,8 @@ function sync(){
   $('model').textContent = S.layout === 'one' ? cs[S.idx] : cs.join('');
   $('model').style.fontSize = S.layout === 'one' ? '72px' : '';
   [...$('presets').children].forEach((b) => b.setAttribute('aria-pressed', b.dataset.t === S.text));
+  $('cheer').hidden = true; clearTimeout(kidTimer);
+  if (kid) syncKid(cs); else { $('soWrap').hidden = true; $('wrap').hidden = false; $('actions').hidden = false; $('resSec').hidden = false; }
   save(); layout();
 }
 function setText(t){ t = (t || '').trim(); if (!t) return; S.text = t; S.idx = 0; sync(); }
@@ -414,6 +519,151 @@ $('next').onclick = () => { S.idx = (S.idx + 1) % chars().length; sync(); };
 $('undo').onclick = () => { S.strokes.pop(); S.graded = null; render(); };
 $('clear').onclick = () => { S.strokes = []; S.graded = null; render(); };
 $('grade').onclick = grade;
+
+// ---- 구름이 모드 ----
+let kidTimer = 0;
+const kidChar = () => chars()[S.idx];
+const hasStrokes = () => !!STROKES[kidChar()];
+function syncKid(cs){
+  const ch = cs[S.idx], stroke = K.step === 'stroke' && hasStrokes();
+  $('stars').textContent = `★ ${K.stars}`;
+  $('kcourse').innerHTML = KCOURSES.map(([n], i) => `<button type="button" class="chip" data-k="${i}" aria-pressed="${i === K.kc}">${n}</button>`).join('');
+  $('kstrip').innerHTML = cs.map((c, i) => { const b = K.best[c] || 0;
+    return `<button type="button" data-i="${i}" aria-current="${i === S.idx}" aria-label="${c}">${c}<i>${'★'.repeat(b)}</i></button>`; }).join('');
+  $('kstep').hidden = !hasStrokes();
+  $('k-stroke').setAttribute('aria-pressed', stroke); $('k-trace').setAttribute('aria-pressed', !stroke);
+  $('soWrap').hidden = !stroke; $('wrap').hidden = stroke; $('actions').hidden = stroke; $('resSec').hidden = stroke;
+  $('nav').hidden = true;
+  if (stroke) so.load(ch);
+  else showTips(null, ['흐린 글씨 위에 따라 쓰고 <b>채점하기</b>를 눌러요.']);
+}
+function say(t){
+  try{ const u = new SpeechSynthesisUtterance(NAMES[t] || t); u.lang = 'ko-KR'; u.rate = 0.85; speechSynthesis.cancel(); speechSynthesis.speak(u); }catch(e){}
+}
+function cheer(html, next){
+  $('cheer').innerHTML = html + `<div class="say"><button class="btn primary" type="button" id="cheerNext">${next ? '다음' : '한 번 더'}</button></div>`;
+  $('cheer').hidden = false;
+  $('cheerNext').onclick = () => (next ? next() : ($('cheer').hidden = true));
+  if (next){ clearTimeout(kidTimer); kidTimer = setTimeout(next, 3500); }
+}
+function nextLetter(){ S.idx = (S.idx + 1) % chars().length; K.step = 'stroke'; sync(); }
+// 어른용 RULES 순서에 맞춘 아이 말투 (0 작다, 1 크다, 4 처짐, 5 뜸, 7·8 기울기, 9 빠진 획, 10 벗어남)
+const KID_TIP = { 0: '조금 더 크게 써 볼까?', 1: '조금 작게, 칸 안에 쏙!', 4: '조금 위로 올려 써 봐요.', 5: '조금 아래로 내려 써 봐요.',
+  7: '세로줄을 똑바로 내려 그어요.', 8: '세로줄을 똑바로 내려 그어요.', 9: '빠진 줄이 있어요. 빨간 글씨랑 비교해 봐요.', 10: '빨간 글씨 자리에 맞춰 써 봐요.' };
+function kidResult(total, done){
+  const ch = kidChar();
+  if (total >= 70){
+    const st = total >= 90 ? 3 : total >= 80 ? 2 : 1;
+    const first = !K.best[ch], got = st + (first ? 1 : 0);
+    K.stars += got; K.best[ch] = Math.max(K.best[ch] || 0, st); save();
+    $('stars').textContent = `★ ${K.stars}`;
+    const cell = $('kstrip').children[S.idx]; if (cell) cell.querySelector('i').textContent = '★'.repeat(K.best[ch]);
+    showTips(total, [first ? `<b>${ch}</b> 처음 완성! 보너스 별 1개.` : `<b>${ch}</b> 또 잘했어요.`]);
+    cheer(`<span class="big">${'★'.repeat(st)}</span><b>${['', '잘했어요!', '아주 잘했어요!', '최고예요!'][st]}</b><span>별 ${got}개를 받았어요.</span>`, nextLetter);
+    say(ch);
+  } else {
+    const i = RULES.findIndex(([t]) => done.some(t)), tip = KID_TIP[i] || '빨간 글씨를 보고 한 번 더 써 봐요.';
+    showTips(total, [tip]);
+    cheer(`<b>한 번 더 해 볼까?</b><span>${tip}</span>`, null);
+    $('cheerNext').onclick = () => { $('cheer').hidden = true; S.strokes = []; S.graded = null; render(); };
+  }
+}
+
+// 획순 따라 긋기 (kumon-math StrokeOrderCanvas 와 같은 규칙: 시작점·순서·방향을 지켜야 인정)
+const so = (() => {
+  const svg = $('so'), NS = 'http://www.w3.org/2000/svg';
+  const START_TOL = 15, TOL = 14, LOOK = 6;
+  let ch = '', paths = [], samples = [], cur = 0, idx = 0, drawing = false, demoT = 0;
+  const msg = (t, warn) => { $('soMsg').textContent = t; $('soMsg').className = warn ? 'warn' : ''; };
+  function sample(d){
+    const tk = d.match(/[MLC]|-?[\d.]+/g), out = []; let i = 0, cmd = '', p = [0, 0];
+    while (i < tk.length){
+      if (/[MLC]/.test(tk[i])) cmd = tk[i++];
+      if (cmd === 'M'){ p = [+tk[i], +tk[i + 1]]; i += 2; out.push(p); }
+      else if (cmd === 'L'){
+        const q = [+tk[i], +tk[i + 1]]; i += 2;
+        const n = Math.max(2, Math.round(Math.hypot(q[0] - p[0], q[1] - p[1]) / 2));
+        for (let k = 1; k <= n; k++) out.push([p[0] + (q[0] - p[0]) * k / n, p[1] + (q[1] - p[1]) * k / n]);
+        p = q;
+      } else if (cmd === 'C'){
+        const c = tk.slice(i, i + 6).map(Number); i += 6;
+        for (let k = 1; k <= 14; k++){
+          const t = k / 14, u = 1 - t;
+          out.push([u*u*u*p[0] + 3*u*u*t*c[0] + 3*u*t*t*c[2] + t*t*t*c[4], u*u*u*p[1] + 3*u*u*t*c[1] + 3*u*t*t*c[3] + t*t*t*c[5]]);
+        }
+        p = [c[4], c[5]];
+      } else i++;
+    }
+    return out;
+  }
+  const el = (n, a) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  const poly = (pts) => 'M' + pts.map((q) => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L');
+  function draw(){
+    const ink = css('--ink'), guide = css('--guide'), grid = css('--grid'), soft = css('--grid-soft'), red = css('--red');
+    svg.innerHTML = '';
+    svg.append(el('rect', { x: 0.5, y: 0.5, width: 99, height: 99, fill: css('--paper'), stroke: grid, 'stroke-width': 0.6 }));
+    svg.append(el('path', { d: 'M50,3 L50,97 M3,50 L97,50', stroke: soft, 'stroke-width': 0.5, 'stroke-dasharray': '2 2.5', fill: 'none' }));
+    paths.forEach((d, i) => svg.append(el('path', { d, fill: 'none', stroke: i < cur ? ink : guide, 'stroke-width': i < cur ? 6 : 8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })));
+    if (cur < paths.length){
+      const s = samples[cur];
+      svg.append(el('path', { d: paths[cur], fill: 'none', stroke: grid, 'stroke-width': 1.4, 'stroke-dasharray': '3 3', 'stroke-linecap': 'round' }));
+      if (idx > 0) svg.append(el('path', { d: poly(s.slice(0, idx + 1)), fill: 'none', stroke: ink, 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+      svg.append(el('circle', { cx: s[0][0], cy: s[0][1], r: 4.5, fill: grid }));
+      const t = el('text', { x: s[0][0] - 7, y: s[0][1] - 5, fill: red, 'font-size': 8, 'font-weight': 700, 'text-anchor': 'middle', 'font-family': 'sans-serif' });
+      t.textContent = cur + 1; svg.append(t);
+    }
+  }
+  function load(c){
+    clearTimeout(demoT); ch = c; paths = STROKES[c] || []; samples = paths.map(sample); cur = 0; idx = 0; drawing = false;
+    const W = Math.min(document.querySelector('main').clientWidth || 340, 380); svg.style.width = svg.style.height = W + 'px';
+    msg(`초록 점에서 시작해요. 모두 ${paths.length}획.`); draw();
+  }
+  function demo(){
+    if (cur >= paths.length) return;
+    const s = samples[cur]; let k = 0;
+    const dot = el('circle', { r: 4, fill: css('--red') }); svg.append(dot);
+    const step = () => { if (k >= s.length){ dot.remove(); return; } dot.setAttribute('cx', s[k][0]); dot.setAttribute('cy', s[k][1]); k++; demoT = setTimeout(step, 28); };
+    clearTimeout(demoT); step();
+  }
+  const pos = (e) => { const r = svg.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 100, (e.clientY - r.top) / r.height * 100]; };
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  function finish(){
+    drawing = false; idx = 0; cur++;
+    if (cur < paths.length){ msg(`좋아요! ${cur + 1}번째 획.`); draw(); return; }
+    draw(); msg('획순 완성!');
+    K.stars += 1; save(); $('stars').textContent = `★ ${K.stars}`; say(ch);
+    cheer(`<span class="big">★</span><b>${ch} 획순 완성!</b><span>이제 따라 써 볼까요?</span>`, () => { K.step = 'trace'; sync(); });
+  }
+  svg.addEventListener('pointerdown', (e) => {
+    if (cur >= paths.length) return;
+    e.preventDefault();
+    if (dist(pos(e), samples[cur][0]) > START_TOL){ msg('초록 점에서 시작해요!', true); return; }
+    svg.setPointerCapture(e.pointerId); drawing = true; idx = 0; msg('');
+  });
+  svg.addEventListener('pointermove', (e) => {
+    if (!drawing) return;
+    const p = pos(e), s = samples[cur];
+    for (let k = Math.min(s.length - 1, idx + LOOK); k > idx; k--) if (dist(p, s[k]) < TOL){ idx = k; break; }
+    if (idx >= s.length - 2) finish(); else draw();
+  });
+  const up = () => {
+    if (!drawing) return;
+    if (idx >= samples[cur].length * 0.85) finish();
+    else { drawing = false; idx = 0; draw(); msg('끝까지 한 번에 이어서 그어요.', true); }
+  };
+  svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', up);
+  return { load, demo, reset: () => load(ch) };
+})();
+
+$('w-kid').onclick = () => { if (S.who !== 'kid'){ enterKid(); sync(); } };
+$('w-adult').onclick = () => { if (S.who !== 'adult'){ enterAdult(); sync(); } };
+$('kcourse').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (!b) return; K.kc = +b.dataset.k; K.ki = 0; K.step = 'stroke'; enterKid(); sync(); });
+$('kstrip').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (!b) return; S.idx = +b.dataset.i; K.step = 'stroke'; sync(); });
+$('k-stroke').onclick = () => { K.step = 'stroke'; sync(); };
+$('k-trace').onclick = () => { K.step = 'trace'; sync(); };
+$('demo').onclick = () => so.demo();
+$('soReset').onclick = () => so.reset();
+$('sayIt').onclick = () => say(kidChar());
 
 let lastW = 0;
 new ResizeObserver(() => { const w = $('wrap').clientWidth; if (w !== lastW){ lastW = w; layout(); } }).observe($('wrap'));
