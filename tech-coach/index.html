@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f3f0e8" />
+    <meta name="description" content="FDS 경력자가 8주 동안 웹 서비스 구조와 AI 용어를 이해하고 2문장으로 설명하는 연습 앱." />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="기술설명" />
+    <link rel="stylesheet" href="style.css?v=1" />
+    <title>기술 설명 8주</title>
+  </head>
+  <body>
+    <noscript>이 앱을 실행하려면 JavaScript가 필요합니다.</noscript>
+
+    <main id="app">
+      <header class="top">
+        <h1><span class="mark">FDS</span>기술 설명 8주</h1>
+        <span id="wk" class="wk"></span>
+      </header>
+      <div id="view"></div>
+    </main>
+
+    <nav class="tabs" id="tabs">
+      <button data-act="tab" data-tab="home" class="on"><span class="tk">今</span><span>오늘</span></button>
+      <button data-act="tab" data-tab="course"><span class="tk">8W</span><span>커리큘럼</span></button>
+      <button data-act="tab" data-tab="qa"><span class="tk">Q</span><span>질문</span></button>
+      <button data-act="tab" data-tab="terms"><span class="tk">語</span><span>용어</span></button>
+      <button data-act="tab" data-tab="log"><span class="tk">記</span><span>기록</span></button>
+    </nav>
+
+    <!-- 진단·질문 연습·용어 퀴즈·3분 설명은 전체 화면으로 덮어서 진행한다 -->
+    <section id="session" class="session" hidden></section>
+
+    <script src="data.js?v=1"></script>
+    <script src="app.js?v=1"></script>
+  </body>
+</html>
