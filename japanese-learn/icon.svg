@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#f6f1e7"/>
+  <g transform="rotate(-6 256 256)">
+    <rect x="92" y="92" width="328" height="328" rx="34" fill="#c2462e"/>
+    <!-- 日: 글꼴 없이도 같은 모양이 나오게 획을 도형으로 그린다 -->
+    <g fill="none" stroke="#fffcf6" stroke-width="30" stroke-linecap="square">
+      <rect x="181" y="150" width="150" height="212"/>
+      <line x1="181" y1="256" x2="331" y2="256"/>
+    </g>
+  </g>
+</svg>
