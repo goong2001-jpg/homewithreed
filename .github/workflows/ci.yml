@@ -97,6 +97,8 @@ jobs:
           npm init -y >/dev/null
           npm i --no-save playwright@1.47.0
           npx playwright install --with-deps chromium
+          # 일부 smoke.js 가 CHROMIUM_PATH 기본값으로 로컬 경로를 쓰므로, 여기서 설치된 크로미움 경로를 넘긴다
+          echo "CHROMIUM_PATH=$(node -e "console.log(require('playwright').chromium.executablePath())")" >> "$GITHUB_ENV"
       - name: Serve
         working-directory: ${{ matrix.app }}
         run: |
