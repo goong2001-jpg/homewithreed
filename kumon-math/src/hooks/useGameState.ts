@@ -24,12 +24,13 @@ const INITIAL_ITEMS: AvatarItem[] = [
   { id: 'fx_bubbles', name: '비눗방울', emoji: '🫧', category: 'effect', price: 140, owned: false, equipped: false, unlockAt: 26 },
 
   // 💎 전설의 컬렉션 — 문제를 풀수록 한 조각씩 열려요 (정답 개수로 해금)
-  { id: 'diana_crown',    name: '보석 왕관',    emoji: '👑', category: 'special', price: 120, owned: false, equipped: false, unlockAt: 15,  image: 'diana_crown.png',    bgRemoval: 'green' },
-  { id: 'diana_necklace', name: '별빛 목걸이', emoji: '📿', category: 'special', price: 150, owned: false, equipped: false, unlockAt: 30,  image: 'diana_necklace.png', bgRemoval: 'green' },
-  { id: 'diana_wings',    name: '요정 날개',   emoji: '🪽', category: 'special', price: 180, owned: false, equipped: false, unlockAt: 45,  image: 'diana_wings.png',    bgRemoval: 'green' },
-  { id: 'diana_aura',     name: '반짝이 오라', emoji: '💫', category: 'special', price: 210, owned: false, equipped: false, unlockAt: 60,  image: 'diana_aura.png',     bgRemoval: 'black' },
-  { id: 'diana_dress',    name: '드림 드레스', emoji: '👗', category: 'special', price: 250, owned: false, equipped: false, unlockAt: 80,  image: 'diana_dress.png',    bgRemoval: 'green' },
-  { id: 'diana_full',     name: '✨다이아 요정✨', emoji: '🧚', category: 'special', price: 350, owned: false, equipped: false, unlockAt: 100, image: 'diana_full.png', bgRemoval: 'none', fullImage: true },
+  // 그림은 배경이 이미 투명한 WebP 라 그대로 겹쳐 올리면 된다
+  { id: 'diana_crown',    name: '보석 왕관',    emoji: '👑', category: 'special', price: 120, owned: false, equipped: false, unlockAt: 15,  image: 'diana_crown.webp' },
+  { id: 'diana_necklace', name: '별빛 목걸이', emoji: '📿', category: 'special', price: 150, owned: false, equipped: false, unlockAt: 30,  image: 'diana_necklace.webp' },
+  { id: 'diana_wings',    name: '요정 날개',   emoji: '🪽', category: 'special', price: 180, owned: false, equipped: false, unlockAt: 45,  image: 'diana_wings.webp' },
+  { id: 'diana_aura',     name: '반짝이 오라', emoji: '💫', category: 'special', price: 210, owned: false, equipped: false, unlockAt: 60,  image: 'diana_aura.webp' },
+  { id: 'diana_dress',    name: '드림 드레스', emoji: '👗', category: 'special', price: 250, owned: false, equipped: false, unlockAt: 80,  image: 'diana_dress.webp' },
+  { id: 'diana_full',     name: '✨다이아 요정✨', emoji: '🧚', category: 'special', price: 350, owned: false, equipped: false, unlockAt: 100, image: 'diana_full.webp', fullImage: true },
 ];
 
 const STORAGE_KEY = 'kumon_game_state';

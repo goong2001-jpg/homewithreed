@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import './App.css';
-import MathScreen from './screens/MathScreen';
-import AlphabetScreen from './screens/AlphabetScreen';
 import WordScreen from './screens/WordScreen';
-import PlayScreen from './screens/PlayScreen';
+import Loading from './components/Loading';
 import { playClick } from './utils/sounds';
+
+// 기본 탭(영어 단어)만 바로 싣고, 나머지 화면은 그 탭을 눌렀을 때 따로 내려받는다 (번들 다이어트)
+const PlayScreen = lazy(() => import('./screens/PlayScreen'));
+const MathScreen = lazy(() => import('./screens/MathScreen'));
+const AlphabetScreen = lazy(() => import('./screens/AlphabetScreen'));
 
 /**
  * ─────────────────────────────────────────────────────────────
@@ -90,10 +93,12 @@ export default function App() {
       )}
 
       {/* 화면 — 각 놀이는 서로 독립적으로 동작 */}
-      {tab === 'math' && SHOW_MATH && <MathScreen />}
-      {tab === 'alphabet' && SHOW_ALPHABET && <AlphabetScreen />}
-      {tab === 'words' && SHOW_WORDS && <WordScreen />}
-      {tab === 'play' && SHOW_PLAY && <PlayScreen />}
+      <Suspense fallback={<Loading />}>
+        {tab === 'math' && SHOW_MATH && <MathScreen />}
+        {tab === 'alphabet' && SHOW_ALPHABET && <AlphabetScreen />}
+        {tab === 'words' && SHOW_WORDS && <WordScreen />}
+        {tab === 'play' && SHOW_PLAY && <PlayScreen />}
+      </Suspense>
     </div>
   );
 }

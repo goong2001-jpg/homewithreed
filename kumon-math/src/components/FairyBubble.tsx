@@ -8,9 +8,12 @@ import { playClick } from '../utils/sounds';
  * 요정 말풍선 — 단어를 넣은 문장을 보여주고, 누르면 읽어 준다.
  * 단어마다 문장이 여러 개라 "🔄 다른 말"을 누르면 새 문장을 들려준다.
  * 처음 보여줄 문장도 무작위로 골라 볼 때마다 다른 말을 한다.
+ *
+ * note 가 있으면(요정의 기억 — words/fairy.ts) 평소 제목 대신 그 말을 보여준다.
+ * 어떤 말을 할지는 밖에서 정한다. 이 컴포넌트는 보여주기만 한다.
  */
-export default function FairyBubble({ word, label = '🧚 요정이 말해요 (눌러서 듣기 🔊)', style }: {
-  word: Word; label?: string; style?: React.CSSProperties;
+export default function FairyBubble({ word, label = '🧚 요정이 말해요 (눌러서 듣기 🔊)', note, style }: {
+  word: Word; label?: string; note?: string | null; style?: React.CSSProperties;
 }) {
   const all = sentencesFor(word);
   const [i, setI] = useState(() => Math.floor(Math.random() * all.length));
@@ -43,7 +46,13 @@ export default function FairyBubble({ word, label = '🧚 요정이 말해요 (�
           fontFamily: 'inherit', textAlign: 'left',
         }}
       >
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#c06aa0', marginBottom: 2 }}>{label}</div>
+        {note ? (
+          <div style={{ fontSize: 13, fontWeight: 900, color: '#b5478f', marginBottom: 4, lineHeight: 1.35 }}>
+            🧚 {note}
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#c06aa0', marginBottom: 2 }}>{label}</div>
+        )}
         <div style={{ fontSize: 18, fontWeight: 800, color: '#5b4b8a' }}>
           {pre}<span style={{ color: '#e67e22' }}>{mid}</span>{post}
         </div>

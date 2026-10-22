@@ -1,9 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { wordsForDay, questionsForDay, WORDS_PER_DAY, TEST_COUNT } from '../words/dailySet';
-import { WORD_BANK } from '../words/wordBank';
+import { WORD_BANK, Word } from '../words/wordBank';
 import { drawCoupon, CouponKind, COUPONS } from '../words/coupons';
 import { useWordProgress } from '../hooks/useWordProgress';
 import { useGameState } from '../hooks/useGameState';
+import { useMissions } from '../hooks/useMissions';
+import { useStreak } from '../hooks/useStreak';
+import { MissionCard, MissionCelebration } from '../components/DailyMission';
+import { MISSION_BONUS } from '../words/missions';
+import { fairyLine } from '../words/fairy';
+import { todayKey } from '../words/dailySet';
 import { speakWord, speakPhonics, warmUpVoices, speechSupported } from '../alphabet/speech';
 import { firstSoundKo, firstSoundPhrase } from '../words/phonics';
 import Avatar from '../components/Avatar';
@@ -21,6 +27,8 @@ export default function WordScreen() {
     completeSet, chooseUnit,
   } = useWordProgress();
   const { gameState, items, buyItem, equipItem, addPoints, recordCorrect } = useGameState();
+  const { missions, bump, reward, closeCelebration, allDone, needsReward } = useMissions();
+  const { streak, markActive } = useStreak();
 
   // 오답 노트에서 오늘 다시 볼 단어 (날이 바뀔 때 정해져 오늘 하루는 그대로다)
   const missedKey = progress.todayMissed.join('|');
@@ -28,13 +36,22 @@ export default function WordScreen() {
     () => WORD_BANK.filter(w => missedKey.split('|').includes(w.en)),
     [missedKey],
   );
+  // 간격 반복에서 오늘 복습 차례인 단어 (묶음을 시작할 때 정해져 묶음 동안은 그대로다)
+  const reviewKey = progress.todayReview.join('|');
+  const reviewWords = useMemo(
+    () => reviewKey.split('|').map(en => WORD_BANK.find(w => w.en === en)).filter((w): w is Word => !!w),
+    [reviewKey],
+  );
   // 오늘 배우는 소리 단계 (날이 바뀔 때 정해진다)
   const plan = progress.todayPlan;
   const words = useMemo(
     // 오답 노트 단어는 그날 첫 묶음에만 넣는다
-    () => wordsForDay({ unit: plan.unit, unitDay: plan.unitDay }, undefined, progress.round === 0 ? missedWords : []),
-    [progress.round, plan.unit, plan.unitDay, missedWords],
+    () => wordsForDay({ unit: plan.unit, unitDay: plan.unitDay }, undefined, progress.round === 0 ? missedWords : [], reviewWords),
+    [progress.round, plan.unit, plan.unitDay, missedWords, reviewWords],
   );
+  // 오늘 단어 중 복습(이미 상자에 있는 단어)과 새 단어 수
+  const reviewCount = words.filter(w => progress.srs[w.en]).length;
+  const newCount = words.length - reviewCount;
   const [introOpen, setIntroOpen] = useState(
     progress.phase === 'learn' && progress.learned === 0 && progress.round === 0,
   );
@@ -57,6 +74,34 @@ export default function WordScreen() {
   // 보기를 눌러 첫소리를 들어보고, 확인 버튼으로 고른다
   const [selected, setSelected] = useState<string | null>(null);
   const rewardRef = useRef<HTMLDivElement>(null);
+
+  // 오늘 처음 열었는지 — 요정이 첫 단어에서 인사한다
+  const [firstVisit] = useState(() => {
+    try {
+      if (localStorage.getItem('word_greeted') === todayKey()) return false;
+      localStorage.setItem('word_greeted', todayKey());
+    } catch {}
+    return true;
+  });
+
+  // 스트릭이 오르면 잠깐 튀어오르는 효과
+  const streakDays = streak.current;
+  const prevStreak = useRef(streakDays);
+  const [streakPop, setStreakPop] = useState(false);
+  useEffect(() => {
+    const grew = streakDays > prevStreak.current;
+    prevStreak.current = streakDays;
+    if (!grew) return;
+    setStreakPop(true);
+    const t = setTimeout(() => setStreakPop(false), 900);
+    return () => clearTimeout(t);
+  }, [streakDays]);
+
+  // 미션 3개를 다 하면 별 보너스 (하루 한 번) — 축하 화면은 닫을 때까지 보여준다
+  useEffect(() => {
+    if (needsReward) { reward(); addPoints(MISSION_BONUS); playStreak(); }
+  }, [needsReward, reward, addPoints]);
+  const celebrating = allDone && !missions.celebrated;
 
   useEffect(() => { warmUpVoices(); }, []);
 
@@ -98,14 +143,17 @@ export default function WordScreen() {
     playClick();
     addPoints(1);              // 단어 하나 볼 때마다 별 1개
     learnNext(WORDS_PER_DAY, word?.en);
-  }, [learnNext, addPoints, word]);
+    bump('cards');             // 오늘 미션: 단어 카드 보기
+    markActive();              // 오늘 공부함 — 스트릭
+  }, [learnNext, addPoints, word, bump, markActive]);
 
   const handleChoice = useCallback((en: string) => {
     if (picked !== null || !question) return;
     setPicked(en);
     const correct = en === question.word.en;
-    // 별 2개 + 정답 개수 1 (상점 아이템 해금에 쓰인다)
-    if (correct) { playCorrect(); setHappy(true); recordCorrect(2); }
+    markActive();              // 답을 하나라도 하면 오늘 공부한 날
+    // 별 2개 + 정답 개수 1 (상점 아이템 해금에 쓰인다) + 오늘 미션: 퀴즈 맞히기
+    if (correct) { playCorrect(); setHappy(true); recordCorrect(2); bump('quiz'); }
     else {
       playWrong();
       // 정답을 소리로도 들려줘서 머리에 남게 한다
@@ -119,7 +167,25 @@ export default function WordScreen() {
       setSelected(null);
       answer(correct, question.word.en, firstTry);
     }, correct ? 900 : 2600);
-  }, [picked, question, answer, recordCorrect, progress.results.length]);
+  }, [picked, question, answer, recordCorrect, progress.results.length, bump, markActive]);
+
+  // 요정의 기억 — 기록을 보고 한마디 (없으면 평소 말풍선)
+  const fairyNote = useMemo(() => fairyLine({
+    today: todayKey(),
+    word: word?.en,
+    todayWords: words.map(w => w.en),
+    srs: progress.srs,
+    yesterdayMissed: progress.yesterdayMissed,
+    todayMissed: progress.todayMissed,
+    todayCorrect: progress.todayCorrect,
+    streak,
+    firstVisit: firstVisit && progress.learned === 0 && progress.round === 0,
+    yesterdayLearned: progress.yesterdayLearned,
+    missionsDone: allDone,
+  }), [
+    word, words, progress.srs, progress.yesterdayMissed, progress.todayMissed, progress.todayCorrect,
+    progress.learned, progress.round, progress.yesterdayLearned, streak, firstVisit, allDone,
+  ]);
 
   // 틀린 문제도 결국 다 맞혀야 끝난다 — 끝났다면 모두 맞힌 것
   const testFinished = progress.queue.length === 0;
@@ -169,10 +235,29 @@ export default function WordScreen() {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         width: '100%', maxWidth: 380, marginBottom: 12,
       }}>
-        <div style={{ fontSize: 21, fontWeight: 900, color: '#44405e' }}>📖 영어 단어</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 21, fontWeight: 900, color: '#44405e' }}>📖 영어 단어</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#8a7a9a', marginTop: 2 }}>
+            복습 {reviewCount} · 새 단어 {newCount}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* 🔥 연속 학습 — 오르면 잠깐 튀어오른다 */}
+          <div
+            className={streakPop ? 'streak-pop' : ''}
+            title={`최고 ${streak.best}일`}
+            style={{
+              background: streak.current > 0 ? 'linear-gradient(135deg,#ffe29f,#ff9a6c)' : 'white',
+              borderRadius: 14, padding: '7px 9px', fontSize: 12, fontWeight: 900,
+              color: streak.current > 0 ? '#7a2e0e' : '#aaa', boxShadow: '0 3px 10px rgba(0,0,0,0.1)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.15,
+            }}
+          >
+            <span>🔥 {streak.current}일 연속</span>
+            {streak.freezes > 0 && <span style={{ fontSize: 10, color: '#2a6f97' }}>🧊 프리즈 {streak.freezes}개</span>}
+          </div>
           <div style={{
-            background: 'white', borderRadius: 14, padding: '7px 12px',
+            background: 'white', borderRadius: 14, padding: '7px 10px',
             fontSize: 14, fontWeight: 800, color: '#f39c12',
             boxShadow: '0 3px 10px rgba(0,0,0,0.1)',
           }}>⭐ {gameState.points}</div>
@@ -180,7 +265,7 @@ export default function WordScreen() {
             onClick={() => { setShowWallet(true); playClick(); }}
             style={{
               background: 'linear-gradient(135deg,#f6d365,#fda085)', color: '#5b4a2a',
-              border: 'none', borderRadius: 14, padding: '8px 13px',
+              border: 'none', borderRadius: 14, padding: '8px 10px',
               fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
               boxShadow: '0 4px 12px rgba(246,211,101,0.6)',
             }}
@@ -189,12 +274,15 @@ export default function WordScreen() {
             onClick={() => { setShowShop(true); playClick(); }}
             style={{
               background: 'linear-gradient(135deg,#f093fb,#f5576c)', color: 'white',
-              border: 'none', borderRadius: 14, padding: '8px 11px',
+              border: 'none', borderRadius: 14, padding: '8px 9px',
               fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
             }}
           >🛍️</button>
         </div>
       </div>
+
+      {/* 오늘 미션 3개 — 다 하면 "오늘 끝" */}
+      <MissionCard missions={missions} />
 
       {/* 오늘 진행 */}
       <div style={{
@@ -262,7 +350,7 @@ export default function WordScreen() {
             {word.ko}
           </div>
           {/* 요정이 이 단어로 문장을 말한다 — 누르면 들려준다 */}
-          <FairyBubble word={word} style={{ marginBottom: 14 }} />
+          <FairyBubble word={word} note={fairyNote} style={{ marginBottom: 14 }} />
           <div style={{ display: 'flex', gap: 10 }}>
             <button
               onClick={() => { speakWord(word.en); playClick(); }}
@@ -531,6 +619,8 @@ export default function WordScreen() {
           이 브라우저는 읽어주기를 지원하지 않아요.
         </div>
       )}
+
+      {celebrating && <MissionCelebration onClose={closeCelebration} />}
 
       {showUnits && (
         <UnitPicker

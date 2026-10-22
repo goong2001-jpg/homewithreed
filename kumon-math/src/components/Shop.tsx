@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { AvatarItem } from '../types';
 import Avatar from './Avatar';
-import BgRemoveImg from './BgRemoveImg';
 import { playPurchase, playClick } from '../utils/sounds';
 
 const ASSET_BASE = `${process.env.PUBLIC_URL}/avatar/`;
@@ -132,7 +131,7 @@ export default function Shop({ items, points, totalCorrect, onBuy, onEquip, onCl
                   ) : bought === item.id ? (
                     <span style={{ fontSize: 38 }}>🎉</span>
                   ) : item.image ? (
-                    <BgRemoveImg src={ASSET_BASE + item.image} bgRemoval={item.bgRemoval ?? 'none'} style={{ width: 52, height: 52, objectFit: 'contain' }} />
+                    <img src={ASSET_BASE + item.image} alt="" loading="lazy" style={{ width: 52, height: 52, objectFit: 'contain' }} />
                   ) : (
                     <span style={{ fontSize: 38 }}>{item.emoji}</span>
                   )}

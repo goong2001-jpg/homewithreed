@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { AvatarItem } from '../types';
-import BgRemoveImg from './BgRemoveImg';
 
 type AvatarMood = 'idle' | 'happy' | 'sad' | 'thinking';
 
@@ -21,16 +20,16 @@ const BG_THEMES: Record<string, { grad: string; deco: string[] }> = {
   bg_space:   { grad: 'linear-gradient(160deg,#0b1026,#3a2c6e)', deco: ['🪐', '⭐', '🚀', '✨'] },
 };
 
-/** 이미지가 있으면 배경 제거 후 표시, 없거나 로딩 실패 시 이모지로 자동 대체 */
+/** 이미지(배경 투명)가 있으면 그대로 표시, 없거나 로딩 실패 시 이모지로 자동 대체 */
 function AssetImg({ item, fontSize, imgStyle }: {
   item: AvatarItem; fontSize: number; imgStyle?: React.CSSProperties;
 }) {
   const [failed, setFailed] = useState(false);
   if (item.image && !failed) {
     return (
-      <BgRemoveImg
+      <img
         src={ASSET_BASE + item.image}
-        bgRemoval={item.bgRemoval ?? 'none'}
+        alt=""
         onError={() => setFailed(true)}
         style={{ display: 'block', ...imgStyle }}
       />
@@ -152,7 +151,8 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
   const hairColor = hat ? (HAIR_COLORS[hat.id] || '#4a3728') : '#4a3728';
 
   // 기본 아바타 이미지 (아무것도 착용 안 했을 때 보여줄 기본 캐릭터)
-  const BASE_AVATAR = `${ASSET_BASE}diana_base.png`;
+  // — 완성형 다이아 요정과 같은 그림이라 파일 하나를 같이 쓴다
+  const BASE_AVATAR = `${ASSET_BASE}diana_full.webp`;
 
   // 🌈 배경 장면 (배경 아이템 착용 시 테마 그라데이션 + 장식 이모지)
   const decoPos = [['8%', '10%'], ['72%', '15%'], ['15%', '70%'], ['78%', '63%']];
@@ -200,9 +200,9 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
     return (
       <div style={{ position: 'relative', width: W, height: H, flexShrink: 0 }}>
         {bgScene}
-        <BgRemoveImg
+        <img
           src={ASSET_BASE + fullAvatar.image}
-          bgRemoval={fullAvatar.bgRemoval ?? 'none'}
+          alt=""
           onError={() => setFullFailed(true)}
           style={{ position: 'relative', zIndex: 1, width: W, height: H, objectFit: 'contain' }}
         />
@@ -222,7 +222,7 @@ export default function Avatar({ items, mood, size = 'large' }: Props) {
       {/* 배경 */}
       {bgScene}
 
-      {/* 기본 캐릭터: diana_base.png 있으면 이미지, 없으면 SVG */}
+      {/* 기본 캐릭터: diana_full.webp 있으면 이미지, 없으면 SVG */}
       {!baseFailed ? (
         <img
           src={BASE_AVATAR}
