@@ -2,6 +2,8 @@
  * 서버 없음. 이 브라우저 localStorage 한 곳에만 있다. 은행 기기는 한 대로 정해서 쓴다.
  *
  * 통장 한 줄: { id, date, type: 'in'|'out'|'interest'|'tax', amount, memo, createdAt }
+ *   엄마아빠 모드에서 날짜·금액·메모를 고칠 수 있다. 이미 이자를 준 달의 기록을 고쳐도 지난 이자는 다시 계산하지 않는다.
+ * 출금 신청 알림: 설정에 habit-push 서버 주소·암호를 넣으면, 아이가 찾기 신청을 누를 때 부모 폰으로 푸시를 보낸다.
  * 이자: 하루 끝 잔액 × 연 이자율 ÷ 365 를 한 달 모아서, 다음 달 1일에 원 단위 버림으로 넣는다.
  *       기본은 시중은행 1년 정기예금 수준(연 3.5%). 세금을 떼면 물가와 겨우 비기는 수준이라
  *       나중에 "예금만으로는 돈이 크게 늘지 않는다"를 보여줄 수 있다.
@@ -10,7 +12,7 @@
   'use strict';
 
   // 배포할 때마다 index.html 의 ?v=, sw.js, version.json 과 같이 올린다
-  var APP_VERSION = '5';
+  var APP_VERSION = '6';
 
   var STORE_KEY = 'hwr-bank-v1';
   var BACKUP_KEY = 'hwr-bank-last-backup';
@@ -131,6 +133,10 @@
     });
     if (parseRate(s.rate) === null) s.rate = 3.5;
     if (parseRate(s.inflation) === null) s.inflation = 2.9;
+    if (s.push && typeof s.push === 'object') {
+      ['endpoint', 'passphrase', 'deviceId'].forEach(function (f) { if (typeof s.push[f] !== 'string') delete s.push[f]; });
+      s.push.enabled = !!s.push.enabled;
+    } else delete s.push;
     return s;
   }
   function load() {
@@ -177,10 +183,11 @@
     }).catch(function () {});   // http 처럼 crypto.subtle 이 없으면 다음에 다시
     return s;
   }
-  // 백업 파일에는 비밀번호(해시·소금 포함)를 넣지 않는다
-  function withoutPin(s) {
+  // 백업 파일에는 비밀번호(해시·소금 포함)와 알림 암호·구독을 넣지 않는다. 알림 서버 주소만 남긴다
+  function forBackup(s) {
     var o = {};
-    Object.keys(s).forEach(function (k) { if (k !== 'pin' && k !== 'pinHash' && k !== 'pinSalt') o[k] = s[k]; });
+    Object.keys(s).forEach(function (k) { if (k !== 'pin' && k !== 'pinHash' && k !== 'pinSalt' && k !== 'push') o[k] = s[k]; });
+    if (s.push && s.push.endpoint) o.push = { endpoint: s.push.endpoint };
     return o;
   }
 
@@ -204,6 +211,9 @@
     });
   }
   function balance(k) { return k.tx.reduce(function (s, t) { return s + sign(t); }, 0); }
+  // 그 날짜가 든 달의 이자를 이미 줬나. 고치거나 지난 날짜로 맡기면 지난 이자는 다시 계산하지 않고 한 번 묻는다
+  function inSettledMonth(k, date) { return date.slice(0, 7) <= k.settled; }
+  var SETTLED_MSG = '이미 이자를 준 달의 기록이 바뀝니다. 지난 이자는 다시 계산하지 않아요. 그래도 바꿀까요?';
 
   // from~to(포함) 매일 끝 잔액 × 연 이자율 ÷ 365 의 합 (소수점 그대로)
   function interestBetween(k, from, to) {
@@ -336,6 +346,9 @@
     $('tags').innerHTML = TAGS[mode].map(function (g) {
       return '<button class="chip' + (g === tag ? ' on' : '') + '" data-tag="' + esc(g) + '">' + esc(g) + '</button>';
     }).join('');
+    $('dateInput').max = now;
+    $('dateInput').min = k.opened;
+    if (!$('dateInput').value) $('dateInput').value = now;
 
     renderLedger(k);
     renderAdmin(isParent);
@@ -479,7 +492,7 @@
       var plus = sign(t) > 0;
       var d = (t.date.slice(0, 4) !== year ? t.date.slice(2, 4) + '.' : '') + (+t.date.slice(5, 7)) + '.' + (+t.date.slice(8, 10));
       return '<div class="lrow ' + t.type + '" data-id="' + t.id + '"><span>' + d + '</span><span class="memo">' + esc(t.memo || '') +
-        '</span><span class="num">' + (plus ? '' : num(t.amount)) + '</span><span class="num">' + (plus ? num(t.amount) : '') +
+        '<button class="editBtn" aria-label="고치기"></button></span><span class="num">' + (plus ? '' : num(t.amount)) + '</span><span class="num">' + (plus ? num(t.amount) : '') +
         '</span><span class="num bal">' + num(bal) + '</span></div>';
     });
     var shown = rows.slice(Math.max(0, rows.length - ledgerShown));
@@ -499,6 +512,11 @@
     $('nameInputs').innerHTML = state.kids.map(function (x, i) {
       return '<label class="editField"><span>' + (i + 1) + '번째</span><input data-name="' + i + '" type="text" maxlength="6" value="' + esc(x.name) + '" /></label>';
     }).join('');
+    var pc = pushCfg();
+    $('pushEndpoint').value = pc.endpoint || '';
+    $('pushPass').value = pc.passphrase || '';
+    $('pushParent').checked = !!pc.enabled;
+    pushStatus();
     showLastBackup();
   }
 
@@ -507,8 +525,18 @@
     $('undoBtn').classList.toggle('hidden', !withUndo);
     $('toast').classList.remove('hidden');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { $('toast').classList.add('hidden'); lastAdded = null; mergeable = null; }, 5000);
+    toastTimer = setTimeout(function () { $('toast').classList.add('hidden'); lastAdded = null; mergeable = null; resetDate(); }, 5000);
   }
+  var miniTimer = null;
+  function miniToast(text) {   // 되돌리기 토스트를 덮지 않는 작은 알림
+    $('pushToast').textContent = text;
+    $('pushToast').classList.remove('hidden');
+    clearTimeout(miniTimer);
+    miniTimer = setTimeout(function () { $('pushToast').classList.add('hidden'); }, 3000);
+  }
+  // 맡긴 날짜 칸을 오늘로 되돌린다 (고르는 중이면 그대로 둔다)
+  function resetDate() { if (document.activeElement !== $('dateInput')) $('dateInput').value = today(); }
+  function shortDate(d) { return (+d.slice(5, 7)) + '/' + (+d.slice(8, 10)); }
 
   // ---------- 동작 ----------
   // 칩(누가/어디)과 이유 칸을 합쳐 한 줄 메모로. 둘 다 없으면 기본 말.
@@ -518,14 +546,25 @@
   }
   function freshEntry() { return !!(tag || $('noteInput').value.trim()); }
 
+  // 맡긴 날짜 칸. 비어 있으면 오늘. 오늘보다 뒤거나 통장을 만든 날보다 앞이면 null
+  function pickedDate(k) {
+    var d = $('dateInput').value || today();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) d = today();
+    if (d > today()) { alert('오늘보다 뒤의 날짜에는 맡길 수 없어요.'); return null; }
+    if (d < k.opened) { alert('통장을 만든 날(' + k.opened + ') 이후 날짜만 돼요.'); return null; }
+    return d;
+  }
+
   function deposit(amount, btn) {
-    var k = kid(), t = null;
+    var k = kid(), t = null, date = pickedDate(k);
+    if (!date) return;
     if (btn && !freshEntry() && mergeable && mergeable.kidId === k.id) {
-      t = k.tx.filter(function (x) { return x.id === mergeable.txId; })[0] || null;
+      t = k.tx.filter(function (x) { return x.id === mergeable.txId && x.date === date; })[0] || null;
     }
     if (t) t.amount += amount;
     else {
-      t = { id: newId(), date: today(), type: 'in', amount: amount, memo: memoOf('맡김'), createdAt: Date.now() };
+      if (date !== today() && inSettledMonth(k, date) && !confirm(SETTLED_MSG)) return;
+      t = { id: newId(), date: date, type: 'in', amount: amount, memo: memoOf('맡김'), createdAt: Date.now() };
       k.tx.push(t);
     }
     save();
@@ -537,7 +576,7 @@
     pop(btn);
     coinSound();
     coinDrop();
-    toast('+' + won(t.amount) + ' 맡겼어요' + (btn ? ' · 더 누르면 합쳐져요' : ''), true);
+    toast('+' + won(t.amount) + ' 맡겼어요' + (date !== today() ? ' (' + shortDate(date) + ' 날짜로)' : '') + (btn ? ' · 더 누르면 합쳐져요' : ''), true);
   }
 
   function request(amount, btn) {
@@ -566,6 +605,7 @@
     render();
     pop(btn);
     toast(won(r.amount) + ' 찾기 신청했어요. 엄마아빠 승인을 기다려요', true);
+    notifyParents(k, r);
   }
 
   function pop(btn) {
@@ -616,10 +656,77 @@
     if (!t || !confirm(t.date + ' ' + (t.memo || '') + ' ' + won(t.amount) + ' 기록을 지울까요?')) return;
     k.tx = k.tx.filter(function (x) { return x.id !== id; });
     save();
+    closeEdit();
     lastAdded = { kidId: k.id, kind: 'del', tx: t };
     mergeable = null;
     render();
     toast('지웠어요', true);
+  }
+
+  // ---------- 통장 내역 고치기 ----------
+  // 엄마아빠 모드면 날짜·금액·메모를 고치거나 지운다. 아이 모드면 보기만 한다.
+  var editing = null;   // { id, readOnly }
+  var KIND_TEXT = { in: '맡기신 돈', out: '찾으신 돈', interest: '이자', tax: '이자 세금' };
+  // '할머니 · 생일 선물' 을 칩과 이유로 다시 나눈다
+  function splitMemo(memo, type) {
+    var parts = String(memo || '').split(' · ');
+    if ((TAGS[type] || []).indexOf(parts[0]) >= 0) return { tag: parts[0], note: parts.slice(1).join(' · ') };
+    return { tag: '', note: memo || '' };
+  }
+  function openEdit(id) {
+    var k = kid(), t = k.tx.filter(function (x) { return x.id === id; })[0];
+    if (!t) return;
+    var ro = !unlocked(), hasTag = t.type === 'in' || t.type === 'out', m = splitMemo(t.memo, t.type);
+    editing = { id: id, readOnly: ro };
+    $('editTitle').textContent = ro ? '통장 내역' : '기록 고치기';
+    $('editKind').textContent = KIND_TEXT[t.type] + (ro ? '' : ' · 날짜는 통장을 만든 날부터 오늘까지만 돼요.');
+    $('editDate').value = t.date;
+    $('editDate').min = k.opened;
+    $('editDate').max = today();
+    $('editAmount').value = t.amount.toLocaleString('ko-KR');
+    $('editTagRow').hidden = !hasTag;
+    if (hasTag) {
+      $('editTagLabel').textContent = MODE_TEXT[t.type].label;
+      $('editTag').innerHTML = '<option value="">(없음)</option>' + TAGS[t.type].map(function (g) {
+        return '<option' + (g === m.tag ? ' selected' : '') + '>' + esc(g) + '</option>';
+      }).join('');
+    }
+    $('editNote').value = hasTag ? m.note : (t.memo || '');
+    ['editDate', 'editAmount', 'editTag', 'editNote'].forEach(function (f) { $(f).disabled = ro; });
+    $('editBtns').hidden = ro;
+    $('editViewBtns').hidden = !ro;
+    $('editSheet').classList.remove('hidden');
+  }
+  function closeEdit() {
+    editing = null;
+    $('editSheet').classList.add('hidden');
+  }
+  function saveEdit() {
+    if (!editing || editing.readOnly || !unlocked()) return closeEdit();
+    var k = kid(), t = k.tx.filter(function (x) { return x.id === editing.id; })[0];
+    if (!t) return closeEdit();
+    var amount = parseAmount($('editAmount').value);
+    if (!amount) { alert('금액을 읽지 못했어요. 숫자로 적거나 "3만5천"처럼 적어 주세요.'); return; }
+    var date = $('editDate').value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { alert('날짜를 골라 주세요.'); return; }
+    if (date > today()) { alert('오늘보다 뒤의 날짜는 안 돼요.'); return; }
+    if (date < k.opened) { alert('통장을 만든 날(' + k.opened + ') 이후 날짜만 돼요.'); return; }
+    var note = $('editNote').value.trim(), memo;
+    if (t.type === 'in' || t.type === 'out') memo = [$('editTag').value, note].filter(Boolean).join(' · ') || (t.type === 'in' ? '맡김' : '찾기');
+    else memo = note || t.memo;
+    if (date === t.date && amount === t.amount && memo === t.memo) return closeEdit();
+    // 이미 이자를 준 달이 끼면 한 번 묻는다. 지난 이자는 그대로 둔다 (다시 계산하지 않는다)
+    if ((inSettledMonth(k, date) || inSettledMonth(k, t.date)) && !confirm(SETTLED_MSG)) return;
+    t.date = date;
+    t.amount = amount;
+    t.memo = memo;
+    k.tx = sorted(k);   // id 는 그대로, 날짜순으로 다시 정렬
+    save();
+    lastAdded = null;
+    mergeable = null;
+    closeEdit();
+    render();
+    toast('고쳤어요', false);
   }
 
   function saveSettings() {
@@ -628,6 +735,8 @@
     if (infl === null) { alert('물가 상승률은 0~20 사이 숫자로 적어 주세요. (예: 2.9)'); return; }
     var names = [].map.call(document.querySelectorAll('#nameInputs input'), function (i) { return i.value.trim(); });
     if (names.some(function (n) { return !n; })) { alert('아이 이름을 비워 둘 수 없어요.'); return; }
+    var ep = normEndpoint($('pushEndpoint').value), pp = $('pushPass').value.trim();
+    if (ep && !/^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1))/.test(ep)) { alert('알림 서버 주소는 https:// 로 시작해야 해요. (예: https://habit-push.계정.workers.dev)'); return; }
     if (rate !== state.rate) {
       if (!confirm('이자율을 연 ' + pct(rate) + '로 바꿀까요? 지난달까지 아직 안 준 이자는 지금 이자율(연 ' + pct(state.rate) + ')로 먼저 넣고, 그다음부터 새 이자율로 계산해요.')) return;
       settleAll();   // 밀린 달 이자는 옛 이자율로 먼저 정산한다
@@ -638,6 +747,10 @@
     state.showInflation = $('inflInput').checked;
     state.sound = $('soundInput').checked;
     names.forEach(function (n, i) { state.kids[i].name = n; });
+    var pc = pushCfg();
+    pc.endpoint = ep;
+    pc.passphrase = pp;
+    if (!(ep && pp)) pc.enabled = false;   // 서버가 없으면 받을 수도 없다
     save();
     if (document.activeElement) document.activeElement.blur();
     render();
@@ -663,7 +776,7 @@
   }
 
   function exportBackup() {
-    var data = { format: BACKUP_FORMAT, version: 1, exportedAt: Date.now(), state: withoutPin(state) };
+    var data = { format: BACKUP_FORMAT, version: 1, exportedAt: Date.now(), state: forBackup(state) };
     var blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -682,10 +795,11 @@
       if (!data || data.format !== BACKUP_FORMAT || !isState(data.state)) { alert('가족은행 백업 파일이 아니에요.'); return; }
       var merge = confirm('백업 기록을 지금 통장에 합칠까요?\n[확인] 합치기: 같은 기록은 한 번만, 양쪽 기록을 모두 남겨요.\n[취소] 다음 질문에서 지금 통장을 백업 내용으로 바꿀 수 있어요.');
       if (!merge && !confirm('지금 통장을 백업 파일 내용으로 바꿀까요? 지금 기록은 사라져요.')) return;
-      var keep = { pin: state.pin, pinHash: state.pinHash, pinSalt: state.pinSalt };   // 비밀번호는 이 기기 것을 그대로 둔다
+      var keep = { pin: state.pin, pinHash: state.pinHash, pinSalt: state.pinSalt, push: state.push };   // 비밀번호·알림 설정은 이 기기 것을 그대로 둔다
       var inc = clean(data.state);
       if (merge) mergeState(inc); else state = inc;
       ['pin', 'pinHash', 'pinSalt'].forEach(function (f) { if (keep[f]) state[f] = keep[f]; else delete state[f]; });
+      if (keep.push && (keep.push.endpoint || keep.push.enabled)) state.push = keep.push;
       kidIdx = 0;
       settleAll();
       save();
@@ -742,6 +856,121 @@
     }).catch(function () {});
   }
 
+  // ---------- 출금 신청 알림 (부모 폰 푸시) ----------
+  // 서버는 habit-push(Cloudflare Worker). 아이가 찾기 신청을 누르면 이 기기가 /bank/notify 를 부르고,
+  // Worker 가 등록된 부모 폰 전부에 푸시를 보낸다. 서버 주소·암호가 비어 있으면 아무 일도 하지 않는다.
+  // 부모 폰은 설정의 스위치로 /bank/subscribe 에 자기 구독을 올린다. (habit-talk/src/push/register.ts 와 같은 흐름)
+  function pushCfg() { if (!state.push || typeof state.push !== 'object') state.push = {}; return state.push; }
+  function normEndpoint(v) { return String(v || '').trim().replace(/\/+$/, ''); }
+  function postJson(url, body) {
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  }
+  function appUrl() { return location.href.replace(/[?#].*$/, ''); }
+  function isIOS() { return /iPhone|iPod|iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1); }
+  function standalone() { return navigator.standalone === true || !!(window.matchMedia && matchMedia('(display-mode: standalone)').matches); }
+  function b64ToBytes(b) {
+    var raw = atob((b + '='.repeat((4 - b.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+    var out = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+  function pushStatus() {
+    var c = pushCfg();
+    $('pushStatus').textContent = c.enabled
+      ? '이 폰은 출금 신청 알림을 받아요' + (c.subscribedAt ? ' (' + new Date(c.subscribedAt).toLocaleDateString('ko-KR') + ' 켬)' : '') + '.'
+      : c.endpoint && c.passphrase ? '아이가 찾기 신청을 하면 이 서버로 알림을 보내요. 부모 폰에서는 위 스위치를 켜 주세요.'
+      : '서버 주소와 암호를 적고 설정 저장을 누르면, 찾기 신청 때 알림을 보내요.';
+  }
+  // 아이가 찾기 신청 → 부모 폰. 화면을 막지 않고, 실패해도 조용히 넘어간다 (콘솔에만 남긴다)
+  function notifyParents(k, r) {
+    var c = pushCfg();
+    if (!(c.endpoint && c.passphrase) || !window.fetch) return;
+    try {
+      postJson(c.endpoint + '/bank/notify', {
+        passphrase: c.passphrase,
+        title: '엄마아빠 은행',
+        body: callName(k.name) + '가 ' + won(r.amount) + ' 찾기 신청했어요' + (r.memo && r.memo !== '찾기' ? ' (' + r.memo + ')' : ''),
+        url: appUrl(),
+        tag: 'hwr-bank-req-' + r.id   // 이어 눌러 합쳐진 신청은 알림도 하나로
+      }).then(function (res) { return res.ok ? res.json() : Promise.reject(new Error('HTTP ' + res.status)); })
+        .then(function (d) {
+          if (d && d.sent > 0) miniToast('엄마아빠 폰에 알림 보냄');
+          else console.warn('알림을 받을 부모 폰이 없어요', d);
+        })
+        .catch(function (err) { console.warn('알림 보내기 실패', err); });
+    } catch (err) { console.warn('알림 보내기 실패', err); }
+  }
+  // 이 폰을 부모 폰으로 등록. 반드시 스위치를 누른 동작 안에서 불러야 한다 (특히 아이폰)
+  function enablePush() {
+    var c = pushCfg(), endpoint = normEndpoint($('pushEndpoint').value), pass = $('pushPass').value.trim();
+    function fail(msg) {
+      c.enabled = false;
+      save();
+      $('pushParent').checked = false;
+      pushStatus();
+      alert(msg);
+    }
+    if (!endpoint || !pass) return fail('먼저 서버 주소와 암호를 적어 주세요.');
+    c.endpoint = endpoint;
+    c.passphrase = pass;
+    if (!c.deviceId) c.deviceId = 'bank-' + newId();
+    save();
+    if (!window.isSecureContext) return fail('https 주소(또는 홈 화면에 추가한 앱)에서만 알림을 켤 수 있어요.');
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      return fail('이 브라우저는 푸시 알림을 지원하지 않아요.' + (isIOS() ? ' 아이폰은 iOS 16.4 이상에서, 홈 화면에 추가한 앱 안에서만 돼요.' : ''));
+    }
+    if (isIOS() && !standalone()) return fail('아이폰은 먼저 사파리 공유 → 홈 화면에 추가로 설치한 뒤, 그 앱 안에서 켜야 해요.');
+    var reg = null;
+    Notification.requestPermission().then(function (perm) {
+      if (perm !== 'granted') throw new Error('알림 권한이 허용되지 않았어요. 폰 설정에서 이 앱의 알림을 허용해 주세요.');
+      return navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(function () { throw new Error('서비스워커를 등록하지 못했어요.'); });
+    }).then(function () {
+      // ready 가 영영 안 풀리는 경우가 있어서 기다리는 시간을 둔다
+      return Promise.race([navigator.serviceWorker.ready, new Promise(function (_, rej) {
+        setTimeout(function () { rej(new Error('서비스워커가 준비되지 않았어요. 앱을 닫았다 다시 열고 시도해 주세요.')); }, 10000);
+      })]);
+    }).then(function (r) {
+      reg = r;
+      // 공개키는 서버의 /health 에서 받는다. 서버에서 키를 바꿔도 앱은 손댈 게 없다
+      return fetch(endpoint + '/health', { cache: 'no-cache' }).catch(function () { throw new Error('알림 서버에 연결하지 못했어요. 주소와 인터넷을 확인해 주세요.'); });
+    }).then(function (res) {
+      if (!res.ok) throw new Error('알림 서버가 응답하지 않아요 (' + res.status + ').');
+      return res.json();
+    }).then(function (h) {
+      var key = String(h && h.vapidPublicKey || '').trim();
+      if (!key) throw new Error('알림 서버에 아직 키가 없어요. habit-push 설치를 마쳐 주세요.');
+      return reg.pushManager.getSubscription().then(function (sub) {
+        return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+      }).catch(function () { throw new Error('구독에 실패했어요. 잠시 뒤 다시 시도해 주세요.'); });
+    }).then(function (sub) {
+      return postJson(endpoint + '/bank/subscribe', { passphrase: pass, subscription: sub.toJSON(), deviceId: c.deviceId, role: 'parent' })
+        .catch(function () { throw new Error('알림 서버에 연결하지 못했어요. 주소와 인터넷을 확인해 주세요.'); });
+    }).then(function (res) {
+      if (res.status === 401) throw new Error('암호가 맞지 않아요. habit-push 의 PASSPHRASE 와 같은지 확인해 주세요.');
+      if (!res.ok) throw new Error('알림 서버가 응답하지 않아요 (' + res.status + ').');
+      c.enabled = true;
+      c.subscribedAt = Date.now();
+      save();
+      $('pushParent').checked = true;
+      pushStatus();
+      toast('이 폰으로 출금 신청 알림을 받아요', false);
+    }).catch(function (err) { fail(err && err.message ? err.message : '알림을 켜지 못했어요.'); });
+  }
+  function disablePush() {
+    var c = pushCfg();
+    c.enabled = false;
+    save();
+    pushStatus();
+    toast('이 폰에서는 알림을 받지 않아요', false);
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.getRegistration().then(function (reg) { return reg && reg.pushManager.getSubscription(); })
+      .then(function (sub) { if (sub) return sub.unsubscribe(); })
+      .then(function () {
+        if (c.endpoint && c.passphrase && c.deviceId) return postJson(c.endpoint + '/bank/unsubscribe', { passphrase: c.passphrase, deviceId: c.deviceId });
+      })
+      .catch(function () {});
+  }
+
   // ---------- 연결 ----------
   $('kids').addEventListener('click', function (e) {
     var b = e.target.closest('[data-kid]');
@@ -749,6 +978,7 @@
     kidIdx = +b.dataset.kid;
     tag = '';
     $('noteInput').value = '';
+    $('dateInput').value = '';   // 통장마다 만든 날이 달라서 오늘로
     mergeable = null;
     ledgerShown = LEDGER_STEP;
     render();
@@ -787,8 +1017,14 @@
   });
   $('ledger').addEventListener('click', function (e) {
     var row = e.target.closest('.lrow');
-    if (row) removeTx(row.dataset.id);
+    if (row) openEdit(row.dataset.id);
   });
+  $('editSave').addEventListener('click', saveEdit);
+  $('editCancel').addEventListener('click', closeEdit);
+  $('editClose').addEventListener('click', closeEdit);
+  $('editDelete').addEventListener('click', function () { if (editing) removeTx(editing.id); });
+  $('editSheet').addEventListener('click', function (e) { if (e.target === $('editSheet')) closeEdit(); });
+  $('pushParent').addEventListener('change', function (e) { if (e.target.checked) enablePush(); else disablePush(); });
   $('goalCard').addEventListener('click', function (e) {
     var b = e.target.closest('[data-goal]');
     if (b) goalAction(b.dataset.goal);

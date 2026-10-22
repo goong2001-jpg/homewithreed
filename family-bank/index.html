@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="가족은행" />
-    <link rel="stylesheet" href="style.css?v=5" />
+    <link rel="stylesheet" href="style.css?v=6" />
     <title>엄마아빠 은행</title>
   </head>
   <body>
@@ -62,6 +62,7 @@
         <div class="fieldLabel"><span id="tagLabel">누가 줬어요?</span> <small>(안 골라도 돼요)</small></div>
         <div id="tags" class="chips"></div>
         <input id="noteInput" class="noteInput" type="text" maxlength="20" autocomplete="off" />
+        <label class="dateRow"><span>맡긴 날짜</span><input id="dateInput" type="date" /><small>(지난 날짜도 돼요)</small></label>
         <div class="bills">
           <button class="bill b1000" data-amount="1000"><span class="billNum">1,000</span><span class="billWon">천원</span></button>
           <button class="bill b5000" data-amount="5000"><span class="billNum">5,000</span><span class="billWon">오천원</span></button>
@@ -93,6 +94,12 @@
         <p class="hint">기본 이자율 3.5%는 시중은행 1년 정기예금 수준(2026년 10월 초 연 3.4~3.6%), 기본 물가 상승률 2.9%는 2026년 9월 소비자물가(국가데이터처, 10월 2일 발표) 기준이에요.</p>
         <div class="subHead">아이 이름</div>
         <div id="nameInputs"></div>
+        <div class="subHead">알림 설정 (아이가 찾기 신청하면 엄마아빠 폰으로)</div>
+        <label class="editField"><span>서버 주소</span><input id="pushEndpoint" type="url" inputmode="url" autocomplete="off" placeholder="https://….workers.dev" /></label>
+        <label class="editField"><span>암호</span><input id="pushPass" type="password" autocomplete="off" /></label>
+        <label class="checkRow"><input id="pushParent" type="checkbox" /> <span>이 폰으로 출금 신청 알림 받기 (부모 폰)</span></label>
+        <p id="pushStatus" class="hint"></p>
+        <p class="hint">서버 주소와 암호는 habit-push(톡톡 습관친구 알림 서버)의 것과 같아요. 아이가 쓰는 은행 기기와 부모 폰 모두에 적고, 부모 폰에서만 스위치를 켜요. 아이폰은 iOS 16.4 이상에서 사파리 공유 → <b>홈 화면에 추가</b>로 설치한 앱 안에서만 알림이 와요.</p>
         <div class="adminBtns">
           <button id="saveSettings" class="primaryBtn">설정 저장</button>
           <button id="importAllowance" class="ghost">용돈기입장 잔액 옮겨오기</button>
@@ -101,7 +108,7 @@
           <label class="ghost fileBtn">백업 불러오기<input id="importInput" type="file" accept="application/json,.json" hidden /></label>
         </div>
         <p id="lastBackup" class="hint"></p>
-        <p class="hint">기록은 이 기기 브라우저에만 저장돼요. 은행 기기는 한 대로 정해서 쓰고, 가끔 백업 파일을 저장해 두세요. 엄마아빠 모드에서 통장 내역 한 줄을 누르면 지울 수 있어요.</p>
+        <p class="hint">기록은 이 기기 브라우저에만 저장돼요. 은행 기기는 한 대로 정해서 쓰고, 가끔 백업 파일을 저장해 두세요. 엄마아빠 모드에서 통장 내역 한 줄을 누르면 날짜·금액·메모를 고치거나 지울 수 있어요.</p>
       </section>
 
       <footer class="foot">
@@ -134,11 +141,32 @@
       </div>
     </div>
 
+    <!-- 통장 내역 고치기 (아이 모드에서는 보기만) -->
+    <div id="editSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+      <div class="sheetBox">
+        <h3 id="editTitle">기록 고치기</h3>
+        <p id="editKind" class="hint"></p>
+        <label class="editField"><span>날짜</span><input id="editDate" type="date" /></label>
+        <label class="editField"><span>금액</span><input id="editAmount" type="text" inputmode="numeric" placeholder="예: 10000, 3만5천" /></label>
+        <label class="editField" id="editTagRow"><span id="editTagLabel">누가 줬어요?</span><select id="editTag"></select></label>
+        <label class="editField"><span>이유</span><input id="editNote" type="text" maxlength="20" autocomplete="off" /></label>
+        <div class="sheetBtns three" id="editBtns">
+          <button id="editDelete" class="ghost danger">지우기</button>
+          <button id="editCancel" class="ghost">취소</button>
+          <button id="editSave" class="primaryBtn">저장</button>
+        </div>
+        <div class="sheetBtns" id="editViewBtns" hidden>
+          <button id="editClose" class="ghost">닫기</button>
+        </div>
+      </div>
+    </div>
+
     <div id="update" class="bootFail" hidden>
       새 버전이 있어요!
       <button id="updateNow">업데이트</button>
     </div>
 
+    <div id="pushToast" class="toast mini hidden" role="status"></div>
     <div id="toast" class="toast hidden" role="status">
       <span id="toastText"></span>
       <button id="undoBtn" class="undo">되돌리기</button>
@@ -163,6 +191,6 @@
         }, 1500);
       });
     </script>
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=6"></script>
   </body>
 </html>

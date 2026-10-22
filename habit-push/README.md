@@ -208,7 +208,29 @@ curl "http://127.0.0.1:8787/__scheduled?cron=*+*+*+*+*"   # 크론 강제 실행
 | `POST /subscribe` | 구독 + 시간표 등록 (암호 필요). 내용이 같으면 저장을 건너뜁니다 |
 | `POST /unsubscribe` | 등록 해제 (암호 필요) |
 | `GET /health` | 서버 상태, VAPID 공개키, 마지막 cron 시각(`lastTickAt`). 앱이 이걸로 구독합니다 (아무 데서나 읽을 수 있음) |
+| `POST /bank/subscribe` | 엄마아빠 은행: 부모 폰 구독 등록 (아래 참고) |
+| `POST /bank/unsubscribe` | 엄마아빠 은행: 부모 폰 등록 해제 |
+| `POST /bank/notify` | 엄마아빠 은행: 등록된 부모 폰 전부에 푸시 한 통 |
 
-`/subscribe` 와 `/unsubscribe` 는 `ALLOWED_ORIGIN` 과 다른 `Origin` 에서 오면 403,
+쓰기 경로(`/subscribe`, `/unsubscribe`, `/bank/*`)는 `ALLOWED_ORIGIN` 과 다른 `Origin` 에서 오면 403,
 본문이 64KB 를 넘으면 413, 같은 IP 에서 1분에 10번을 넘으면 429 를 돌려줍니다.
-횟수 제한은 요청마다 KV 쓰기 한 번을 쓰지만, 이 두 경로는 하루에 몇 번 안 불립니다.
+횟수 제한은 요청마다 KV 쓰기 한 번을 쓰지만, 이 경로들은 하루에 몇 번 안 불립니다.
+
+## 엄마아빠 은행 알림
+
+같은 저장소의 `family-bank`(엄마아빠 은행)도 이 Worker 를 그대로 씁니다. 따로 배포할 것이 없고,
+**암호(`PASSPHRASE`)와 VAPID 키를 습관친구와 공유**합니다. 아이가 은행 기기에서 "찾기 신청"을
+누르면 그 기기가 `/bank/notify` 를 부르고, Worker 가 등록된 부모 폰 전부에 푸시를 보냅니다.
+cron 과는 무관하고 KV 의 `bank:parents` 키 하나만 더 씁니다.
+
+| 경로 | 본문 | 하는 일 |
+|---|---|---|
+| `POST /bank/subscribe` | `{ passphrase, subscription, deviceId, role: "parent" }` | 부모 폰 구독을 `bank:parents` 에 저장. 최대 4대, 같은 기기·같은 구독은 하나만, 내용이 같으면 쓰기를 건너뜁니다 |
+| `POST /bank/unsubscribe` | `{ passphrase, deviceId }` | 그 기기만 뺍니다 |
+| `POST /bank/notify` | `{ passphrase, title?, body, url?, tag? }` | 모든 부모 폰에 `{title, body, url, tag}` 페이로드로 푸시. 죽은 구독(404/410)은 지우고 `{ sent, parents }` 를 돌려줍니다 |
+
+`/bank/notify` 는 암호 하나(=한 가족) 기준으로 **한 시간에 30번**까지만 보냅니다(넘으면 429).
+`body` 는 300자, `title` 은 60자까지이고 `url` 은 `http(s)://` 로 시작해야 합니다.
+앱 쪽 설정 방법은 `family-bank/README.md` 의 "출금 신청 알림"을 보세요.
+`ALLOWED_ORIGIN` 은 GitHub Pages 의 출처(`https://<계정>.github.io`)라서 같은 사이트에 있는
+은행 앱도 그대로 통과합니다.
