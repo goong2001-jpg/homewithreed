@@ -52,7 +52,7 @@
         <header class="bar">
           <div>
             <div class="ch">CH <b id="chLabel">0000</b></div>
-            <div id="statusLine" class="status">연결 중…</div>
+            <div id="statusLine" class="status" role="status" aria-live="polite">연결 중…</div>
           </div>
           <button id="leaveBtn" class="ghost">나가기</button>
         </header>
@@ -69,7 +69,7 @@
           <div id="netStat" class="netStat"></div>
         </div>
 
-        <button id="pttBtn" class="ptt">
+        <button id="pttBtn" class="ptt" aria-pressed="false">
           <span class="pttIcon">🎙</span>
           <span class="pttText">누르고 말하기</span>
         </button>
@@ -98,7 +98,8 @@
 
     <div id="audioSink" hidden></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <!-- peerjs@1.5.4 dist/peerjs.min.js 를 그대로 둔 것. CDN 없이 뜨고 오프라인 껍데기 캐시에도 들어간다. 버전을 올리면 파일을 바꾼다 -->
+    <script src="./peerjs.min.js?v=4"></script>
     <script src="app.js"></script>
   </body>
 </html>

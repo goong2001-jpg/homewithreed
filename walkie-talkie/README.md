@@ -40,7 +40,7 @@
 
 ```
 index.html   화면
-app.js       PTT·연결 로직 (PeerJS CDN 사용)
+app.js       PTT·연결 로직 (peerjs.min.js 동봉, CDN 없음)
 style.css    스타일
 sw.js        오프라인 껍데기 캐시
 manifest.json / icon*  PWA 설치용

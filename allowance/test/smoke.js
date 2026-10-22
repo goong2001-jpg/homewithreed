@@ -197,6 +197,31 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('같은 버전이면 안내 없음', !(await p.isVisible('#update')));
   await p.evaluate(() => window.scrollTo(0, 0));
   await p.screenshot({ path: process.env.SHOT || 'shot.png', fullPage: true });
+  // ---- 날짜 한도: 화면에 돌아오면 '오늘'로 다시 잡는다 (밤새 켜 둔 앱) ----
+  const todayStr = (() => { const d = new Date(), z = n => (n < 10 ? '0' : '') + n; return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()); })();
+  await p.evaluate(() => { document.getElementById('dateInput').max = '2000-01-01'; document.dispatchEvent(new Event('visibilitychange')); });
+  check('돌아오면 날짜 한도 = 오늘', (await p.getAttribute('#dateInput', 'max')) === todayStr, await p.getAttribute('#dateInput', 'max'));
+
+  // ---- 백업 알림: 기록 20개 이상 + 30일 넘게(또는 한 번도) 백업 안 함 ----
+  check('기록이 적으면 백업 알림 없음', !(await p.isVisible('#backupNudge')));
+  await p.evaluate(() => {
+    const a = JSON.parse(localStorage.getItem('hwr-allowance-v1'));
+    for (let i = 0; i < 20; i++) a.push({ id: 'n' + i, date: new Date().getFullYear() + '-03-01', amount: 1000, giver: '엄마', createdAt: 2 });
+    localStorage.setItem('hwr-allowance-v1', JSON.stringify(a));
+    localStorage.setItem('hwr-allowance-last-backup', String(Date.now() - 45 * 86400000));
+  });
+  await p.reload();
+  check('45일 전 백업 → 알림', (await t('#backupNudgeText')) === '백업한 지 45일 지났어요', await t('#backupNudgeText'));
+  await p.click('#backupNudgeClose');
+  check('닫으면 숨김', !(await p.isVisible('#backupNudge')));
+  await p.reload();
+  check('닫은 뒤 7일 동안 안 뜸', !(await p.isVisible('#backupNudge')));
+  await p.evaluate(() => { localStorage.removeItem('hwr-allowance-backup-nudge'); localStorage.removeItem('hwr-allowance-last-backup'); });
+  await p.reload();
+  check('한 번도 안 했으면 안내', (await t('#backupNudgeText')) === '아직 백업한 적이 없어요', await t('#backupNudgeText'));
+  const [dl2] = await Promise.all([p.waitForEvent('download'), p.click('#backupNudgeBtn')]);
+  check('알림 버튼으로 백업 → 알림 사라짐', !!(await dl2.path()) && !(await p.isVisible('#backupNudge')));
+
   check('JS 에러 없음', errors.length === 0, errors.join(' | '));
   await browser.close();
   console.log(fail.length ? '\n실패 ' + fail.length + '개' : '\n모두 통과');

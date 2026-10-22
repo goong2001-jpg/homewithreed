@@ -10,7 +10,7 @@
   'use strict';
 
   // 배포할 때마다 index.html 의 ?v=, sw.js, version.json 과 같이 올린다
-  var APP_VERSION = '4';
+  var APP_VERSION = '5';
 
   var STORE_KEY = 'hwr-bank-v1';
   var BACKUP_KEY = 'hwr-bank-last-backup';
@@ -61,7 +61,7 @@
     });
   }
   // "1,500원", "3만5천" 같은 입력을 숫자로. 못 읽으면 0. (용돈기입장과 같은 규칙)
-  var AMOUNT_MAX = 100000000;
+  var AMOUNT_MAX = 1000000000;   // 10억. 아이 목표(자동차 1억 2500만원)까지는 들어가되 오타로 터무니없는 금액은 막는다. 용돈기입장·가족은행 같은 값
   var UNIT = { '억': 100000000, '만': 10000, '천': 1000 };
   function parseAmount(v) {
     if (v === null || v === undefined) return 0;
@@ -102,7 +102,7 @@
   function freshState() {
     var m = prevMonth(today().slice(0, 7));
     return {
-      rate: 3.5, tax: false, showInflation: false, inflation: 2.9, pin: null,
+      rate: 3.5, tax: false, showInflation: false, inflation: 2.9,
       kids: [
         { id: 'k1', name: '하율', opened: today(), settled: m, tx: [], requests: [] },
         { id: 'k2', name: '호윤', opened: today(), settled: m, tx: [], requests: [] }
@@ -136,13 +136,52 @@
   function load() {
     try {
       var s = JSON.parse(localStorage.getItem(STORE_KEY));
-      if (isState(s)) return clean(s);
+      if (isState(s)) return migratePin(clean(s));
     } catch (e) {}
     return freshState();
   }
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
     catch (e) { alert('저장에 실패했어요. 브라우저 저장공간을 확인해 주세요.'); }
+  }
+
+  // ---------- 비밀번호 저장 ----------
+  // 비밀번호를 그대로 두지 않고 소금(salt) + 비밀번호의 SHA-256 만 저장한다.
+  // crypto.subtle 은 https 또는 localhost 에서만 쓸 수 있다.
+  function hex(buf) {
+    return Array.prototype.map.call(new Uint8Array(buf), function (b) { return (b < 16 ? '0' : '') + b.toString(16); }).join('');
+  }
+  function newSalt() { var b = new Uint8Array(16); crypto.getRandomValues(b); return hex(b); }
+  function hashPin(pin, salt) {
+    if (!(window.crypto && crypto.subtle)) return Promise.reject(new Error('crypto.subtle 없음'));
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(salt + pin)).then(hex);
+  }
+  function hasPin() { return !!(state.pinHash || state.pin); }
+  function setPin(pin) {
+    var salt = newSalt();
+    return hashPin(pin, salt).then(function (h) { state.pinSalt = salt; state.pinHash = h; delete state.pin; save(); });
+  }
+  // 입력한 비밀번호가 맞는지. 아직 옛 방식(그대로 저장)인 기기는 그대로 비교한다
+  function checkPin(v) {
+    if (state.pinHash) return hashPin(v, state.pinSalt).then(function (h) { return h === state.pinHash; });
+    return Promise.resolve(v === state.pin);
+  }
+  // 버전 4까지 그대로 저장돼 있던 비밀번호를 해시로 바꾸고 원문은 지운다
+  function migratePin(s) {
+    if (s.pinHash) { delete s.pin; return s; }
+    if (typeof s.pin !== 'string' || !s.pin) return s;
+    var salt = newSalt();
+    hashPin(s.pin, salt).then(function (h) {
+      s.pinSalt = salt; s.pinHash = h; delete s.pin;
+      if (s === state) save();
+    }).catch(function () {});   // http 처럼 crypto.subtle 이 없으면 다음에 다시
+    return s;
+  }
+  // 백업 파일에는 비밀번호(해시·소금 포함)를 넣지 않는다
+  function withoutPin(s) {
+    var o = {};
+    Object.keys(s).forEach(function (k) { if (k !== 'pin' && k !== 'pinHash' && k !== 'pinSalt') o[k] = s[k]; });
+    return o;
   }
 
   var state = load();
@@ -219,31 +258,37 @@
     if (!pinJob) return;
     var v = $('pinInput').value.trim(), job = pinJob;
     if (job.step === 'check') {
-      if (v !== state.pin) return openPin('check', job.then, '비밀번호가 달라요. 다시 입력해 주세요.');
-      closePin();
-      unlockedUntil = Date.now() + UNLOCK_MS;
-      render();
-      if (job.then) job.then();
+      checkPin(v).then(function (ok) {
+        if (pinJob !== job) return;   // 그새 창을 닫았거나 다시 열었다
+        if (!ok) return openPin('check', job.then, '비밀번호가 달라요. 다시 입력해 주세요.');
+        closePin();
+        unlockedUntil = Date.now() + UNLOCK_MS;
+        render();
+        if (job.then) job.then();
+      });
     } else if (job.step === 'set1') {
       if (!/^\d{4,8}$/.test(v)) return openPin('set1', job.then, '숫자 4~8자리로 정해 주세요.');
       pinJob.first = v;
       openPin('set2', job.then);
     } else {
       if (v !== job.first) { pinJob.first = null; return openPin('set1', job.then, '두 번 입력한 비밀번호가 달라요. 처음부터 다시 정해 주세요.'); }
-      state.pin = v;
-      save();
-      closePin();
-      unlockedUntil = Date.now() + UNLOCK_MS;
-      render();
-      toast('비밀번호를 정했어요', false);
-      if (job.then) job.then();
+      setPin(v).then(function () {
+        closePin();
+        unlockedUntil = Date.now() + UNLOCK_MS;
+        render();
+        toast('비밀번호를 정했어요', false);
+        if (job.then) job.then();
+      }).catch(function () {
+        closePin();
+        alert('이 주소에서는 비밀번호를 안전하게 저장할 수 없어요. https 주소나 localhost 로 열어 주세요.');
+      });
     }
   }
   // 엄마아빠만 하는 일. 잠겨 있으면 비밀번호부터 묻고, 맞으면 이어서 한다.
   function asParent(then) {
     if (unlocked()) { unlockedUntil = Date.now() + UNLOCK_MS; return then && then(); }
     pinJob = null;
-    if (!state.pin) openPin('set1', then, '처음이에요. 엄마아빠 비밀번호(숫자 4자리 이상)를 정해 주세요. 아이가 모르게!');
+    if (!hasPin()) openPin('set1', then, '처음이에요. 엄마아빠 비밀번호(숫자 4자리 이상)를 정해 주세요. 아이가 모르게!');
     else openPin('check', then);
   }
 
@@ -305,7 +350,7 @@
         '<button class="primaryBtn" data-goal="set">목표 정하기</button>';
       return;
     }
-    var p = Math.min(100, Math.floor(bal / g.amount * 100)), left = g.amount - bal;
+    var p = Math.max(0, Math.min(100, Math.floor(bal / g.amount * 100))), left = g.amount - bal;   // 잔액이 음수여도 0~100%
     var slow = '';
     if (state.showInflation && left > 0 && bal > 0 && state.rate > 0) {
       // 더 넣지 않고 이자로만 모으면 걸리는 시간 (월복리로 어림)
@@ -583,7 +628,10 @@
     if (infl === null) { alert('물가 상승률은 0~20 사이 숫자로 적어 주세요. (예: 2.9)'); return; }
     var names = [].map.call(document.querySelectorAll('#nameInputs input'), function (i) { return i.value.trim(); });
     if (names.some(function (n) { return !n; })) { alert('아이 이름을 비워 둘 수 없어요.'); return; }
-    if (rate !== state.rate && !confirm('이자율을 연 ' + pct(rate) + '로 바꿀까요? 아직 안 준 이번 달 이자부터 새 이자율로 계산해요.')) return;
+    if (rate !== state.rate) {
+      if (!confirm('이자율을 연 ' + pct(rate) + '로 바꿀까요? 지난달까지 아직 안 준 이자는 지금 이자율(연 ' + pct(state.rate) + ')로 먼저 넣고, 그다음부터 새 이자율로 계산해요.')) return;
+      settleAll();   // 밀린 달 이자는 옛 이자율로 먼저 정산한다
+    }
     state.rate = rate;
     state.inflation = infl;
     state.tax = $('taxInput').checked;
@@ -615,7 +663,7 @@
   }
 
   function exportBackup() {
-    var data = { format: BACKUP_FORMAT, version: 1, exportedAt: Date.now(), state: state };
+    var data = { format: BACKUP_FORMAT, version: 1, exportedAt: Date.now(), state: withoutPin(state) };
     var blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -632,15 +680,35 @@
       var data;
       try { data = JSON.parse(reader.result); } catch (e) { alert('백업 파일을 읽을 수 없어요.'); return; }
       if (!data || data.format !== BACKUP_FORMAT || !isState(data.state)) { alert('가족은행 백업 파일이 아니에요.'); return; }
-      if (!confirm('지금 통장을 백업 파일 내용으로 바꿀까요? 지금 기록은 사라져요.')) return;
-      state = clean(data.state);
+      var merge = confirm('백업 기록을 지금 통장에 합칠까요?\n[확인] 합치기: 같은 기록은 한 번만, 양쪽 기록을 모두 남겨요.\n[취소] 다음 질문에서 지금 통장을 백업 내용으로 바꿀 수 있어요.');
+      if (!merge && !confirm('지금 통장을 백업 파일 내용으로 바꿀까요? 지금 기록은 사라져요.')) return;
+      var keep = { pin: state.pin, pinHash: state.pinHash, pinSalt: state.pinSalt };   // 비밀번호는 이 기기 것을 그대로 둔다
+      var inc = clean(data.state);
+      if (merge) mergeState(inc); else state = inc;
+      ['pin', 'pinHash', 'pinSalt'].forEach(function (f) { if (keep[f]) state[f] = keep[f]; else delete state[f]; });
       kidIdx = 0;
       settleAll();
       save();
       render();
-      toast('백업을 불러왔어요', false);
+      toast(merge ? '백업을 합쳤어요' : '백업을 불러왔어요', false);
     };
     reader.readAsText(file);
+  }
+  // 백업의 통장 기록을 지금 통장에 합친다. 같은 id 는 더 나중 것(createdAt, 없으면 날짜) 하나만 남긴다.
+  function mergeState(inc) {
+    function newer(a, b) { return (a.createdAt || 0) > (b.createdAt || 0) || ((a.createdAt || 0) === (b.createdAt || 0) && (a.date || '') > (b.date || '')); }
+    inc.kids.forEach(function (ik) {
+      var k = state.kids.filter(function (x) { return x.id === ik.id; })[0];
+      if (!k) { state.kids.push(ik); return; }
+      ['tx', 'requests'].forEach(function (f) {
+        var by = {};
+        k[f].concat(ik[f]).forEach(function (t) { if (!by[t.id] || newer(t, by[t.id])) by[t.id] = t; });
+        k[f] = Object.keys(by).map(function (id) { return by[id]; });
+      });
+      if (ik.settled > k.settled) k.settled = ik.settled;   // 어느 쪽이든 이미 준 이자를 또 주지 않게
+      if (ik.opened < k.opened) k.opened = ik.opened;
+      if (!k.goal && ik.goal) k.goal = ik.goal;
+    });
   }
   function showLastBackup() {
     var t = null;

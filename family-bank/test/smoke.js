@@ -17,7 +17,8 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   p.on('dialog', d => { dialogs.push(d.message()); return d.type() === 'prompt' && answers.length ? d.accept(answers.shift()) : d.accept(); });
   await p.goto(BASE + '/index.html');
   const t = sel => p.textContent(sel);
-  const pin = async v => { await p.fill('#pinInput', v); await p.click('#pinOk'); };
+  const pin = async v => { await p.fill('#pinInput', v); await p.click('#pinOk'); await p.waitForTimeout(250); };   // 해시 계산은 비동기
+  const stored = () => p.evaluate(() => JSON.parse(localStorage.getItem('hwr-bank-v1')));
 
   // ---- 처음 ----
   check('처음엔 0원', (await t('#balance')) === '0원');
@@ -63,6 +64,8 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   check('승인 → 40,000원', (await t('#balance')) === '40,000원', await t('#balance'));
   check('대기 사라짐', !(await p.isVisible('#pendingCard')));
   check('엄마아빠 설정 보임', await p.isVisible('#admin'));
+  const st = await stored();
+  check('비밀번호는 해시로만 저장', st.pin === undefined && /^[0-9a-f]{64}$/.test(st.pinHash) && /^[0-9a-f]{32}$/.test(st.pinSalt), JSON.stringify([st.pin, st.pinHash, st.pinSalt]));
   check('내역 찾으신 돈', (await p.locator('.lrow').nth(1).textContent()).includes('10,000'));
 
   // ---- 잠그고 거절은 비밀번호 확인 ----
@@ -112,12 +115,16 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
     s.tax = true;
     localStorage.setItem('hwr-bank-v1', JSON.stringify(s));
   }, [ds(m2), ds(m3).slice(0, 7)]);
-  await p.evaluate(() => {   // 버전 2 기본 이름으로 저장돼 있던 기기
+  await p.evaluate(() => {   // 버전 2 기본 이름으로 저장돼 있던 기기 + 버전 4까지 그대로 저장돼 있던 비밀번호
     const s = JSON.parse(localStorage.getItem('hwr-bank-v1'));
     s.kids[0].name = '구름'; s.kids[1].name = '열매';
+    s.pin = '1234'; delete s.pinHash; delete s.pinSalt;
     localStorage.setItem('hwr-bank-v1', JSON.stringify(s));
   });
   await p.reload();
+  await p.waitForTimeout(300);
+  const mig = await stored();
+  check('옛 비밀번호 → 해시로 옮김', mig.pin === undefined && /^[0-9a-f]{64}$/.test(mig.pinHash), JSON.stringify([mig.pin, mig.pinHash]));
   check('옛 기본 이름 → 하율·호윤', (await p.locator('#kids button').allTextContents()).join(',') === '하율,호윤');
   await p.click('#kids [data-kid="1"]');
   check('이자 축하 창', await p.isVisible('#giftSheet'));
@@ -158,6 +165,17 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   await p.fill('#rateInput', '0.1');
   await p.click('#saveSettings');
   check('이자율 0.1%', (await t('#rate')) === '연 0.1%', await t('#rate'));
+
+  // ---- 백업: 비밀번호는 빠지고, 불러오기는 합치기(확인)/바꾸기 ----
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#exportBtn')]);
+  const bkFile = await dl.path();
+  const bk = JSON.parse(require('fs').readFileSync(bkFile, 'utf8'));
+  check('백업에 비밀번호 없음', !('pin' in bk.state) && !('pinHash' in bk.state) && !('pinSalt' in bk.state), Object.keys(bk.state).join(','));
+  const balBefore = await t('#balance');
+  await p.setInputFiles('#importInput', bkFile);   // confirm 은 모두 확인 → 합치기
+  await p.waitForTimeout(500);
+  check('합치기: 같은 기록은 한 번만', (await t('#balance')) === balBefore && dialogs.some(m => m.includes('합칠까요')), (await t('#balance')) + ' vs ' + balBefore);
+  check('합친 뒤에도 비밀번호 유지', (await stored()).pinHash === mig.pinHash);
 
   // ---- 화면 ----
   const sw = await p.evaluate(() => document.documentElement.scrollWidth);

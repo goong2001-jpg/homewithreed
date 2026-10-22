@@ -20,6 +20,8 @@
   var STALE_MS = 20000;        // 이만큼 소식 없으면 끊긴 것으로 본다
   var CONNECT_TIMEOUT = 12000; // 연결 시도 포기 시간
   var MAX_TRIES = 4;           // 같은 상대에게 다시 걸어보는 최대 횟수
+  var RETRY_REST_MS = 30000;   // 시도를 다 쓴 뒤 이만큼 쉬고 처음부터 다시 건다
+  var HIGHER_DIAL_MS = 15000;  // 작은 ID 쪽이 이만큼 걸어오지 않으면 큰 ID 쪽도 건다
 
   var ICE = {
     iceServers: [
@@ -45,7 +47,8 @@
     hubConn: null,         // 멤버일 때 허브로 가는 데이터 연결
     hubMembers: {},        // 허브일 때: id -> { name, seen, conn }
     roster: {},            // 모두: id -> name
-    peers: {},             // id -> { conn, call, name, talking, seen, audio, tries, timer }
+    peers: {},             // id -> { conn, call, name, talking, seen, audio, tries, timer, dc, mc, dir, gen, since, lastTry }
+                           //   dc/mc: 열렸든 아니든 지금 걸려 있는 데이터/소리 연결, dir: 'out' 내가 건 것 / 'in' 상대가 건 것
     localStream: null, micTrack: null,
     talking: false, locked: false, duplex: true,
     hubSeen: 0,
@@ -288,6 +291,7 @@
     setMicOpen(true);
     if (state.duplex) duckRemotes(true);
     $('pttBtn').classList.add('on');
+    $('pttBtn').setAttribute('aria-pressed', 'true');
     $('pttBtn').querySelector('.pttText').textContent = '송신 중…';
     broadcast({ t: 'talk', on: true });
     beep(880, 90);
@@ -300,6 +304,7 @@
     setMicOpen(false);
     duckRemotes(false);
     $('pttBtn').classList.remove('on');
+    $('pttBtn').setAttribute('aria-pressed', 'false');
     $('pttBtn').querySelector('.pttText').textContent = state.locked ? '눌러서 송신 시작' : '누르고 말하기';
     broadcast({ t: 'talk', on: false });
     beep(520, 70);
@@ -316,17 +321,37 @@
 
   /* ---------- 상대와의 직접 연결 ---------- */
   function getPeerRec(id) {
-    if (!state.peers[id]) state.peers[id] = { name: state.roster[id] || '', tries: 0, seen: Date.now() };
+    if (!state.peers[id]) state.peers[id] = { name: state.roster[id] || '', tries: 0, seen: Date.now(), since: Date.now(), gen: 0, dir: '' };
     return state.peers[id];
   }
 
-  function watchIce(call, id) {
+  // 지금 걸려 있는 연결(열렸든 아니든)을 버린다. 버린 연결의 이벤트는 gen 이 달라져서 무시된다.
+  function abandon(p) {
+    p.gen++;
+    if (p.timer) { clearTimeout(p.timer); p.timer = null; }
+    try { if (p.dc) p.dc.close(); } catch (e) {}
+    try { if (p.mc) p.mc.close(); } catch (e) {}
+    p.dc = p.mc = p.conn = p.call = null;
+    p.dir = '';
+  }
+
+  // 이만큼 기다려도 소리가 안 붙으면 버리고 다음 시도를 기다린다
+  function armTimeout(id) {
+    var p = getPeerRec(id);
+    if (p.timer) clearTimeout(p.timer);
+    p.timer = setTimeout(function () {
+      p.timer = null;
+      if (!p.call) { log('응답 없음 → 다시 시도 예정: ' + shortId(id)); abandon(p); renderMembers(); }
+    }, CONNECT_TIMEOUT);
+  }
+
+  function watchIce(call, id, live) {
     try {
       var pc = call.peerConnection;
       if (!pc) return;
       pc.oniceconnectionstatechange = function () {
         log('ICE(' + shortId(id) + '): ' + pc.iceConnectionState);
-        if (pc.iceConnectionState === 'failed') {
+        if (pc.iceConnectionState === 'failed' && live()) {
           log('→ 직접 연결 실패. 중계(TURN)까지 막힌 상태입니다.');
           dropPeer(id, '연결 실패');
         }
@@ -335,8 +360,11 @@
   }
 
   function wirePeerConn(id, conn) {
-    var p = getPeerRec(id);
+    var p = getPeerRec(id), gen = p.gen;
+    var live = function () { return state.peers[id] === p && p.gen === gen; };   // 버린 연결의 이벤트는 무시
+    p.dc = conn;
     conn.on('open', function () {
+      if (!live()) return;
       p.conn = conn;
       p.seen = Date.now();
       try { conn.send({ t: 'hi', name: state.name }); } catch (e) {}
@@ -344,7 +372,7 @@
       renderMembers();
     });
     conn.on('data', function (msg) {
-      if (!msg || typeof msg !== 'object') return;
+      if (!live() || !msg || typeof msg !== 'object') return;
       p.seen = Date.now();
       if (msg.name) p.name = String(msg.name).slice(0, 12);
       if (msg.t === 'hi') { try { conn.send({ t: 'hi-ack', name: state.name }); } catch (e) {} }
@@ -352,21 +380,24 @@
       if (msg.t === 'bye') { dropPeer(id, '상대가 나감'); return; }
       renderMembers();
     });
-    conn.on('close', function () { dropPeer(id, '데이터 연결 끊김'); });
+    conn.on('close', function () { if (live()) dropPeer(id, '데이터 연결 끊김'); });
     conn.on('error', function (e) { log('데이터 오류(' + shortId(id) + '): ' + (e && e.type || e)); });
   }
 
   function wirePeerCall(id, call) {
-    var p = getPeerRec(id);
-    watchIce(call, id);
+    var p = getPeerRec(id), gen = p.gen;
+    var live = function () { return state.peers[id] === p && p.gen === gen; };
+    p.mc = call;
+    watchIce(call, id, live);
     call.on('stream', function (stream) {
+      if (!live()) return;
       p.call = call;
       p.seen = Date.now();
       if (p.timer) { clearTimeout(p.timer); p.timer = null; }
       attachStream(id, stream);
       renderMembers();
     });
-    call.on('close', function () { dropPeer(id, '소리 연결 끊김'); });
+    call.on('close', function () { if (live()) dropPeer(id, '소리 연결 끊김'); });
     call.on('error', function (e) { log('소리 오류(' + shortId(id) + '): ' + (e && e.type || e)); });
   }
 
@@ -375,22 +406,30 @@
     if (!p) return;
     if (p.timer) clearTimeout(p.timer);
     if (p.audio) { try { p.audio.srcObject = null; } catch (e) {} p.audio.remove(); }
-    try { if (p.conn) p.conn.close(); } catch (e) {}
-    try { if (p.call) p.call.close(); } catch (e) {}
+    try { if (p.dc) p.dc.close(); } catch (e) {}
+    try { if (p.mc) p.mc.close(); } catch (e) {}
     delete state.peers[id];
     log('연결 정리(' + shortId(id) + '): ' + why);
     renderMembers();
   }
 
-  // 명단에 실제로 있는 상대에게만, 한쪽에서만 건다 (ID 사전순으로 작은 쪽이 건다)
+  // 명단에 실제로 있는 상대에게만 건다. 기본은 ID 사전순으로 작은 쪽이 걸고,
+  // 큰 쪽은 한참 기다려도 안 걸려 오면 그때 건다. 시도를 다 쓰면 잠시 쉬었다가 처음부터 다시 건다.
+  // (예전엔 작은 쪽이 시도를 다 쓰면 영영 안 걸고, 큰 쪽은 아예 안 걸어서 서로 기다리기만 했다)
   function connectPeer(id) {
     if (id === state.myId || !state.peer || state.peer.destroyed) return;
-    var p = getPeerRec(id);
-    if (p.conn || p.call || p.timer) return;
-    if (state.myId > id) return;              // 반대쪽이 걸어온다
-    if (p.tries >= MAX_TRIES) return;
+    var p = getPeerRec(id), now = Date.now();
+    if (p.dc || p.mc || p.timer) return;      // 이미 걸려 있거나 걸리는 중
+    if (state.myId > id && now - p.since < HIGHER_DIAL_MS) return;   // 반대쪽이 걸어온다
+    if (p.tries >= MAX_TRIES) {
+      if (now - p.lastTry < RETRY_REST_MS) return;
+      p.tries = 0;
+      log('잠시 쉬었다 처음부터 다시: ' + (p.name || shortId(id)));
+    }
 
     p.tries++;
+    p.lastTry = now;
+    p.dir = 'out';
     log('연결 시도 ' + p.tries + '/' + MAX_TRIES + ' → ' + (p.name || shortId(id)));
     try {
       wirePeerConn(id, state.peer.connect(id, { reliable: true, metadata: { name: state.name } }));
@@ -399,14 +438,22 @@
     } catch (e) {
       log('연결 시도 실패: ' + e);
     }
-    p.timer = setTimeout(function () {
-      p.timer = null;
-      if (!p.call) {
-        log('응답 없음 → 다시 시도 예정: ' + shortId(id));
-        try { if (p.conn) p.conn.close(); } catch (e) {}
-        p.conn = null;
-      }
-    }, CONNECT_TIMEOUT);
+    armTimeout(id);
+  }
+
+  // 상대가 걸어온 연결을 받을지. 양쪽이 동시에 걸었으면 작은 ID 쪽이 건 연결만 남긴다.
+  function acceptIncoming(id, kind) {
+    var p = getPeerRec(id);
+    if (p.dir === 'out' && (p.dc || p.mc || p.timer)) {
+      if (state.myId < id) return false;   // 내가 건 게 우선. 상대가 건 건 닫는다
+      log('양쪽이 동시에 걸었음 → 상대 쪽 연결을 남김: ' + shortId(id));
+      abandon(p);
+    } else if (p.dir === 'in' && kind === 'dc' && p.dc) {
+      abandon(p);   // 상대가 새로 다시 걸었다. 들고 있던 옛 연결은 버린다
+    }
+    p.dir = 'in';
+    if (!p.timer) armTimeout(id);
+    return true;
   }
 
   /* ---------- 허브(명단 관리) ---------- */
@@ -424,7 +471,7 @@
   }
 
   function claimHub() {
-    if (state.isHub || state.hubPeer) return;
+    if (state.isHub || state.hubPeer || !state.peer) return;   // 나간 뒤 늦게 도는 타이머
     log('허브 자리 확인 중…');
     var hp = new Peer(state.hubId, { config: ICE, debug: 0 });
     var settled = false;
@@ -476,7 +523,7 @@
   }
 
   function connectToHub() {
-    if (state.isHub || state.hubConn) return;
+    if (state.isHub || state.hubConn || !state.peer || state.peer.destroyed) return;   // 나간 뒤 늦게 도는 타이머
     var conn = state.peer.connect(state.hubId, { reliable: true, metadata: { name: state.name } });
     var opened = false;
 
@@ -562,7 +609,7 @@
     Object.keys(state.roster).forEach(function (id) {
       if (id === state.myId) return;
       var p = state.peers[id];
-      if (p && !p.call && !p.timer) connectPeer(id);
+      if (!p || (!p.call && !p.timer)) connectPeer(id);   // 끊겨서 정리된 상대도 다시 건다
     });
 
     renderMembers();
@@ -599,6 +646,13 @@
       localStorage.setItem(NS + ':room', room);
     } catch (e) {}
 
+    // CDN 의 PeerJS 가 안 내려왔으면 마이크를 열기 전에 바로 알린다
+    if (typeof Peer === 'undefined') {
+      log('PeerJS 를 불러오지 못함');
+      joinMsg('연결 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하세요.', true);
+      return;
+    }
+
     joinMsg('마이크 권한을 확인하는 중…');
     $('joinBtn').disabled = true;
     log('입장 시도: 채널 ' + room + ' / 내 ID ' + shortId(state.myId));
@@ -633,10 +687,13 @@
         $('talkView').classList.remove('hidden');
         keepAwake();
 
-        peer.on('connection', function (conn) { wirePeerConn(conn.peer, conn); });
+        peer.on('connection', function (conn) {
+          if (!acceptIncoming(conn.peer, 'dc')) { try { conn.close(); } catch (e) {} return; }
+          wirePeerConn(conn.peer, conn);
+        });
         peer.on('call', function (call) {
-          getPeerRec(call.peer);
-          if (call.metadata && call.metadata.name) state.peers[call.peer].name = call.metadata.name;
+          if (!acceptIncoming(call.peer, 'mc')) { try { call.close(); } catch (e) {} return; }
+          if (call.metadata && call.metadata.name) getPeerRec(call.peer).name = call.metadata.name;
           call.answer(state.localStream);
           wirePeerCall(call.peer, call);
         });

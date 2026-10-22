@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="구름이 용돈" />
-    <link rel="stylesheet" href="style.css?v=6" />
+    <link rel="stylesheet" href="style.css?v=7" />
     <title>구름이 용돈기입장</title>
   </head>
   <body>
@@ -21,6 +21,13 @@
       <header class="top">
         <h1>☁️ 구름이 용돈기입장</h1>
       </header>
+
+      <!-- 백업 알림: 기록이 쌓였는데 오래 백업을 안 했을 때 -->
+      <div id="backupNudge" class="nudge" role="status" hidden>
+        <span id="backupNudgeText"></span>
+        <button id="backupNudgeBtn">백업하기</button>
+        <button id="backupNudgeClose" class="close" aria-label="닫기">×</button>
+      </div>
 
       <!-- 가진 돈 + 연도별 받은 돈·쓴 돈 -->
       <section class="card total">
@@ -150,6 +157,6 @@
         }, 1500);
       });
     </script>
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=7"></script>
   </body>
 </html>
