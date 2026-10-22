@@ -3,6 +3,7 @@ import { Asset, AssetEquity, AssetKind, DateKey, LIQUIDITY_META } from '../types
 import { ddayLabel, shortWon, signedPercent, won } from '../utils/format';
 import { alive } from '../utils/merge';
 import { assetLiquidity } from '../utils/summary';
+import Sparkline from './Sparkline';
 import { COLOR, card, empty, ghostButton, row, sectionTitle } from './ui';
 
 interface Props {
@@ -156,6 +157,10 @@ function AssetRow(
           </div>
         )}
       </div>
+      {/* 평가액 이력이 두 줄 이상이면 작은 추세선 */}
+      {a.valueHistory && a.valueHistory.length >= 2 && (
+        <Sparkline values={a.valueHistory.map(p => p.value)} />
+      )}
       <div style={{ textAlign: 'right' }}>
         <div
           style={{

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import {
-  Asset, AssetKind, DateKey, LIQUIDITY_META, Liquidity, Loan, Summary, View,
+  Asset, AssetKind, DateKey, LIQUIDITY_META, Liquidity, Loan, Snapshot, Summary, View,
 } from '../types';
 import { ddayLabel, shortWon, signedPercent, signedWon, won } from '../utils/format';
 import { loanStatus } from '../utils/loan';
 import { alive } from '../utils/merge';
+import { monthOverMonth } from '../utils/snapshot';
 import { UPCOMING_LIMIT } from '../utils/summary';
 import { COLOR, card, ddayStyle, empty, ghostButton, row, sectionTitle } from './ui';
 
@@ -14,19 +15,24 @@ interface Props {
   assets: Asset[];
   loans: Loan[];
   today: DateKey;
+  /** 지난달 스냅샷 — 있으면 '전월 대비'를 띄운다 */
+  prevSnapshot: Snapshot | null;
   onEditAsset: (a: Asset) => void;
   onEditLoan: (l: Loan) => void;
   onGo: (v: View) => void;
 }
 
 export default function HomeView({
-  summary: s, kinds, assets, loans, today, onEditAsset, onEditLoan, onGo,
+  summary: s, kinds, assets, loans, today, prevSnapshot, onEditAsset, onEditLoan, onGo,
 }: Props) {
   const liveAssets = alive(assets);
   const liveLoans = alive(loans);
   const kindById = new Map(alive(kinds).map(k => [k.id, k]));
   const assetById = new Map(liveAssets.map(a => [a.id, a]));
   const nothing = liveAssets.length === 0 && liveLoans.length === 0;
+  const mom = prevSnapshot ? monthOverMonth(s.netWorth, prevSnapshot.netWorth) : null;
+  // 7일 안에 닥치는 만기 — 알림이 필요한 수준
+  const imminent = s.upcoming.filter(u => u.dday <= 7).length;
 
   // 유동성 단계를 눌러 펼친 것. 한 번에 하나만 연다.
   const [openLevel, setOpenLevel] = useState<Liquidity | null>(null);
@@ -51,6 +57,23 @@ export default function HomeView({
         <div style={{ fontSize: 12, color: COLOR.faint, marginTop: 2 }}>
           {won(s.netWorth)}
         </div>
+        {mom && (
+          <button
+            onClick={() => onGo('trend')}
+            style={{
+              display: 'inline-flex', alignItems: 'baseline', gap: 4, marginTop: 8,
+              padding: '4px 9px', borderRadius: 999, border: 'none', cursor: 'pointer',
+              fontSize: 12, fontWeight: 700, font: 'inherit',
+              background: mom.change < 0 ? '#fdecea' : mom.change > 0 ? '#e8f6ee' : '#eef1f4',
+              color: mom.change < 0 ? '#c0392b' : mom.change > 0 ? '#1e7e45' : COLOR.sub,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            전월 대비 {signedWon(mom.change)}
+            {mom.ratio !== null && <span style={{ opacity: 0.85 }}>({signedPercent(mom.ratio)})</span>}
+            <span style={{ fontWeight: 500, opacity: 0.7 }}>›</span>
+          </button>
+        )}
 
         <div
           style={{
@@ -325,6 +348,21 @@ export default function HomeView({
         <>
           <div style={sectionTitle}>다가오는 만기</div>
           <div style={{ ...card, margin: '0 16px', padding: 0, overflow: 'hidden' }}>
+            {imminent > 0 && (
+              <button
+                onClick={() => onGo('settings')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                  padding: '10px 16px', border: 'none', cursor: 'pointer', font: 'inherit',
+                  background: '#fdf3e3', color: '#b9770e', fontSize: 13, fontWeight: 600,
+                  textAlign: 'left', borderBottom: `1px solid ${COLOR.line}`,
+                }}
+              >
+                <span>⏰</span>
+                <span style={{ flex: 1 }}>7일 안에 만기 {imminent}건</span>
+                <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.85 }}>캘린더로 내보내기 ›</span>
+              </button>
+            )}
             {s.upcoming.slice(0, UPCOMING_LIMIT).map((u, i, arr) => (
               <div
                 key={u.id}

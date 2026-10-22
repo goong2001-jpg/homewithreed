@@ -1,8 +1,9 @@
-import React, { useRef, useState } from 'react';
-import { Asset, AssetKind, Goal, Loan, Recurring, Syncable } from '../types';
+import React, { useEffect, useRef, useState } from 'react';
+import { Asset, AssetKind, Goal, Loan, Recurring, Snapshot, Syncable, Upcoming } from '../types';
 import {
-  Backup, backupFileName, backupSummary, buildBackup, downloadBackup, parseBackup, serializeBackup,
+  Backup, backupFileName, backupSummary, buildBackup, downloadBackup, downloadFile, parseBackup, serializeBackup,
 } from '../utils/backup';
+import { ICS_FILE_NAME, buildIcs } from '../utils/ics';
 import { deletedOnly } from '../utils/merge';
 import { CollName } from '../hooks/useAssets';
 import { COLOR, card, dangerButton, empty, ghostButton, primaryButton, sectionTitle } from './ui';
@@ -13,6 +14,9 @@ interface Props {
   loans: Loan[];
   recurrings: Recurring[];
   goals: Goal[];
+  snapshots: Snapshot[];
+  /** 다가오는 만기 — 캘린더로 내보낸다 */
+  upcoming: Upcoming[];
   /** 파일 검사는 여기서 끝낸다 — 부모는 이미 읽어낸 백업을 받는다 */
   onImport: (backup: Backup) => { ok: boolean; message: string };
   onRestore: (coll: CollName, id: string) => void;
@@ -24,8 +28,9 @@ const COLL_LABEL: Record<CollName, string> = {
 };
 
 export default function SettingsView({
-  kinds, assets, loans, recurrings, goals, onImport, onRestore, onReset,
+  kinds, assets, loans, recurrings, goals, snapshots, upcoming, onImport, onRestore, onReset,
 }: Props) {
+  const offline = useOfflineReady();
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -38,7 +43,7 @@ export default function SettingsView({
   ].sort((a, b) => b.rec.updatedAt - a.rec.updatedAt);
 
   const handleExport = () => {
-    const backup = buildBackup({ kinds, assets, loans, recurrings, goals });
+    const backup = buildBackup({ kinds, assets, loans, recurrings, goals, snapshots });
     downloadBackup(serializeBackup(backup), backupFileName());
     setMessage({ ok: true, text: `백업 파일을 내려받았어요. (${backupSummary(backup)})` });
   };
@@ -52,6 +57,12 @@ export default function SettingsView({
     }
     const result = onImport(parsed.backup);
     setMessage({ ok: result.ok, text: result.message });
+  };
+
+  const [icsMessage, setIcsMessage] = useState<string | null>(null);
+  const handleIcs = () => {
+    downloadFile(buildIcs(upcoming), ICS_FILE_NAME, 'text/calendar;charset=utf-8');
+    setIcsMessage(`${ICS_FILE_NAME} 을 내려받았어요. 만기 ${upcoming.length}건이 들어 있어요.`);
   };
 
   const handleReset = () => {
@@ -116,6 +127,50 @@ export default function SettingsView({
         )}
       </div>
 
+      {/* ── 만기 일정 캘린더 ───────────────────── */}
+      <div style={sectionTitle}>📅 만기 일정</div>
+      <div style={{ ...card, margin: '0 16px' }}>
+        <p style={{ margin: '0 0 14px', fontSize: 13, color: COLOR.sub, lineHeight: 1.65 }}>
+          적금 만기와 대출 종료일을 캘린더 파일(.ics)로 내보내요.
+          내려받은 파일을 열면 <strong>캘린더 앱</strong>에 종일 일정으로 들어가고, <strong>7일 전</strong>에 알림이 울립니다.
+        </p>
+        <button
+          style={{ ...ghostButton, opacity: upcoming.length ? 1 : 0.5 }}
+          disabled={upcoming.length === 0}
+          onClick={handleIcs}
+        >
+          만기 일정 캘린더로 내보내기 (.ics)
+        </button>
+        <p style={{ margin: '10px 0 0', fontSize: 12, color: COLOR.faint, lineHeight: 1.6 }}>
+          {upcoming.length === 0
+            ? '아직 다가오는 만기가 없어요. 자산에 만기일을, 대출에 기간을 적으면 여기 잡혀요.'
+            : `다가오는 만기 ${upcoming.length}건. 다시 내보내 가져와도 같은 일정이 두 개 생기지 않아요.`}
+        </p>
+        {icsMessage && (
+          <p style={{ margin: '12px 0 0', padding: '10px 12px', borderRadius: 8, fontSize: 13, lineHeight: 1.6, background: '#e8f6ee', color: '#1e7e45' }}>
+            {icsMessage}
+          </p>
+        )}
+      </div>
+
+      {/* ── 오프라인 ───────────────────────────── */}
+      <div style={sectionTitle}>📶 오프라인</div>
+      <div style={{ ...card, margin: '0 16px' }}>
+        {offline ? (
+          <p style={{ margin: 0, fontSize: 13, color: '#1e7e45', fontWeight: 700 }}>
+            오프라인 사용 가능 ✓
+            <span style={{ display: 'block', marginTop: 4, fontWeight: 500, color: COLOR.sub, lineHeight: 1.6 }}>
+              앱 화면을 이 기기에 담아뒀어요. 인터넷이 끊겨도 열리고 적을 수 있어요.
+            </span>
+          </p>
+        ) : (
+          <p style={{ margin: 0, fontSize: 13, color: COLOR.sub, lineHeight: 1.65 }}>
+            아직 오프라인 준비가 안 됐어요. 인터넷이 연결된 상태로 앱을 한 번 더 열면
+            화면을 담아두고, 그다음부터는 인터넷 없이도 열려요.
+          </p>
+        )}
+      </div>
+
       {/* ── 홈 화면에 추가 안내 ─────────────────── */}
       <div style={sectionTitle}>📱 폰에서 앱처럼 쓰기</div>
       <div style={{ ...card, margin: '0 16px' }}>
@@ -176,4 +231,22 @@ export default function SettingsView({
       <div style={{ height: 24 }} />
     </div>
   );
+}
+
+/**
+ * 서비스워커가 이 페이지를 쥐고 있는가 = 오프라인에서도 뜨는가.
+ * 처음 설치 직후에는 controller 가 아직 없다가 claim 되면서 바뀌므로 controllerchange 를 듣는다.
+ */
+function useOfflineReady(): boolean {
+  const read = () => typeof navigator !== 'undefined'
+    && !!navigator.serviceWorker && !!navigator.serviceWorker.controller;
+  const [ready, setReady] = useState(read);
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.serviceWorker) return;
+    const sw = navigator.serviceWorker;
+    const onChange = () => setReady(read());
+    sw.addEventListener('controllerchange', onChange);
+    return () => sw.removeEventListener('controllerchange', onChange);
+  }, []);
+  return ready;
 }

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import AssetSheet from './components/AssetSheet';
 import AssetsView from './components/AssetsView';
 import GoalSheet from './components/GoalSheet';
@@ -10,6 +10,7 @@ import OutflowView from './components/OutflowView';
 import RecurringSheet from './components/RecurringSheet';
 import SettingsView from './components/SettingsView';
 import TabBar, { TAB_BAR_HEIGHT } from './components/TabBar';
+import TrendView from './components/TrendView';
 import { COLOR } from './components/ui';
 import { CollName, useAssets } from './hooks/useAssets';
 import { useNow } from './hooks/useNow';
@@ -19,6 +20,7 @@ import { todayKey } from './utils/date';
 import { goalProgressAll } from './utils/goal';
 import { newId } from './utils/id';
 import { alive } from './utils/merge';
+import { previousMonthSnapshot } from './utils/snapshot';
 import { summarize } from './utils/summary';
 
 const TITLE: Record<View, string> = {
@@ -26,6 +28,7 @@ const TITLE: Record<View, string> = {
   assets: '자산',
   outflow: '나가는 돈',
   goals: '목표',
+  trend: '추이',
   settings: '설정',
 };
 
@@ -57,6 +60,15 @@ export default function App() {
       recurrings: store.recurrings,
     }, today),
     [store.kinds, store.assets, store.loans, store.recurrings, today],
+  );
+
+  // 이번 달 스냅샷을 최신 상태로 — 숫자가 그대로면 아무 일도 안 일어난다 (snapshot.ts)
+  const { syncSnapshot } = store;
+  useEffect(() => { syncSnapshot(summary, today); }, [syncSnapshot, summary, today]);
+
+  const prevSnapshot = useMemo(
+    () => previousMonthSnapshot(store.snapshots, today),
+    [store.snapshots, today],
   );
 
   const goalProgress = useMemo(
@@ -98,6 +110,7 @@ export default function App() {
           assets={store.assets}
           loans={store.loans}
           today={today}
+          prevSnapshot={prevSnapshot}
           onEditAsset={a => setEditing({ kind: 'asset', target: a, defaultKindId: a.kindId })}
           onEditLoan={l => setEditing({ kind: 'loan', target: l })}
           onGo={setView}
@@ -144,6 +157,10 @@ export default function App() {
         />
       )}
 
+      {view === 'trend' && (
+        <TrendView snapshots={store.snapshots} today={today} />
+      )}
+
       {view === 'settings' && (
         <SettingsView
           kinds={store.kinds}
@@ -151,6 +168,8 @@ export default function App() {
           loans={store.loans}
           recurrings={store.recurrings}
           goals={store.goals}
+          snapshots={store.snapshots}
+          upcoming={summary.upcoming}
           onImport={handleImport}
           onRestore={handleRestore}
           onReset={store.resetAll}
@@ -164,6 +183,7 @@ export default function App() {
           asset={editing.target}
           kinds={liveKinds}
           defaultKindId={editing.defaultKindId || liveKinds[0]?.id || ETC_KIND_ID}
+          today={today}
           equity={editing.target ? summary.equityByAsset[editing.target.id] : undefined}
           onClose={close}
           onDelete={editing.target

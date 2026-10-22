@@ -126,6 +126,43 @@ export interface Asset extends Syncable {
   memo: string;
   order: number;
   createdAt: number;
+  /**
+   * 평가액 이력. 시트에서 '지금 얼마'를 고칠 때마다 날짜와 함께 한 줄 쌓인다
+   * (같은 날 두 번 고치면 마지막 값만 남는다). 날짜 오름차순, 최대 HISTORY_CAP 개.
+   * 예전 기록에는 이 필드가 없다 — 첫 저장 때 지금 평가액으로 한 줄 만들어준다.
+   */
+  valueHistory?: ValuePoint[];
+}
+
+/** 어느 날의 평가액 하나 */
+export interface ValuePoint {
+  date: DateKey;
+  value: number;
+}
+
+// ============================ 월별 스냅샷 ============================
+
+/** 'YYYY-MM' */
+export type MonthKey = string;
+
+/**
+ * 달마다 하나씩 남기는 순자산 기록 — 추이 탭이 이걸로 그래프를 그린다.
+ *
+ * 이번 달 스냅샷은 숫자가 바뀔 때마다 덮어써서 '지금' 상태를 따라가고,
+ * 달이 바뀌면 그대로 얼어붙는다. 그래서 지난달 값은 언제 봐도 같다.
+ * id 는 `snap_YYYY-MM` 으로 고정 — 백업을 합쳐도 같은 달이 두 개 생기지 않는다.
+ */
+export interface Snapshot extends Syncable {
+  month: MonthKey;
+  /** 마지막으로 찍은 시각 (Date.now()) */
+  takenAt: number;
+  netWorth: number;
+  totalAsset: number;
+  totalDebt: number;
+  /** 지금 쓸 수 있는 돈 ('즉시' 자산의 내 몫) */
+  liquid: number;
+  /** 분류별 평가액 합계 */
+  byKind: Record<string, number>;
 }
 
 // ============================== 부채 ==============================
@@ -354,4 +391,4 @@ export interface Summary {
 
 // ============================== 뷰 ==============================
 
-export type View = 'home' | 'assets' | 'outflow' | 'goals' | 'settings';
+export type View = 'home' | 'assets' | 'outflow' | 'goals' | 'trend' | 'settings';

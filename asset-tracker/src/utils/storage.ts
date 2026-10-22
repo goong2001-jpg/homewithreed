@@ -13,6 +13,7 @@ export const KEYS = {
   loans: 'asset_tracker_loans',
   recurrings: 'asset_tracker_recurrings',
   goals: 'asset_tracker_goals',
+  snapshots: 'asset_tracker_snapshots',
 } as const;
 
 export function load<T>(key: string, fallback: T): T {
