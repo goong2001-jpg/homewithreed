@@ -1,11 +1,14 @@
 import React from 'react';
-import { MonthBudget, MonthKey, SyncStatus } from '../types';
+import { BudgetStatusRow, MonthBudget, MonthKey, SyncStatus } from '../types';
 import { LEVEL_COLOR, LEVEL_LABEL } from '../utils/budget';
 import { shortWon, signedWon, won } from '../utils/format';
+import { WeeklyReport } from '../utils/weekly';
 import MonthHeader from './MonthHeader';
 import PiggyGauge from './PiggyGauge';
 import StatRow from './StatRow';
 import PersonBars from './PersonBars';
+import BudgetLimits from './BudgetLimits';
+import WeeklyReportCard from './WeeklyReportCard';
 
 interface Props {
   month: MonthKey;
@@ -14,6 +17,10 @@ interface Props {
   syncStatus: SyncStatus;
   /** 지난달 수입 합계 (0이면 복사할 게 없다) */
   prevMonthIncome: number;
+  /** 상한을 정한 카테고리의 사용 현황 (없으면 빈 배열 = 아무것도 안 그린다) */
+  budgetRows: BudgetStatusRow[];
+  /** 일·월요일에만 들어온다 — 그 외엔 null */
+  weeklyReport: WeeklyReport | null;
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
@@ -26,7 +33,7 @@ interface Props {
 }
 
 export default function HomeView({
-  month, budget, fixedCount, syncStatus, prevMonthIncome,
+  month, budget, fixedCount, syncStatus, prevMonthIncome, budgetRows, weeklyReport,
   onPrev, onNext, onToday, onGoSettings, onGoAdd, onGoAddIncome,
   onCopyPrevIncome, onSelectPerson,
 }: Props) {
@@ -162,6 +169,12 @@ export default function HomeView({
 
           <StatRow budget={budget} />
           <PersonBars budget={budget} onSelectPerson={onSelectPerson} />
+          <BudgetLimits rows={budgetRows} onGoSettings={onGoSettings} />
+
+          {/* 일요일·월요일에만 — 주말을 넘기는 동안 한 주를 돌아본다 */}
+          {weeklyReport && budget.phase === 'current' && (
+            <WeeklyReportCard report={weeklyReport} style={{ margin: '0 16px 12px' }} />
+          )}
 
           <button
             onClick={onGoSettings}

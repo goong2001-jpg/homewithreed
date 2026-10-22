@@ -1,7 +1,8 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CollName, DEFAULT_PERSONS, Expense, ExpenseCategory, FixedExpense, GiftDirection,
-  GiftEntry, GiftKind, IncomeEntry, MonthKey, Person, RemoteBatch, Syncable, SyncSettings,
+  CategoryBudget, CollName, DEFAULT_PERSONS, Expense, ExpenseCategory, FixedExpense,
+  GiftDirection, GiftEntry, GiftKind, IncomeEntry, MonthKey, Person, RemoteBatch, Syncable,
+  SyncSettings, budgetIdOf,
 } from '../types';
 import { KEYS, load, remove, save } from '../utils/storage';
 import { localWinners, mergeById } from '../utils/merge';
@@ -47,6 +48,7 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
   const [fixed, setFixed] = useState<FixedExpense[]>(() => load(KEYS.fixedExpenses, []));
   const [expenses, setExpenses] = useState<Expense[]>(() => load(KEYS.expenses, []));
   const [gifts, setGifts] = useState<GiftEntry[]>(() => load(KEYS.gifts, []));
+  const [budgets, setBudgets] = useState<CategoryBudget[]>(() => load(KEYS.budgets, []));
 
   /**
    * 스냅샷 병합에서 로컬이 이긴 레코드 — 렌더가 끝난 뒤 서버로 되밀어 올린다.
@@ -101,6 +103,9 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
         break;
       case 'gifts':
         mergeIn('gifts', KEYS.gifts, setGifts, batch.records);
+        break;
+      case 'budgets':
+        mergeIn('budgets', KEYS.budgets, setBudgets, batch.records);
         break;
     }
   }, [mergeIn]);
@@ -294,6 +299,30 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     [gifts, softDelete],
   );
 
+  // -------------------------- 카테고리별 월 상한 --------------------------
+
+  /**
+   * 카테고리 하나의 월 상한을 정한다. 0 이하(빈 칸)는 '상한 없음' = 툼스톤.
+   * id 가 카테고리에서 정해지므로(budgetIdOf) 같은 카테고리에 두 건이 생기지 않는다.
+   */
+  const setCategoryBudget = useCallback((category: ExpenseCategory, monthlyLimit: number) => {
+    const id = budgetIdOf(category);
+    const existing = budgets.find(b => b.id === id);
+    const limit = Math.max(0, Math.round(monthlyLimit));
+
+    if (limit <= 0) {
+      // 없던 상한을 지우는 건 아무 일도 아니다 — 툼스톤을 괜히 만들지 않는다
+      if (!existing || existing.deleted) return;
+      softDelete('budgets', KEYS.budgets, setBudgets, budgets, id);
+      return;
+    }
+    if (existing && !existing.deleted && existing.monthlyLimit === limit) return;
+
+    // 툼스톤이던 카테고리에 다시 상한을 넣으면 deleted 없는 새 레코드로 되살린다
+    const rec: CategoryBudget = { id, category, monthlyLimit: limit, updatedAt: Date.now() };
+    commit('budgets', KEYS.budgets, setBudgets, rec);
+  }, [budgets, commit, softDelete]);
+
   /**
    * 지난달 수입을 이 달로 그대로 가져온다.
    * 급여는 보통 매달 같으므로, 달이 바뀔 때마다 처음부터 입력하지 않도록 한 번에 복사한다.
@@ -364,8 +393,9 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
       fixed: apply('fixedExpenses', KEYS.fixedExpenses, setFixed, fixed, backup.fixedExpenses),
       expenses: apply('expenses', KEYS.expenses, setExpenses, expenses, backup.expenses),
       gifts: apply('gifts', KEYS.gifts, setGifts, gifts, backup.gifts),
+      budgets: apply('budgets', KEYS.budgets, setBudgets, budgets, backup.budgets),
     };
-  }, [persons, incomes, fixed, expenses, gifts, push]);
+  }, [persons, incomes, fixed, expenses, gifts, budgets, push]);
 
   // -------------------------- 클라우드 보조작업 --------------------------
 
@@ -377,8 +407,9 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     for (const r of fixed) { push('fixedExpenses', r); n++; }
     for (const r of expenses) { push('expenses', r); n++; }
     for (const r of gifts) { push('gifts', r); n++; }
+    for (const r of budgets) { push('budgets', r); n++; }
     return n;
-  }, [persons, incomes, fixed, expenses, gifts, push]);
+  }, [persons, incomes, fixed, expenses, gifts, budgets, push]);
 
   /**
    * 연결된 뒤 이 기기의 기존 기록을 방에 딱 한 번 올린다.
@@ -422,9 +453,9 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
    * 안 지우면 같은 방에 다시 연결했을 때 기록이 다시 올라가지 않는다.
    */
   const clearLocal = useCallback(() => {
-    setIncomes([]); setFixed([]); setExpenses([]); setGifts([]);
+    setIncomes([]); setFixed([]); setExpenses([]); setGifts([]); setBudgets([]);
     save(KEYS.incomes, []); save(KEYS.fixedExpenses, []);
-    save(KEYS.expenses, []); save(KEYS.gifts, []);
+    save(KEYS.expenses, []); save(KEYS.gifts, []); save(KEYS.budgets, []);
     remove(KEYS.persons);
     setPersons(loadPersons());
     remove(KEYS.seeded);
@@ -437,12 +468,14 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
       fixed: fixed.filter(r => !r.deleted).length,
       expenses: expenses.filter(r => !r.deleted).length,
       gifts: gifts.filter(r => !r.deleted).length,
+      budgets: budgets.filter(r => !r.deleted).length,
     }),
-    [persons, incomes, fixed, expenses, gifts],
+    [persons, incomes, fixed, expenses, gifts, budgets],
   );
 
   return {
-    persons, incomes, fixed, expenses, gifts,
+    persons, incomes, fixed, expenses, gifts, budgets,
+    setCategoryBudget,
     savePerson, deletePerson,
     saveIncome, deleteIncome,
     saveFixed, deleteFixed,

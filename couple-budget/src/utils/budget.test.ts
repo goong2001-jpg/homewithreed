@@ -1,8 +1,11 @@
 import {
-  addMonths, computeMonthBudget, dailyBudgetOf, daysInMonth, elapsedDays,
-  categoryTotals, isFixedActive, monthPhase, todayKey, topExpenses,
+  addMonths, budgetStatus, computeMonthBudget, dailyBudgetOf, daysInMonth, elapsedDays,
+  categoryTotals, frequentExpenses, isFixedActive, limitAlert, monthExpenses, monthPhase,
+  todayKey, topExpenses,
 } from './budget';
-import { Expense, FixedExpense, IncomeEntry, Person } from '../types';
+import {
+  CategoryBudget, Expense, ExpenseCategory, FixedExpense, IncomeEntry, Person, budgetIdOf,
+} from '../types';
 
 // 모든 테스트는 날짜를 명시적으로 주입한다 — 시스템 시계에 의존하면 안 된다.
 const NOW = new Date(2026, 6, 10, 15, 0, 0);   // 2026-07-10 (7월은 31일)
@@ -435,5 +438,156 @@ describe('큰 지출 TOP', () => {
   it('기록이 없으면 빈 배열', () => {
     expect(topExpenses([], '2026-07')).toEqual([]);
     expect(topExpenses(rows, '2026-07', 0)).toEqual([]);
+  });
+});
+
+// ======================= 카테고리별 월 상한 =======================
+
+const limitOf = (category: ExpenseCategory, monthlyLimit: number, deleted?: boolean): CategoryBudget =>
+  ({ id: budgetIdOf(category), category, monthlyLimit, updatedAt: 1, ...(deleted ? { deleted } : {}) });
+
+const catExp = (date: string, amount: number, category: ExpenseCategory, content = '메모', personId = 'p1'): Expense =>
+  ({
+    id: `${date}-${category}-${content}-${amount}-${personId}`, date, month: date.slice(0, 7),
+    amount, category, content, personId, createdAt: 0, updatedAt: 0,
+  });
+
+describe('budgetStatus — 카테고리 상한 대비 사용 현황', () => {
+  const rows = [
+    catExp('2026-07-01', 100_000, '식비'),
+    catExp('2026-07-03', 60_000, '식비'),
+    catExp('2026-07-05', 30_000, '교통'),
+    catExp('2026-07-06', 90_000, '쇼핑'),
+  ];
+
+  it('상한이 없으면 빈 배열', () => {
+    expect(budgetStatus(rows, [])).toEqual([]);
+  });
+
+  it('비율 = 쓴 돈 ÷ 상한, 안 쓴 카테고리는 0', () => {
+    const out = budgetStatus(rows, [limitOf('식비', 200_000), limitOf('육아', 100_000)]);
+    const food = out.find(r => r.category === '식비')!;
+    expect(food.spent).toBe(160_000);
+    expect(food.limit).toBe(200_000);
+    expect(food.ratio).toBeCloseTo(0.8);
+    const kids = out.find(r => r.category === '육아')!;
+    expect(kids.spent).toBe(0);
+    expect(kids.ratio).toBe(0);
+  });
+
+  it('넘치면 비율이 1을 넘는다 (자르지 않는다)', () => {
+    const out = budgetStatus(rows, [limitOf('쇼핑', 50_000)]);
+    expect(out[0].ratio).toBeCloseTo(1.8);
+  });
+
+  it('급한 순 — 비율 높은 카테고리가 먼저, 같으면 카테고리 고정 순서', () => {
+    const out = budgetStatus(rows, [
+      limitOf('여가', 10_000),      // 0
+      limitOf('식비', 200_000),     // 0.8
+      limitOf('쇼핑', 50_000),      // 1.8
+      limitOf('교통', 100_000),     // 0.3
+      limitOf('의료', 10_000),      // 0 — 여가보다 앞(카테고리 순서)
+    ]);
+    expect(out.map(r => r.category)).toEqual(['쇼핑', '식비', '교통', '의료', '여가']);
+  });
+
+  it('지운 상한·0원 상한·지운 지출은 빼고 센다', () => {
+    const withTomb = [...rows, { ...catExp('2026-07-09', 999_999, '식비'), deleted: true }];
+    const out = budgetStatus(withTomb, [
+      limitOf('식비', 200_000), limitOf('교통', 100_000, true), limitOf('쇼핑', 0),
+    ]);
+    expect(out.map(r => r.category)).toEqual(['식비']);
+    expect(out[0].spent).toBe(160_000);
+  });
+
+  it('monthExpenses 와 이어 쓰면 그 달만 센다', () => {
+    const mixed = [...rows, catExp('2026-06-30', 500_000, '식비')];
+    const out = budgetStatus(monthExpenses(mixed, '2026-07'), [limitOf('식비', 200_000)]);
+    expect(out[0].spent).toBe(160_000);
+  });
+});
+
+describe('limitAlert — 저장 한 번으로 선을 넘었는지', () => {
+  it('80% 를 이번에 넘기면 warn', () => {
+    expect(limitAlert(150_000, 160_000, 200_000)).toBe('warn');
+    expect(limitAlert(0, 160_000, 200_000)).toBe('warn');
+  });
+  it('100% 를 이번에 넘기면 over (80%도 같이 넘겨도 over 하나)', () => {
+    expect(limitAlert(190_000, 210_000, 200_000)).toBe('over');
+    expect(limitAlert(0, 200_000, 200_000)).toBe('over');
+  });
+  it('이미 넘어 있었으면 다시 잔소리하지 않는다', () => {
+    expect(limitAlert(170_000, 180_000, 200_000)).toBeNull();
+    expect(limitAlert(250_000, 260_000, 200_000)).toBeNull();
+  });
+  it('선 아래면 null, 상한이 없으면 null', () => {
+    expect(limitAlert(0, 100_000, 200_000)).toBeNull();
+    expect(limitAlert(0, 100_000, 0)).toBeNull();
+  });
+});
+
+// ======================= 자주 쓰는 지출 =======================
+
+describe('frequentExpenses — 최근 90일 반복 지출', () => {
+  const now = new Date(2026, 6, 10);   // 2026-07-10
+
+  it('(카테고리·내용·금액) 이 같은 것끼리 묶고 횟수 많은 순', () => {
+    const rows = [
+      catExp('2026-07-01', 4_500, '식비', '아메리카노'),
+      catExp('2026-07-03', 4_500, '식비', '아메리카노'),
+      catExp('2026-07-08', 4_500, '식비', '아메리카노'),
+      catExp('2026-07-02', 1_500, '교통', '버스'),
+      catExp('2026-07-05', 1_500, '교통', '버스'),
+      catExp('2026-07-07', 80_000, '생활', '마트'),
+    ];
+    const out = frequentExpenses(rows, now);
+    expect(out.map(f => [f.content, f.count])).toEqual([
+      ['아메리카노', 3], ['버스', 2], ['마트', 1],
+    ]);
+    expect(out[0].amount).toBe(4_500);
+    expect(out[0].category).toBe('식비');
+  });
+
+  it('금액이 다르면 다른 후보다', () => {
+    const rows = [
+      catExp('2026-07-01', 4_500, '식비', '커피'),
+      catExp('2026-07-02', 5_000, '식비', '커피'),
+    ];
+    expect(frequentExpenses(rows, now)).toHaveLength(2);
+  });
+
+  it('횟수가 같으면 최근에 쓴 것이 먼저', () => {
+    const rows = [
+      catExp('2026-06-01', 1_000, '기타', '옛것'),
+      catExp('2026-07-09', 2_000, '기타', '새것'),
+    ];
+    expect(frequentExpenses(rows, now).map(f => f.content)).toEqual(['새것', '옛것']);
+  });
+
+  it('90일보다 오래된 것과 미래 날짜·툼스톤은 빼고, 최대 5개', () => {
+    const rows = [
+      catExp('2026-04-10', 1_000, '기타', '91일전'),   // 90일 밖
+      catExp('2026-04-11', 1_000, '기타', '90일전'),   // 경계 — 포함
+      catExp('2026-07-20', 1_000, '기타', '미래'),
+      { ...catExp('2026-07-01', 1_000, '기타', '지움'), deleted: true },
+      ...['a', 'b', 'c', 'd', 'e', 'f'].map((c, i) => catExp('2026-07-0' + (i + 1), 1_000, '쇼핑', c)),
+    ];
+    const out = frequentExpenses(rows, now);
+    expect(out).toHaveLength(5);
+    const names = out.map(f => f.content);
+    expect(names).not.toContain('91일전');
+    expect(names).not.toContain('미래');
+    expect(names).not.toContain('지움');
+    expect(frequentExpenses(rows, now, 20).map(f => f.content)).toContain('90일전');
+  });
+
+  it('사람은 가장 최근에 쓴 사람을 따른다', () => {
+    const rows = [
+      catExp('2026-07-01', 4_500, '식비', '커피', 'p1'),
+      catExp('2026-07-05', 4_500, '식비', '커피', 'p2'),
+    ];
+    const [c] = frequentExpenses(rows, now);
+    expect(c.personId).toBe('p2');
+    expect(c.lastDate).toBe('2026-07-05');
   });
 });

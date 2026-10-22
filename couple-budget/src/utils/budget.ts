@@ -1,6 +1,7 @@
 import {
-  BudgetLevel, CategorySpend, DateKey, Expense, ExpenseCategory, FixedExpense,
-  IncomeEntry, MonthBudget, MonthKey, MonthPhase, Person, PersonSpend,
+  BUDGET_WARN_RATIO, BudgetLevel, BudgetStatusRow, CATEGORIES, CategoryBudget, CategorySpend,
+  DateKey, Expense, ExpenseCategory, FixedExpense, FrequentExpense, IncomeEntry, MonthBudget,
+  MonthKey, MonthPhase, Person, PersonSpend,
 } from '../types';
 
 /**
@@ -136,6 +137,104 @@ export function topExpenses(
       num(b.amount) - num(a.amount)
       || b.date.localeCompare(a.date)
       || b.createdAt - a.createdAt)
+    .slice(0, Math.max(0, limit));
+}
+
+// ======================= 카테고리별 월 상한 =======================
+
+/**
+ * 상한이 걸린 카테고리마다 이 달에 얼마나 썼는지.
+ *
+ * expensesOfMonth 는 이미 그 달로 걸러진 지출(monthExpenses 결과)을 받는다 —
+ * 어느 달인지는 호출자가 안다. 툼스톤은 여기서 한 번 더 거른다.
+ * 상한이 없는(없거나 0·삭제된) 카테고리는 아예 빼서, 아무것도 안 정했으면 빈 배열이다.
+ *
+ * 정렬: 많이 쓴 비율이 높은 순 — 급한 게 위로. 같으면 카테고리 고정 순서.
+ */
+export function budgetStatus(
+  expensesOfMonth: Expense[], budgets: CategoryBudget[],
+): BudgetStatusRow[] {
+  const spent = new Map<ExpenseCategory, number>();
+  for (const e of expensesOfMonth) {
+    if (!alive(e)) continue;
+    spent.set(e.category, (spent.get(e.category) ?? 0) + num(e.amount));
+  }
+
+  const order = (c: ExpenseCategory) => {
+    const i = CATEGORIES.indexOf(c);
+    return i < 0 ? CATEGORIES.length : i;
+  };
+
+  return budgets
+    .filter(b => alive(b) && num(b.monthlyLimit) > 0)
+    .map(b => {
+      const limit = num(b.monthlyLimit);
+      const used = spent.get(b.category) ?? 0;
+      return { category: b.category, spent: used, limit, ratio: used / limit };
+    })
+    .sort((a, b) => b.ratio - a.ratio || order(a.category) - order(b.category));
+}
+
+/**
+ * 지출 하나를 저장한 뒤 상한 경고를 띄울지.
+ *  · 'over' — 이번 저장으로 100% 를 넘었다
+ *  · 'warn' — 이번 저장으로 80% 를 넘었다
+ *  · null  — 선을 안 넘었거나, 이미 그 전에 넘어 있었다 (매번 잔소리하지 않는다)
+ */
+export function limitAlert(
+  spentBefore: number, spentAfter: number, limit: number,
+): 'over' | 'warn' | null {
+  if (!(limit > 0)) return null;
+  const before = spentBefore / limit;
+  const after = spentAfter / limit;
+  if (after >= 1 && before < 1) return 'over';
+  if (after >= BUDGET_WARN_RATIO && before < BUDGET_WARN_RATIO) return 'warn';
+  return null;
+}
+
+// ======================= 자주 쓰는 지출 =======================
+
+/** 오늘 기준 n일 전 날짜 */
+export function daysAgoKey(now: Date, days: number): DateKey {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days);
+  return todayKey(d);
+}
+
+/**
+ * 최근 90일 동안 (카테고리·내용·금액) 이 똑같이 반복된 지출 — 원탭 입력 후보.
+ * 횟수 많은 순, 같으면 최근에 쓴 순. 내용 비교는 앞뒤 공백만 뗀다.
+ */
+export function frequentExpenses(
+  expenses: Expense[], now: Date = new Date(), limit = 5,
+): FrequentExpense[] {
+  const since = daysAgoKey(now, 90);
+  const until = todayKey(now);
+  const bucket = new Map<string, FrequentExpense>();
+
+  for (const e of expenses) {
+    if (!alive(e)) continue;
+    if (e.date < since || e.date > until) continue;
+    const amount = num(e.amount);
+    if (amount <= 0) continue;
+    const content = (e.content ?? '').trim();
+    const key = `${e.category}\u0000${content}\u0000${amount}`;
+    const cur = bucket.get(key);
+    if (!cur) {
+      bucket.set(key, {
+        category: e.category, content, amount, personId: e.personId,
+        count: 1, lastDate: e.date,
+      });
+    } else {
+      cur.count += 1;
+      if (e.date > cur.lastDate) { cur.lastDate = e.date; cur.personId = e.personId; }
+    }
+  }
+
+  return Array.from(bucket.values())
+    .sort((a, b) =>
+      b.count - a.count
+      || b.lastDate.localeCompare(a.lastDate)
+      || b.amount - a.amount)
     .slice(0, Math.max(0, limit));
 }
 

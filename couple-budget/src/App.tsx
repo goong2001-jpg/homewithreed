@@ -1,6 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { AddMode, Expense, GiftDirection, GiftEntry, IncomeEntry, View } from './types';
-import { computeMonthBudget } from './utils/budget';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  AddMode, Expense, GiftDirection, GiftEntry, IncomeEntry, View, budgetIdOf,
+} from './types';
+import {
+  alive, budgetStatus, computeMonthBudget, frequentExpenses, limitAlert, monthExpenses, monthOf,
+} from './utils/budget';
+import { shortWon } from './utils/format';
+import { isReportDay, reportAnchor, weeklyReport } from './utils/weekly';
 import { useAppSettings } from './hooks/useAppSettings';
 import { useMonthNav } from './hooks/useMonthNav';
 import { useLedger } from './hooks/useLedger';
@@ -12,6 +18,7 @@ import TopSpendView from './components/TopSpendView';
 import GiftsView from './components/GiftsView';
 import GiftForm from './components/GiftForm';
 import SettingsView from './components/SettingsView';
+import Toast, { ToastMessage } from './components/Toast';
 
 export default function App() {
   const [view, setView] = useState<View>('home');
@@ -50,6 +57,59 @@ export default function App() {
 
   const nav = { onPrev: prev, onNext: next, onToday: goToToday };
 
+  // ---- 카테고리별 월 상한 ----
+  const budgetRows = useMemo(
+    () => budgetStatus(monthExpenses(ledger.expenses, month), ledger.budgets),
+    [ledger.expenses, ledger.budgets, month],
+  );
+
+  // ---- 자주 쓰는 지출 (최근 90일) ----
+  const frequent = useMemo(() => frequentExpenses(ledger.expenses, new Date()), [ledger.expenses]);
+
+  // ---- 주간 리포트 — 탭을 옮길 때마다 '오늘'을 다시 본다 (자정을 넘긴 채 켜 둔 폰) ----
+  const weekly = useMemo(() => {
+    const now = new Date();
+    const report = weeklyReport(
+      { incomes: ledger.incomes, fixed: ledger.fixed, expenses: ledger.expenses },
+      reportAnchor(now),
+    );
+    return { report, showOnHome: isReportDay(now) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ledger.incomes, ledger.fixed, ledger.expenses, view]);
+
+  // ---- 상한을 넘겼을 때 한 줄 알림 ----
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const clearToast = useCallback(() => setToast(null), []);
+
+  /** 저장 전후의 그 카테고리 지출을 비교해 80%·100% 를 '이번에' 넘겼으면 알린다 */
+  const { budgets, expenses, saveExpense } = ledger;
+  const saveExpenseWithAlert: typeof saveExpense = useCallback(input => {
+    const limitRec = budgets.find(b => b.id === budgetIdOf(input.category));
+    const limit = limitRec && alive(limitRec) ? limitRec.monthlyLimit : 0;
+    if (limit > 0) {
+      const m = monthOf(input.date);
+      const others = expenses.filter(
+        e => alive(e) && e.month === m && e.category === input.category && e.id !== input.id,
+      ).reduce((s, e) => s + e.amount, 0);
+      const prev = input.id ? expenses.find(e => e.id === input.id) : undefined;
+      // 고치는 중이면 원래 금액이 이미 들어 있던 상태가 '전'이다 (달·카테고리가 같을 때만)
+      const wasHere = prev && alive(prev) && prev.month === m && prev.category === input.category;
+      const before = others + (wasHere ? prev!.amount : 0);
+      const after = others + input.amount;
+      const kind = limitAlert(before, after, limit);
+      if (kind) {
+        setToast({
+          key: Date.now(),
+          tone: kind,
+          text: kind === 'over'
+            ? `🚨 ${input.category} 예산 ${shortWon(limit)}을 넘었어요 (${shortWon(after)})`
+            : `⚠️ ${input.category} 예산의 80%를 썼어요 (${shortWon(limit)} 중 ${shortWon(after)})`,
+        });
+      }
+    }
+    saveExpense(input);
+  }, [budgets, expenses, saveExpense]);
+
   /** 입력 화면을 깨끗한 '새로 쓰기' 상태로 연다 */
   function openAdd(mode: AddMode) {
     setEditingExpense(null);
@@ -82,6 +142,8 @@ export default function App() {
             fixedCount={ledger.counts.fixed}
             syncStatus={ledger.syncStatus}
             prevMonthIncome={ledger.prevMonthIncome}
+            budgetRows={budgetRows}
+            weeklyReport={weekly.showOnHome ? weekly.report : null}
             {...nav}
             onGoSettings={() => setView('settings')}
             onGoAdd={() => openAdd('expense')}
@@ -100,7 +162,8 @@ export default function App() {
             onModeChange={setAddMode}
             editingExpense={editingExpense ?? undefined}
             editingIncome={editingIncome ?? undefined}
-            onSaveExpense={ledger.saveExpense}
+            frequent={frequent}
+            onSaveExpense={saveExpenseWithAlert}
             onDeleteExpense={ledger.deleteExpense}
             onSaveIncome={ledger.saveIncome}
             onDeleteIncome={ledger.deleteIncome}
@@ -180,6 +243,9 @@ export default function App() {
             fixed={ledger.fixed}
             expenses={ledger.expenses}
             gifts={ledger.gifts}
+            budgets={ledger.budgets}
+            onSetBudget={ledger.setCategoryBudget}
+            weeklyReport={weekly.report}
             syncStatus={ledger.syncStatus}
             syncError={ledger.syncError}
             counts={ledger.counts}
@@ -200,6 +266,8 @@ export default function App() {
           />
         )}
       </div>
+
+      <Toast toast={toast} onDone={clearToast} />
 
       <TabBar
         active={view}

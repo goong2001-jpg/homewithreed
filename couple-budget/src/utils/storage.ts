@@ -9,6 +9,7 @@ export const KEYS = {
   fixedExpenses: 'couple_budget_fixed',
   expenses: 'couple_budget_expenses',
   gifts: 'couple_budget_gifts',
+  budgets: 'couple_budget_budgets',
   settings: 'couple_budget_settings',
   /** 이 기기의 기존 기록을 어느 방에 이미 올렸는지 (방 코드 저장) */
   seeded: 'couple_budget_seeded_room',
