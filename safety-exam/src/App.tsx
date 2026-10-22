@@ -16,7 +16,11 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1 onClick={goHome}>🦺 산업안전기사 시험 대비</h1>
+        <h1>
+          <button type="button" className="home-link" onClick={goHome} aria-label="홈으로">
+            🦺 산업안전기사 시험 대비
+          </button>
+        </h1>
         <span className="subtitle">간이시험 · 필기 CBT · 오답노트 · 실기 필답형</span>
       </header>
 

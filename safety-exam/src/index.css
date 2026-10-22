@@ -30,7 +30,20 @@ body {
 .app-header h1 {
   font-size: 1.35rem;
   color: #14532d;
+}
+
+/* 제목은 홈으로 가는 버튼 — 키보드로도 누를 수 있게 button 으로 두고 겉모습만 제목처럼 */
+.app-header h1 .home-link {
+  all: unset;
   cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.app-header h1 .home-link:focus-visible {
+  outline: 2px solid #1a5c3a;
+  outline-offset: 4px;
+  border-radius: 4px;
 }
 
 .app-header .subtitle {

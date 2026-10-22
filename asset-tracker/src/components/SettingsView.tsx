@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Asset, AssetKind, Goal, Loan, Recurring, Syncable } from '../types';
 import {
-  backupFileName, backupSummary, buildBackup, downloadBackup, parseBackup, serializeBackup,
+  Backup, backupFileName, backupSummary, buildBackup, downloadBackup, parseBackup, serializeBackup,
 } from '../utils/backup';
 import { deletedOnly } from '../utils/merge';
 import { CollName } from '../hooks/useAssets';
@@ -13,7 +13,8 @@ interface Props {
   loans: Loan[];
   recurrings: Recurring[];
   goals: Goal[];
-  onImport: (text: string) => { ok: boolean; message: string };
+  /** 파일 검사는 여기서 끝낸다 — 부모는 이미 읽어낸 백업을 받는다 */
+  onImport: (backup: Backup) => { ok: boolean; message: string };
   onRestore: (coll: CollName, id: string) => void;
   onReset: () => void;
 }
@@ -49,7 +50,7 @@ export default function SettingsView({
       setMessage({ ok: false, text: parsed.error });
       return;
     }
-    const result = onImport(text);
+    const result = onImport(parsed.backup);
     setMessage({ ok: result.ok, text: result.message });
   };
 

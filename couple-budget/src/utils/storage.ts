@@ -30,3 +30,11 @@ export function save(key: string, value: unknown): void {
     console.warn('저장 실패:', e);
   }
 }
+
+export function remove(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch (e) {
+    console.warn('삭제 실패:', e);
+  }
+}

@@ -12,8 +12,9 @@ import SettingsView from './components/SettingsView';
 import TabBar, { TAB_BAR_HEIGHT } from './components/TabBar';
 import { COLOR } from './components/ui';
 import { CollName, useAssets } from './hooks/useAssets';
+import { useNow } from './hooks/useNow';
 import { Asset, AssetKind, ETC_KIND_ID, Goal, Loan, Recurring, View } from './types';
-import { backupSummary, parseBackup } from './utils/backup';
+import { Backup, backupSummary } from './utils/backup';
 import { todayKey } from './utils/date';
 import { goalProgressAll } from './utils/goal';
 import { newId } from './utils/id';
@@ -42,7 +43,9 @@ export default function App() {
   const [editing, setEditing] = useState<Editing>(null);
   const store = useAssets(newId);
 
-  // 자정을 넘겨도 D-day가 하루 어긋나지 않게 매 렌더에서 오늘을 다시 읽는다
+  // 자정을 넘겨도 D-day가 하루 어긋나지 않게 1분마다(그리고 화면이 다시 보일 때) 다시 그린다.
+  // 값 자체는 매 렌더에서 새로 읽는다 — 틱은 '언제 다시 그릴지'만 정한다.
+  useNow(60_000);
   const today = todayKey();
 
   // 모든 돈 계산은 여기 한 번. 자식 컴포넌트는 다시 계산하지 않는다.
@@ -64,11 +67,10 @@ export default function App() {
   const liveKinds = alive(store.kinds).slice().sort((a, b) => a.order - b.order);
   const close = () => setEditing(null);
 
-  const handleImport = (text: string) => {
-    const parsed = parseBackup(text);
-    if (!parsed.ok) return { ok: false, message: parsed.error };
-    store.importBackup(parsed.backup);
-    return { ok: true, message: `불러왔어요. (${backupSummary(parsed.backup)})` };
+  // 파일 검사와 오류 문구는 SettingsView(parseBackup)가 맡는다 — 여기선 합치기만
+  const handleImport = (backup: Backup) => {
+    store.importBackup(backup);
+    return { ok: true, message: `불러왔어요. (${backupSummary(backup)})` };
   };
 
   const handleRestore = (coll: CollName, id: string) => store.restore(coll, id);

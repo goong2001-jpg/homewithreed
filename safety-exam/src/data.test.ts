@@ -140,3 +140,36 @@ describe('간이시험 문제 구성', () => {
     });
   });
 });
+
+describe('시험지 되살리기와 보기 섞기', () => {
+  const { findWrittenByIds, isValidChoiceOrder, shuffledChoiceOrder } = require('./data/questionBank');
+
+  test('id 목록으로 같은 순서의 문제를 돌려준다', () => {
+    const ids = writtenQuestions.slice(0, 5).map((q) => q.id).reverse();
+    const found = findWrittenByIds(ids);
+    expect(found).not.toBeNull();
+    expect(found!.map((q: { id: string }) => q.id)).toEqual(ids);
+  });
+
+  test('없는 id가 섞여 있으면 null', () => {
+    expect(findWrittenByIds([writtenQuestions[0].id, 'no-such-id'])).toBeNull();
+  });
+
+  test('보기 순서는 원래 인덱스의 순열이다', () => {
+    const q = writtenQuestions[0];
+    for (let i = 0; i < 20; i++) {
+      const order = shuffledChoiceOrder(q);
+      expect(order).toHaveLength(q.choices.length);
+      expect([...order].sort()).toEqual([0, 1, 2, 3]);
+      expect(isValidChoiceOrder(q, order)).toBe(true);
+    }
+  });
+
+  test('보기 수와 맞지 않는 순서는 쓰지 않는다', () => {
+    const q = writtenQuestions[0];
+    expect(isValidChoiceOrder(q, undefined)).toBe(false);
+    expect(isValidChoiceOrder(q, [0, 1, 2])).toBe(false);
+    expect(isValidChoiceOrder(q, [0, 0, 1, 2])).toBe(false);
+    expect(isValidChoiceOrder(q, [3, 2, 1, 0])).toBe(true);
+  });
+});

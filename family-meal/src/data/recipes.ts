@@ -792,7 +792,7 @@ const SOUPS: Recipe[] = [
     ease: 1,
     protein: 'none',
     veg: 2,
-    allergens: ['새우'],
+    allergens: ['새우', '생선'],
     ingredients: [
       veg('애호박', 1, '개'),
       veg('양파', 0.5, '개'),
@@ -920,7 +920,7 @@ const SOUPS: Recipe[] = [
     ease: 1,
     protein: 'pork',
     veg: 1,
-    allergens: ['밀', '달걀', '대두', '돼지고기'],
+    allergens: ['밀', '달걀', '대두', '돼지고기', '생선'],
     ingredients: [
       dry('냉동만두', 12, '개'),
       dairy('달걀', 2, '개'),
@@ -1370,7 +1370,7 @@ const MAINS: Recipe[] = [
     ease: 3,
     protein: 'pork',
     veg: 2,
-    allergens: ['달걀', '대두', '돼지고기'],
+    allergens: ['달걀', '대두', '돼지고기', '밀'],
     ingredients: [
       meat('돼지고기 다짐육', 400, 'g'),
       dry('두부', 0.5, '모'),

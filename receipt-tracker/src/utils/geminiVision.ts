@@ -1,4 +1,42 @@
-import { ExtractedFields } from '../types';
+import { Category, ExtractedFields, PaymentMethod, TransactionType } from '../types';
+
+const CATEGORIES: Category[] = ['식비', '교통', '쇼핑', '의료', '생활', '여가', '기타'];
+const TYPES: TransactionType[] = ['지출', '입금'];
+const PAYMENT_METHODS: PaymentMethod[] = ['현금', '카드', '계좌이체', '기타'];
+
+/**
+ * 모델이 돌려준 JSON 을 그대로 믿지 않고 한 번 거른다.
+ * 형식이 어긋난 값은 비워 두어 사용자가 폼에서 직접 채우게 한다.
+ *  - date: YYYY-MM-DD 가 아니면 비움
+ *  - amount: 유한한 0 이상 숫자가 아니면 비움 (쉼표·원 기호가 섞인 문자열은 숫자로 풀어본다)
+ *  - category / type / paymentMethod: 허용된 값이 아니면 비움 (폼이 기본값을 고른다)
+ */
+export function normalizeExtracted(raw: unknown): ExtractedFields {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const o = raw as Record<string, unknown>;
+  const out: ExtractedFields = {};
+
+  if (typeof o.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.date)) out.date = o.date;
+
+  const amountText = typeof o.amount === 'string' ? o.amount.replace(/[^\d.-]/g, '') : '';
+  const amount = typeof o.amount === 'number'
+    ? o.amount
+    : amountText ? Number(amountText) : NaN;   // Number('') 은 0 이라 빈 문자열은 따로 거른다
+  if (Number.isFinite(amount) && amount >= 0) out.amount = amount;
+
+  if (typeof o.content === 'string' && o.content.trim()) out.content = o.content.trim();
+
+  if (typeof o.category === 'string' && (CATEGORIES as string[]).includes(o.category)) {
+    out.category = o.category as Category;
+  }
+  if (typeof o.type === 'string' && (TYPES as string[]).includes(o.type)) {
+    out.type = o.type as TransactionType;
+  }
+  if (typeof o.paymentMethod === 'string' && (PAYMENT_METHODS as string[]).includes(o.paymentMethod)) {
+    out.paymentMethod = o.paymentMethod as PaymentMethod;
+  }
+  return out;
+}
 
 // 무료 한도가 있는 모델을 우선순위대로 시도 (앞 모델이 막히면 다음으로 자동 전환)
 // 2026년 기준: 2.0-flash는 무료 한도 0이라 제외, 2.5 계열 사용
@@ -24,11 +62,12 @@ interface CallResult {
 }
 
 async function callModel(model: string, mimeType: string, base64Data: string, apiKey: string): Promise<CallResult> {
+  // 키는 URL(?key=)이 아니라 헤더로 보낸다 — URL 은 브라우저 기록·프록시 로그에 남는다
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         contents: [
           {
@@ -76,14 +115,21 @@ export async function extractFromImage(
       const text: string | undefined = r.data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!text) throw new Error('인식 결과가 비어 있습니다.');
       const cleaned = text.replace(/```json\n?|\n?```/g, '').trim();
-      return JSON.parse(cleaned) as ExtractedFields;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        throw new Error('인식 결과를 읽지 못했습니다. 직접 입력해주세요.');
+      }
+      return normalizeExtracted(parsed);
     }
 
     lastMessage = r.message || `API 오류: ${r.status}`;
 
     // API 키 자체가 잘못된 경우는 다른 모델을 시도해도 소용없음
-    if (r.status === 400 && /API key|API_KEY_INVALID/i.test(lastMessage)) {
-      throw new Error('API 키가 올바르지 않습니다. 설정에서 키를 확인해주세요.');
+    if (r.status === 401 || r.status === 403
+      || (r.status === 400 && /API key|API_KEY_INVALID/i.test(lastMessage))) {
+      throw new Error('API 키가 올바르지 않거나 권한이 없습니다. 설정에서 키를 확인해주세요.');
     }
 
     // 할당량 초과(429)/모델 없음(404)/일시적 오류(503)면 다음 모델로 자동 전환
@@ -92,7 +138,8 @@ export async function extractFromImage(
       continue;
     }
 
-    // 그 외 오류도 일단 다음 모델 시도
+    // 그 외(400 잘못된 요청, 500 등)는 모델을 바꿔도 같으므로 바로 알린다
+    throw new Error(`인식에 실패했습니다 (${r.status}). ${lastMessage}`);
   }
 
   if (quotaHit) {

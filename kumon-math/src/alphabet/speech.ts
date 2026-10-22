@@ -7,10 +7,33 @@ export function speechSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
 }
 
+/**
+ * 목소리 목록은 비동기로 로드된다(처음엔 빈 배열일 수 있다).
+ * 목록이 바뀔 때마다(voiceschanged) 다시 받아 둔다.
+ */
+let voiceCache: SpeechSynthesisVoice[] = [];
+
+function refreshVoices(): SpeechSynthesisVoice[] {
+  if (!speechSupported()) return [];
+  try {
+    voiceCache = window.speechSynthesis.getVoices() || [];
+  } catch {
+    voiceCache = [];
+  }
+  return voiceCache;
+}
+
+if (speechSupported()) {
+  try {
+    window.speechSynthesis.addEventListener('voiceschanged', () => { refreshVoices(); });
+  } catch {}
+}
+
 /** 영어 목소리를 고른다. 아이용으로 또렷한 목소리를 우선 */
 function pickEnglishVoice(): SpeechSynthesisVoice | null {
   if (!speechSupported()) return null;
-  const voices = window.speechSynthesis.getVoices();
+  // 아직 목록을 못 받았으면 지금 한 번 더 시도한다
+  const voices = voiceCache.length ? voiceCache : refreshVoices();
   if (!voices.length) return null;
 
   const en = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('en'));
@@ -26,8 +49,7 @@ function pickEnglishVoice(): SpeechSynthesisVoice | null {
 
 /** 목소리 목록은 비동기로 로드되므로 미리 깨워둔다 */
 export function warmUpVoices(): void {
-  if (!speechSupported()) return;
-  window.speechSynthesis.getVoices();
+  refreshVoices();
 }
 
 interface SpeakOptions {

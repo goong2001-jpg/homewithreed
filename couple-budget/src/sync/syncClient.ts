@@ -209,7 +209,8 @@ export async function testConnection(
       //    그대로 두면 화면이 '확인 중…'에서 영영 멈추므로 반드시 시간 제한을 건다.
       await withTimeout(
         (async () => {
-          await setDoc(ref, { t: Date.now() });
+          // 보안 규칙이 쓰기마다 updatedAt(숫자)을 요구하므로 임시 문서에도 넣는다
+          await setDoc(ref, { t: Date.now(), updatedAt: Date.now() });
           const snap = await getDoc(ref);
           if (!snap.exists()) throw new Error('__READ_BACK_FAILED__');
           await deleteDoc(ref);

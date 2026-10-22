@@ -20,13 +20,26 @@ export interface Backup {
   state: AppState;
 }
 
-export function buildBackup(state: AppState, now = Date.now()): Backup {
+export function buildBackup(
+  state: AppState,
+  now = Date.now(),
+  /** 알림 암호까지 담을지. 백업 파일은 카톡으로 오가기 쉬워서 기본은 뺀다 */
+  includePassphrase = false
+): Backup {
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
     exportedAt: now,
     // 기기 구독 정보는 기기마다 달라야 하니 빼고 내보낸다
-    state: { ...state, push: { ...state.push, endpoint: '', syncedHash: '' } },
+    state: {
+      ...state,
+      push: {
+        ...state.push,
+        passphrase: includePassphrase ? state.push.passphrase : '',
+        endpoint: '',
+        syncedHash: '',
+      },
+    },
   };
 }
 
@@ -69,7 +82,8 @@ export function parseBackup(text: string, current: AppState): ParseResult {
       logs: Array.isArray(s.logs) ? s.logs : [],
       lastRead: s.lastRead ?? {},
       delivered: Array.isArray(s.delivered) ? s.delivered : [],
-      // 구독은 이 기기 것을 그대로 유지한다
+      // 구독은 이 기기 것을 그대로 유지한다. 백업에 암호가 없으면(기본 내보내기)
+      // 이 기기에 적어 둔 암호를 빈 값으로 덮어쓰지 않는다.
       push: { ...current.push, passphrase: s.push?.passphrase || current.push.passphrase },
     },
   };

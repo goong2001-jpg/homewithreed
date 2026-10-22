@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import DayCard from './DayCard';
 import { getRecipe } from '../data/recipes';
 import { Settings, Slot, WeekPlan } from '../types';
-import { todayIndex } from '../utils/planner';
+import { cookedRecipeIds, todayIndex } from '../utils/planner';
 import { C } from '../theme';
 
 interface Props {
@@ -17,13 +17,9 @@ export default function PlanView({ plan, settings, onRegenerate, onSwap, onPick 
   const today = todayIndex();
   const [open, setOpen] = useState<number | null>(today);
 
+  // 어제 만들어 둔 것을 먹는 날은 조리 시간에 넣지 않는다 (DayCard·영양 집계와 같은 기준).
   const totalMinutes = plan.days.reduce(
-    (sum, d) =>
-      sum +
-      [d.breakfast, d.lunch, d.soup, d.main, d.side].reduce(
-        (m, id) => m + (getRecipe(id)?.minutes ?? 0),
-        0
-      ),
+    (sum, d) => sum + cookedRecipeIds(d).reduce((m, r) => m + (getRecipe(r.id)?.minutes ?? 0), 0),
     0
   );
 

@@ -20,7 +20,7 @@ export default function WordScreen() {
     practiceAgain, totalCoupons, rewardedThisRound, couponsLeftToday,
     completeSet, chooseUnit,
   } = useWordProgress();
-  const { gameState, items, buyItem, equipItem, addPoints } = useGameState();
+  const { gameState, items, buyItem, equipItem, addPoints, recordCorrect } = useGameState();
 
   // 오답 노트에서 오늘 다시 볼 단어 (날이 바뀔 때 정해져 오늘 하루는 그대로다)
   const missedKey = progress.todayMissed.join('|');
@@ -104,7 +104,8 @@ export default function WordScreen() {
     if (picked !== null || !question) return;
     setPicked(en);
     const correct = en === question.word.en;
-    if (correct) { playCorrect(); setHappy(true); addPoints(2); }
+    // 별 2개 + 정답 개수 1 (상점 아이템 해금에 쓰인다)
+    if (correct) { playCorrect(); setHappy(true); recordCorrect(2); }
     else {
       playWrong();
       // 정답을 소리로도 들려줘서 머리에 남게 한다
@@ -118,7 +119,7 @@ export default function WordScreen() {
       setSelected(null);
       answer(correct, question.word.en, firstTry);
     }, correct ? 900 : 2600);
-  }, [picked, question, answer, addPoints, progress.results.length]);
+  }, [picked, question, answer, recordCorrect, progress.results.length]);
 
   // 틀린 문제도 결국 다 맞혀야 끝난다 — 끝났다면 모두 맞힌 것
   const testFinished = progress.queue.length === 0;

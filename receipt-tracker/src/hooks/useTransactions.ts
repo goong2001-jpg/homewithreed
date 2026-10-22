@@ -12,7 +12,12 @@ function load(): Transaction[] {
 }
 
 function save(transactions: Transaction[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+  } catch (e) {
+    // 사파리 프라이빗 모드나 저장 용량 초과로 막힐 수 있다. 앱을 죽이지는 않는다.
+    console.warn('저장 실패:', e);
+  }
 }
 
 export function useTransactions() {

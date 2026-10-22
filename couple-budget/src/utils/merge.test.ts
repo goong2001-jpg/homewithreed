@@ -1,4 +1,4 @@
-import { mergeById, purgeTombstones, sanitizeForFirestore } from './merge';
+import { localWinners, mergeById, purgeTombstones, sanitizeForFirestore } from './merge';
 
 interface Rec { id: string; updatedAt: number; deleted?: boolean; amount: number }
 
@@ -53,6 +53,38 @@ describe('mergeById — last-write-wins', () => {
     expect(mergeById<Rec>([], [])).toEqual([]);
     expect(mergeById([r('a', 1, 1)], [])).toHaveLength(1);
     expect(mergeById<Rec>([], [r('a', 1, 1)])).toHaveLength(1);
+  });
+});
+
+describe('localWinners — 서버로 되밀어 올릴 레코드', () => {
+  it('로컬이 더 최신인 것만 고른다', () => {
+    const local = [r('a', 300, 111), r('b', 100, 222)];
+    const incoming = [r('a', 200, 999), r('b', 150, 999)];
+    const out = localWinners(local, incoming);
+    expect(out.map(x => x.id)).toEqual(['a']);
+    expect(out[0].amount).toBe(111);
+  });
+
+  it('동점은 로컬 승자가 아니다 (방금 올린 기록의 메아리에 다시 올리지 않는다)', () => {
+    expect(localWinners([r('a', 100, 1)], [r('a', 100, 2)])).toEqual([]);
+  });
+
+  it('로컬에만 있는 레코드는 포함하지 않는다', () => {
+    expect(localWinners([r('a', 100, 1)], [r('b', 100, 2)])).toEqual([]);
+    expect(localWinners([r('a', 100, 1)], [])).toEqual([]);
+  });
+
+  it('로컬의 삭제가 더 최신이면 툼스톤을 되밀어 올린다', () => {
+    const out = localWinners([r('a', 500, 1, true)], [r('a', 200, 1)]);
+    expect(out).toHaveLength(1);
+    expect(out[0].deleted).toBe(true);
+  });
+
+  it('mergeById 결과와 일관된다 — 승자는 병합 뒤에도 로컬 값 그대로다', () => {
+    const local = [r('a', 300, 111)];
+    const incoming = [r('a', 200, 999)];
+    const merged = mergeById(local, incoming);
+    expect(localWinners(local, incoming)).toEqual(merged);
   });
 });
 

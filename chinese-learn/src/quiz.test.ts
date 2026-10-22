@@ -65,6 +65,18 @@ describe('시험지 만들기', () => {
     expect(exam.some((q) => q.kind === 'listenWord')).toBe(false);
   });
 
+  it('병음 문제의 보기에는 병음이 붙지 않아 정답이 드러나지 않는다', () => {
+    const exams = [1, 2, 3, 4, 5].map((seed) => buildExam(LESSONS, { rng: seeded(seed) }));
+    const pinyinQuestions = exams.flat().filter((q) => q.kind === 'pinyinWord');
+    expect(pinyinQuestions.length).toBeGreaterThan(0);
+    pinyinQuestions.forEach((q) => {
+      q.choices.forEach((c) => {
+        expect(c.sub ?? '').not.toContain(q.prompt);
+        expect(c.sub).toBeUndefined();
+      });
+    });
+  });
+
   it('세트가 20개일 때는 같은 세트가 두 번 나오지 않는다', () => {
     const exam = buildExam(LESSONS, { rng: seeded(21) });
     expect(new Set(exam.map((q) => q.setId)).size).toBe(EXAM_SIZE);

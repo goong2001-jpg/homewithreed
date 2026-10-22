@@ -2,8 +2,28 @@ const ctx = (() => {
   try { return new (window.AudioContext || (window as any).webkitAudioContext)(); } catch { return null; }
 })();
 
+/**
+ * 브라우저는 사용자가 화면을 한 번 만지기 전까지 소리를 잠가 둔다(autoplay 정책).
+ * 잠겨 있으면 깨워 본다 — 실패해도 조용히 넘어간다.
+ */
+function unlock() {
+  if (!ctx || ctx.state !== 'suspended') return;
+  try { ctx.resume().catch(() => {}); } catch {}
+}
+
+// 첫 터치/클릭/키 입력 때 한 번만 깨운다
+if (typeof document !== 'undefined') {
+  const events = ['pointerdown', 'touchstart', 'keydown'] as const;
+  const once = () => {
+    unlock();
+    events.forEach(e => document.removeEventListener(e, once));
+  };
+  events.forEach(e => document.addEventListener(e, once, { passive: true }));
+}
+
 function beep(freq: number, dur: number, type: OscillatorType = 'sine', vol = 0.3) {
   if (!ctx) return;
+  unlock(); // 잠겨 있던 소리는 이번 입력으로 풀린다
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.connect(gain);

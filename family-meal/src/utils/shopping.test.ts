@@ -1,6 +1,6 @@
 import { DEFAULT_SETTINGS, Settings } from '../types';
 import { generateWeek } from './planner';
-import { buildDayLists, buildShoppingList, formatQty, scaleQty, toShareText } from './shopping';
+import { buildDayLists, buildShoppingList, formatItemQty, formatQty, scaleQty, toShareText } from './shopping';
 
 test('4인분 기준 수량을 인분 수에 맞춰 줄인다', () => {
   expect(scaleQty(400, 'g', 2)).toBe(200);
@@ -114,4 +114,33 @@ test('쌀은 여러 메뉴에 들어가도 한 줄로 합쳐진다', () => {
     .filter((i) => i.name === '쌀');
   expect(rice).toHaveLength(1);
   expect(rice[0].unit).toBe('kg');
+});
+
+test('양념은 큰술·작은술이 섞여도 한 줄로 합친다', () => {
+  // 간장은 여러 레시피에서 큰술과 작은술로 나뉘어 쓰인다.
+  let found = false;
+  for (let seed = 0; seed < 30 && !found; seed++) {
+    const items = buildShoppingList(generateWeek(seed, DEFAULT_SETTINGS), DEFAULT_SETTINGS).flatMap((g) => g.items);
+    const soy = items.filter((i) => i.name === '간장');
+    expect(soy.length).toBeLessThanOrEqual(1);
+    if (soy[0]?.extra?.length) {
+      found = true;
+      expect(soy[0].key).toBe('간장');
+      expect(formatItemQty(soy[0])).toMatch(/^[\d.]+(큰술|작은술) \+ [\d.]+(큰술|작은술)$/);
+    }
+  }
+  expect(found).toBe(true);
+});
+
+test('양념이 아닌 재료는 단위가 다르면 따로 둔다', () => {
+  const items = buildShoppingList(generateWeek(42, DEFAULT_SETTINGS), DEFAULT_SETTINGS).flatMap((g) => g.items);
+  items.filter((i) => !i.pantry).forEach((i) => {
+    expect(i.key).toBe(`${i.name}|${i.unit}`);
+    expect(i.extra).toBeUndefined();
+  });
+});
+
+test('한 줄로 합친 양념의 양은 단위별로 이어 적는다', () => {
+  expect(formatItemQty({ qty: 2, unit: '큰술', extra: [{ qty: 1, unit: '작은술' }] })).toBe('2큰술 + 1작은술');
+  expect(formatItemQty({ qty: 2, unit: '큰술' })).toBe('2큰술');
 });

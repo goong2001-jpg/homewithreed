@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { speak } from '../speech';
 import { useVoiceGuide } from '../voiceGuide';
 
@@ -19,6 +19,11 @@ interface Props {
 export default function SpeakButton({ text, children, rate, className = '' }: Props) {
   const [speaking, setSpeaking] = useState(false);
   const { status, openGuide } = useVoiceGuide();
+  // 안전장치 타이머 — 화면을 떠나면 지워서 사라진 버튼의 상태를 바꾸지 않게 한다
+  const safetyTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (safetyTimer.current !== null) window.clearTimeout(safetyTimer.current);
+  }, []);
   // 'loading'(목록 로딩 중)은 막지 않는다. 눌렀을 때 speak()가 다시 확인한다
   const muted = status === 'no-voice' || status === 'unsupported';
 
@@ -38,7 +43,11 @@ export default function SpeakButton({ text, children, rate, className = '' }: Pr
     });
     if (result !== 'ok') return;
     // 음성이 끝났다는 신호가 안 오는 기기가 있어 안전장치를 둔다
-    window.setTimeout(() => setSpeaking(false), 6000);
+    if (safetyTimer.current !== null) window.clearTimeout(safetyTimer.current);
+    safetyTimer.current = window.setTimeout(() => {
+      safetyTimer.current = null;
+      setSpeaking(false);
+    }, 6000);
   };
 
   return (

@@ -155,7 +155,18 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /rooms/{roomCode}/{document=**} {
-      allow read, write: if roomCode.size() >= 12;
+      // 우리집 코드: 영문·숫자·하이픈 12~64자 (앱이 만드는 코드는 19자)
+      function roomOk() {
+        return roomCode.matches('^[A-Za-z0-9-]{12,64}$');
+      }
+      allow read, delete: if roomOk();
+      // 쓰기는 updatedAt(숫자)이 서버에 있는 것보다 오래되면 거부한다 —
+      // 오프라인에서 묵힌 낡은 수정이 최신 기록을 덮어쓰지 못하게
+      allow create, update: if roomOk()
+        && request.resource.data.updatedAt is number
+        && (resource == null
+            || !('updatedAt' in resource.data)
+            || request.resource.data.updatedAt >= resource.data.updatedAt);
     }
   }
 }
@@ -166,8 +177,9 @@ service cloud.firestore {
 ## ⚠️ 꼭 알아둘 점 — 우리집 코드가 곧 비밀번호입니다
 
 로그인 없이 쓰는 구조라서, **코드를 아는 사람은 누구나 우리 가계부를 보고 고칠 수 있습니다.**
-위 규칙의 `roomCode.size() >= 12`는 `test`, `1234` 같은 짧은 코드를 찍어보는 시도만 막아 줍니다.
+위 규칙의 `roomCode.matches(...)`는 `test`, `1234` 같은 짧은 코드를 찍어보는 시도만 막아 줍니다.
 제대로 된 접근 제어가 아니라는 점을 분명히 알아두세요.
+(`updatedAt` 조건은 접근 제어가 아니라, 오프라인에서 묵힌 낡은 수정이 최신 기록을 덮어쓰지 못하게 하는 장치입니다.)
 
 그래서 이렇게 대비합니다.
 

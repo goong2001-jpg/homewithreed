@@ -45,6 +45,9 @@ describe('detectIntent', () => {
     ['아직 안했어', 'no'],
     ['밥 안먹었어', 'no'],
     ['숙제 못했어', 'no'],
+    ['못먹었어', 'no'],
+    ['못 씻었어', 'no'],
+    ['아직 못했어', 'no'],
     ['하기싫어', 'no'],
     ['졸려...', 'sleepy'],
     ['배고파', 'hungry'],
@@ -72,6 +75,12 @@ describe('detectIntent', () => {
 });
 
 describe('reply', () => {
+  it.each(['못먹었어', '못 씻었어', '아직 못했어'])('"%s" 는 못 한 거라 칭찬하지 않는다', (text) => {
+    // "못 먹었어" 안에 "먹었"이 들어 있어서 긍정으로 잘못 읽히던 경우
+    const r = reply(text, ctx({ seed: 3 }));
+    expect(r.text).not.toMatch(/잘했어|최고야|멋지다|대단해/);
+  });
+
   it('모르는 말에도 반드시 뭔가 답한다', () => {
     const r = reply('갸울뚱캬푸', ctx());
     expect(r.text.length).toBeGreaterThan(0);

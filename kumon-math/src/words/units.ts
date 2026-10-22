@@ -33,7 +33,8 @@ export const UNITS: [SoundDef, SoundDef][] = [
   [S('vuh', 'v', ['v'], '브'),        S('yuh', 'y', ['y'], '유')],
   [S('zuh', 'z', ['z'], '즈'),        S('kwuh', 'qu', ['qu'], '쿠')],
   [S('shuh', 'sh', ['sh'], '쉬'),     S('chuh', 'ch', ['ch'], '츄')],
-  [S('thuh', 'th', ['th'], '쓰'),     S('fuh', 'f', ['f'], '프')],
+  // ph 는 f 와 같은 소리지만 철자가 달라 따로 배운다 (f 는 9단계에서 이미 배웠다)
+  [S('thuh', 'th', ['th'], '쓰'),     S('fuh', 'ph', ['ph'], '프')],
 ];
 
 /**

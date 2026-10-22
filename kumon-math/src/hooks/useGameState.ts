@@ -163,8 +163,11 @@ export function useGameState() {
   const [items, setItems] = useState<AvatarItem[]>(loadItems);
 
   const save = useCallback((state: GameState, itemList: AvatarItem[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    localStorage.setItem(ITEMS_KEY, JSON.stringify(itemList));
+    // 저장 실패(프라이빗 모드·용량 초과 등)로 놀이가 멈추면 안 된다
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(ITEMS_KEY, JSON.stringify(itemList));
+    } catch {}
   }, []);
 
   // loadState가 날짜 정산(미리하기 차감)을 했으므로 시작하자마자 저장해 둔다.
@@ -343,5 +346,18 @@ export function useGameState() {
     });
   }, [items, save]);
 
-  return { gameState, items, onCorrect, onWrong, buyItem, equipItem, switchCourse, addPoints };
+  /**
+   * 다른 놀이(영어 단어 등)에서 문제를 맞혔을 때.
+   * 별을 더하고, 상점 아이템 해금 기준인 정답 개수도 함께 올린다.
+   * (수학 코스 진행·미션·레벨은 건드리지 않는다)
+   */
+  const recordCorrect = useCallback((amount: number) => {
+    setGameState(prev => {
+      const next = { ...prev, points: prev.points + amount, totalCorrect: prev.totalCorrect + 1 };
+      save(next, items);
+      return next;
+    });
+  }, [items, save]);
+
+  return { gameState, items, onCorrect, onWrong, buyItem, equipItem, switchCourse, addPoints, recordCorrect };
 }

@@ -4,11 +4,16 @@ import { isAtHome } from './ingredients';
 import { cookedRecipeIds, planRecipeIds } from './planner';
 
 export interface ShopItem {
-  /** 이름+단위. 체크 상태를 저장하는 키로도 쓴다. */
+  /** 이름+단위(양념은 이름만). 체크 상태를 저장하는 키로도 쓴다. */
   key: string;
   name: string;
   qty: number;
   unit: string;
+  /**
+   * 양념이 큰술·작은술처럼 여러 단위로 쓰일 때 나머지 단위의 양.
+   * 한 줄로 합쳐 보여 주되 단위가 다른 양은 더할 수 없어 따로 들고 있는다.
+   */
+  extra?: { qty: number; unit: string }[];
   aisle: Aisle;
   pantry: boolean;
   /** 냉장고에 이미 있다고 적어 둔 재료 */
@@ -52,9 +57,18 @@ export function formatQty(qty: number, unit: string): string {
   return `${text}${unit}`;
 }
 
+/** 한 줄로 합친 양념은 "2큰술 + 1작은술"처럼 단위별 양을 이어 적는다. */
+export function formatItemQty(item: Pick<ShopItem, 'qty' | 'unit' | 'extra'>): string {
+  return [formatQty(item.qty, item.unit)]
+    .concat((item.extra ?? []).map((e) => formatQty(e.qty, e.unit)))
+    .join(' + ');
+}
+
 /**
  * 재료를 이름+단위로 더해 코너별로 묶는다.
  * 같은 재료라도 단위가 다르면(예: 두부 '모' vs 'g') 합치지 않고 따로 둔다.
+ * 다만 상비 양념은 큰술·작은술이 섞여도 한 줄로 두고, 단위별 양만 따로 적는다 —
+ * 간장이 두 줄로 나오면 두 번 체크해야 해서 번거롭다.
  */
 function groupItems(
   recipeIds: string[],
@@ -69,10 +83,17 @@ function groupItems(
       raw.name === '밥'
         ? { name: '쌀', qty: raw.qty * RICE_PER_BOWL_KG, unit: 'kg', aisle: '쌀·면·가공' }
         : raw;
-    const key = `${ing.name}|${ing.unit}`;
+    const key = ing.pantry ? ing.name : `${ing.name}|${ing.unit}`;
     const found = merged.get(key);
     if (found) {
-      found.qty += ing.qty;
+      if (found.unit === ing.unit) {
+        found.qty += ing.qty;
+      } else {
+        const extra = (found.extra ??= []);
+        const same = extra.find((e) => e.unit === ing.unit);
+        if (same) same.qty += ing.qty;
+        else extra.push({ qty: ing.qty, unit: ing.unit });
+      }
       if (from && !found.usedIn.includes(from)) found.usedIn.push(from);
       return;
     }
@@ -99,6 +120,7 @@ function groupItems(
   const items = Array.from(merged.values()).map((item) => ({
     ...item,
     qty: scaleQty(item.qty, item.unit, settings.servings),
+    extra: item.extra?.map((e) => ({ ...e, qty: scaleQty(e.qty, e.unit, settings.servings) })),
     have: isAtHome(settings.haveAtHome, item.name),
   }));
 
@@ -150,7 +172,7 @@ export function toShareText(groups: AisleGroup[], hidePantry: boolean): string {
     const items = g.items.filter((i) => !i.have && !(hidePantry && i.pantry));
     if (items.length === 0) continue;
     lines.push('', `■ ${g.aisle}`);
-    items.forEach((i) => lines.push(`- ${i.name} ${formatQty(i.qty, i.unit)}`));
+    items.forEach((i) => lines.push(`- ${i.name} ${formatItemQty(i)}`));
   }
   return lines.join('\n');
 }

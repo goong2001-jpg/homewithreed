@@ -30,11 +30,13 @@ Worker도 내용이 같으면 저장을 생략합니다. `list()`는 쓰지 않�
 
 ## 설치
 
-**API 토큰도, 시크릿 등록도 필요 없습니다.** Cloudflare 대시보드에서 저장소를
-연결하고, 알림 키는 KV 에 넣어두면 Worker 가 알아서 읽어 씁니다.
+알림 키와 암호는 **Worker 시크릿**에 넣는 것이 기본입니다. KV 는 대시보드에서
+누구나 값을 열어 볼 수 있어서 개인키를 두기에 맞지 않습니다. 시크릿은 한 번
+넣으면 Cloudflare 가 보관하고, 재배포해도 그대로 남습니다.
 
-브라우저에서만 하면 되는 일이라 사람이 직접 해도 되고, 브라우저를 다루는
-AI 에이전트에게 시켜도 됩니다.
+터미널(`npx wrangler`)이 한 번은 필요합니다. 대시보드만으로 하고 싶다면
+Workers & Pages → 해당 Worker → **Settings → Variables and Secrets** 에서
+같은 이름으로 **Secret** 타입을 골라 넣어도 됩니다.
 
 ### 1. Cloudflare 가입
 
@@ -48,28 +50,44 @@ Storage & Databases → KV → **Create Instance** → 이름 `HABIT_KV`
 `habit-push/wrangler.toml` 의 `id = "..."` 자리에 넣어야 합니다.
 비밀값이 아니니 그대로 커밋하면 됩니다.
 
-### 3. 알림 키를 KV 에 넣기
+### 3. 알림 키와 암호를 시크릿에 넣기
 
-배포된 앱의 `/keygen.html` 을 엽니다.
-예: `https://<계정>.github.io/homewithreed/habit-talk/keygen.html`
-**키 만들기** 를 누르면 세 값이 나옵니다. 키는 그 브라우저 안에서만
-만들어지고 어디로도 전송되지 않습니다.
+키는 두 가지 방법으로 만들 수 있습니다.
 
-방금 만든 KV 에서 **Add entry** 로 두 개를 넣으세요.
+- 터미널: `cd habit-push && npm install && npm run keys`
+- 브라우저: 배포된 앱의 `/keygen.html`
+  (예: `https://<계정>.github.io/homewithreed/habit-talk/keygen.html`).
+  키는 그 브라우저 안에서만 만들어지고 어디로도 전송되지 않습니다.
 
-| Key | Value |
+나온 세 값을 Worker 시크릿으로 넣습니다. 값을 물어보면 붙여넣으세요.
+
+```bash
+cd habit-push
+npx wrangler login
+npx wrangler secret put VAPID_PUBLIC_KEY
+npx wrangler secret put VAPID_PRIVATE_KEY
+npx wrangler secret put PASSPHRASE
+```
+
+| 시크릿 | 값 |
 |---|---|
-| `config:vapid` | `{"publicKey":"<공개키>","privateKey":"<개인키>"}` |
-| `config:passphrase` | `<알림 암호>` |
+| `VAPID_PUBLIC_KEY` | 공개키 (공개돼도 되는 값) |
+| `VAPID_PRIVATE_KEY` | 개인키 — **절대 커밋하거나 KV 에 넣지 마세요** |
+| `PASSPHRASE` | 알림 암호 — 폰 앱 **설정 → 알림 암호** 에 똑같이 넣습니다 |
 
-`config:vapid` 는 위 형태의 JSON 한 줄이어야 합니다. keygen 페이지가
-붙여넣기 좋게 만들어 줍니다.
+Worker 를 아직 한 번도 배포하지 않았다면 `wrangler secret put` 이 "Worker 가 없다"고
+할 수 있습니다. 그때는 4번을 먼저 하고 돌아와서 넣으세요.
 
-알림 암호는 나중에 폰 앱 **설정 → 알림 암호** 에도 똑같이 넣어야 하니
-기억해 두세요.
+**KV 는 공개키 보조 저장소일 뿐입니다.** 시크릿이 없을 때만 Worker 가
+KV 의 `config:vapid` (`{"publicKey":"<공개키>"}`) 와 `config:passphrase` 를 읽습니다.
+예전처럼 `config:vapid` 에 `privateKey` 까지 넣어 두면 아직 동작은 하지만
+로그에 경고가 남습니다 — 시크릿으로 옮기고 KV 항목은 지우세요.
 
-### 4. 저장소 연결해서 배포
+### 4. 배포
 
+두 가지 중 하나를 고르세요.
+
+**(a) Cloudflare 가 저장소를 보고 직접 배포** —
 Workers & Pages → **Create** → **Workers** 탭 → **Import a repository**
 → GitHub 연결 후 이 저장소 선택
 
@@ -83,6 +101,16 @@ Workers & Pages → **Create** → **Workers** 탭 → **Import a repository**
 
 배포되면 `https://habit-push.<계정>.workers.dev` 같은 주소가 나옵니다.
 앞으로는 이 폴더가 바뀔 때마다 Cloudflare 가 알아서 다시 배포합니다.
+
+**(b) GitHub Actions 로 배포** — 타입체크와 테스트는 `.github/workflows/ci.yml`
+의 `worker` 잡이 모든 push·PR 에서 돌립니다. `.github/workflows/habit-push.yml` 은
+기본 브랜치에 `habit-push/**` 가 push 되면 한 번 더 확인한 뒤 `wrangler deploy` 를
+실행합니다. 이 워크플로는 저장소 시크릿 `CLOUDFLARE_API_TOKEN` (Workers 편집 권한
+토큰)이 있어야 합니다.
+**시크릿을 넣지 않으면 이 배포 워크플로만 실패하고 테스트 결과에는 영향이 없습니다.**
+(a) 방식을 쓰거나 Actions 배포가 필요 없으면 그 실패는 무시해도 되고,
+`habit-push.yml` 을 지워도 됩니다. `wrangler.toml` 의 KV `id` 가
+아직 자리표시자면 어느 방식이든 배포는 실패합니다.
 
 ### 5. 앱에 주소 알려주기
 
@@ -109,24 +137,20 @@ Workers & Pages → **Create** → **Workers** 탭 → **Import a repository**
 
 ### 터미널이 편하다면
 
-같은 일을 CLI 로도 할 수 있습니다.
+처음부터 끝까지 CLI 로 하면 이렇습니다.
 
 ```bash
 cd habit-push
 npm install
 npx wrangler login
 npx wrangler kv namespace create HABIT_KV    # 나온 id 를 wrangler.toml 에
+npm run deploy                               # 먼저 한 번 올려야 시크릿을 넣을 수 있다
 npm run keys                                 # 키 만들기
 
-# 키와 암호를 KV 에 넣는다
-npx wrangler kv key put --binding HABIT_KV "config:vapid" '{"publicKey":"...","privateKey":"..."}'
-npx wrangler kv key put --binding HABIT_KV "config:passphrase" "정한암호"
-
-npm run deploy
+npx wrangler secret put VAPID_PUBLIC_KEY
+npx wrangler secret put VAPID_PRIVATE_KEY
+npx wrangler secret put PASSPHRASE
 ```
-
-KV 대신 Worker 시크릿을 쓰고 싶으면 `VAPID_PUBLIC_KEY` `VAPID_PRIVATE_KEY`
-`PASSPHRASE` 를 넣어도 됩니다. 그쪽이 있으면 KV 보다 우선합니다.
 
 ---
 
@@ -138,14 +162,17 @@ npm run typecheck
 ```
 
 Worker 를 직접 띄워보려면 `wrangler.toml` 을 `wrangler.local.toml` 로 복사하고
-(KV `id` 는 아무 문자열이나 넣으면 됩니다) 키를 로컬 KV 에 넣으세요.
+(KV `id` 는 아무 문자열이나 넣으면 됩니다) 키와 암호를 `.dev.vars` 에 적으세요.
+이 파일은 `.gitignore` 에 들어 있습니다.
+
+```
+# .dev.vars
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+PASSPHRASE=아무암호
+```
 
 ```bash
-npx wrangler kv key put --local --config wrangler.local.toml --binding HABIT_KV \
-  "config:vapid" '{"publicKey":"...","privateKey":"..."}'
-npx wrangler kv key put --local --config wrangler.local.toml --binding HABIT_KV \
-  "config:passphrase" "아무암호"
-
 npx wrangler dev --config wrangler.local.toml --test-scheduled --local
 curl http://127.0.0.1:8787/health
 curl "http://127.0.0.1:8787/__scheduled?cron=*+*+*+*+*"   # 크론 강제 실행
@@ -180,4 +207,8 @@ curl "http://127.0.0.1:8787/__scheduled?cron=*+*+*+*+*"   # 크론 강제 실행
 |---|---|
 | `POST /subscribe` | 구독 + 시간표 등록 (암호 필요). 내용이 같으면 저장을 건너뜁니다 |
 | `POST /unsubscribe` | 등록 해제 (암호 필요) |
-| `GET /health` | 서버 상태와 VAPID 공개키. 앱이 이걸로 구독합니다 (아무 데서나 읽을 수 있음) |
+| `GET /health` | 서버 상태, VAPID 공개키, 마지막 cron 시각(`lastTickAt`). 앱이 이걸로 구독합니다 (아무 데서나 읽을 수 있음) |
+
+`/subscribe` 와 `/unsubscribe` 는 `ALLOWED_ORIGIN` 과 다른 `Origin` 에서 오면 403,
+본문이 64KB 를 넘으면 413, 같은 IP 에서 1분에 10번을 넘으면 429 를 돌려줍니다.
+횟수 제한은 요청마다 KV 쓰기 한 번을 쓰지만, 이 두 경로는 하루에 몇 번 안 불립니다.

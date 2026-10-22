@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Settings, WeekPlan } from '../types';
 import { DAY_NAMES } from '../utils/planner';
-import { buildDayLists, buildShoppingList, formatQty, toShareText } from '../utils/shopping';
+import { buildDayLists, buildShoppingList, formatItemQty, toShareText } from '../utils/shopping';
 import { C, CARD } from '../theme';
 
 interface Props {
@@ -110,7 +110,7 @@ export default function ShoppingView({ plan, settings, checked, onToggle, onClea
                 </div>
                 <div style={{ fontSize: 13.5, lineHeight: 1.8, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
                   {items.length > 0
-                    ? items.map((i) => `${i.name} ${formatQty(i.qty, i.unit)}`).join(' · ')
+                    ? items.map((i) => `${i.name} ${formatItemQty(i)}`).join(' · ')
                     : '이 날 새로 살 것은 없습니다.'}
                 </div>
               </div>
@@ -217,7 +217,7 @@ export default function ShoppingView({ plan, settings, checked, onToggle, onClea
                       textDecoration: on ? 'line-through' : 'none',
                     }}
                   >
-                    {item.name} {formatQty(item.qty, item.unit)}
+                    {item.name} {formatItemQty(item)}
                   </span>
                   {item.usedIn.length > 0 && (
                     <span
@@ -248,7 +248,7 @@ export default function ShoppingView({ plan, settings, checked, onToggle, onClea
             집에 있어서 뺐습니다 ({atHome.length}개)
           </div>
           <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>
-            {atHome.map((i) => `${i.name} ${formatQty(i.qty, i.unit)}`).join(' · ')}
+            {atHome.map((i) => `${i.name} ${formatItemQty(i)}`).join(' · ')}
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>
             양이 모자라면 설정에서 냉장고 재료를 지우세요.

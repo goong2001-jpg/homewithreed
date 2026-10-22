@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Asset, AssetKind, DEFAULT_KINDS, Goal, Loan, Recurring, Syncable } from '../types';
 import { Backup } from '../utils/backup';
-import { mergeById } from '../utils/merge';
+import { mergeById, purgeTombstones } from '../utils/merge';
 import { KEYS, clearAll, load, save } from '../utils/storage';
 
 /**
@@ -59,12 +59,26 @@ export interface AssetStore {
 
 export type CollName = 'kinds' | 'assets' | 'loans' | 'recurrings' | 'goals';
 
+/** 지운 지 90일이 넘은 툼스톤은 휴지통에서도 치운다 — 되살릴 일이 없는 흔적이 쌓이지 않게 */
+const TOMBSTONE_TTL_MS = 90 * 86_400_000;
+
 export function useAssets(newId: () => string): AssetStore {
-  const [kinds, setKinds] = useState<AssetKind[]>(() => load(KEYS.kinds, DEFAULT_KINDS));
-  const [assets, setAssets] = useState<Asset[]>(() => load(KEYS.assets, []));
-  const [loans, setLoans] = useState<Loan[]>(() => load(KEYS.loans, []));
-  const [recurrings, setRecurrings] = useState<Recurring[]>(() => load(KEYS.recurrings, []));
-  const [goals, setGoals] = useState<Goal[]>(() => load(KEYS.goals, []));
+  // 시작할 때 한 번 오래된 툼스톤을 정리한다 (저장은 아래 effect 가 상태 그대로 한다)
+  const [kinds, setKinds] = useState<AssetKind[]>(
+    () => purgeTombstones(load(KEYS.kinds, DEFAULT_KINDS), TOMBSTONE_TTL_MS),
+  );
+  const [assets, setAssets] = useState<Asset[]>(
+    () => purgeTombstones(load(KEYS.assets, []), TOMBSTONE_TTL_MS),
+  );
+  const [loans, setLoans] = useState<Loan[]>(
+    () => purgeTombstones(load(KEYS.loans, []), TOMBSTONE_TTL_MS),
+  );
+  const [recurrings, setRecurrings] = useState<Recurring[]>(
+    () => purgeTombstones(load(KEYS.recurrings, []), TOMBSTONE_TTL_MS),
+  );
+  const [goals, setGoals] = useState<Goal[]>(
+    () => purgeTombstones(load(KEYS.goals, []), TOMBSTONE_TTL_MS),
+  );
 
   useEffect(() => { save(KEYS.kinds, kinds); }, [kinds]);
   useEffect(() => { save(KEYS.assets, assets); }, [assets]);
