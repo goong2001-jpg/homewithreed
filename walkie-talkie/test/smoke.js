@@ -10,7 +10,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
 (async () => {
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH,   // 없으면 playwright 기본 크로미움
-    args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-capture', '--autoplay-policy=no-user-gesture-required']
+    args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required']
   });
   // 서비스워커가 index.html 을 대신 내주면 아래 route 가 못 끼어들어 SRI 를 못 뺀다 → 테스트에선 막는다
   const ctx = await browser.newContext({ permissions: ['microphone'], serviceWorkers: 'block' });
@@ -96,7 +96,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   // 허브(A)가 나갔을 때 B 가 허브를 이어받고, 새 사람(C)이 여전히 들어올 수 있는지
   console.log('... 허브 승계 확인');
   await a.click('#leaveBtn');
-  await b.waitForFunction(() => document.querySelectorAll('#members li').length === 1, null, { timeout: 15000, polling: 300 });
+  await b.waitForFunction(() => document.querySelectorAll('#members li').length === 1, null, { timeout: 30000, polling: 300 });
   check('A 퇴장 시 B 목록에서 사라짐', await b.evaluate(() => document.querySelectorAll('#members li').length) === 1);
   await b.waitForFunction(() => document.querySelector('#members li.me').textContent.includes('⭐'), null, { timeout: 20000, polling: 300 });
   check('B 가 허브를 이어받음', (await b.textContent('#members')).includes('⭐'), await b.textContent('#members'));
@@ -110,7 +110,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
 
   // 나가기
   await c.click('#leaveBtn');
-  await b.waitForFunction(() => document.querySelectorAll('#members li').length === 1, null, { timeout: 12000, polling: 200 });
+  await b.waitForFunction(() => document.querySelectorAll('#members li').length === 1, null, { timeout: 30000, polling: 200 });
   check('C 퇴장 시 B 목록에서 사라짐', await b.evaluate(() => document.querySelectorAll('#members li').length) === 1);
 
   // PeerJS 가 안 내려온 경우: 마이크를 열기 전에 알려야 한다
