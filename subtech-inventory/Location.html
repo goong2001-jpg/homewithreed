@@ -59,18 +59,30 @@
 #locApp .mergeBar button.ghost{background:transparent;color:var(--ink);border-color:var(--line);font-weight:400}
 
 #locApp .wrap{overflow-x:auto;padding:10px 12px 28px}
-#locApp .grid{display:grid;gap:4px;grid-auto-rows:minmax(70px,auto);min-width:min-content}
-#locApp .cell{position:relative;min-height:70px;border:1.5px solid var(--line);background:var(--slot);border-radius:3px;
+#locApp{--cw:96px;--ch:78px;--fz:13.5px}
+#locApp .grid{display:grid;gap:4px;grid-auto-rows:minmax(var(--ch),auto);min-width:min-content}
+#locApp .cell{position:relative;min-height:var(--ch);font-size:var(--fz);border:1.5px solid var(--line);background:var(--slot);border-radius:3px;
   text-align:left;padding:4px 5px;display:flex;flex-direction:column;gap:2px;overflow:hidden}
-#locApp .cell .code{font-size:10.5px;color:var(--sub);font-weight:500;font-variant-numeric:tabular-nums;line-height:1.2}
-#locApp .cell .name{font-weight:700;font-size:13px;line-height:1.25;word-break:keep-all}
+#locApp .cell .code{font-size:.75em;color:var(--sub);font-weight:500;font-variant-numeric:tabular-nums;line-height:1.2}
+#locApp .cell .name{font-weight:700;font-size:1em;line-height:1.25;overflow-wrap:anywhere}
 #locApp .layers{display:flex;flex-direction:column;flex:1}
-#locApp .layer{flex:1;font-size:12px;line-height:1.3;padding:2px 0;border-top:1px dashed var(--line);word-break:keep-all}
+#locApp .layer{flex:1;font-size:1em;line-height:1.3;padding:2px 0;border-top:1px dashed var(--line);overflow-wrap:anywhere}
 #locApp .layer:first-child{border-top:0}
-#locApp .layer b{display:block;font-size:10.5px;font-weight:500;color:var(--sub)}
+#locApp .layer b.ly{display:block;font-size:.72em;font-weight:500;color:var(--sub)}
+/* 칸 안 품목: 한 줄에 하나, 이름 + 굵은 수량. 📌지정 제품은 왼쪽 노란 막대 */
+#locApp .it{display:block;font-weight:600;line-height:1.25;margin-top:2px;overflow-wrap:anywhere}
+#locApp .it b{font-weight:800;font-variant-numeric:tabular-nums}
+#locApp .it b.q0{opacity:.4;font-weight:400}
+#locApp .it.pin{border-left:3px solid var(--hitline);padding-left:4px}
+#locApp .it.memo{font-weight:400;color:var(--sub);font-size:.88em}
+#locApp .more{display:block;font-size:.8em;color:var(--sub)}
+#locApp .zoom{display:inline-flex;gap:0;margin-left:auto}
+#locApp .tools .zoom button{border-radius:0;min-width:44px}
+#locApp .tools .zoom button:first-child{border-radius:4px 0 0 4px}
+#locApp .tools .zoom button:last-child{border-radius:0 4px 4px 0;border-left:0}
 #locApp .layer i,#locApp .cell .lbl i{font-style:normal;color:var(--sub);opacity:.75}
 #locApp .cell.label{background:var(--label);border-color:var(--label);color:var(--labelink);align-items:center;justify-content:center;text-align:center}
-#locApp .cell.label .lbl{font-weight:700;font-size:16px;word-break:keep-all}
+#locApp .cell.label .lbl{font-weight:700;font-size:1.15em;overflow-wrap:anywhere}
 #locApp .cell.label .lbl i{color:inherit}
 #locApp .cell.void{background:transparent;border-style:dashed}
 #locApp .cell.void .code{opacity:.6}
@@ -167,6 +179,7 @@
       <button data-el="bLine">줄·칸 옮기기</button>
       <button data-el="bSheet">시트 설정</button>
       <button data-el="bBackup">가져오기·내보내기</button>
+      <span class="zoom"><button data-el="zOut" aria-label="칸 작게">가−</button><button data-el="zIn" aria-label="칸 크게">가＋</button></span>
     </div>
     <p class="hint" data-el="hint">칸을 누르면 이름과 자재를 적을 수 있어요.</p>
     <div class="stkbar" data-el="stkBar"></div>
@@ -243,7 +256,6 @@ function covered(s){const cov={};for(const k in s.cells){const x=s.cells[k];if(x
 function sheetKeys(s){const cov=covered(s),o={};for(let r=0;r<s.rows;r++)for(let c=0;c<s.cols;c++){if(cov[K(r,c)])continue;
   keysAt(s,r,c).forEach((k,i)=>o[k]=[r,c,i])}return o}
 const cellHasStock=(s,r,c,from)=>keysAt(s,r,c).slice(from||0).some(k=>stockAt(k).length);
-function sheetHasStock(s){if(stockAt(String(s.name||'').trim()).length)return true;return Object.keys(sheetKeys(s)).some(k=>stockAt(k).length)}
 /** 어느 시트에도 연결되지 않은 재고 위치 (예: 옛 이름 "1층", 시트 이름과 다른 "A동2층") */
 function orphanLocs(){const known={};S.sheets.forEach(s=>{known[String(s.name||'').trim()]=1;Object.assign(known,sheetKeys(s))});
   return Object.keys(STK).filter(k=>!known[k]&&STK[k].length).sort((a,b)=>sum(STK[b])-sum(STK[a]))}
@@ -347,15 +359,15 @@ function cellHTML(x,r,c,s){
   const split=x.layers.length>1;
   const st=x.layers.map((L,i)=>s?stockAt(slotKey(s,r,c,i)):[]);
   const anyItem=x.layers.some(L=>lines(L.t).length||(L.p||[]).length)||st.some(a=>a.length);
-  if(x.rs*x.cs>1&&x.label&&!anyItem&&!split)return h; // 이름만 있는 합친 칸은 이름만 크게
+  if(!anyItem&&!split)return h; // 빈 칸은 칸 코드(와 이름)만 — 화면이 덜 복잡하게
   h+='<span class="layers">'+x.layers.map((L,i)=>{
-    // 실제 재고(굵은 수량) 먼저, 그 다음 손으로 적은 자재
-    // 📌지정 제품(수량, 0이면 흐리게) → 그 밖의 재고 → 손으로 적은 메모
+    // 📌지정 제품(수량, 0이면 흐리게) → 그 밖의 재고 → 손으로 적은 메모. 한 줄에 하나
     const pp=L.p||[];
-    const ls=pp.map(pr=>{const a=st[i].find(z=>z.id===pr.id);return '📌'+esc(prodName(pr))+' <em'+(a?'':' class="z"')+'>'+fmtN(a?a.qty:0)+'</em>'})
-      .concat(st[i].filter(a=>!pp.some(pr=>pr.id===a.id)).map(a=>esc(a.name)+' <em>'+fmtN(a.qty)+'</em>'),lines(L.t).map(esc));
-    const body=ls.length?ls.slice(0,3).join(', ')+(ls.length>3?` 외 ${ls.length-3}`:''):'<i>비어 있음</i>';
-    return `<span class="layer">${split?`<b>${i+1}층</b>`:''}${body}</span>`}).join('')+'</span>';
+    const ls=pp.map(pr=>{const a=st[i].find(z=>z.id===pr.id);return `<span class="it pin">${esc(prodName(pr))} <b${a?'':' class="q0"'}>${fmtN(a?a.qty:0)}</b></span>`})
+      .concat(st[i].filter(a=>!pp.some(pr=>pr.id===a.id)).map(a=>`<span class="it">${esc(a.name)} <b>${fmtN(a.qty)}</b></span>`),
+              lines(L.t).map(t=>`<span class="it memo">${esc(t)}</span>`));
+    const body=ls.length?ls.slice(0,4).join('')+(ls.length>4?`<span class="more">외 ${ls.length-4}개</span>`:''):'<i>–</i>';
+    return `<span class="layer">${split?`<b class="ly">${i+1}층</b>`:''}${body}</span>`}).join('')+'</span>';
   return h;
 }
 function bigStyle(d,x){
@@ -364,13 +376,13 @@ function bigStyle(d,x){
   const name=String(x.label||'').trim(),len=[...name].length,long=Math.max(x.rs,x.cs);
   const fs=(x.type==='label'?17:15)+Math.min(long,5)*1.6;
   const ls=len&&len<=6?Math.min(0.2+0.3*(long-1),1.4):0.02;
-  d.style.setProperty('--fs',fs.toFixed(1)+'px');
+  d.style.setProperty('--fs',(fs/13.5).toFixed(2)+'em');
   d.style.setProperty('--ls',ls.toFixed(2)+'em');
   if(x.rs>x.cs&&len&&len<=6)d.classList.add('tall');
 }
 function renderGrid(){
   const s=sh(),g=E('grid'),q=query(),cov=covered(s);
-  g.style.gridTemplateColumns=`repeat(${s.cols},minmax(70px,1fr))`;g.innerHTML='';
+  g.style.gridTemplateColumns=`repeat(${s.cols},minmax(var(--cw),1fr))`;g.innerHTML='';
   for(let r=0;r<s.rows;r++)for(let c=0;c<s.cols;c++){
     const k=K(r,c);if(cov[k])continue;const x=get(s,r,c);
     const d=document.createElement('button');
@@ -511,8 +523,48 @@ function openPick(i){
   inp.oninput=draw;P.querySelector('[data-a="back"]').onclick=()=>drawCell();draw();setTimeout(()=>inp.focus(),50);
 }
 
+/* ---------- 가운데 줄·칸 지우기: 빈 줄(칸)만, 뒤쪽 줄이 한 칸씩 당겨짐 (재고는 바뀐 칸 이름으로 '이동') ---------- */
+function delPlan(axis,a){
+  const s=sh(),cov=covered(s),n=axis==='r'?s.cols:s.rows,len=axis==='r'?s.rows:s.cols,pos=(line,j)=>axis==='r'?[line,j]:[j,line];
+  if(len<=1)return{err:'마지막 하나는 지울 수 없어요'};
+  for(const k in s.cells){const x=s.cells[k],[r,c]=k.split(',').map(Number),st=axis==='r'?r:c,sp=axis==='r'?x.rs:x.cs;
+    if(sp>1&&a>=st&&a<st+sp)return{err:`${code(r,c)} 합친 칸이 ${lineName(axis,a)}에 걸쳐 있어요. 먼저 "합친 칸 풀기"를 해주세요`};
+    const at=axis==='r'?r===a:c===a;if(at&&(hasContent(x)||x.type==='label'))return{err:`${lineName(axis,a)}에 내용이 있어요 (${code(r,c)}). 먼저 비우거나 다른 자리로 옮겨주세요`}}
+  for(let j=0;j<n;j++){const[r,c]=pos(a,j);if(!cov[K(r,c)]&&cellHasStock(s,r,c))return{err:`${code(r,c)} 칸에 재고가 있어요. 먼저 다른 칸으로 옮겨주세요`}}
+  const groups=[];let neg=false;
+  for(let line=a+1;line<len;line++)for(let j=0;j<n;j++){const[r,c]=pos(line,j),[r2,c2]=pos(line-1,j);if(cov[K(r,c)])continue;
+    keysAt(s,r,c).forEach((k,i)=>{const list=stockAt(k);if(!list.length)return;if(list.some(z=>z.qty<0))neg=true;
+      groups.push({fromLoc:k,toLoc:slotKey(s,r2,c2,i),moves:list.map(z=>({id:z.id,qty:z.qty}))})})}
+  if(neg)return{err:'재고가 마이너스인 칸이 있어요. 재고앱에서 조정한 뒤 지워주세요'};
+  const N=clone(S),ns=N.sheets[S.cur],cells={};
+  for(const k in ns.cells){const[r,c]=k.split(',').map(Number),v=axis==='r'?r:c;if(v===a)continue;
+    cells[v>a?(axis==='r'?K(r-1,c):K(r,c-1)):k]=ns.cells[k]}
+  ns.cells=cells;if(axis==='r')ns.rows--;else ns.cols--;
+  return{groups,N};
+}
+function drawLineDel(){
+  const s=sh(),P=E('panelBody');P.dataset.kind='line';
+  const len=LN.axis==='r'?s.rows:s.cols;LN.a=Math.min(LN.a,len-1);
+  const A=lineName(LN.axis,LN.a),pl=(GAS&&!stockLoaded)?{err:'재고 정보를 불러오는 중이에요'}:delPlan(LN.axis,LN.a),ok=!pl.err;
+  const empties=[];for(let i=0;i<len;i++)if(!delPlan(LN.axis,i).err)empties.push(i);
+  P.innerHTML=`<div class="ph"><h2>줄·칸 지우기<small>${esc(s.name)}</small></h2><button class="x" data-a="close">닫기</button></div>
+  <div class="seg"><button data-md="move">⇄ 옮기기</button><button data-md="del" class="on">🗑 지우기</button></div>
+  <div class="seg"><button data-ax="r" class="${LN.axis==='r'?'on':''}">줄 (A·B·C…)</button><button data-ax="c" class="${LN.axis==='c'?'on':''}">칸 (1·2·3…)</button></div>
+  <label class="f">지울 ${LN.axis==='r'?'줄':'칸'} <small>(✓ = 비어 있어 바로 지울 수 있음)</small><select data-f="a">${Array.from({length:len},(_,i)=>`<option value="${i}"${i===LN.a?' selected':''}>${empties.includes(i)?'✓ ':'　'}${esc(lineName(LN.axis,i))}</option>`).join('')}</select></label>
+  <p class="note"${ok?'':' style="color:#B3412E"'}>${ok?`<b>${esc(A)}</b>를 지우면 ${LN.axis==='r'?'아래 줄이 한 줄씩 위로':'오른쪽 칸이 한 칸씩 왼쪽으로'} 당겨져요.`+(pl.groups.length?` 그래서 재고 ${pl.groups.length}곳의 칸 이름이 바뀌고 재고앱 이력에 '이동'으로 남아요.`:''):esc(pl.err)}</p>
+  <div class="acts"><button data-a="go"${ok?'':' disabled'} class="danger">🗑 ${esc(A)} 지우기</button></div>`;
+  P.querySelector('[data-a="close"]').onclick=closePanel;
+  P.querySelectorAll('[data-md]').forEach(b=>b.onclick=()=>{LN.mode=b.dataset.md;drawLine()});
+  P.querySelectorAll('[data-ax]').forEach(b=>b.onclick=()=>{if(LN.axis===b.dataset.ax)return;LN={axis:b.dataset.ax,a:0,b:1,mode:'del'};drawLine()});
+  P.querySelector('[data-f="a"]').onchange=e=>{LN.a=+e.target.value;drawLine()};
+  P.querySelector('[data-a="go"]').onclick=e=>{if(!ok)return;const btn=e.target;
+    if(pl.groups.length&&!GAS){toast('재고 이동은 재고앱의 위치도에서만 돼요');return}
+    btn.disabled=true;
+    commit(pl.N,pl.groups.length?{groups:pl.groups,staff:lastStaff()||STAFF[0]||'',memo:A+' 지우기'}:null,()=>{render();drawLine();toast(`${A}를 지웠어요`)},()=>{btn.disabled=false})};
+}
+
 /* ---------- 줄·칸 통째로 옮기기 (받는 줄에 내용이 있으면 서로 자리 바꾸기) ---------- */
-let LN={axis:'r',a:0,b:1};
+let LN={axis:'r',a:0,b:1,mode:'move'};
 const lineName=(axis,i)=>axis==='r'?rowCode(i)+'줄':(i+1)+'번 칸';
 function linePlan(axis,a,b){
   const s=sh(),cov=covered(s),n=axis==='r'?s.cols:s.rows,pos=(line,j)=>axis==='r'?[line,j]:[j,line];
@@ -534,12 +586,14 @@ function linePlan(axis,a,b){
 }
 function openLine(){if(MV)endMove();mergeMode=false;sel.clear();render();drawLine();openPanel()}
 function drawLine(){
+  if(LN.mode==='del'){drawLineDel();return}
   const s=sh(),P=E('panelBody');P.dataset.kind='line';
   const n=LN.axis==='r'?s.rows:s.cols;LN.a=Math.min(LN.a,n-1);LN.b=Math.min(LN.b,n-1);
   const opts=v=>Array.from({length:n},(_,i)=>`<option value="${i}"${i===v?' selected':''}>${esc(lineName(LN.axis,i))}</option>`).join('');
   const pl=LN.a===LN.b?{err:'보낼 자리를 다르게 골라주세요'}:(GAS&&!stockLoaded)?{err:'재고 정보를 불러오는 중이에요'}:linePlan(LN.axis,LN.a,LN.b);
   const A=lineName(LN.axis,LN.a),B=lineName(LN.axis,LN.b),ok=!pl.err&&pl.hasA,st=lastStaff(),staff=STAFF.length?STAFF:[''];
   P.innerHTML=`<div class="ph"><h2>줄·칸 옮기기<small>${esc(s.name)}</small></h2><button class="x" data-a="close">닫기</button></div>
+  <div class="seg"><button data-md="move" class="on">⇄ 옮기기</button><button data-md="del">🗑 지우기</button></div>
   <div class="seg"><button data-ax="r" class="${LN.axis==='r'?'on':''}">줄 (A·B·C…)</button><button data-ax="c" class="${LN.axis==='c'?'on':''}">칸 (1·2·3…)</button></div>
   <label class="f">옮길 ${LN.axis==='r'?'줄':'칸'}<select data-f="a">${opts(LN.a)}</select></label>
   <label class="f">보낼 자리<select data-f="b">${opts(LN.b)}</select></label>
@@ -549,7 +603,8 @@ function drawLine(){
   ${ok&&pl.groups.length&&GAS?`<label class="f">담당자<select data-f="staff">${staff.map(v=>`<option${v===st?' selected':''}>${esc(v)}</option>`).join('')}</select></label>`:''}
   <div class="acts"><button data-a="go"${ok?'':' disabled'} style="background:var(--ink);color:var(--paper);font-weight:700">${pl.swap?'⇄ 자리 바꾸기':'⇄ 옮기기'}</button></div>`;
   P.querySelector('[data-a="close"]').onclick=closePanel;
-  P.querySelectorAll('[data-ax]').forEach(b=>b.onclick=()=>{if(LN.axis===b.dataset.ax)return;LN={axis:b.dataset.ax,a:0,b:1};drawLine()});
+  P.querySelectorAll('[data-md]').forEach(b=>b.onclick=()=>{LN.mode=b.dataset.md;drawLine()});
+  P.querySelectorAll('[data-ax]').forEach(b=>b.onclick=()=>{if(LN.axis===b.dataset.ax)return;LN={axis:b.dataset.ax,a:0,b:1,mode:LN.mode};drawLine()});
   P.querySelector('[data-f="a"]').onchange=e=>{LN.a=+e.target.value;drawLine()};
   P.querySelector('[data-f="b"]').onchange=e=>{LN.b=+e.target.value;drawLine()};
   P.querySelector('[data-a="go"]').onclick=e=>{if(!ok)return;const btn=e.target;
@@ -603,21 +658,56 @@ function drawCell(){
 function openSheet(){delArm=false;drawSheet();openPanel()}
 function drawSheet(){
   const s=sh(),P=E('panelBody');P.dataset.kind='sheet';
+  const nm=String(s.name||'').trim(),cellStock=Object.keys(sheetKeys(s)).filter(k=>stockAt(k).length),ext=usedExtent(s);
+  const canTrim=ext.rows<s.rows||ext.cols<s.cols;
   P.innerHTML=`<div class="ph"><h2>시트 설정</h2><button class="x" data-a="close">닫기</button></div>
-  <label class="f">시트 이름<input data-f="name" value="${esc(s.name)}" placeholder="예: A동1층"${GAS&&(!stockLoaded||sheetHasStock(s))?' readonly':''}></label>
-  <p class="note">${GAS&&!stockLoaded?'재고 정보를 불러오는 중이에요.':GAS&&sheetHasStock(s)?'이 시트에 재고가 있어 이름을 바꿀 수 없어요. (칸 위치 이름 = 시트 이름 + 칸 코드)':'시트 이름이 재고앱 위치 이름의 앞부분이 돼요. 기존 위치 이름(예: A동1층)과 같게 하면 그 재고가 이 시트의 "칸 미지정"으로 붙어요.'}</p>
+  <label class="f">시트 이름<input data-f="name" value="${esc(s.name)}" placeholder="예: A동1층"></label>
+  <div class="acts"><button data-a="rename">이름 바꾸기</button></div>
+  <p class="note">시트 이름은 칸 위치 이름의 앞부분이에요 (예: ${esc(nm)} B3). 이름을 바꾸면 칸에 있는 재고도 새 이름으로 같이 옮겨져요(재고앱 이력에 '이동').
+  기존 위치 이름(예: A동1층)과 똑같이 하면 그 이름의 재고가 이 시트의 "칸 미지정"으로 붙어요.</p>
+  <h2 style="font-size:16px;margin:16px 0 8px">크기</h2>
+  ${canTrim?`<div class="acts" style="margin-bottom:10px"><button data-a="trim" style="background:var(--ink);color:var(--paper);font-weight:700">✂ 남는 빈 줄·칸 한 번에 지우기 (줄 ${s.rows}→${ext.rows} · 칸 ${s.cols}→${ext.cols})</button></div>`:''}
   <div class="step"><span>줄 (A부터)</span><button data-d="r-5" aria-label="줄 5개 줄이기">−5</button><button data-d="r-1" aria-label="줄 줄이기">−</button><b>${s.rows}</b><button data-d="r1" aria-label="줄 늘리기">+</button><button data-d="r5" aria-label="줄 5개 늘리기">+5</button></div>
   <div class="step"><span>칸 (1부터)</span><button data-d="c-5" aria-label="칸 5개 줄이기">−5</button><button data-d="c-1" aria-label="칸 줄이기">−</button><b>${s.cols}</b><button data-d="c1" aria-label="칸 늘리기">+</button><button data-d="c5" aria-label="칸 5개 늘리기">+5</button></div>
-  <p class="note">줄이기는 맨 아래 줄, 맨 오른쪽 칸부터 지워져요. 내용이 있으면 멈춰요.</p>
-  <div class="acts">${S.sheets.length>1?`<button class="danger${delArm?' arm':''}" data-a="del">${delArm?'한 번 더 누르면 삭제':'이 시트 삭제'}</button>`:''}</div>`;
-  P.querySelector('[data-f="name"]').oninput=e=>{const v=e.target.value.trim()||'이름 없음';
-    if(S.sheets.some(o=>o!==s&&String(o.name).trim()===v)){toast('같은 이름의 시트가 이미 있어요');return}
-    s.name=v;save();renderTabs();renderGrid();renderStockBar()};
+  <p class="note">−는 맨 아래 줄·맨 오른쪽 칸부터 지워요. <b>중간</b>의 줄·칸은 위 <b>줄·칸 옮기기 → 지우기</b>로 지울 수 있어요.</p>
+  ${S.sheets.length>1?`<h2 style="font-size:16px;margin:16px 0 8px">삭제</h2>
+  ${delArm?`<p class="note">${cellStock.length?`칸에 있는 재고 ${cellStock.length}곳은 "${esc(nm)}"(칸 미지정)으로 옮긴 뒤 삭제해요. `:''}${stockAt(nm).length?`"${esc(nm)}" 이름의 재고(칸 미지정)는 그대로 남아요 — 같은 이름의 시트가 없으면 "연결 안 된 재고"로 보여요. `:''}</p>`:''}
+  <div class="acts"><button class="danger${delArm?' arm':''}" data-a="del">${delArm?'한 번 더 누르면 삭제':'이 시트 삭제'}</button></div>`:''}`;
   P.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const d=b.dataset.d;resize(d[0]==='r'?+d.slice(1):0,d[0]==='c'?+d.slice(1):0)});
-  P.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{if(b.dataset.a==='close'){closePanel();return}
-    if(guard(sheetHasStock(s),'이 시트에 재고가 있어 삭제할 수 없어요. 재고를 옮긴 뒤 삭제해주세요'))return;
+  P.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;
+    if(a==='close'){closePanel();return}
+    if(a==='rename'){renameSheet(P.querySelector('[data-f="name"]').value,b);return}
+    if(a==='trim'){resize(ext.rows-s.rows,ext.cols-s.cols);return}
+    if(a!=='del')return;
+    if(GAS&&!stockLoaded){toast('재고 정보를 불러오는 중이에요. 잠시 후 다시 해주세요');return}
     if(!delArm){delArm=true;drawSheet();return}
-    S.sheets.splice(S.cur,1);fixCur();save();closePanel();render();toast('시트를 삭제했어요')});
+    const N=clone(S);N.sheets.splice(S.cur,1);
+    const groups=cellStock.map(k=>({fromLoc:k,toLoc:nm,moves:stockAt(k).filter(z=>z.qty>0).map(z=>({id:z.id,qty:z.qty}))})).filter(g=>g.moves.length);
+    b.disabled=true;
+    commit(N,groups.length?{groups,staff:lastStaff()||STAFF[0]||'',memo:'시트 삭제'}:null,()=>{fixCur();sel.clear();closePanel();render();toast(`"${nm}" 시트를 삭제했어요`)},()=>{b.disabled=false});
+  });
+}
+/** 시트 이름 바꾸기 — 칸 재고는 새 위치 이름으로 '이동' 기록과 함께 옮김 */
+function renameSheet(v,btn){
+  const s=sh(),old=String(s.name||'').trim();v=String(v||'').trim();
+  if(!v){toast('시트 이름을 입력하세요');return}
+  if(v===old){toast('이름이 그대로예요');return}
+  if(S.sheets.some(o=>o!==s&&String(o.name).trim()===v)){toast('같은 이름의 시트가 이미 있어요');return}
+  if(GAS&&!stockLoaded){toast('재고 정보를 불러오는 중이에요. 잠시 후 다시 해주세요');return}
+  const N=clone(S),ns=N.sheets[S.cur];ns.name=v;
+  const ks=sheetKeys(s),groups=Object.keys(ks).filter(k=>stockAt(k).length).map(k=>{const[r,c,i]=ks[k];
+    return{fromLoc:k,toLoc:slotKey(ns,r,c,i),moves:stockAt(k).filter(z=>z.qty>0).map(z=>({id:z.id,qty:z.qty}))}}).filter(g=>g.moves.length);
+  btn.disabled=true;
+  commit(N,groups.length?{groups,staff:lastStaff()||STAFF[0]||'',memo:'시트 이름 '+old+'→'+v}:null,()=>{drawSheet();render();
+    toast(`이름을 "${v}"로 바꿨어요`+(groups.length?` (칸 재고 ${groups.length}곳 같이 이동)`:''))},()=>{btn.disabled=false});
+}
+/** 내용(이름·메모·지정 제품·이름표·합친 칸·재고)이 있는 마지막 줄·칸까지의 크기 */
+function usedExtent(s){
+  let mr=-1,mc=-1;
+  for(const k in s.cells){const x=s.cells[k],[r,c]=k.split(',').map(Number);
+    if(x.type==='label'||hasContent(x)||x.rs*x.cs>1){mr=Math.max(mr,r+x.rs-1);mc=Math.max(mc,c+x.cs-1)}}
+  const ks=sheetKeys(s);Object.keys(ks).forEach(k=>{if(stockAt(k).length){const[r,c]=ks[k];mr=Math.max(mr,r);mc=Math.max(mc,c)}});
+  return{rows:Math.max(1,mr+1),cols:Math.max(1,mc+1)};
 }
 function resize(dr,dc){
   const s=sh(),nr=Math.min(MAXR,Math.max(1,s.rows+dr)),nc=Math.min(MAXC,Math.max(1,s.cols+dc));
@@ -684,6 +774,13 @@ E('bDoMerge').onclick=doMerge;
 E('bSheet').onclick=openSheet;
 E('bBackup').onclick=openBackup;
 E('bLine').onclick=openLine;
+/* 칸 크기(글자 크기) — 이 기기에 기억 */
+const ZOOM=[{cw:64,ch:56,fz:11},{cw:96,ch:78,fz:13.5},{cw:124,ch:96,fz:15.5},{cw:156,ch:118,fz:18}];
+let zoom=1;try{const z=+localStorage.getItem('subtek-loc-zoom');if(z>=0&&z<ZOOM.length&&localStorage.getItem('subtek-loc-zoom')!==null)zoom=z}catch(e){}
+function applyZoom(){const z=ZOOM[zoom];root.style.setProperty('--cw',z.cw+'px');root.style.setProperty('--ch',z.ch+'px');root.style.setProperty('--fz',z.fz+'px');
+  E('zOut').disabled=zoom===0;E('zIn').disabled=zoom===ZOOM.length-1;try{localStorage.setItem('subtek-loc-zoom',zoom)}catch(e){}}
+E('zOut').onclick=()=>{if(zoom>0){zoom--;applyZoom()}};E('zIn').onclick=()=>{if(zoom<ZOOM.length-1){zoom++;applyZoom()}};
+applyZoom();
 if(GAS&&root.classList.contains('solo')){
   const bk=E('back');bk.hidden=false;
   bk.onclick=()=>{if(APP){openApp({});return}GAS.withSuccessHandler(u=>window.open(u,'_top')).locUrl()};
