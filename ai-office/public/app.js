@@ -50,10 +50,15 @@
     es.onerror = () => {
       serverOk = false; setConn('off', '서버 없음');
       // 401 이면 EventSource 가 그냥 에러만 낸다. status 로 확인.
-      fetch('/api/status', { headers: { 'x-office-pin': pin } }).then(r => { if (r.status === 401) { es.close(); askPin(); } }).catch(() => {
+      const noServer = () => {
         el.banner.textContent = '브리지 서버에 연결되지 않았습니다. PC 에서 서버를 켜고 다시 열어 주세요. 지금은 "데모"만 됩니다.';
         el.banner.classList.remove('hidden');
-      });
+        if (es) { es.close(); es = null; }
+      };
+      fetch('/api/status', { headers: { 'x-office-pin': pin } }).then(r => {
+        if (r.status === 401) { es.close(); askPin(); }
+        else if (!r.ok) noServer();
+      }).catch(noServer);
     };
   }
   function setConn(state, label) { el.conn.className = 'conn ' + state; el.connLabel.textContent = label; }
