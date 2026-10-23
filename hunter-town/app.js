@@ -59,14 +59,14 @@
   ];
   var ZONE_KILLS = 20;
   var BUILDINGS = [
-    { id: 'inn', nm: '숙소', ic: '🏠', col: '#8a4a30', roof: '#c2552f', max: 20, base: 150, desc: function (lv) { return lv ? '헌터 정원 ' + (3 + lv) + '명' : '헌터 정원 3명'; }, fx: 0.18, fy: 0.3 },
-    { id: 'forge', nm: '대장간', ic: '🔥', col: '#4a4a52', roof: '#2e2e36', max: 10, base: 200, desc: function (lv) { return lv ? '제작 등급 ↑ · 강화 성공률 +' + lv * 2 + '%' : '장비 제작·강화'; }, fx: 0.5, fy: 0.28 },
-    { id: 'camp', nm: '훈련소', ic: '🎯', col: '#5a6a3a', roof: '#3a4a22', max: 20, base: 150, desc: function (lv) { return '경험치 +' + lv * 10 + '%'; }, fx: 0.82, fy: 0.3 },
-    { id: 'potion', nm: '물약상점', ic: '🧪', col: '#3a6a6a', roof: '#2a8a7a', max: 10, base: 120, desc: function (lv) { return lv ? '헌터가 물약을 사 감 · 재고 최대 ' + (10 + lv * 5) : '헌터에게 물약 판매'; }, fx: 0.18, fy: 0.6 },
-    { id: 'shrine', nm: '회복의 성소', ic: '⛲', col: '#6a7a9a', roof: '#4a5a8a', max: 10, base: 180, desc: function (lv) { return lv ? '쓰러진 뒤 회복 ' + Math.round((1 - restMul(lv)) * 100) + '% 빠름' : '쓰러진 헌터 회복 가속'; }, fx: 0.5, fy: 0.58 },
-    { id: 'weapon', nm: '무기상점', ic: '🗡️', col: '#7a3a3a', roof: '#a03a2a', max: 10, base: 180, desc: function (lv) { return lv ? '진열 ' + (2 + lv) + '칸 · 헌터가 무기 구매' : '헌터에게 무기 판매'; }, fx: 0.82, fy: 0.6 },
-    { id: 'armor', nm: '방어구상점', ic: '🛡️', col: '#3a4a7a', roof: '#2a5aa0', max: 10, base: 180, desc: function (lv) { return lv ? '진열 ' + (2 + lv) + '칸 · 헌터가 갑옷 구매' : '헌터에게 갑옷 판매'; }, fx: 0.33, fy: 0.8 },
-    { id: 'market', nm: '잡화상', ic: '🧺', col: '#8a6a3a', roof: '#c08a3a', max: 10, base: 100, desc: function (lv) { return lv ? '잡템 매입가 +' + lv * 5 + '% · 세금 ' + (10 + lv) + '%' : '헌터 잡템 매입'; }, fx: 0.67, fy: 0.8 }
+    { id: 'inn', nm: '숙소', ic: '🏠', col: '#8a4a30', roof: '#c2552f', max: 20, base: 150, desc: function (lv) { return lv ? '헌터 정원 ' + (3 + lv) + '명' : '헌터 정원 3명'; }, fx: 0.14, fy: 0.42 },
+    { id: 'forge', nm: '대장간', ic: '🔥', col: '#4a4a52', roof: '#2e2e36', max: 10, base: 200, desc: function (lv) { return lv ? '제작 등급 ↑ · 강화 성공률 +' + lv * 2 + '%' : '장비 제작·강화'; }, fx: 0.38, fy: 0.42 },
+    { id: 'camp', nm: '훈련소', ic: '🎯', col: '#5a6a3a', roof: '#3a4a22', max: 20, base: 150, desc: function (lv) { return '경험치 +' + lv * 10 + '%'; }, fx: 0.62, fy: 0.42 },
+    { id: 'potion', nm: '물약상점', ic: '🧪', col: '#3a6a6a', roof: '#2a8a7a', max: 10, base: 120, desc: function (lv) { return lv ? '헌터가 물약을 사 감 · 재고 최대 ' + (10 + lv * 5) : '헌터에게 물약 판매'; }, fx: 0.14, fy: 0.9 },
+    { id: 'shrine', nm: '회복의 성소', ic: '⛲', col: '#6a7a9a', roof: '#4a5a8a', max: 10, base: 180, desc: function (lv) { return lv ? '쓰러진 뒤 회복 ' + Math.round((1 - restMul(lv)) * 100) + '% 빠름' : '쓰러진 헌터 회복 가속'; }, fx: 0.86, fy: 0.42 },
+    { id: 'weapon', nm: '무기상점', ic: '🗡️', col: '#7a3a3a', roof: '#a03a2a', max: 10, base: 180, desc: function (lv) { return lv ? '진열 ' + (2 + lv) + '칸 · 헌터가 무기 구매' : '헌터에게 무기 판매'; }, fx: 0.38, fy: 0.9 },
+    { id: 'armor', nm: '방어구상점', ic: '🛡️', col: '#3a4a7a', roof: '#2a5aa0', max: 10, base: 180, desc: function (lv) { return lv ? '진열 ' + (2 + lv) + '칸 · 헌터가 갑옷 구매' : '헌터에게 갑옷 판매'; }, fx: 0.62, fy: 0.9 },
+    { id: 'market', nm: '잡화상', ic: '🧺', col: '#8a6a3a', roof: '#c08a3a', max: 10, base: 100, desc: function (lv) { return lv ? '잡템 매입가 +' + lv * 5 + '% · 세금 ' + (10 + lv) + '%' : '헌터 잡템 매입'; }, fx: 0.86, fy: 0.9 }
   ];
   function bld(id) { return BUILDINGS.find(function (b) { return b.id === id; }); }
   function restMul(lv) { return Math.max(0.3, 1 - lv * 0.08); }
@@ -201,20 +201,22 @@
     var m = { id: uid(), nm: boss ? z.boss : z.mons[k], boss: !!boss, kind: k, color: z.mon[k],
       maxHp: Math.round((boss ? 320 : 40 + k * 14) * sc), atk: Math.round((boss ? 14 : 5 + k * 2) * sc), def: Math.round(k * sc),
       spd: boss ? 0.7 : 0.9, gold: Math.round((boss ? 60 : 5 + k * 3) * sc), exp: Math.round((boss ? 90 : 8 + k * 4) * sc),
-      x: F.w + 6 + Math.random() * 10, y: rnd(F.top + 4, F.h - 6), cd: Math.random(), anim: 0, flash: 0, walk: Math.random() * 10 };
+      x: F.w + 6 + Math.random() * 10, y: rnd(F.fTop + 4, F.h - 6), cd: Math.random(), anim: 0, flash: 0, walk: Math.random() * 10 };
     m.hp = m.maxHp; return m;
   }
 
   // ---------- 시뮬레이션 ----------
-  var F = { w: 130, h: 118, top: 26, mons: [], shots: [], fx: [], shake: 0, freeze: 0, spawnCd: 1, ctx: null, pix: 3, terrain: null, terrainZone: 0, townMap: null, townKey: '', time: 0 };
+  var F = { w: 130, h: 118, top: 26, wallY: 90, fTop: 97, mons: [], shots: [], fx: [], shake: 0, freeze: 0, spawnCd: 1, ctx: null, pix: 3, map: null, mapKey: '', time: 0 };
   function capacity() { return 3 + S.town.inn + (S.cfg.capBonus | 0); }
   function hunting() { return S.hunters.filter(function (h) { return h.status === 'hunt'; }); }
   function inTown() { return S.hunters.filter(function (h) { return h.status === 'town'; }); }
   function tierFx(tier) { return 1 + TIER_IDX[tier] * 0.6; }
   function dist(a, b) { var dx = a.x - b.x, dy = a.y - b.y; return Math.sqrt(dx * dx + dy * dy); }
   function moveToward(e, tx, ty, sp, dt) { var dx = tx - e.x, dy = ty - e.y, d = Math.sqrt(dx * dx + dy * dy) || 1; var s = Math.min(d, sp * dt); e.x += dx / d * s; e.y += dy / d * s; e.walk = (e.walk || 0) + dt * 8; return d - s; }
-  function townSpot(id) { var b = bld(id); return { x: Math.round(F.w * b.fx), y: Math.round(F.top + (F.h - F.top) * b.fy) + 4 }; }
-  function gateSpot() { return { x: F.w - 6, y: Math.round((F.top + F.h) / 2) }; }
+  function townSpot(id) { var b = bld(id); return { x: Math.round(F.w * b.fx), y: Math.round(F.top + (F.wallY - F.top) * b.fy) }; }
+  function gateSpot() { return { x: Math.round(F.w / 2), y: F.wallY - 2 }; }       // 마을 쪽 문 앞
+  function fieldGate() { return { x: Math.round(F.w / 2), y: F.fTop + 8 }; }     // 사냥터 쪽 문 앞
+  function plazaSpot() { return { x: Math.round(F.w / 2), y: Math.round((F.top + F.wallY) / 2) + 10 }; }
   function shoutOn() { return Date.now() < S.shoutUntil; }
 
   function step(dt) {
@@ -222,8 +224,9 @@
     S.hunters.forEach(function (h) {
       if (h.bubble && now > h.bubble.until) h.bubble = null;
       h.anim = Math.max(0, h.anim - dt); h.flash = Math.max(0, h.flash - dt); h.potCd = Math.max(0, h.potCd - dt);
+      if (h.status === 'town' && h.hp < h.maxHp) h.hp = Math.min(h.maxHp, h.hp + h.maxHp * 0.03 * dt); // 마을에선 회복
       if (h.status === 'rest' && now >= h.restUntil) {
-        h.hp = h.maxHp; h.status = 'town'; h.phase = h.auto ? 'sell' : 'idle'; var g = gateSpot(); h.x = g.x; h.y = g.y; h.target = null; h.lowSaid = false;
+        h.hp = h.maxHp; h.status = 'town'; h.phase = h.auto ? 'sell' : 'idle'; var g = plazaSpot(); h.x = g.x; h.y = g.y; h.target = null; h.lowSaid = false;
         addLog('<b>' + esc(h.name) + '</b> 회복 완료' + (h.auto ? ', 정비 시작' : '')); if (h.auto) say(h, 'rested', true);
         ui.dirty.hunters = true;
       }
@@ -242,13 +245,15 @@
       if (h.hp / h.maxHp < 0.4 && h.potions > 0 && h.potCd <= 0) { h.potions--; h.hp = Math.min(h.maxHp, h.hp + h.maxHp * 0.5); h.potCd = 3; F.fx.push({ kind: 'num', x: h.x, y: h.y - 16, txt: '🧪', color: '#7fd3c0', size: 7, t: 0, life: 0.9 }); }
       if (h.hp / h.maxHp < 0.3 && !h.lowSaid) { h.lowSaid = true; say(h, 'lowhp'); } else if (h.hp / h.maxHp > 0.6) h.lowSaid = false;
       if (F.time > h.nextTalk) { h.nextTalk = F.time + rnd(12, 30); say(h, 'idle', true); }
-      // 돌아갈 때: 목표 처치 수 채움 / 가방 가득 / 체력 낮은데 물약 없음
-      if (h.trip.kills >= h.trip.need || h.bag.length >= 10 || (h.hp < h.maxHp * 0.25 && h.potions === 0)) { goHome(h); return; }
+      h.trip.t = (h.trip.t || 0) + dt;
+      // 돌아갈 때: 목표 처치 수 채움 / 가방 가득 / 체력 낮은데 물약 없음 (출발 직후 8초는 예외)
+      if (!h.returning && h.trip.t > 8 && (h.trip.kills >= h.trip.need || h.bag.length >= 10 || (h.hp < h.maxHp * 0.25 && h.potions === 0))) { h.returning = true; say(h, 'back'); h.target = null; }
+      if (h.returning) { var fg = fieldGate(); if (moveToward(h, fg.x, fg.y, 26 * h.mspd, dt) < 1.5) goHome(h); return; }
       var tgt = null, best = 1e9;
       F.mons.forEach(function (m) { if (m.hp <= 0 || m.x > F.w - 8) return; var d = dist(h, m); if (d < best) { best = d; tgt = m; } });
       h.target = tgt;
       if (!tgt) {
-        if (!h.wx || dist(h, { x: h.wx, y: h.wy }) < 2) { h.wx = rnd(24, F.w * 0.6); h.wy = rnd(F.top + 6, F.h - 6); }
+        if (!h.wx || dist(h, { x: h.wx, y: h.wy }) < 2) { h.wx = rnd(14, F.w * 0.7); h.wy = rnd(F.fTop + 4, F.h - 6); }
         if (Math.random() < 0.6) moveToward(h, h.wx, h.wy, 9 * h.mspd, dt);
         return;
       }
@@ -258,7 +263,7 @@
     for (var a = 0; a < hs.length; a++) for (var b = a + 1; b < hs.length; b++) {
       var d = dist(hs[a], hs[b]); if (d < 8 && d > 0) { var dx = (hs[b].x - hs[a].x) / d, dy = (hs[b].y - hs[a].y) / d, p = (8 - d) * 0.5; hs[a].x -= dx * p; hs[a].y -= dy * p; hs[b].x += dx * p; hs[b].y += dy * p; }
     }
-    hs.forEach(function (h) { h.x = clamp(h.x, 12, F.w - 18); h.y = clamp(h.y, F.top + 2, F.h - 4); });
+    hs.forEach(function (h) { h.x = clamp(h.x, 6, F.w - 18); h.y = clamp(h.y, F.fTop + 2, F.h - 4); });
     F.mons.forEach(function (m) {
       m.anim = Math.max(0, m.anim - dt); m.flash = Math.max(0, m.flash - dt);
       var tgt = null, best = 1e9;
@@ -267,7 +272,7 @@
       if (best > 7) { moveToward(m, tgt.x + 5, tgt.y, m.boss ? 9 : 13, dt); return; }
       m.cd -= dt * m.spd; if (m.cd <= 0) { m.cd = 1; monsterHit(m, tgt); }
     });
-    F.mons.forEach(function (m) { m.y = clamp(m.y, F.top + 2, F.h - 4); });
+    F.mons.forEach(function (m) { m.y = clamp(m.y, F.fTop + 2, F.h - 4); });
     for (var i = F.shots.length - 1; i >= 0; i--) {
       var s = F.shots[i]; s.t += dt;
       var tx = s.tgt.x, ty = s.tgt.y - 5, ddx = tx - s.x, ddy = ty - s.y, dd = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
@@ -288,15 +293,16 @@
   // ---- 마을 정비: 잡템 판매 → 물약 → 무기·방어구 상점 → 출발 ----
   function stepTown(h, dt) {
     if (!h.auto || h.phase === 'idle') {
-      h.phase = 'idle'; var c = townSpot('shrine');
-      if (!h.wx || dist(h, { x: h.wx, y: h.wy }) < 2) { h.wx = c.x + rnd(-18, 18); h.wy = c.y + rnd(-6, 10); }
+      h.phase = 'idle'; var c = plazaSpot();
+      if (!h.wx || dist(h, { x: h.wx, y: h.wy }) < 2) { h.wx = c.x + rnd(-22, 22); h.wy = c.y + rnd(-8, 8); }
       if (Math.random() < 0.4) moveToward(h, h.wx, h.wy, 7, dt);
       if (F.time > h.nextTalk) { h.nextTalk = F.time + rnd(15, 35); say(h, 'idle', true); }
       return;
     }
     var spotId = { sell: 'market', potion: 'potion', shop: h.shopStep ? 'armor' : 'weapon', ready: null }[h.phase];
     var spot = spotId ? townSpot(spotId) : gateSpot();
-    if (spotId && !S.town[spotId]) { nextPhase(h); return; } // 안 지은 건물은 건너뜀
+    if (spotId && !S.town[spotId] && h.phase !== 'sell') { nextPhase(h); return; } // 안 지은 상점은 건너뜀 (잡템 판매는 잡화상이 없어도 함)
+    if (spotId && !S.town[spotId]) spot = plazaSpot();
     if (spotId) spot = { x: spot.x + (h.phase === 'shop' ? 6 : -6), y: spot.y + 3 };
     var left = moveToward(h, spot.x, spot.y, 16 * h.mspd, dt);
     if (left > 1.5) return;
@@ -314,8 +320,8 @@
   function doPhase(h) {
     if (h.phase === 'sell') {
       var junk = h.bag.filter(function (b) { return b.junk; }), gear = h.bag.filter(function (b) { return !b.junk; });
-      var lvM = S.town.market, total = 0, herbs = 0;
-      junk.forEach(function (j) { total += Math.round(j.v * (1 + lvM * 0.05)); if (j.herb) herbs++; });
+      var lvM = S.town.market, total = 0, herbs = 0, noMarket = !lvM;
+      junk.forEach(function (j) { total += Math.round(j.v * (noMarket ? 0.6 : 1 + lvM * 0.05)); if (j.herb) herbs++; });
       gear.forEach(function (it) { // 주운 장비: 지금 것보다 좋으면 장착, 아니면 헐값에 판다
         var slot = it.kind, ok = it.kind === 'armor' || it.type === CLASSES[h.cls].weapon;
         if (ok && itemScore(it) > itemScore(h[slot])) { if (h[slot]) S.items.push(h[slot]); h[slot] = it; recalc(h); addLog('🧷 <b>' + esc(h.name) + '</b> 주운 <b>' + esc(it.name) + '</b> 장착'); say(h, 'equip'); }
@@ -342,13 +348,13 @@
         say(h, 'buy', true); h.flash = 0.2; checkMission(); ui.dirty.shop = true; ui.dirty.items = true;
       } else if (shelf.length) say(h, 'shop');
     } else if (h.phase === 'ready') {
-      h.status = 'hunt'; h.x = 14; h.y = rnd(F.top + 10, F.h - 10); h.trip = { kills: 0, need: 10 + h.lv * 2 }; h.lowSaid = false; h.target = null;
+      var fg = fieldGate(); h.status = 'hunt'; h.returning = false; h.hp = h.maxHp; h.x = fg.x + rnd(-4, 4); h.y = fg.y; h.trip = { kills: 0, need: 10 + h.lv * 2, t: 0 }; h.lowSaid = false; h.target = null;
       say(h, 'leave'); ui.dirty.hunters = true;
     }
   }
   function goHome(h) {
-    h.status = 'town'; h.phase = 'sell'; var g = gateSpot(); h.x = g.x; h.y = g.y; h.target = null; h.act = 0;
-    say(h, 'back'); ui.dirty.hunters = true;
+    h.status = 'town'; h.phase = 'sell'; h.returning = false; var g = gateSpot(); h.x = g.x; h.y = g.y; h.target = null; h.act = 0;
+    ui.dirty.hunters = true;
   }
   function attack(h, m) {
     h.anim = 0.25;
@@ -520,23 +526,46 @@
     var cv = $('#field'), cssW = cv.parentNode.getBoundingClientRect().width || 360;
     F.pix = Math.max(2, Math.floor(cssW / 125));
     F.w = Math.ceil(cssW / F.pix);
-    var avail = window.innerHeight - $('.nav').offsetHeight - 150;
-    F.h = clamp(Math.floor(avail / F.pix), 110, 190);
+    var avail = window.innerHeight - $('.nav').offsetHeight - 130;
+    F.h = clamp(Math.floor(avail / F.pix), 150, 240);
+    F.wallY = F.top + Math.round((F.h - F.top) * 0.46); F.fTop = F.wallY + 7;
     cv.width = F.w; cv.height = F.h; cv.style.width = F.w * F.pix + 'px'; cv.style.height = F.h * F.pix + 'px';
     F.ctx = cv.getContext('2d'); F.ctx.imageSmoothingEnabled = false;
-    F.terrainZone = 0; F.townKey = '';
+    F.mapKey = '';
   }
   function seeded(seed) { var s = seed * 9301 + 49297; return function () { s = (s * 9301 + 49297) % 233280; return s / 233280; }; }
-  function buildTerrain() {
+  function buildMap() {
     var z = zoneInfo(S.zone), r = seeded(S.zone * 7 + 3), cv = document.createElement('canvas'); cv.width = F.w; cv.height = F.h;
-    var c = cv.getContext('2d'), i, x, y;
-    P(c, 0, 0, z.base, F.w, F.h);
-    for (i = 0; i < 260; i++) { x = Math.floor(r() * F.w); y = Math.floor(r() * F.h); P(c, x, y, r() < 0.5 ? z.light : z.dark, 1 + Math.floor(r() * 3), 1 + Math.floor(r() * 2)); }
-    var py = F.h / 2;
-    for (x = 10; x < F.w; x++) { py += (r() - 0.5) * 1.6; py = clamp(py, F.top + 12, F.h - 14); P(c, x, py - 4, z.path, 1, 9); if (r() < 0.3) P(c, x, py - 5 + Math.floor(r() * 11), z.dark); }
-    var n = z.deco === 'forest' ? 26 : 16;
+    var c = cv.getContext('2d'), i, x, y, cx = Math.round(F.w / 2);
+    // 하늘
+    P(c, 0, 0, '#0e1a26', F.w, F.top - 2); P(c, 0, F.top - 2, '#1a2a30', F.w, 2);
+    for (i = 0; i < 20; i++) P(c, Math.floor(r() * F.w), Math.floor(r() * (F.top - 6)), r() < 0.3 ? '#fff' : '#9ab', 1, 1);
+    P(c, F.w - 22, 6, '#ffe9a8', 6, 6); P(c, F.w - 21, 5, '#ffe9a8', 4, 8); P(c, F.w - 23, 7, '#ffe9a8', 8, 4); P(c, F.w - 20, 8, '#e8d090', 2, 2);
+    // 마을 땅: 잔디 + 돌바닥(두 줄 길 + 문으로 가는 길)
+    P(c, 0, F.top, '#2f4a2a', F.w, F.wallY - F.top);
+    for (i = 0; i < 160; i++) { x = Math.floor(r() * F.w); y = F.top + Math.floor(r() * (F.wallY - F.top)); P(c, x, y, r() < 0.5 ? '#3a5a33' : '#25391f', 1 + Math.floor(r() * 3), 1); }
+    var r1 = Math.round(F.top + (F.wallY - F.top) * 0.42) + 1, r2 = Math.round(F.top + (F.wallY - F.top) * 0.9) + 1;
+    for (y = F.top; y < F.wallY; y++) for (x = 0; x < F.w; x++) {
+      var on = (y >= r1 && y < r1 + 4) || (y >= r2 && y < r2 + 4) || (Math.abs(x - cx) < 4 && y >= r1) || (Math.abs(x - cx) < 14 && y > r1 + 4 && y < r2 - 6);
+      if (on) P(c, x, y, ((x * 7 + y * 3) % 5 === 0) ? '#6a6050' : ((x + y) % 2 ? '#8a8070' : '#7a7060'), 1, 1);
+    }
+    for (i = 0; i < 10; i++) { x = Math.floor(r() * F.w); y = F.top + 2 + Math.floor(r() * (F.wallY - F.top - 4)); P(c, x, y, r() < 0.5 ? '#ffd0e0' : '#fff6c0', 1, 1); }
+    // 성벽 + 문 + 등불
+    for (y = F.wallY; y < F.wallY + 7; y++) for (x = 0; x < F.w; x++) P(c, x, y, (((x >> 1) + y) % 3 === 0) ? '#3a3f4c' : '#4a5060');
+    P(c, 0, F.wallY, '#5a6070', F.w, 1); P(c, 0, F.wallY + 6, '#2a2e38', F.w, 1);
+    for (x = 0; x < F.w; x += 4) P(c, x, F.wallY - 2, '#4a5060', 2, 2);
+    P(c, cx - 5, F.wallY - 3, '#120d0a', 10, 10); P(c, cx - 6, F.wallY - 5, '#5a4030', 12, 2); P(c, cx - 6, F.wallY - 3, '#5a4030', 1, 10); P(c, cx + 5, F.wallY - 3, '#5a4030', 1, 10);
+    P(c, cx - 8, F.wallY - 6, '#ffb040', 1, 1); P(c, cx + 7, F.wallY - 6, '#ffb040', 1, 1);
+    c.globalAlpha = 0.2; c.fillStyle = '#ffb040'; c.beginPath(); c.arc(cx - 8, F.wallY - 6, 6, 0, 7); c.fill(); c.beginPath(); c.arc(cx + 7, F.wallY - 6, 6, 0, 7); c.fill(); c.globalAlpha = 1;
+    // 사냥터: 구역 테마
+    var f0 = F.wallY + 7;
+    P(c, 0, f0, z.base, F.w, F.h - f0);
+    for (i = 0; i < 220; i++) { x = Math.floor(r() * F.w); y = f0 + Math.floor(r() * (F.h - f0)); P(c, x, y, r() < 0.5 ? z.light : z.dark, 1 + Math.floor(r() * 3), 1 + Math.floor(r() * 2)); }
+    var px = cx, py = f0;
+    for (y = f0; y < F.h; y++) { px += (r() - 0.5) * 2.2; px = clamp(px, 12, F.w - 12); P(c, px - 4, y, z.path, 9, 1); if (r() < 0.3) P(c, px - 5 + Math.floor(r() * 11), y, z.dark); }
+    var n = z.deco === 'forest' ? 18 : 12;
     for (i = 0; i < n; i++) {
-      x = 20 + Math.floor(r() * (F.w - 26)); y = F.top + Math.floor(r() * (F.h - F.top - 4)); var k = r();
+      x = 4 + Math.floor(r() * (F.w - 10)); y = f0 + 6 + Math.floor(r() * (F.h - f0 - 8)); var k = r();
       if (z.deco === 'cave' || (z.deco === 'lava' && k < 0.5)) { P(c, x, y, '#6a6f7a', 3, 2); P(c, x, y - 1, '#8a8f9a', 2, 1); }
       else if (z.deco === 'lava' && k < 0.8) { P(c, x, y, '#ff7a2a', 2, 1); P(c, x + 1, y + 1, '#ffb040', 1, 1); }
       else if (z.deco === 'abyss' && k < 0.5) { P(c, x, y, '#b07aff', 1, 1); P(c, x + 2, y + 1, '#7a4fd0', 1, 1); }
@@ -544,39 +573,7 @@
       else if (k < 0.75) { P(c, x, y, z.dark, 4, 2); P(c, x + 1, y - 1, z.light, 2, 1); }
       else P(c, x, y, r() < 0.5 ? '#ffd0e0' : '#fff6c0', 1, 1);
     }
-    for (y = F.top - 6; y < F.h; y++) for (x = 0; x < 12; x++) P(c, x, y, ((x + (y >> 1)) % 3 === 0) ? '#3a3f4c' : '#4a5060');
-    P(c, 10, F.top - 6, '#2a2e38', 2, F.h);
-    var gy = F.h / 2; P(c, 6, gy - 9, '#120d0a', 6, 18); P(c, 6, gy - 11, '#5a4030', 6, 2);
-    P(c, 4, gy - 13, '#ffb040', 1, 1); P(c, 13, gy - 13, '#ffb040', 1, 1);
-    c.globalAlpha = 0.18; c.fillStyle = '#ffb040'; c.beginPath(); c.arc(4, gy - 13, 6, 0, 7); c.fill(); c.beginPath(); c.arc(13, gy - 13, 6, 0, 7); c.fill(); c.globalAlpha = 1;
-    P(c, 0, F.top - 16, '#6a3a2a', 10, 1); P(c, 1, F.top - 15, '#8a4a30', 8, 9); P(c, 3, F.top - 11, '#ffd070', 2, 2); P(c, 0, F.top - 17, '#3a2a1a', 11, 1);
-    drawSky(c, r);
-    F.terrain = cv; F.terrainZone = S.zone;
-  }
-  function drawSky(c, r) {
-    var i; P(c, 12, 0, '#0e1a26', F.w, F.top - 2); P(c, 12, F.top - 2, '#1a2a30', F.w, 2);
-    for (i = 0; i < 20; i++) P(c, 12 + Math.floor(r() * (F.w - 12)), Math.floor(r() * (F.top - 6)), r() < 0.3 ? '#fff' : '#9ab', 1, 1);
-    P(c, F.w - 22, 6, '#ffe9a8', 6, 6); P(c, F.w - 21, 5, '#ffe9a8', 4, 8); P(c, F.w - 23, 7, '#ffe9a8', 8, 4); P(c, F.w - 20, 8, '#e8d090', 2, 2);
-  }
-  // 마을 배경(건물은 매 프레임 그린다: 헌터와 앞뒤 정렬)
-  function buildTownMap() {
-    var r = seeded(11), cv = document.createElement('canvas'); cv.width = F.w; cv.height = F.h; var c = cv.getContext('2d'), i, x, y;
-    P(c, 0, 0, '#2f4a2a', F.w, F.h);
-    for (i = 0; i < 200; i++) { x = Math.floor(r() * F.w); y = Math.floor(r() * F.h); P(c, x, y, r() < 0.5 ? '#3a5a33' : '#25391f', 1 + Math.floor(r() * 3), 1); }
-    // 돌바닥 광장과 길
-    var cx = Math.round(F.w / 2), cy = Math.round(F.top + (F.h - F.top) * 0.58) + 4;
-    for (y = F.top + 2; y < F.h; y++) for (x = 0; x < F.w; x++) {
-      var onPlaza = Math.abs(x - cx) < 22 && Math.abs(y - cy) < 11, onRow = Math.abs(y - (F.top + (F.h - F.top) * 0.3 + 6)) < 3 || Math.abs(y - cy) < 3 || Math.abs(y - (F.top + (F.h - F.top) * 0.8 + 6)) < 3, onCol = Math.abs(x - cx) < 3 || Math.abs(x - Math.round(F.w * 0.18)) < 3 || Math.abs(x - Math.round(F.w * 0.82)) < 3;
-      if (onPlaza || onRow || (onCol && y > F.top + (F.h - F.top) * 0.3)) P(c, x, y, ((x * 7 + y * 3) % 5 === 0) ? '#6a6050' : ((x + y) % 2 ? '#8a8070' : '#7a7060'), 1, 1);
-    }
-    // 오른쪽 돌담 + 문(사냥터로 나가는 길)
-    for (y = F.top - 6; y < F.h; y++) for (x = F.w - 10; x < F.w; x++) P(c, x, y, ((x + (y >> 1)) % 3 === 0) ? '#3a3f4c' : '#4a5060');
-    var gy = Math.round((F.top + F.h) / 2); P(c, F.w - 10, gy - 9, '#120d0a', 10, 18); P(c, F.w - 10, gy - 11, '#5a4030', 10, 2); P(c, F.w - 12, gy - 13, '#ffb040', 1, 1);
-    c.globalAlpha = 0.18; c.fillStyle = '#ffb040'; c.beginPath(); c.arc(F.w - 12, gy - 13, 6, 0, 7); c.fill(); c.globalAlpha = 1;
-    // 꽃·나무
-    for (i = 0; i < 14; i++) { x = 4 + Math.floor(r() * (F.w - 20)); y = F.top + Math.floor(r() * (F.h - F.top)); if (r() < 0.5) P(c, x, y, r() < 0.5 ? '#ffd0e0' : '#fff6c0', 1, 1); else { P(c, x + 2, y + 2, '#3a2a1a', 2, 3); P(c, x, y - 2, '#2f6a3a', 6, 4); P(c, x + 1, y - 3, '#3f8a4a', 4, 1); } }
-    drawSky(c, r);
-    F.townMap = cv; F.townKey = F.w + 'x' + F.h;
+    F.map = cv; F.mapKey = F.w + 'x' + F.h + 'z' + S.zone;
   }
   function drawHouse(ctx, b, lv, x, y) {
     if (!lv) { P(ctx, x - 7, y - 3, '#4a3a22', 14, 4); P(ctx, x - 5, y - 2, '#5a4a2a', 10, 2); P(ctx, x + 3, y - 8, '#6a5a3a', 1, 6); P(ctx, x + 1, y - 9, '#c0a070', 5, 3); return; }
@@ -600,27 +597,15 @@
   function draw() {
     var ctx = F.ctx; if (!ctx) return;
     if (ui.sleep) return;
+    if (F.mapKey !== F.w + 'x' + F.h + 'z' + S.zone) buildMap();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (ui.scene === 'town') drawTownScene(ctx); else drawHuntScene(ctx);
-    drawLabels();
-  }
-  function drawTownScene(ctx) {
-    if (F.townKey !== F.w + 'x' + F.h) buildTownMap();
-    ctx.drawImage(F.townMap, 0, 0);
-    var ents = BUILDINGS.map(function (b) { var s = townSpot(b.id); return { y: s.y - 2, b: b, x: s.x, sy: s.y }; });
-    inTown().forEach(function (h) { ents.push({ y: h.y, h: h }); });
-    ents.sort(function (a, b) { return a.y - b.y; });
-    ents.forEach(function (e) { if (e.h) drawHunter(ctx, e.h, Math.round(e.h.x), Math.round(e.h.y)); else drawHouse(ctx, e.b, S.town[e.b.id], e.x, e.sy); });
-    F.fx.forEach(function (f) { if (f.kind === 'spark') { ctx.globalAlpha = 1 - f.t / f.life; P(ctx, f.x, f.y, f.color, 1, 1); ctx.globalAlpha = 1; } });
-    ctx.fillStyle = 'rgba(10,16,40,.12)'; ctx.fillRect(0, F.top - 2, F.w, F.h);
-  }
-  function drawHuntScene(ctx) {
-    if (F.terrainZone !== S.zone) buildTerrain();
     var sx = F.shake > 0.05 ? Math.round(rnd(-F.shake, F.shake)) : 0, sy = F.shake > 0.05 ? Math.round(rnd(-F.shake, F.shake)) : 0;
-    ctx.drawImage(F.terrain, sx, sy); ctx.translate(sx, sy);
-    var ents = hunting().map(function (h) { return { y: h.y, h: h }; }).concat(F.mons.map(function (m) { return { y: m.y, m: m }; }));
+    ctx.drawImage(F.map, sx, sy); ctx.translate(sx, sy);
+    var ents = BUILDINGS.map(function (b) { var s = townSpot(b.id); return { y: s.y - 2, b: b, x: s.x, sy: s.y }; });
+    S.hunters.forEach(function (h) { if (h.status === 'town' || h.status === 'hunt') ents.push({ y: h.y, h: h }); });
+    F.mons.forEach(function (m) { ents.push({ y: m.y, m: m }); });
     ents.sort(function (a, b) { return a.y - b.y; });
-    ents.forEach(function (e) { if (e.h) drawHunter(ctx, e.h, Math.round(e.h.x), Math.round(e.h.y)); else drawMonster(ctx, e.m, Math.round(e.m.x), Math.round(e.m.y)); });
+    ents.forEach(function (e) { if (e.h) drawHunter(ctx, e.h, Math.round(e.h.x), Math.round(e.h.y)); else if (e.m) drawMonster(ctx, e.m, Math.round(e.m.x), Math.round(e.m.y)); else drawHouse(ctx, e.b, S.town[e.b.id], e.x, e.sy); });
     F.shots.forEach(function (s) {
       var col = s.tier ? TIER_COLOR[s.tier] : '#ddd';
       if (s.type === 'bow') { P(ctx, s.x, s.y, '#e8d8b0', 1, 1); P(ctx, s.x - s.dx * 1.5, s.y - s.dy * 1.5, col, 1, 1); P(ctx, s.x - s.dx * 3, s.y - s.dy * 3, '#a08860', 1, 1); }
@@ -632,8 +617,9 @@
       else { ctx.globalAlpha = Math.min(1, a * 1.5); ctx.font = 'bold ' + f.size + 'px monospace'; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; var tx = Math.round(f.x), ty = Math.round(f.y); ctx.fillText(f.txt, tx - 1, ty); ctx.fillText(f.txt, tx + 1, ty); ctx.fillText(f.txt, tx, ty - 1); ctx.fillText(f.txt, tx, ty + 1); ctx.fillStyle = f.color; ctx.fillText(f.txt, tx, ty); }
       ctx.globalAlpha = 1;
     });
-    if (shoutOn()) { ctx.globalAlpha = 0.08 + 0.05 * Math.sin(F.time * 10); ctx.fillStyle = '#ffd34f'; ctx.fillRect(0, F.top - 2, F.w, F.h); ctx.globalAlpha = 1; }
-    ctx.fillStyle = 'rgba(10,16,40,.14)'; ctx.fillRect(-2, F.top - 2, F.w + 4, F.h);
+    if (shoutOn()) { ctx.globalAlpha = 0.08 + 0.05 * Math.sin(F.time * 10); ctx.fillStyle = '#ffd34f'; ctx.fillRect(0, F.fTop, F.w, F.h); ctx.globalAlpha = 1; }
+    ctx.fillStyle = 'rgba(10,16,40,.13)'; ctx.fillRect(-2, F.top - 2, F.w + 4, F.h);
+    drawLabels();
   }
   function drawHunter(ctx, h, x, y, big) {
     var c = CLASSES[h.cls], L = h.look || { hair: 0, hc: '#2b2320', skin: '#f3d9b1' }, t = y - 14;
@@ -689,13 +675,12 @@
   function drawLabels() {
     var box = $('#labels'), seen = {}, p = F.pix;
     function el(id, cls) { var e = labelEls[id]; if (!e) { e = document.createElement('div'); e.className = cls; box.appendChild(e); labelEls[id] = e; } e.className = cls; seen[id] = true; return e; }
-    var list = ui.scene === 'town' ? inTown() : hunting();
-    list.forEach(function (h) {
+    S.hunters.filter(function (h) { return h.status === 'town' || h.status === 'hunt'; }).forEach(function (h) {
       var e = el(h.id, 'tag'); e.textContent = h.name; e.style.left = h.x * p + 'px'; e.style.top = (h.y + 3) * p + 'px';
       if (h.bubble) { var b = el(h.id + 'b', 'bubble'); b.textContent = h.bubble.txt; b.style.left = h.x * p + 'px'; b.style.top = (h.y - 17) * p + 'px'; }
     });
-    if (ui.scene === 'town') BUILDINGS.forEach(function (b) { var s = townSpot(b.id), lv = S.town[b.id], e = el('bld' + b.id, lv ? 'tag bld' : 'tag lot'); e.textContent = lv ? b.ic + b.nm + ' Lv.' + lv : '빈 터 · ' + b.nm; e.style.left = s.x * p + 'px'; e.style.top = (s.y + 1) * p + 'px'; });
-    else F.mons.forEach(function (m) { if (!m.boss) return; var e = el(m.id, 'tag boss'); e.textContent = m.nm; e.style.left = m.x * p + 'px'; e.style.top = (m.y - 32) * p + 'px'; });
+    BUILDINGS.forEach(function (b) { var s = townSpot(b.id), lv = S.town[b.id], e = el('bld' + b.id, lv ? 'tag bld' : 'tag lot'); e.textContent = lv ? b.ic + b.nm + ' ' + lv : '빈 터·' + b.nm; e.style.left = s.x * p + 'px'; e.style.top = (s.y + 1) * p + 'px'; });
+    F.mons.forEach(function (m) { if (!m.boss) return; var e = el(m.id, 'tag boss'); e.textContent = m.nm; e.style.left = m.x * p + 'px'; e.style.top = (m.y - 32) * p + 'px'; });
     Object.keys(labelEls).forEach(function (id) { if (!seen[id]) { labelEls[id].remove(); delete labelEls[id]; } });
   }
   function drawPortrait(cv, h, size) {
@@ -723,7 +708,7 @@
   }
 
   // ---------- 화면(DOM) ----------
-  var ui = { dirty: { gate: true, hunters: true, items: true, town: true, log: true, head: true, chat: true, mission: true, shop: true }, sheetHunter: null, pickSlot: null, scene: 'hunt', sleep: false, sleepAt: 0, sleepGold: 0, sleepKills: 0, wake: null };
+  var ui = { dirty: { gate: true, hunters: true, items: true, town: true, log: true, head: true, chat: true, mission: true, shop: true }, sheetHunter: null, pickSlot: null, sleep: false, sleepAt: 0, sleepGold: 0, sleepKills: 0, wake: null };
   function tierTag(t) { return '<span class="tier ' + t + '">' + TIER_LABEL[t] + '</span>'; }
   function renderHead() {
     ui.dirty.head = false;
@@ -735,8 +720,7 @@
     $('#hunterCount').textContent = '👤 ' + S.hunters.length + '/' + capacity();
     $('#itemCount').textContent = '창고 장비 ' + S.items.length + '개';
     $('#soundBtn').textContent = S.cfg.sound ? '🔊' : '🔇';
-    $('#sceneBtn').textContent = ui.scene === 'town' ? '⚔️ 사냥터 보기' : '🏘️ 마을 보기';
-    $('#hint').textContent = ui.scene === 'town' ? '👆 건물을 탭하면 관리 화면' : '👆 몬스터를 탭하면 촌장의 일격!';
+    $('#hint').textContent = '👆 몬스터 탭: 촌장의 일격 · 건물 탭: 관리';
     var left = S.shoutCd - Date.now(); $('#shoutBtn').textContent = left > 0 ? '📣 ' + Math.ceil(left / 1000) + 's' : '📣 함성'; $('#shoutBtn').disabled = left > 0;
     var badge = $('#waitBadge'); badge.hidden = S.gate.length === 0; badge.textContent = S.gate.length;
   }
@@ -749,8 +733,7 @@
   function renderMission() {
     ui.dirty.mission = false; var d = S.daily, rows = [[d.kills, MISSION.kills, '몬스터 처치'], [d.accept, MISSION.accept, '헌터 받아들이기'], [d.sales, MISSION.sales, '상점 판매']];
     var done = rows.filter(function (r) { return r[0] >= r[1]; }).length;
-    $('#missionDone').textContent = d.claimed ? '✅' : '(' + done + '/3)';
-    $('#missionList').innerHTML = d.claimed ? '<div class="ok">오늘 할 일 모두 완료!</div>' : rows.map(function (r) { return '<div class="' + (r[0] >= r[1] ? 'ok' : '') + '">' + (r[0] >= r[1] ? '✓' : '·') + ' ' + r[2] + ' ' + Math.min(r[0], r[1]) + '/' + r[1] + '</div>'; }).join('');
+    $('#missionLine').innerHTML = d.claimed ? '<b>오늘 할 일</b> ✅ 완료' : '<b>오늘 할 일 ' + done + '/3</b> · ' + rows.map(function (r) { return '<span class="' + (r[0] >= r[1] ? 'ok' : '') + '">' + r[2] + ' ' + Math.min(r[0], r[1]) + '/' + r[1] + '</span>'; }).join(' · ');
   }
   function renderChat() {
     var el = $('#chatList');
@@ -933,7 +916,7 @@
   function acceptHunter(id) {
     var i = S.gate.findIndex(function (h) { return h.id === id; }); if (i < 0) return;
     if (S.hunters.length >= capacity()) return toast('숙소가 꽉 찼어요. 건설에서 숙소를 올리거나 헌터를 내보내세요');
-    var h = S.gate.splice(i, 1)[0]; h.status = 'town'; h.phase = 'sell'; h.auto = true; var g = gateSpot(); h.x = g.x; h.y = g.y; S.hunters.push(h); S.daily.accept++;
+    var h = S.gate.splice(i, 1)[0]; h.status = 'town'; h.phase = 'sell'; h.auto = true; var g = plazaSpot(); h.x = g.x + rnd(-10, 10); h.y = g.y; S.hunters.push(h); S.daily.accept++;
     addLog('🤝 <b>' + esc(h.name) + '</b> 합류! 정비 뒤 사냥터로'); toast('🤝 ' + h.name + ' 합류!'); say(h, 'arrive', true); checkMission();
     renderGate(); renderHunters(); save();
   }
@@ -982,14 +965,13 @@
       var now = Date.now(); godTaps.push(now); godTaps = godTaps.filter(function (t) { return now - t < 3000; });
       if (godTaps.length >= 7) { godTaps = []; openGod(); } else if (godTaps.length >= 4) toast('✨ ' + (7 - godTaps.length) + '번 더…');
     });
-    $('#sceneBtn').addEventListener('click', function () { ui.scene = ui.scene === 'town' ? 'hunt' : 'town'; renderHead(); });
     $('#shoutBtn').addEventListener('click', shout);
     $('#sleepBtn').addEventListener('click', function () { setSleep(true); save(); });
     $('#sleep').addEventListener('click', function () { setSleep(false); });
     // 캔버스 탭: 사냥터 = 촌장의 일격, 마을 = 건물 열기
     $('#field').addEventListener('pointerdown', function (e) {
       var r = e.currentTarget.getBoundingClientRect(), x = (e.clientX - r.left) / F.pix, y = (e.clientY - r.top) / F.pix;
-      if (ui.scene === 'hunt') { if (chiefStrike(x, y)) renderHead(); return; }
+      if (y >= F.wallY) { if (chiefStrike(x, y)) renderHead(); return; }
       var hit = null; BUILDINGS.forEach(function (b) { var s = townSpot(b.id); if (Math.abs(x - s.x) < 12 && y > s.y - 22 && y < s.y + 4) hit = b; });
       if (hit) openPanel(hit.id === 'potion' || hit.id === 'weapon' || hit.id === 'armor' ? 'shop' : hit.id === 'inn' ? 'hunters' : hit.id === 'forge' ? 'items' : 'town');
     });
@@ -1068,7 +1050,7 @@
     $('#gGem').addEventListener('click', function () { S.gems += 10; renderHead(); save(); });
     $('#gMats').addEventListener('click', function () { S.mats.wood += 100; S.mats.ore += 100; S.mats.herb += 100; renderHead(); save(); });
     $('#gHunterGold').addEventListener('click', function () { S.hunters.forEach(function (h) { h.gold += 500; }); renderHunters(); save(); });
-    $('#gZoneUp').addEventListener('click', function () { S.zone++; S.zoneKills = 0; S.bossDone = false; F.mons = []; renderHead(); save(); });
+    $('#gZoneUp').addEventListener('click', function () { S.zone++; S.zoneKills = 0; S.bossDone = false; F.mons = []; F.mapKey = ''; renderHead(); save(); });
     $('#gExport').addEventListener('click', function () { $('#gData').value = JSON.stringify(S); $('#gData').select(); toast('아래 칸의 내용을 복사해 두세요'); });
     $('#gImport').addEventListener('click', function () { try { var s = JSON.parse($('#gData').value); if (!s || !s.hunters) throw 0; localStorage.setItem(SAVE_KEY, JSON.stringify(s)); location.reload(); } catch (e) { toast('저장 데이터 형식이 아니에요'); } });
     $('#gReset').addEventListener('click', function () { if (!confirm('정말 전부 지울까요? 되돌릴 수 없어요.')) return; localStorage.removeItem(SAVE_KEY); location.reload(); });
@@ -1081,10 +1063,10 @@
   // ---------- 시작 ----------
   S = load();
   fillGodSelects(); resizeCanvas(); bind();
-  S.hunters.forEach(function (h) { if (h.status === 'hunt' && (!h.y || h.y < F.top)) { h.x = 14; h.y = rnd(F.top + 10, F.h - 10); } if (h.status === 'town' && (!h.y || h.y < F.top)) { var g = gateSpot(); h.x = g.x; h.y = g.y; } recalc(h); });
+  S.hunters.forEach(function (h) { if (h.status === 'hunt' && (!h.y || h.y < F.fTop)) { var fg = fieldGate(); h.x = fg.x; h.y = fg.y; } if (h.status === 'town' && (!h.y || h.y >= F.wallY)) { var g = plazaSpot(); h.x = g.x; h.y = g.y; } h.returning = false; if (h.trip && h.trip.t === undefined) h.trip.t = 0; recalc(h); });
   rateAcc.goldAt = S.stats.goldEarned; rateAcc.hgoldAt = sumHunterGold();
   checkMission(); offlineCatchUp(); renderAll();
   requestAnimationFrame(loop);
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function () {});
-  window.__ht = { S: S, F: F, ui: ui, makeHunter: makeHunter, makeItem: makeItem, save: save, townSpot: townSpot }; // 테스트·디버그용
+  window.__ht = { S: S, F: F, ui: ui, makeHunter: makeHunter, makeItem: makeItem, save: save, townSpot: townSpot, fieldGate: fieldGate }; // 테스트·디버그용
 })();
