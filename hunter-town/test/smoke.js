@@ -15,87 +15,92 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   const t = sel => p.textContent(sel);
 
   // ---- 첫 화면 ----
-  check('제목', (await t('#title')).includes('헌터 마을'));
+  check('구역 배지 1', (await t('#zoneNo')) === '1');
   check('시작 골드 300', (await t('#gold')).includes('300'), await t('#gold'));
-  check('입구 타이머', /다음 헌터까지 \d\d:\d\d/.test(await t('#spawnTimer')), await t('#spawnTimer'));
-  check('헌터 0 / 4', (await t('#hunterCount')) === '헌터 0 / 4', await t('#hunterCount'));
-  check('사냥터 캔버스', (await p.locator('#field').count()) === 1);
+  check('대기소 타이머', /다음 \d\d:\d\d/.test(await t('#spawnTimer')), await t('#spawnTimer'));
+  check('헌터 0/4', (await t('#hunterCount')) === '👤 0/4', await t('#hunterCount'));
+  check('픽셀 캔버스(내부 해상도 작음)', await p.evaluate(() => document.getElementById('field').width < 200));
+  check('오늘 할 일 3개', (await p.locator('#missionList div').count()) === 3);
 
-  // ---- 신 모드: 제목 7번 탭 ----
-  for (let i = 0; i < 7; i++) await p.click('#title');
+  // ---- 신 모드: 구역 배지 7번 탭 ----
+  for (let i = 0; i < 7; i++) await p.click('#zoneBadge');
   await p.waitForSelector('#god:not([hidden])');
   check('신 모드 열림', !(await p.locator('#god').isHidden()));
-  check('신 모드 기본값 등장 간격 10분', (await p.inputValue('#gSpawnMin')) === '10');
-
-  // 헌터 부르기 → 입구 카드
+  check('기본값 등장 간격 10분', (await p.inputValue('#gSpawnMin')) === '10');
   await p.click('#gCallNow');
-  await p.waitForSelector('.gate-card');
-  check('입구에 헌터 1명', (await p.locator('.gate-card').count()) === 1);
-  // 내 헌터 만들기(S+ 전사 "테스터")
   await p.fill('#gHName', '테스터');
   await p.selectOption('#gHCls', 'warrior');
   await p.selectOption('#gHTier', 'SP');
   await p.click('#gMakeHunter');
-  check('입구에 헌터 2명', (await p.locator('.gate-card').count()) === 2);
-  const card = p.locator('.gate-card', { hasText: '테스터' });
-  check('만든 헌터 S+', (await card.locator('.tier').textContent()) === 'S+');
-  // 신의 장비: S+ 검
   await p.selectOption('#gIKind', 'sword');
   await p.selectOption('#gITier', 'SP');
   await p.click('#gMakeItem');
-  // 규칙 변경: 등장 간격 0.1분, 경험치 10배
   await p.fill('#gSpawnMin', '0.1');
   await p.fill('#gExpMul', '10');
   await p.click('#gApply');
-  await p.click('#god [data-close].btn');
+  await p.click('#god .sheet-title .x');
   check('신 모드 닫힘', await p.locator('#god').isHidden());
+  check('대기소 배지 2', (await t('#waitBadge')) === '2', await t('#waitBadge'));
 
-  // ---- 입구: 받아들이기 / 돌려보내기 ----
+  // ---- 대기소: 받아들이기 / 돌려보내기 ----
+  await p.click('#waitBtn');
+  await p.waitForSelector('#waitSheet:not([hidden])');
+  check('대기소에 헌터 2명', (await p.locator('#gateList .item[data-id]').count()) === 2);
+  const card = p.locator('#gateList .item[data-id]', { hasText: '테스터' });
+  check('만든 헌터 S+', (await card.locator('.tier').textContent()) === 'S+');
+  check('대기소 초상화 그려짐', (await card.locator('canvas').count()) === 1);
   await card.locator('[data-act="accept"]').click();
-  check('헌터 1 / 4', (await t('#hunterCount')) === '헌터 1 / 4', await t('#hunterCount'));
-  check('목록에 테스터', (await t('#hunterList')).includes('테스터'));
-  check('합류하면 바로 사냥', (await t('#hunterList')).includes('사냥 중'));
-  await p.locator('.gate-card [data-act="reject"]').first().click();
-  check('돌려보내면 입구 비움', (await p.locator('.gate-card').count()) === 0);
+  check('헌터 1/4', (await t('#hunterCount')) === '👤 1/4', await t('#hunterCount'));
+  await p.locator('#gateList [data-act="reject"]').first().click();
+  check('돌려보내면 대기소 비움', (await p.locator('#gateList .item[data-id]').count()) === 0);
+  await p.click('#waitSheet .sheet-title .x');
+  check('합류하면 바로 사냥', await p.evaluate(() => window.__ht.S.hunters[0].status === 'hunt'));
+  check('사냥터 이름표', (await p.locator('#labels .tag', { hasText: '테스터' }).count()) === 1);
+  check('합류 인사말이 수다에', (await t('#chatList')).includes('테스터'));
 
-  // ---- 장비 교체 ----
+  // ---- 헌터 패널 → 장비 교체 ----
+  await p.click('.navbtn[data-panel="hunters"]');
+  await p.waitForSelector('#panel:not([hidden])');
+  check('헌터 패널 제목', (await t('#panelTitle')).includes('헌터'));
   await p.click('#hunterList .item');
   await p.waitForSelector('#sheet:not([hidden])');
-  check('헌터 시트 열림', (await t('#sheetContent')).includes('테스터'));
+  check('헌터 시트', (await t('#sheetContent')).includes('테스터'));
   check('처음엔 맨손', (await t('#sheetContent')).includes('맨손'));
   await p.click('#sheetContent [data-act="pick"][data-slot="weapon"]');
   await p.click('#pickList .item[data-pick]:not([data-pick="none"])');
-  check('무기 장착', (await t('#sheetContent')).includes('신의 검'), (await t('#sheetContent')).slice(0, 80));
+  check('무기 장착', (await t('#sheetContent')).includes('신의 검'));
   const atkAfter = await p.evaluate(() => window.__ht.S.hunters[0].atk);
   check('장착 뒤 공격력 오름', atkAfter > 30, String(atkAfter));
   check('창고에서 빠짐', await p.evaluate(() => window.__ht.S.items.length === 0));
-  await p.click('#sheetContent [data-close]');
-  check('목록에 무기 표시', (await t('#hunterList')).includes('신의 검'));
+  check('장비 미션 카운트', await p.evaluate(() => window.__ht.S.daily.equip === 1));
+  await p.click('#sheetContent [data-act="close"]');
+  await p.click('#panel .sheet-title .x');
 
-  // ---- 사냥 진행: 몇 초 뒤 처치 수·골드가 오른다 ----
-  await p.waitForFunction(() => window.__ht.S.stats.kills >= 1, null, { timeout: 20000 });
+  // ---- 사냥 진행 ----
+  await p.waitForFunction(() => window.__ht.S.stats.kills >= 1, null, { timeout: 25000 });
   check('몬스터 처치', await p.evaluate(() => window.__ht.S.stats.kills >= 1));
   check('골드 증가', await p.evaluate(() => window.__ht.S.gold > 300));
-  check('경험치 증가', await p.evaluate(() => window.__ht.S.hunters[0].exp > 0 || window.__ht.S.hunters[0].lv > 1));
+  check('경험치/레벨 증가', await p.evaluate(() => window.__ht.S.hunters[0].exp > 0 || window.__ht.S.hunters[0].lv > 1));
 
-  // ---- 자동 등장: 0.1분 간격이라 곧 새 헌터가 온다 ----
+  // ---- 자동 등장 ----
   await p.waitForFunction(() => window.__ht.S.gate.length >= 1, null, { timeout: 15000 });
   check('시간이 지나면 새 헌터 등장', await p.evaluate(() => window.__ht.S.gate.length >= 1));
 
-  // ---- 마을 / 장비 탭 / 기록 ----
-  await p.click('.tab[data-tab="town"]');
-  check('마을 건물 4개', (await p.locator('#townList .item[data-id]').count()) === 4);
-  await p.click('.tab[data-tab="items"]');
+  // ---- 건설 / 창고 / 대장간 / 기록 ----
+  await p.click('.navbtn[data-panel="town"]');
+  check('건물 4개', (await p.locator('#townList .item[data-id]').count()) === 4);
+  await p.click('.navbtn[data-panel="forge"]');
   check('대장간 버튼', (await t('#craftBtn')).includes('만들기'));
-  await p.click('.tab[data-tab="log"]');
+  await p.click('.navbtn[data-panel="log"]');
   check('기록 쌓임', (await p.locator('#logList div').count()) >= 3);
+  await p.click('#panel .sheet-title .x');
 
   // ---- 저장/복원 ----
   await p.evaluate(() => window.__ht.save());
   await p.reload();
-  await p.waitForSelector('#hunterList .item');
-  check('새로고침 뒤 헌터 유지', (await t('#hunterList')).includes('테스터'));
-  check('새로고침 뒤 무기 유지', (await t('#hunterList')).includes('신의 검'));
+  await p.waitForFunction(() => window.__ht && window.__ht.S.hunters.length === 1);
+  check('새로고침 뒤 헌터 유지', await p.evaluate(() => window.__ht.S.hunters[0].name === '테스터'));
+  check('새로고침 뒤 무기 유지', await p.evaluate(() => window.__ht.S.hunters[0].weapon && window.__ht.S.hunters[0].weapon.tier === 'SP'));
   check('규칙 유지(등장 간격 0.1)', await p.evaluate(() => window.__ht.S.cfg.spawnMin === 0.1));
 
   if (process.env.SHOT) await p.screenshot({ path: process.env.SHOT, fullPage: true });
