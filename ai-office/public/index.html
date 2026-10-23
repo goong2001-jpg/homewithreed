@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI 사무실</title>
+<meta name="description" content="Claude Code 에이전트들이 회사처럼 일하는 모습을 픽셀 사무실로 지켜보고 명령을 내리는 화면">
+<meta name="theme-color" content="#1b1d2a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">🏢</span><h1>AI 사무실</h1></div>
+  <div class="conn" id="conn" title="브리지 서버 연결 상태"><span class="dot"></span><span class="label">연결 중…</span></div>
+  <div class="zoom"><button id="zoomIn" aria-label="확대">+</button><button id="zoomOut" aria-label="축소">−</button></div>
+</header>
+
+<main class="layout">
+  <section class="stage" id="stage">
+    <div class="stageInner" id="stageInner">
+      <canvas id="office" width="736" height="480" aria-label="사무실 지도"></canvas>
+    </div>
+    <div class="banner hidden" id="banner"></div>
+  </section>
+
+  <aside class="panel">
+    <form class="command" id="commandForm">
+      <div class="row">
+        <label class="acct">계정
+          <select id="account"></select>
+        </label>
+        <label class="chk"><input type="checkbox" id="resume"> 이어서</label>
+      </div>
+      <textarea id="commandText" rows="3" placeholder="총괄에게 지시를 내리세요. 예) 우리 가족 여행 체크리스트 문서 만들어줘" enterkeyhint="send"></textarea>
+      <div class="row buttons">
+        <button type="submit" class="primary" id="sendBtn">보내기</button>
+        <button type="button" id="demoBtn" title="가짜 회사를 돌려 화면을 확인">데모</button>
+        <button type="button" class="danger" id="stopBtn" disabled>중지</button>
+      </div>
+      <div class="queue hidden" id="queue"></div>
+    </form>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="live" role="tab">실황</button>
+      <button class="tab" data-tab="result" role="tab">결과</button>
+      <button class="tab" data-tab="history" role="tab">기록</button>
+      <button class="tab" data-tab="org" role="tab">조직</button>
+    </nav>
+    <section class="tabPane active" id="pane-live"><ol class="live" id="live"></ol></section>
+    <section class="tabPane" id="pane-result">
+      <div class="meta" id="resultMeta"></div>
+      <article class="md" id="result"><p class="muted">아직 결과가 없습니다.</p></article>
+    </section>
+    <section class="tabPane" id="pane-history"><ul class="history" id="history"></ul></section>
+    <section class="tabPane" id="pane-org"><ul class="org" id="orgList"></ul></section>
+  </aside>
+</main>
+
+<div class="modal hidden" id="pinModal">
+  <form class="modalBox" id="pinForm">
+    <h2>PIN 입력</h2>
+    <p>브리지 서버에 설정된 PIN 을 입력하세요.</p>
+    <input type="password" inputmode="numeric" id="pinInput" autocomplete="off" autofocus>
+    <button type="submit" class="primary">확인</button>
+    <p class="err hidden" id="pinErr">PIN 이 틀립니다.</p>
+  </form>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script src="office-canvas.js"></script>
+<script src="demo-events.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

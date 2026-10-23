@@ -1,0 +1,15 @@
+{
+  "name": "ai-office",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Claude Code 서브에이전트로 돌아가는 AI 회사를 픽셀 사무실로 지켜보는 브리지 서버",
+  "scripts": {
+    "start": "node server/server.js",
+    "mock": "node server/server.js --mock",
+    "login": "node server/login.js",
+    "test": "node server/test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

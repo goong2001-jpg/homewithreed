@@ -1,0 +1,17 @@
+{
+  "name": "AI 사무실",
+  "short_name": "AI사무실",
+  "description": "Claude Code 에이전트들이 회사처럼 일하는 모습을 지켜보고 명령을 내리는 화면",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1b1d2a",
+  "theme_color": "#1b1d2a",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

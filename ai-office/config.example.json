@@ -1,0 +1,15 @@
+{
+  "port": 7777,
+  "host": "0.0.0.0",
+  "pin": "1234",
+  "workspace": "~/ai-office-work",
+  "claudeCommand": "claude",
+  "model": "",
+  "permissionMode": "acceptEdits",
+  "allowBash": false,
+  "skipPermissions": false,
+  "hooks": true,
+  "accounts": [
+    { "id": "main", "name": "내 계정", "configDir": "~/.claude-office-main" }
+  ]
+}
