@@ -87,6 +87,8 @@ jobs:
             port: 8151
           - app: walkie-talkie
             port: 8137
+          - app: hunter-town
+            port: 8152
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
