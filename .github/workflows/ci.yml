@@ -89,6 +89,8 @@ jobs:
             port: 8137
           - app: hunter-town
             port: 8152
+          - app: god-village
+            port: 8153
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

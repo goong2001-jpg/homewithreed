@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#14181c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>신의 마을</title>
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<!-- 지도: 픽셀 캔버스 + HUD -->
+<section class="field">
+  <canvas id="field" aria-label="마을"></canvas>
+  <div id="labels" class="labels"></div>
+  <div class="hud hud-tl">
+    <div class="era"><span id="eraIc">🪨</span><b id="eraNm">석기 시대</b><small id="worldNo"></small></div>
+    <div id="resRow" class="res"></div>
+    <div id="cap" class="cap"></div>
+  </div>
+  <div class="hud hud-tr">
+    <div id="faith" class="pill faith">✨ 0</div>
+    <div id="popCnt" class="pill">👥 0/0</div>
+    <div id="happy" class="pill">🙂 50</div>
+  </div>
+  <div class="hud hud-r">
+    <div id="wishList" class="wishes"></div>
+  </div>
+  <div class="hud hud-bl">
+    <div id="techLine" class="techline"></div>
+    <div id="oracleLine" class="oracleline"></div>
+  </div>
+  <div class="hud hud-br">
+    <button id="sleepBtn" class="pill btnpill" type="button">🌙 절전</button>
+  </div>
+</section>
+
+<!-- 신의 힘 -->
+<section class="powers">
+  <div class="powers-hint">👆 힘을 고르고 지도를 탭 · 시민은 집어서 옮길 수 있어요</div>
+  <div id="powerBar" class="powerbar"></div>
+</section>
+
+<!-- 시민 수다 -->
+<section class="chat">
+  <div class="chat-tabs"><span class="on">마을 소식</span><span id="huntInfo"></span></div>
+  <div id="chatList" class="chat-list"></div>
+</section>
+
+<nav class="nav">
+  <button class="navbtn" data-panel="pop" type="button"><i>👥</i>시민</button>
+  <button class="navbtn" data-panel="bld" type="button"><i>🏗️</i>건물</button>
+  <button class="navbtn" data-panel="tech" type="button"><i>🔬</i>발견</button>
+  <button class="navbtn" data-panel="ach" type="button"><i>🏆</i>업적</button>
+  <button class="navbtn" data-panel="more" type="button"><i>⋯</i>더보기</button>
+</nav>
+
+<div id="panel" class="sheet" hidden>
+  <div class="sheet-bg" data-close></div>
+  <div class="sheet-body">
+    <div class="sheet-grab"></div>
+    <div class="sheet-title"><h2 id="panelTitle">시민</h2><button class="x" data-close type="button">✕</button></div>
+    <section id="tab-pop" class="pane"><div id="jobSummary" class="jobs"></div><div id="popList" class="list"></div></section>
+    <section id="tab-bld" class="pane"><p id="bldNext" class="hint"></p><div id="bldList" class="list"></div></section>
+    <section id="tab-tech" class="pane"><p class="hint">학자가 토템·모닥불·학당에서 지식📜을 쌓으면 차례로 발견합니다. 💡 영감을 내리면 빨라집니다.</p><div id="techList"></div></section>
+    <section id="tab-ach" class="pane"><h3>오늘의 과제</h3><div id="dailyList" class="daily"></div><h3>업적</h3><div id="achList" class="list"></div></section>
+    <section id="tab-more" class="pane">
+      <p id="moreInfo" class="hint"></p>
+      <div class="row"><button class="btn" id="soundBtn" type="button">🔊 소리</button><button class="btn primary" id="newWorldBtn" type="button" disabled>🌍 새 세계 열기</button></div>
+      <p class="hint">새 세계: 우주선을 완성하면 열 수 있습니다. 처음부터 다시 시작하지만 세계마다 모든 생산 +10%.</p>
+      <h3>신의 손 (치트·백업)</h3>
+      <div class="row"><button class="btn" id="godFaith" type="button">✨ +100</button><button class="btn" id="godKnow" type="button">📜 +500</button><button class="btn" id="godRes" type="button">자원 +300</button><button class="btn" id="godEra" type="button">시대 넘기기</button></div>
+      <label>오프라인 보상(%) <input id="godOff" type="number" min="0" max="100" step="5"></label>
+      <div class="row"><button class="btn" id="godExport" type="button">내보내기</button><button class="btn" id="godImport" type="button">가져오기</button><button class="btn danger" id="godReset" type="button">전부 초기화</button></div>
+      <textarea id="godData" rows="3" placeholder="저장 데이터(JSON)"></textarea>
+      <h3>기록</h3><div id="logList" class="log"></div>
+    </section>
+  </div>
+</div>
+
+<div id="oracleSheet" class="sheet" hidden>
+  <div class="sheet-bg" data-close></div>
+  <div class="sheet-body">
+    <div class="sheet-grab"></div>
+    <div class="sheet-title"><h2>📣 신탁</h2><button class="x" data-close type="button">✕</button></div>
+    <p class="hint">시민들에게 뜻을 전합니다. 한동안 그 일에 사람이 몰립니다.</p>
+    <div id="oracleList" class="oracles"></div>
+  </div>
+</div>
+
+<div id="sheet" class="sheet" hidden>
+  <div class="sheet-bg" data-close></div>
+  <div class="sheet-body"><div class="sheet-grab"></div><div id="sheetContent"></div></div>
+</div>
+
+<div id="sleep" class="sleep" hidden>
+  <div class="sleep-clock" id="sleepClock">00:00</div>
+  <div class="sleep-stats" id="sleepStats"></div>
+  <div class="sleep-hint">🌙 절전 모드 — 마을은 계속 자랍니다 (보상 100%)<br>화면을 탭하면 돌아갑니다</div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<div id="welcome" class="modal" hidden>
+  <div class="modal-body"><h2>🌅 돌아온 사이에</h2><p id="welcomeText"></p><button class="btn primary" id="welcomeOk" type="button">확인</button></div>
+</div>
+
+<script src="data.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

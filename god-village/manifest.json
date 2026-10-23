@@ -1,0 +1,7 @@
+{
+  "short_name": "신의 마을",
+  "name": "신의 마을 — 원시인부터 우주 시대까지 지켜보는 신 게임",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }],
+  "start_url": ".", "scope": ".", "display": "standalone", "orientation": "portrait",
+  "theme_color": "#14181c", "background_color": "#14181c"
+}
