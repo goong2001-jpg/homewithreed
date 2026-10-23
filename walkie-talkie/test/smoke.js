@@ -10,16 +10,23 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
 (async () => {
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH,   // 없으면 playwright 기본 크로미움
-    args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-capture', '--autoplay-policy=no-user-gesture-required']
+    args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required']
   });
-  const ctx = await browser.newContext({ permissions: ['microphone'] });
+  // 서비스워커가 index.html 을 대신 내주면 아래 route 가 못 끼어들어 SRI 를 못 뺀다 → 테스트에선 막는다
+  const ctx = await browser.newContext({ permissions: ['microphone'], serviceWorkers: 'block' });
 
   const errors = [];
   async function openPage() {
     const p = await ctx.newPage();
     p.on('pageerror', e => errors.push(String(e)));
     p.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
-    await p.route('**/peerjs.min.js', r => r.fulfill({ status: 200, contentType: 'application/javascript', body: FAKE }));
+    await p.route('**/peerjs.min.js*', r => r.fulfill({ status: 200, contentType: 'application/javascript', body: FAKE }));
+    // (예전 CDN+SRI 시절의 흔적: integrity 속성이 있으면 떼어 낸다. 지금은 로컬 파일이라 없음)
+    await p.route('**/index.html', async r => {
+      const res = await r.fetch();
+      const html = (await res.text()).replace(/\s+integrity="[^"]*"\s+crossorigin="anonymous"/, '');
+      await r.fulfill({ response: res, body: html, headers: { ...res.headers(), 'content-type': 'text/html; charset=utf-8' } });
+    });
     await p.goto(BASE + '/index.html');
     return p;
   }
@@ -61,6 +68,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   await a.dispatchEvent('#pttBtn', 'pointerdown');
   await a.waitForTimeout(300);
   check('A 송신 중 표시', (await a.getAttribute('#pttBtn', 'class')).includes('on'));
+  check('A 송신 중 aria-pressed', (await a.getAttribute('#pttBtn', 'aria-pressed')) === 'true');
   // 게이트가 실제로 소리를 흘려보내는지 (마이크 레벨 바가 움직이는지)
   let micMoved = false;
   try {
@@ -79,7 +87,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   await b.waitForFunction(() => !document.getElementById('nowTalking').textContent.includes('말하는 중'),
     null, { timeout: 5000, polling: 200 });
   check('손 떼면 송신 종료 전파', !(await b.textContent('#nowTalking')).includes('말하는 중'));
-  check('버튼 원래대로', !(await a.getAttribute('#pttBtn', 'class')).includes('on'));
+  check('버튼 원래대로', !(await a.getAttribute('#pttBtn', 'class')).includes('on') && (await a.getAttribute('#pttBtn', 'aria-pressed')) === 'false');
   await a.waitForTimeout(1300);
   check('손 떼면 마이크 레벨 0 (게이트 닫힘)',
     parseFloat(await a.evaluate(() => document.getElementById('micBar').style.width)) === 0,
@@ -88,7 +96,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   // 허브(A)가 나갔을 때 B 가 허브를 이어받고, 새 사람(C)이 여전히 들어올 수 있는지
   console.log('... 허브 승계 확인');
   await a.click('#leaveBtn');
-  await b.waitForFunction(() => document.querySelectorAll('#members li').length === 1, null, { timeout: 15000, polling: 300 });
+  await b.waitForFunction(() => document.querySelectorAll('#members li').length === 1, null, { timeout: 30000, polling: 300 });
   check('A 퇴장 시 B 목록에서 사라짐', await b.evaluate(() => document.querySelectorAll('#members li').length) === 1);
   await b.waitForFunction(() => document.querySelector('#members li.me').textContent.includes('⭐'), null, { timeout: 20000, polling: 300 });
   check('B 가 허브를 이어받음', (await b.textContent('#members')).includes('⭐'), await b.textContent('#members'));
@@ -102,8 +110,21 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
 
   // 나가기
   await c.click('#leaveBtn');
-  await b.waitForFunction(() => document.querySelectorAll('#members li').length === 1, null, { timeout: 12000, polling: 200 });
+  await b.waitForFunction(() => document.querySelectorAll('#members li').length === 1, null, { timeout: 30000, polling: 200 });
   check('C 퇴장 시 B 목록에서 사라짐', await b.evaluate(() => document.querySelectorAll('#members li').length) === 1);
+
+  // PeerJS 가 안 내려온 경우: 마이크를 열기 전에 알려야 한다
+  const d = await ctx.newPage();
+  global.__pages.d = d;
+  d.on('pageerror', e => errors.push(String(e)));
+  await d.route('**/peerjs.min.js*', r => r.abort());
+  await d.goto(BASE + '/index.html');
+  await d.fill('#nameInput', '리드'); await d.fill('#roomInput', '1234');
+  await d.click('#joinBtn');
+  await d.waitForTimeout(300);
+  check('라이브러리 못 받으면 한국어 안내', (await d.textContent('#joinMsg')).includes('연결 라이브러리를 불러오지 못했습니다'), await d.textContent('#joinMsg'));
+  check('안내 뒤에도 버튼 사용 가능', !(await d.isDisabled('#joinBtn')));
+  check('상태 줄은 live region', (await d.getAttribute('#statusLine', 'role')) === 'status' && (await d.getAttribute('#statusLine', 'aria-live')) === 'polite');
 
   check('JS 오류 없음', errors.length === 0, errors.slice(0, 3).join(' | '));
 

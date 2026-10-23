@@ -2,6 +2,7 @@
  * 톡톡 습관친구 — 푸시 알림 스케줄러 (Cloudflare Worker)
  *
  * 하는 일은 딱 하나다: 1분마다 깨어나서 "지금 알림 보낼 시간인 기기가 있나" 보고, 있으면 쏜다.
+ * (덤으로 엄마아빠 은행의 "출금 신청 → 부모 폰 알림"도 같은 키·암호로 중계한다. /bank/* 참고)
  *
  * 메시지 문구·발신 친구 후보는 전부 앱이 정해서 올려준다(POST /subscribe).
  * Worker 는 그중에서 무작위로 하나씩 골라 쓰기만 한다. 그래서 부모가 앱에서
@@ -22,16 +23,17 @@ export interface Env {
   ALLOWED_ORIGIN: string;
   VAPID_SUBJECT: string;
   /**
-   * 아래 세 개는 없어도 된다.
-   * 배포 워크플로가 키와 암호를 만들어 KV 에 넣어두기 때문에, 기본 경로에서는
-   * 사람이 시크릿을 등록할 일이 없다. 직접 wrangler 로 설정하고 싶을 때만 쓴다.
+   * 키와 암호는 Worker 시크릿으로 넣는 것이 기본 경로다.
+   *   npx wrangler secret put VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / PASSPHRASE
+   * 시크릿이 없을 때만 KV(config:vapid / config:passphrase)를 읽는다.
+   * KV 에는 공개키만 두는 것을 권한다 — 개인키는 대시보드에서 누구나 열어 볼 수 있다.
    */
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   PASSPHRASE?: string;
 }
 
-/** KV 에 들어 있는 설정 키 이름 — 배포 워크플로가 같은 이름으로 넣는다 */
+/** 시크릿이 없을 때 읽는 KV 키 이름 */
 const VAPID_KV_KEY = 'config:vapid';
 const PASSPHRASE_KV_KEY = 'config:passphrase';
 
@@ -41,20 +43,32 @@ interface VapidPair {
 }
 
 /** 매 tick 마다 KV 를 읽지 않도록 아이솔레이트가 살아 있는 동안 들고 있는다 */
-let cachedVapid: VapidPair | null = null;
+let cachedVapid: Partial<VapidPair> | null = null;
 let cachedPassphrase: string | null = null;
+/** 마지막으로 cron 이 돈 시각. /health 에서 "스케줄러가 살아 있나" 보는 용도 (KV 안 씀) */
+let lastTickAt = 0;
 
-/** 환경변수로 직접 넣었으면 그걸 쓰고, 아니면 KV 에서 읽는다 */
+/**
+ * 시크릿을 먼저 보고, 없는 쪽만 KV 에서 채운다.
+ * KV 의 config:vapid 는 `{"publicKey":"..."}` 만 있어도 되고,
+ * 예전처럼 privateKey 가 같이 들어 있으면 그것도 쓰되 경고를 남긴다.
+ */
 async function getVapid(env: Env): Promise<VapidPair | null> {
-  if (env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY) {
-    return { publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY };
+  let publicKey = env.VAPID_PUBLIC_KEY ?? '';
+  let privateKey = env.VAPID_PRIVATE_KEY ?? '';
+  if (!publicKey || !privateKey) {
+    if (!cachedVapid) {
+      const raw = (await env.HABIT_KV.get(VAPID_KV_KEY, 'json')) as Partial<VapidPair> | null;
+      cachedVapid = raw && typeof raw === 'object' ? raw : {};
+      if (!privateKey && cachedVapid.privateKey) {
+        console.warn('VAPID private key is in KV; move it to `wrangler secret put VAPID_PRIVATE_KEY`');
+      }
+    }
+    publicKey = publicKey || cachedVapid.publicKey || '';
+    privateKey = privateKey || cachedVapid.privateKey || '';
   }
-  if (cachedVapid) return cachedVapid;
-  const raw = await env.HABIT_KV.get(VAPID_KV_KEY, 'json');
-  const pair = raw as VapidPair | null;
-  if (!pair || !pair.publicKey || !pair.privateKey) return null;
-  cachedVapid = pair;
-  return pair;
+  if (!publicKey || !privateKey) return null;
+  return { publicKey, privateKey };
 }
 
 async function getPassphrase(env: Env): Promise<string> {
@@ -95,12 +109,28 @@ interface Device {
 }
 
 const DEVICES_KEY = 'devices';
+/** 요청 본문 상한. 시간표 전부를 담아도 몇 KB 면 충분하다 */
+const MAX_BODY_BYTES = 64 * 1024;
+/** 같은 IP 에서 1분에 받아 주는 /subscribe·/unsubscribe 횟수 */
+const RATE_LIMIT_PER_MINUTE = 10;
+/** 분 단위 카운터는 두 번째 분이 지나면 자연히 사라진다 (초) */
+const RATE_LIMIT_TTL_SECONDS = 120;
 /** 한 가족용이다. 이 이상은 장난이나 사고로 본다 */
 const MAX_DEVICES = 4;
 /** cron 이 늦게 돌 수도 있어서, 예정 시각부터 이만큼 안이면 발송한다 (분) */
 const FIRE_WINDOW_MINUTES = 5;
 /** 발송 표시는 이틀이면 충분하다 (초) */
 const SENT_TTL_SECONDS = 60 * 60 * 48;
+
+// ── 엄마아빠 은행 (family-bank) ──
+/** 출금 신청 알림을 받을 부모 폰 구독 목록. devices 와 마찬가지로 키 하나에 통째로 담는다 */
+const BANK_PARENTS_KEY = 'bank:parents';
+/** 한 가족이면 부모 폰 둘 + 여분이면 충분하다 */
+const MAX_BANK_PARENTS = 4;
+/** /bank/notify 는 암호 하나(=한 가족) 기준으로 한 시간에 이만큼만 보낸다. 무료 한도와 장난 방지용 */
+const BANK_NOTIFY_PER_HOUR = 30;
+/** 시간 단위 카운터는 두 번째 시간이 지나면 사라진다 (초) */
+const BANK_NOTIFY_TTL_SECONDS = 2 * 60 * 60;
 
 /**
  * KV 는 쓴 값이 바로 안 보일 수 있다(최대 1분쯤). 그 사이 tick 에서 중복 발송이
@@ -201,7 +231,18 @@ function choose<T>(list: T[]): T {
 
 // ── 설정 등록 ────────────────────────────────────────
 
-function validConfig(c: unknown): c is DeviceConfig {
+/** 알림 제목에 들어가는 친구 정보. 셋 다 문자열이어야 하고 터무니없이 길면 안 된다 */
+function validFriend(f: unknown): f is DeviceConfig['friends'][number] {
+  if (!f || typeof f !== 'object') return false;
+  const x = f as { id?: unknown; name?: unknown; emoji?: unknown };
+  return (
+    typeof x.id === 'string' && x.id.length > 0 && x.id.length <= 100 &&
+    typeof x.name === 'string' && x.name.length > 0 && x.name.length <= 40 &&
+    typeof x.emoji === 'string' && x.emoji.length <= 16
+  );
+}
+
+export function validConfig(c: unknown): c is DeviceConfig {
   if (!c || typeof c !== 'object') return false;
   const d = c as DeviceConfig;
   if (typeof d.deviceId !== 'string' || d.deviceId.length === 0 || d.deviceId.length > 100) {
@@ -209,6 +250,7 @@ function validConfig(c: unknown): c is DeviceConfig {
   }
   if (typeof d.timezone !== 'string' || d.timezone.length > 64) return false;
   if (!Array.isArray(d.friends) || d.friends.length === 0 || d.friends.length > 20) return false;
+  if (!d.friends.every(validFriend)) return false;
   if (!Array.isArray(d.slots) || d.slots.length > 20) return false;
   for (const s of d.slots) {
     if (!s || typeof s.id !== 'string' || parseHHMM(s.time) < 0) return false;
@@ -226,6 +268,45 @@ function validSubscription(s: unknown): s is StoredSubscription {
   return (
     !!sub.keys && typeof sub.keys.p256dh === 'string' && typeof sub.keys.auth === 'string'
   );
+}
+
+/**
+ * 앱이 있는 주소에서만 쓰기 요청을 받는다. ALLOWED_ORIGIN 이 비어 있거나
+ * Origin 헤더가 없는 요청(curl 등)은 그대로 통과시킨다 — 진짜 방어선은 암호다.
+ */
+function originAllowed(request: Request, env: Env): boolean {
+  if (!env.ALLOWED_ORIGIN) return true;
+  const origin = request.headers.get('Origin');
+  return !origin || origin === env.ALLOWED_ORIGIN;
+}
+
+/**
+ * IP 당 1분에 몇 번까지만 받는다. 암호를 무작위로 찔러 보는 걸 느리게 만드는 정도다.
+ * 요청마다 KV 쓰기 한 번이 든다 — /subscribe 는 하루 몇 번 안 오니 한도 안이다.
+ */
+async function rateLimited(request: Request, env: Env, now: number): Promise<boolean> {
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  const key = `rl:${ip}:${Math.floor(now / 60_000)}`;
+  const count = Number((await env.HABIT_KV.get(key)) ?? '0') + 1;
+  if (count > RATE_LIMIT_PER_MINUTE) return true;
+  await env.HABIT_KV.put(key, String(count), { expirationTtl: RATE_LIMIT_TTL_SECONDS });
+  return false;
+}
+
+/** 본문을 읽기 전에 크기부터 본다. 시간표 전부를 담아도 64KB 가 넘을 일은 없다 */
+function bodyTooLarge(request: Request): boolean {
+  const length = Number(request.headers.get('content-length') ?? '0');
+  return Number.isFinite(length) && length > MAX_BODY_BYTES;
+}
+
+/** /subscribe·/unsubscribe·/bank/* 공통 문지기. 통과하면 null 을 돌려준다 */
+async function guardWrite(request: Request, env: Env): Promise<Response | null> {
+  if (!originAllowed(request, env)) return json({ error: 'forbidden origin' }, 403, env);
+  if (bodyTooLarge(request)) return json({ error: 'payload too large' }, 413, env);
+  if (await rateLimited(request, env, Date.now())) {
+    return json({ error: 'too many requests' }, 429, env);
+  }
+  return null;
 }
 
 async function handleSubscribe(request: Request, env: Env): Promise<Response> {
@@ -288,6 +369,35 @@ async function handleUnsubscribe(request: Request, env: Env): Promise<Response> 
 
 // ── 발송 ─────────────────────────────────────────────
 
+/** 구독 하나에 푸시 한 통. 404/410 이면 구독이 죽은 것이라 'gone' 으로 알려 지우게 한다 */
+async function pushTo(
+  env: Env,
+  keys: CryptoKeyPair,
+  subscription: StoredSubscription,
+  payload: string,
+  label: string
+): Promise<'sent' | 'gone' | 'failed'> {
+  try {
+    // sub 클레임은 라이브러리가 mailto: 를 붙여준다
+    const email = (env.VAPID_SUBJECT || '').replace(/^mailto:/, '');
+    const res = await sendPushNotification(keys, subscription, email, payload, {
+      algorithm: 'aes128gcm',
+      urgency: 'high',
+      ttl: 60 * 30,
+    });
+
+    if (res.status === 404 || res.status === 410) return 'gone';
+    if (!res.ok) {
+      // endpoint 전체는 구독 토큰이라 로그에 남기지 않는다. 호스트만으로 어느 푸시 서비스인지 안다
+      console.error('push failed', res.status, endpointHost(subscription.endpoint), label);
+    }
+    return res.ok ? 'sent' : 'failed';
+  } catch (err) {
+    console.error('push threw', endpointHost(subscription.endpoint), label, String(err));
+    return 'failed';
+  }
+}
+
 async function sendOne(
   env: Env,
   keys: CryptoKeyPair,
@@ -308,19 +418,14 @@ async function sendOne(
     date,
   });
 
-  try {
-    // sub 클레임은 라이브러리가 mailto: 를 붙여준다
-    const email = (env.VAPID_SUBJECT || '').replace(/^mailto:/, '');
-    const res = await sendPushNotification(keys, device.subscription, email, payload, {
-      algorithm: 'aes128gcm',
-      urgency: 'high',
-      ttl: 60 * 30,
-    });
+  return pushTo(env, keys, device.subscription, payload, slot.id);
+}
 
-    if (res.status === 404 || res.status === 410) return 'gone';
-    return res.ok ? 'sent' : 'failed';
+function endpointHost(endpoint: string): string {
+  try {
+    return new URL(endpoint).host;
   } catch {
-    return 'failed';
+    return 'invalid-endpoint';
   }
 }
 
@@ -401,6 +506,163 @@ async function runSchedule(env: Env, now: Date): Promise<void> {
   if (sentInMemory.size > 200) sentInMemory.clear();
 }
 
+// ── 엄마아빠 은행: 출금 신청 알림 ─────────────────────
+/*
+ * family-bank 앱은 서버가 없다. 아이가 "찾기 신청"을 누르면 그 기기가 여기로
+ * POST /bank/notify 를 보내고, 이 Worker 가 등록된 부모 폰 전부에 푸시를 쏜다.
+ * habit-talk 과 같은 VAPID 키·암호·출처 제한·횟수 제한을 그대로 쓴다.
+ */
+
+export interface BankParent {
+  deviceId: string;
+  subscription: StoredSubscription;
+  updatedAt: number;
+}
+
+export interface BankPayload {
+  title: string;
+  body: string;
+  url?: string;
+  tag?: string;
+}
+
+/** 앱이 보낸 알림 내용을 검사해서 푸시 페이로드로 다듬는다. 이상하면 null */
+export function bankPayload(input: unknown): BankPayload | null {
+  if (!input || typeof input !== 'object') return null;
+  const x = input as Record<string, unknown>;
+  const title = typeof x.title === 'string' && x.title.trim() ? x.title.trim() : '엄마아빠 은행';
+  if (title.length > 60) return null;
+  if (typeof x.body !== 'string' || !x.body.trim() || x.body.length > 300) return null;
+  const out: BankPayload = { title, body: x.body.trim() };
+  if (x.url !== undefined) {
+    if (typeof x.url !== 'string' || x.url.length > 500 || !/^https?:\/\//.test(x.url)) return null;
+    out.url = x.url;
+  }
+  if (x.tag !== undefined) {
+    if (typeof x.tag !== 'string' || x.tag.length > 60) return null;
+    out.tag = x.tag;
+  }
+  return out;
+}
+
+/**
+ * 부모 폰 목록에 구독을 넣거나 갱신한다. 순수 함수라 따로 테스트한다(src/bank.test.mjs).
+ * 같은 기기(deviceId)나 같은 구독(endpoint)은 하나만 남기고, 내용이 그대로면 changed=false 로
+ * 알려서 KV 쓰기를 건너뛰게 한다. 넘치면 오래된 것부터 버린다.
+ */
+export function upsertParent(
+  list: BankParent[],
+  parent: { deviceId: string; subscription: StoredSubscription },
+  now: number
+): { list: BankParent[]; changed: boolean } {
+  const same = list.find((p) => p.deviceId === parent.deviceId);
+  if (
+    same &&
+    same.subscription.endpoint === parent.subscription.endpoint &&
+    same.subscription.keys.p256dh === parent.subscription.keys.p256dh &&
+    same.subscription.keys.auth === parent.subscription.keys.auth
+  ) {
+    return { list, changed: false };
+  }
+  const next = list.filter(
+    (p) => p.deviceId !== parent.deviceId && p.subscription.endpoint !== parent.subscription.endpoint
+  );
+  next.push({ deviceId: parent.deviceId, subscription: parent.subscription, updatedAt: now });
+  next.sort((a, b) => b.updatedAt - a.updatedAt);
+  return { list: next.slice(0, MAX_BANK_PARENTS), changed: true };
+}
+
+async function readParents(env: Env): Promise<BankParent[]> {
+  const raw = await env.HABIT_KV.get(BANK_PARENTS_KEY, 'json');
+  return Array.isArray(raw) ? (raw as BankParent[]) : [];
+}
+
+async function writeParents(env: Env, parents: BankParent[]): Promise<void> {
+  await env.HABIT_KV.put(BANK_PARENTS_KEY, JSON.stringify(parents));
+}
+
+/** 본문을 읽고 암호를 확인한다. 실패하면 에러 응답, 성공하면 본문 */
+async function readAuthed<T extends { passphrase?: string }>(
+  request: Request,
+  env: Env
+): Promise<{ body: T } | { error: Response }> {
+  let body: T;
+  try {
+    body = await request.json();
+  } catch {
+    return { error: json({ error: 'bad json' }, 400, env) };
+  }
+  const passphrase = await getPassphrase(env);
+  if (!passphrase || !safeEqual(body.passphrase ?? '', passphrase)) {
+    return { error: json({ error: 'unauthorized' }, 401, env) };
+  }
+  return { body };
+}
+
+async function handleBankSubscribe(request: Request, env: Env): Promise<Response> {
+  const r = await readAuthed<{ passphrase?: string; subscription?: unknown; deviceId?: unknown; role?: unknown }>(request, env);
+  if ('error' in r) return r.error;
+  const { subscription, deviceId, role } = r.body;
+  if (
+    role !== 'parent' ||
+    typeof deviceId !== 'string' || deviceId.length === 0 || deviceId.length > 100 ||
+    !validSubscription(subscription)
+  ) {
+    return json({ error: 'bad payload' }, 400, env);
+  }
+
+  const parents = await readParents(env);
+  const result = upsertParent(parents, { deviceId, subscription }, Date.now());
+  if (!result.changed) return json({ ok: true, unchanged: true }, 200, env);
+  await writeParents(env, result.list);
+  return json({ ok: true }, 200, env);
+}
+
+async function handleBankUnsubscribe(request: Request, env: Env): Promise<Response> {
+  const r = await readAuthed<{ passphrase?: string; deviceId?: unknown }>(request, env);
+  if ('error' in r) return r.error;
+  const parents = await readParents(env);
+  const next = parents.filter((p) => p.deviceId !== r.body.deviceId);
+  if (next.length !== parents.length) await writeParents(env, next);
+  return json({ ok: true }, 200, env);
+}
+
+/** 한 가족(암호 하나) 기준 한 시간 발송 횟수. 넘으면 true */
+async function bankNotifyLimited(env: Env, now: number): Promise<boolean> {
+  const key = `rl:bank:notify:${Math.floor(now / 3_600_000)}`;
+  const count = Number((await env.HABIT_KV.get(key)) ?? '0') + 1;
+  if (count > BANK_NOTIFY_PER_HOUR) return true;
+  await env.HABIT_KV.put(key, String(count), { expirationTtl: BANK_NOTIFY_TTL_SECONDS });
+  return false;
+}
+
+async function handleBankNotify(request: Request, env: Env): Promise<Response> {
+  const r = await readAuthed<{ passphrase?: string }>(request, env);
+  if ('error' in r) return r.error;
+  const payload = bankPayload(r.body);
+  if (!payload) return json({ error: 'bad payload' }, 400, env);
+  if (await bankNotifyLimited(env, Date.now())) return json({ error: 'too many notifications' }, 429, env);
+
+  const parents = await readParents(env);
+  if (parents.length === 0) return json({ sent: 0, parents: 0 }, 200, env);
+
+  const vapid = await getVapid(env);
+  if (!vapid) return json({ error: 'vapid not configured' }, 503, env);
+  const keys = await deserializeVapidKeys(vapid);
+  const text = JSON.stringify(payload);
+
+  let sent = 0;
+  const gone = new Set<string>();
+  for (const parent of parents) {
+    const result = await pushTo(env, keys, parent.subscription, text, 'bank');
+    if (result === 'sent') sent += 1;
+    else if (result === 'gone') gone.add(parent.deviceId);
+  }
+  // 죽은 구독은 지운다
+  if (gone.size > 0) await writeParents(env, parents.filter((p) => !gone.has(p.deviceId)));
+  return json({ sent, parents: parents.length - gone.size }, 200, env);
+}
+
 // ── 진입점 ───────────────────────────────────────────
 
 export default {
@@ -412,10 +674,20 @@ export default {
     }
 
     if (url.pathname === '/subscribe' && request.method === 'POST') {
-      return handleSubscribe(request, env);
+      return (await guardWrite(request, env)) ?? handleSubscribe(request, env);
     }
     if (url.pathname === '/unsubscribe' && request.method === 'POST') {
-      return handleUnsubscribe(request, env);
+      return (await guardWrite(request, env)) ?? handleUnsubscribe(request, env);
+    }
+    // 엄마아빠 은행 (family-bank) — 같은 암호·같은 문지기
+    if (url.pathname === '/bank/subscribe' && request.method === 'POST') {
+      return (await guardWrite(request, env)) ?? handleBankSubscribe(request, env);
+    }
+    if (url.pathname === '/bank/unsubscribe' && request.method === 'POST') {
+      return (await guardWrite(request, env)) ?? handleBankUnsubscribe(request, env);
+    }
+    if (url.pathname === '/bank/notify' && request.method === 'POST') {
+      return (await guardWrite(request, env)) ?? handleBankNotify(request, env);
     }
     if (url.pathname === '/health') {
       const [vapid, passphrase] = await Promise.all([getVapid(env), getPassphrase(env)]);
@@ -425,6 +697,8 @@ export default {
           configured: Boolean(vapid && passphrase),
           // 공개키는 공개돼도 되는 값이다. 앱이 이걸 받아서 구독한다
           vapidPublicKey: vapid?.publicKey ?? '',
+          // cron 이 마지막으로 돈 시각. 아이솔레이트가 새로 뜨면 null 로 돌아간다
+          lastTickAt: lastTickAt ? new Date(lastTickAt).toISOString() : null,
         },
         200,
         env,
@@ -436,6 +710,8 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(runSchedule(env, new Date()));
+    const now = new Date();
+    lastTickAt = now.getTime();
+    ctx.waitUntil(runSchedule(env, now));
   },
 };

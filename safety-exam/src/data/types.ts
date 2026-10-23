@@ -46,9 +46,25 @@ export interface ExamRecord {
   mode?: 'full' | 'quick';
 }
 
+/** 풀다 만 시험 — 화면을 떠나거나 새로고침해도 이어서 풀 수 있게 저장한다 */
+export interface InProgressExam {
+  mode: 'full' | 'quick';
+  /** 출제된 문제 id (순서 그대로) */
+  questionIds: string[];
+  /** 문제별 보기 순서 — 원래 보기 인덱스의 순열 (예: [2,0,3,1]) */
+  choiceOrders: Record<string, number[]>;
+  /** 문제 id → 고른 보기 (원래 보기 인덱스 기준) */
+  answers: Record<string, number>;
+  /** 시험이 끝나는 시각 (Date.now() 기준 ms) */
+  deadlineAt: number;
+  /** 보고 있던 문제 번호 */
+  current: number;
+}
+
 export const STORAGE_KEYS = {
   wrongNotes: 'safety-exam-wrong-notes',
   history: 'safety-exam-history',
+  inProgressExam: 'safety-exam-in-progress',
   practicalProgress: 'safety-exam-practical-progress',
   customWritten: 'safety-exam-custom-written',
   customPractical: 'safety-exam-custom-practical',

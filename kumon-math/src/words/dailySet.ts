@@ -1,6 +1,7 @@
 import { WORD_BANK, Word } from './wordBank';
 import { firstSound, firstLetters, isIrregular } from './phonics';
 import { UNITS, SoundDef } from './units';
+import { SrsMap, pickDue, isDue } from './srs';
 
 export const WORDS_PER_DAY = 10;
 export const TEST_COUNT = 3;
@@ -37,6 +38,8 @@ export function todayKey(d: Date = new Date()): string {
 export const MAX_MISSED_PER_DAY = 2;
 /** 소리 하나에서 하루에 배우는 단어 수 (두 소리 × 4 = 8, 나머지 2개는 복습) */
 const PER_SOUND = 4;
+/** 하루 단어 중 복습 자리 수 */
+export const REVIEW_SLOTS = WORDS_PER_DAY - PER_SOUND * 2;
 
 /** 이 단어가 해당 소리로 시작하는지 (불규칙한 단어는 제외) */
 export function hasSound(w: Word, sound: SoundDef): boolean {
@@ -74,22 +77,44 @@ function pastWords(unit: number): Word[] {
   return out;
 }
 
+/** 오늘의 소리 두 개에서 새로 배우는 단어 8개 */
+export function mainWords(plan: DayPlan): Word[] {
+  const [a, b] = UNITS[plan.unit % UNITS.length];
+  return [...pickFromSound(a, plan.unitDay, PER_SOUND), ...pickFromSound(b, plan.unitDay, PER_SOUND)];
+}
+
+/**
+ * 오늘 복습할 단어 — 간격 반복 상자에서 복습 차례가 된 단어를 고른다.
+ * 이미 배운 단계(지난 단계 + 지금 단계)의 단어만 보고, 오늘 새로 배울 8개는 뺀다.
+ * 복습 차례가 아닌 단어는 돌려주지 않는다 (남는 자리는 wordsForDay 가 채운다).
+ */
+export function reviewForDay(srs: SrsMap, plan: DayPlan, d: Date = new Date(), n = REVIEW_SLOTS): string[] {
+  const unit = plan.unit % UNITS.length;
+  const today = todayKey(d);
+  const main = new Set(mainWords(plan).map(w => w.en));
+  const unlocked = [...pastWords(unit), ...UNITS[unit].flatMap(wordsOfSound)]
+    .map(w => w.en).filter(en => !main.has(en));
+  return pickDue(srs, unlocked, today, n).filter(en => isDue(srs[en], today));
+}
+
 /**
  * 오늘의 단어 10개
  *   = 오늘의 소리 A 4개 + 소리 B 4개 + 복습 2개.
- * 복습 자리는 오답 노트 단어가 먼저 차지하고, 남으면 지난 단계 소리의 단어로 채운다.
+ * 복습 자리는 오답 노트 단어 → 간격 반복에서 복습 차례인 단어(review) 순으로 차지하고,
+ * 남으면 지난 단계 소리의 단어로 채운다.
  * 첫 단계라 지난 소리가 없으면 오늘의 소리 단어를 더 넣는다.
  */
-export function wordsForDay(plan: DayPlan, d: Date = new Date(), priority: Word[] = []): Word[] {
+export function wordsForDay(plan: DayPlan, d: Date = new Date(), priority: Word[] = [], review: Word[] = []): Word[] {
   const day = dayNumber(d);
   const [a, b] = UNITS[plan.unit % UNITS.length];
-  const main = [...pickFromSound(a, plan.unitDay, PER_SOUND), ...pickFromSound(b, plan.unitDay, PER_SOUND)];
+  const main = mainWords(plan);
   const taken = new Set(main.map(w => w.en));
   const out = [...main];
   const add = (w: Word) => {
     if (out.length < WORDS_PER_DAY && !taken.has(w.en)) { out.push(w); taken.add(w.en); }
   };
   priority.slice(0, MAX_MISSED_PER_DAY).forEach(add);
+  review.forEach(add);
   shuffled(pastWords(plan.unit % UNITS.length), day * 13 + 7).forEach(add);
   // 지난 소리가 없을 때(첫 단계): 오늘의 소리 단어를 더 꺼낸다
   [...wordsOfSound(a), ...wordsOfSound(b)].forEach(add);

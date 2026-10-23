@@ -1,4 +1,4 @@
-import { Expense, FixedExpense, GiftEntry, IncomeEntry, Person } from '../types';
+import { CategoryBudget, Expense, FixedExpense, GiftEntry, IncomeEntry, Person } from '../types';
 
 /**
  * 부부끼리 파일로 주고받는 백업 형식.
@@ -12,12 +12,16 @@ import { Expense, FixedExpense, GiftEntry, IncomeEntry, Person } from '../types'
  */
 export const BACKUP_FORMAT = 'couple-budget-backup';
 /**
- * ⚠️ 경조사(gifts)를 더하면서도 1로 둔다.
- * 새 필드를 더하기만 했으므로 옛 버전 앱이 이 파일을 읽어도 gifts 만 못 보고
- * 나머지는 정상으로 합쳐진다. 버전을 올리면 옛 앱이 파일 전체를 거부해서,
- * 배우자가 새로고침하기 전까지 지출조차 주고받지 못하게 된다.
+ * 버전 내력
+ *  1 — 처음. 경조사(gifts)는 필드만 더하고 버전은 그대로 뒀다.
+ *  2 — 카테고리별 월 상한(budgets) 추가.
+ *
+ * 읽을 때는 1·2 모두 받아들인다 — 없는 배열은 빈 배열로 본다.
+ * 더 큰 버전은 거부하고 새로고침을 안내한다 (parseBackup).
+ * ⚠️ 그래서 버전 1 앱(옛 배우자 폰)은 이 앱이 만든 파일을 통째로 거부한다.
+ *    그 폰에서 새로고침하면 바로 풀린다.
  */
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
 
 export interface Backup {
   format: string;
@@ -28,6 +32,7 @@ export interface Backup {
   fixedExpenses: FixedExpense[];
   expenses: Expense[];
   gifts: GiftEntry[];
+  budgets: CategoryBudget[];
 }
 
 export function buildBackup(input: {
@@ -36,6 +41,8 @@ export function buildBackup(input: {
   fixedExpenses: FixedExpense[];
   expenses: Expense[];
   gifts: GiftEntry[];
+  /** 생략하면 빈 배열 — 옛 호출부·테스트 호환 */
+  budgets?: CategoryBudget[];
   now?: number;
 }): Backup {
   return {
@@ -48,6 +55,7 @@ export function buildBackup(input: {
     fixedExpenses: input.fixedExpenses,
     expenses: input.expenses,
     gifts: input.gifts,
+    budgets: input.budgets ?? [],
   };
 }
 
@@ -99,12 +107,14 @@ export function parseBackup(
     incomes: readRecords<IncomeEntry>(o.incomes),
     fixedExpenses: readRecords<FixedExpense>(o.fixedExpenses),
     expenses: readRecords<Expense>(o.expenses),
-    // 경조사가 없던 버전이 만든 파일이면 그냥 빈 배열이 된다
+    // 경조사·예산이 없던 버전이 만든 파일이면 그냥 빈 배열이 된다
     gifts: readRecords<GiftEntry>(o.gifts),
+    budgets: readRecords<CategoryBudget>(o.budgets),
   };
 
   const total = backup.persons.length + backup.incomes.length
-    + backup.fixedExpenses.length + backup.expenses.length + backup.gifts.length;
+    + backup.fixedExpenses.length + backup.expenses.length + backup.gifts.length
+    + backup.budgets.length;
   if (total === 0) {
     return { ok: false, error: '파일에 기록이 하나도 없어요. 상대방이 먼저 가계부를 입력했는지 확인해 주세요.' };
   }

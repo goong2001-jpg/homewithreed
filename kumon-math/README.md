@@ -1,46 +1,96 @@
-# Getting Started with Create React App
+# 영어 단어 (kumon-math)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+7살 아이가 **하루 10분**, 파닉스 순서대로 영어 단어를 배우는 앱입니다.
+단어 카드를 보고 → 3문제 퀴즈를 풀고 → 배운 단어로 놀이터에서 놉니다.
+맞힐 때마다 별(⭐)을 모아 요정 아바타를 꾸미고, 묶음을 끝내면 쿠폰(🎟️)을 뽑습니다.
 
-## Available Scripts
+안드로이드 크롬에서 열고 메뉴의 **"홈 화면에 추가"**를 누르면 앱처럼 전체화면으로 실행됩니다.
 
-In the project directory, you can run:
+배포 주소: `https://<계정>.github.io/homewithreed/`
 
-### `npm start`
+---
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+## 화면
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+| 탭 | 하는 일 |
+|---|---|
+| 📖 **영어 단어** (기본) | 오늘 미션 카드 · 오늘의 소리(파닉스 단계) · 단어 카드 10개 → 퀴즈 3문제 → 쿠폰 뽑기 · 상점·쿠폰 지갑 |
+| 🎮 **놀이터** | 배운 단어로 하는 놀이 5가지 — 짝 맞추기, 철자 맞추기, 단어 그림책, 선생님 놀이, 물건 찾기 |
+| 🧮 수학놀이 · 🔤 알파벳 | 코드는 남아 있지만 숨겨 둔 탭 (`src/App.tsx` 의 `SHOW_MATH`, `SHOW_ALPHABET` 를 `true` 로 바꾸면 다시 나타남) |
 
-### `npm test`
+놀이터와 숨긴 탭은 처음 누를 때 따로 내려받습니다(`React.lazy`). 첫 화면은 영어 단어 탭만 싣습니다.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## 오늘 미션 3개 — "오늘은 끝"이 분명하게
 
-### `npm run build`
+단어 화면 맨 위 카드에 오늘 할 일 세 가지가 체크 표시와 함께 보입니다.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+| 미션 | 끝나는 조건 |
+|---|---|
+| 📖 단어 카드 10개 보기 | 카드에서 "다음 단어" 10번 |
+| ✅ 퀴즈 3개 맞히기 | 퀴즈 정답 3개 |
+| 🎮 놀이터 게임 1판 | 놀이터에서 별을 한 번이라도 받기 |
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+세 개를 다 하면 **색종이 축하 화면**("오늘 끝! 내일 또 만나 👋")이 하루 한 번 뜨고 별 10개를 보너스로 줍니다.
+그 뒤 카드는 "오늘 미션 완료 ✅"로 바뀝니다. 더 하고 싶으면 얼마든지 더 할 수 있지만, 안 해도 됩니다.
+규칙은 `src/words/missions.ts`, 화면은 `src/components/DailyMission.tsx` (`MissionCard`, `MissionCelebration`).
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## 간격 반복 (라이트너 상자)
 
-### `npm run eject`
+단어마다 **상자 번호(0~4)** 와 **다음에 볼 날짜**가 있습니다 (`src/words/srs.ts`).
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+- 카드를 처음 보면 1번 상자(내일 복습). 퀴즈에서 맞히면 한 칸 위로 — 다음 복습은 0·1·3·7·14일 뒤.
+- 틀리면 0번 상자로 떨어져 **오늘** 다시 봅니다. 4번 상자에 오르면 "완전히 익힌" 단어입니다.
+- 오늘의 단어 10개 = 오늘의 소리 두 개에서 새 단어 8개 + **복습 2개**.
+  복습 자리는 오답 노트 단어 → 복습 차례가 된 단어(낮은 상자·오래된 순) → 지난 단계 단어 순으로 채웁니다.
+  복습은 **이미 배운 단계의 단어만** 꺼내므로 파닉스 진도 순서는 그대로입니다 (`src/words/dailySet.ts` 의 `reviewForDay`).
+- 화면 제목 아래 "복습 N · 새 단어 M"이 오늘 단어의 구성을 알려 줍니다.
+- 예전 저장 데이터는 처음 열 때 자동으로 옮깁니다 (맞힌 단어 → 2번, 틀린 단어 → 0번, 보기만 한 단어 → 1번).
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## 연속 학습 스트릭 + 프리즈
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+- 하루에 미션 진행이나 퀴즈 답이 하나라도 있으면 그날은 공부한 날. 이어지면 "🔥 5일 연속"이 오릅니다.
+- **🧊 프리즈**는 한 주(월요일 시작)에 하나씩 받고 최대 2개까지 모읍니다.
+  딱 하루 건너뛰었을 때 프리즈가 있으면 자동으로 하나 써서 스트릭을 지킵니다. 이틀 넘게 쉬면 0으로.
+- 규칙은 `src/words/streak.ts` (`updateStreak`), 화면은 단어 탭 머리의 별 옆 배지.
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+## 요정의 기억
 
-## Learn More
+단어 카드의 요정 말풍선이 아이의 기록을 보고 한마디 합니다 (`src/words/fairy.ts`, 무작위 없음).
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+- "어제 틀린 cat, 오늘은 맞췄네! 👏" — 어제 틀린 단어를 오늘 맞혔을 때
+- "dog는 이제 완전 네 거야! 💎" — 4번 상자에 오른 단어
+- "🔥 5일 연속 공부! 정말 대단해!" — 3·5·7·10·14·21·30·50·100일
+- "어제 8개 배웠지? 오늘도 가보자 💪" — 오늘 첫 카드
+- "오늘 미션 다 했어! 최고야 🏆"
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+할 말이 없으면 평소처럼 단어를 넣은 문장을 들려줍니다 (`src/words/sentences.ts`).
+
+## 소리
+
+브라우저 음성 합성(Web Speech API)으로 단어·문장·첫소리를 읽어 줍니다. 읽어주기를 지원하지 않는 기기에서는 안내가 뜹니다.
+
+## 데이터 (브라우저 `localStorage`, 서버 없음)
+
+| 키 | 내용 |
+|---|---|
+| `word_progress` | 오늘 진행, 소리 단계 진도, 오답 노트, 간격 반복 상자(`srs`), 쿠폰과 기록 |
+| `word_missions` | 오늘 미션 진행 (날이 바뀌면 초기화) |
+| `word_streak` | 연속 학습 스트릭과 프리즈 |
+| `word_greeted` | 오늘 요정이 인사했는지 |
+| `kumon_game_state`, `kumon_items` | 별(⭐)·정답 개수·아바타 아이템 (모든 탭이 같이 씀) |
+| `active_tab` | 마지막으로 보던 탭 |
+
+화면마다 훅을 따로 만들고 `localStorage` 를 공용 저장소로 씁니다. 다른 화면이 봐야 하는 값은 반드시 저장하세요.
+
+## 아바타 그림
+
+`public/avatar/*.webp` — 배경이 이미 투명한 WebP 입니다 (앱 안에서 배경을 지우지 않습니다). 자세한 건 `public/avatar/README.md`.
+
+## 개발
+
+```bash
+npm install
+npm start                                  # 개발 서버
+CI=true npm test -- --watchAll=false       # 미션·간격 반복·스트릭·요정·오늘의 단어 로직 테스트
+CI=true npm run build                      # 배포 빌드 (경고도 실패로 처리)
+```

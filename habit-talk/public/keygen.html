@@ -42,28 +42,36 @@
   <div class="card">
     <button id="gen">키 만들기</button>
     <div class="warn">
-      만든 값은 Cloudflare KV 에 넣은 뒤 이 페이지를 닫으세요.
-      메신저나 메모장에 남기지 마세요.
+      만든 값은 Worker 시크릿(<span class="name">wrangler secret put</span>)에 넣은 뒤
+      이 페이지를 닫으세요. 메신저나 메모장에 남기지 말고, 개인키는 KV 에도 넣지 마세요.
     </div>
   </div>
 
   <div id="out">
     <div class="card">
-      <h2>1. KV 에 넣기 — <span class="name">config:vapid</span></h2>
+      <h2>1. 공개키 — <span class="name">VAPID_PUBLIC_KEY</span></h2>
       <p class="desc">
-        Cloudflare 대시보드 → Storage &amp; Databases → KV → <b>HABIT_KV</b> →
-        <b>Add entry</b> 에서<br>
-        Key 에 <span class="name">config:vapid</span>, Value 에 아래 내용을 그대로 붙여넣으세요.
+        터미널에서 <span class="name">cd habit-push &amp;&amp; npx wrangler secret put VAPID_PUBLIC_KEY</span>
+        를 실행하고, 값을 물어보면 아래 내용을 붙여넣으세요. 공개돼도 되는 값입니다.
       </p>
-      <textarea id="vapid" rows="4" readonly></textarea>
-      <div class="row"><button class="copy" data-for="vapid">복사</button><span id="vapidMsg"></span></div>
+      <textarea id="pub" rows="2" readonly></textarea>
+      <div class="row"><button class="copy" data-for="pub">복사</button><span id="pubMsg"></span></div>
     </div>
 
     <div class="card">
-      <h2>2. KV 에 넣기 — <span class="name">config:passphrase</span></h2>
+      <h2>2. 개인키 — <span class="name">VAPID_PRIVATE_KEY</span></h2>
       <p class="desc">
-        같은 곳에서 <b>Add entry</b> 를 한 번 더 눌러,
-        Key 에 <span class="name">config:passphrase</span>, Value 에 아래 값을 넣으세요.
+        <span class="name">npx wrangler secret put VAPID_PRIVATE_KEY</span> 에 아래 값을 넣으세요.
+        비밀입니다 — 저장소에 커밋하거나 KV 에 넣지 마세요.
+      </p>
+      <textarea id="priv" rows="4" readonly></textarea>
+      <div class="row"><button class="copy" data-for="priv">복사</button><span id="privMsg"></span></div>
+    </div>
+
+    <div class="card">
+      <h2>3. 알림 암호 — <span class="name">PASSPHRASE</span></h2>
+      <p class="desc">
+        <span class="name">npx wrangler secret put PASSPHRASE</span> 에 아래 값을 넣으세요.
       </p>
       <textarea id="pass" rows="2" readonly></textarea>
       <div class="row"><button class="copy" data-for="pass">복사</button><span id="passMsg"></span></div>
@@ -74,7 +82,8 @@
     </div>
 
     <div class="ok">
-      두 개를 다 넣었으면 Cloudflare 에서 저장소를 연결해 Worker 를 배포하면 됩니다.
+      세 개를 다 넣었으면 Worker 를 배포하면 됩니다. 대시보드로만 하고 싶으면
+      Worker 의 <b>Settings → Variables and Secrets</b> 에 같은 이름으로 넣어도 됩니다.
       자세한 순서는 <b>habit-push/README.md</b> 에 있습니다.
     </div>
   </div>
@@ -96,8 +105,8 @@ document.getElementById('gen').addEventListener('click', async () => {
   const publicKey = b64u(await crypto.subtle.exportKey('raw', pair.publicKey));
   const privateKey = b64u(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
 
-  // Worker 가 KV 에서 그대로 JSON.parse 하는 형태로 내보낸다
-  document.getElementById('vapid').value = JSON.stringify({ publicKey, privateKey });
+  document.getElementById('pub').value = publicKey;
+  document.getElementById('priv').value = privateKey;
 
   // 사람이 옮겨 적기 쉬우면서 추측은 어려운 암호
   const rnd = new Uint8Array(18);

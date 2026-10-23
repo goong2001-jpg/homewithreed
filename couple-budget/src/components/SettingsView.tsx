@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import {
-  AppSettings, Expense, FixedExpense, GiftEntry, IncomeEntry, MonthBudget, MonthKey,
-  Person, SyncSettings, SyncStatus,
+  AppSettings, CategoryBudget, Expense, FixedExpense, GiftEntry, IncomeEntry, MonthBudget,
+  MonthKey, Person, SyncSettings, SyncStatus,
 } from '../types';
 import { monthLabel } from '../utils/format';
 import { exportMonthToExcel } from '../utils/excelExport';
+import { WeeklyReport, weekRangeLabel } from '../utils/weekly';
 import MonthHeader from './MonthHeader';
 import IncomeCard from './IncomeCard';
 import FixedExpenseCard from './FixedExpenseCard';
 import PersonsCard from './PersonsCard';
 import SyncCard from './SyncCard';
 import ExchangeCard from './ExchangeCard';
+import CategoryBudgetCard from './CategoryBudgetCard';
+import WeeklyReportCard from './WeeklyReportCard';
 
 interface Props {
   month: MonthKey;
@@ -20,6 +23,10 @@ interface Props {
   fixed: FixedExpense[];
   expenses: Expense[];
   gifts: GiftEntry[];
+  budgets: CategoryBudget[];
+  onSetBudget: React.ComponentProps<typeof CategoryBudgetCard>['onSet'];
+  /** 언제나 열어볼 수 있는 주간 리포트 (오늘 기준) */
+  weeklyReport: WeeklyReport;
   syncStatus: SyncStatus;
   syncError: string;
   counts: { persons: number; incomes: number; fixed: number; expenses: number; gifts: number };
@@ -49,6 +56,7 @@ const cardStyle: React.CSSProperties = {
 export default function SettingsView(props: Props) {
   const {
     month, budget, settings, persons, incomes, fixed, expenses, gifts,
+    budgets, onSetBudget, weeklyReport,
     syncStatus, syncError, counts,
     onPrev, onNext, onToday, onAddIncome, onEditIncome, onDeleteIncome, onCopyPrevIncome,
     onSaveFixed, onDeleteFixed,
@@ -57,6 +65,7 @@ export default function SettingsView(props: Props) {
 
   const [confirmClear, setConfirmClear] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showWeekly, setShowWeekly] = useState(false);
 
   async function handleExport() {
     setExporting(true);
@@ -101,6 +110,33 @@ export default function SettingsView(props: Props) {
           onDelete={onDeleteFixed}
           cardStyle={cardStyle}
         />
+
+        <CategoryBudgetCard
+          budgets={budgets}
+          onSet={onSetBudget}
+          cardStyle={cardStyle}
+        />
+
+        {/* 주간 리포트 — 홈에는 일·월요일에만 뜨지만 여기서는 언제든 */}
+        {showWeekly ? (
+          <WeeklyReportCard report={weeklyReport} />
+        ) : (
+          <button
+            onClick={() => setShowWeekly(true)}
+            style={{
+              ...cardStyle, cursor: 'pointer', border: 'none', textAlign: 'left',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}
+          >
+            <span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#333' }}>📊 주간 리포트 보기</span>
+              <span style={{ display: 'block', fontSize: 12, color: '#95a5a6', marginTop: 3 }}>
+                {weekRangeLabel(weeklyReport)} · 카톡으로 공유할 수 있어요
+              </span>
+            </span>
+            <span style={{ color: '#bbb', fontSize: 18 }}>›</span>
+          </button>
+        )}
 
         <PersonsCard
           persons={persons}

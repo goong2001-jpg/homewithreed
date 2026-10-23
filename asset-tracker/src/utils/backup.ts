@@ -1,4 +1,4 @@
-import { Asset, AssetKind, Goal, Loan, Recurring } from '../types';
+import { Asset, AssetKind, Goal, Loan, Recurring, Snapshot } from '../types';
 
 /**
  * 백업 파일 형식.
@@ -12,7 +12,12 @@ import { Asset, AssetKind, Goal, Loan, Recurring } from '../types';
  * 백업을 얹어도 지금 기록이 엉뚱하게 되살아나지 않는다.
  */
 export const BACKUP_FORMAT = 'asset-tracker-backup';
-export const BACKUP_VERSION = 1;
+/**
+ * 버전 내력
+ *  1 — kinds · assets · loans · recurrings · goals
+ *  2 — snapshots(월별 순자산) 추가. 1 파일도 그대로 읽힌다 (snapshots 는 빈 배열)
+ */
+export const BACKUP_VERSION = 2;
 
 export interface Backup {
   format: string;
@@ -23,6 +28,7 @@ export interface Backup {
   loans: Loan[];
   recurrings: Recurring[];
   goals: Goal[];
+  snapshots: Snapshot[];
 }
 
 export function buildBackup(input: {
@@ -31,6 +37,7 @@ export function buildBackup(input: {
   loans: Loan[];
   recurrings: Recurring[];
   goals: Goal[];
+  snapshots?: Snapshot[];
   now?: number;
 }): Backup {
   return {
@@ -43,6 +50,7 @@ export function buildBackup(input: {
     loans: input.loans,
     recurrings: input.recurrings,
     goals: input.goals,
+    snapshots: input.snapshots ?? [],
   };
 }
 
@@ -95,10 +103,13 @@ export function parseBackup(
     loans: readRecords<Loan>(o.loans),
     recurrings: readRecords<Recurring>(o.recurrings),
     goals: readRecords<Goal>(o.goals),
+    // 버전 1 파일에는 없다 — 빈 배열로 읽혀서 합칠 때 아무것도 안 한다
+    snapshots: readRecords<Snapshot>(o.snapshots),
   };
 
   const total = backup.kinds.length + backup.assets.length
-    + backup.loans.length + backup.recurrings.length + backup.goals.length;
+    + backup.loans.length + backup.recurrings.length + backup.goals.length
+    + backup.snapshots.length;
   if (total === 0) {
     return { ok: false, error: '파일에 기록이 하나도 없어요.' };
   }
@@ -126,7 +137,12 @@ export function backupSummary(b: Backup): string {
 
 /** 브라우저에서 파일로 내려받는다 */
 export function downloadBackup(text: string, fileName: string): void {
-  const blob = new Blob([text], { type: 'application/json' });
+  downloadFile(text, fileName, 'application/json');
+}
+
+/** 아무 텍스트나 파일로 내려받는다 — 백업(json)과 캘린더(ics)가 같이 쓴다 */
+export function downloadFile(text: string, fileName: string, mime: string): void {
+  const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

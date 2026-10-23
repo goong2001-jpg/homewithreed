@@ -9,10 +9,12 @@
   'use strict';
 
   // 배포할 때마다 index.html 의 ?v=, sw.js, version.json 과 같이 올린다
-  var APP_VERSION = '6';
+  var APP_VERSION = '7';
 
   var STORE_KEY = 'hwr-allowance-v1';
   var BACKUP_KEY = 'hwr-allowance-last-backup';
+  var NUDGE_KEY = 'hwr-allowance-backup-nudge';   // 백업 알림을 닫은 시각
+  var NUDGE_DAYS = 30, NUDGE_MIN_RECORDS = 20, NUDGE_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
   var BACKUP_FORMAT = 'hwr-allowance-backup';
   var GOAL_KEY = 'hwr-allowance-goal';
   var TAG_KEYS = { in: 'hwr-allowance-givers', out: 'hwr-allowance-uses' };
@@ -101,7 +103,7 @@
     return (+p[1]) + '월 ' + (+p[2]) + '일 (' + DOW[d.getDay()] + ')';
   }
   // "1,500원", "125000000", "1억 2500만원", "3만5천" 같은 입력을 숫자로. 못 읽으면 0.
-  var AMOUNT_MAX = 1000000000000;   // 1조. 자율주행차도 들어가게 넉넉히
+  var AMOUNT_MAX = 1000000000;   // 10억. 아이 목표(자동차 1억 2500만원)까지는 들어가되 오타로 터무니없는 금액은 막는다. 용돈기입장·가족은행 같은 값
   var UNIT = { '억': 100000000, '만': 10000, '천': 1000 };
   function parseAmount(v) {
     if (v === null || v === undefined) return 0;
@@ -184,6 +186,7 @@
     $('yearOutCount').textContent = yout.length + '번';
 
     renderGoal(bal);
+    showBackupNudge();
 
     // 받은 지폐 장수
     $('billCounts').innerHTML = BILLS.map(function (bill) {
@@ -443,7 +446,7 @@
     if (!r) return;
     editing = { id: id, type: typeOf(r) };
     $('editDate').value = r.date;
-    $('editDate').max = today();
+    refreshDateMax();
     $('editAmount').value = r.amount.toLocaleString('ko-KR');
     setEditType(typeOf(r), tagOf(r));
     $('editSheet').classList.remove('hidden');
@@ -587,11 +590,26 @@
     var t = null;
     try { t = +localStorage.getItem(BACKUP_KEY); } catch (e) {}
     $('lastBackup').textContent = t ? '마지막 백업: ' + new Date(t).toLocaleDateString('ko-KR') : '아직 백업한 적이 없어요.';
+    showBackupNudge();
   }
+
+  // 기록이 20개 넘게 쌓였는데 30일 넘게(또는 한 번도) 백업을 안 했으면 맨 위에 작은 알림을 띄운다. 닫으면 7일 동안 안 뜬다.
+  function showBackupNudge() {
+    var last = 0, closed = 0;
+    try { last = +localStorage.getItem(BACKUP_KEY) || 0; closed = +localStorage.getItem(NUDGE_KEY) || 0; } catch (e) {}
+    var days = last ? Math.floor((Date.now() - last) / 86400000) : -1;
+    var show = records.length >= NUDGE_MIN_RECORDS && (days < 0 || days >= NUDGE_DAYS) && Date.now() - closed >= NUDGE_SNOOZE_MS;
+    $('backupNudge').hidden = !show;
+    if (show) $('backupNudgeText').textContent = days < 0 ? '아직 백업한 적이 없어요' : '백업한 지 ' + days + '일 지났어요';
+  }
+
+  // 날짜 칸의 '오늘' 한도. 앱을 밤새 켜 두면 날이 바뀌므로 화면에 돌아올 때·날짜를 고를 때 다시 잡는다
+  function refreshDateMax() { $('dateInput').max = today(); $('editDate').max = today(); }
 
   // ---------- 연결 ----------
   $('dateInput').value = today();
-  $('dateInput').max = today();
+  refreshDateMax();
+  $('dateInput').addEventListener('focus', refreshDateMax);
 
   document.querySelector('.seg').addEventListener('click', function (e) {
     var b = e.target.closest('button');
@@ -643,6 +661,11 @@
   $('nextYear').addEventListener('click', function () { viewYear++; render(); });
   $('undoBtn').addEventListener('click', undo);
   $('exportBtn').addEventListener('click', exportBackup);
+  $('backupNudgeBtn').addEventListener('click', exportBackup);
+  $('backupNudgeClose').addEventListener('click', function () {
+    try { localStorage.setItem(NUDGE_KEY, String(Date.now())); } catch (e) {}
+    $('backupNudge').hidden = true;
+  });
   $('importInput').addEventListener('change', function (e) {
     if (e.target.files[0]) importBackup(e.target.files[0]);
     e.target.value = '';
@@ -662,7 +685,7 @@
   window.__allowanceReady = true;
   $('verLabel').textContent = '버전 ' + APP_VERSION;
   checkUpdate();
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) checkUpdate(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { refreshDateMax(); checkUpdate(); } });
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });

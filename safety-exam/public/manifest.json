@@ -1,0 +1,12 @@
+{
+  "short_name": "산업안전기사",
+  "name": "산업안전기사 시험 대비 - 간이시험·CBT·오답노트",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#1a5c3a",
+  "background_color": "#f4f6f5"
+}

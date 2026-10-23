@@ -13,7 +13,8 @@ export default function IngredientPicker({ have, onChange }: Props) {
 
   const add = (name: string) => {
     const clean = name.trim();
-    if (clean.length < 2 || have.includes(clean)) return;
+    // '무'처럼 한 글자 재료도 있다. 빈 칸만 거른다.
+    if (clean.length < 1 || have.includes(clean)) return;
     onChange([...have, clean]);
   };
 

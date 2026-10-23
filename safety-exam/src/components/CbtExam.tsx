@@ -1,7 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
-import { SUBJECTS, SubjectScore, WrittenQuestion } from '../data/types';
-import { buildFullExam, buildQuickExam, QUESTIONS_PER_SUBJECT } from '../data/questionBank';
-import { addHistory, addWrongNotes } from '../storage';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { InProgressExam, SUBJECTS, SubjectScore, WrittenQuestion } from '../data/types';
+import {
+  buildFullExam,
+  buildQuickExam,
+  findWrittenByIds,
+  isValidChoiceOrder,
+  QUESTIONS_PER_SUBJECT,
+  shuffledChoiceOrder,
+} from '../data/questionBank';
+import {
+  addHistory,
+  addWrongNotes,
+  clearInProgressExam,
+  loadInProgressExam,
+  saveInProgressExam,
+} from '../storage';
 
 const FULL_EXAM_SECONDS = 180 * 60;
 const QUICK_EXAM_SECONDS = 10 * 60;
@@ -16,6 +29,93 @@ function formatTime(totalSeconds: number): string {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+/** 마감 시각까지 남은 초 — 기기 시계 기준이라 백그라운드에 있어도 어긋나지 않는다 */
+function secondsLeft(deadlineAt: number, now: number = Date.now()): number {
+  return Math.max(0, Math.ceil((deadlineAt - now) / 1000));
+}
+
+/** 시험 한 회차의 상태 (문제·보기 순서·답안·마감) */
+interface Session {
+  questions: WrittenQuestion[];
+  choiceOrders: Record<string, number[]>;
+  answers: Record<string, number>;
+  current: number;
+  deadlineAt: number;
+  /** 풀다 만 시험을 이어서 푸는 중인지 */
+  resumed: boolean;
+}
+
+function toSaved(session: Session, mode: ExamMode): InProgressExam {
+  return {
+    mode,
+    questionIds: session.questions.map((q) => q.id),
+    choiceOrders: session.choiceOrders,
+    answers: session.answers,
+    deadlineAt: session.deadlineAt,
+    current: session.current,
+  };
+}
+
+/** 새 시험지 — 문제마다 보기 순서도 새로 섞는다 */
+function startSession(mode: ExamMode, examSeconds: number): Session {
+  const questions = mode === 'quick' ? buildQuickExam() : buildFullExam();
+  const choiceOrders: Record<string, number[]> = {};
+  questions.forEach((q) => {
+    choiceOrders[q.id] = shuffledChoiceOrder(q);
+  });
+  return {
+    questions,
+    choiceOrders,
+    answers: {},
+    current: 0,
+    deadlineAt: Date.now() + examSeconds * 1000,
+    resumed: false,
+  };
+}
+
+/** 풀다 만 시험이 있으면 그대로 되살린다. 없거나 못 쓰면 null */
+function resumeSession(mode: ExamMode): Session | null {
+  const saved = loadInProgressExam();
+  if (!saved || saved.mode !== mode) return null;
+  const questions = findWrittenByIds(saved.questionIds);
+  if (!questions) {
+    clearInProgressExam(); // 문제은행이 바뀌어 되살릴 수 없다
+    return null;
+  }
+  const choiceOrders: Record<string, number[]> = {};
+  questions.forEach((q) => {
+    const order = saved.choiceOrders[q.id];
+    choiceOrders[q.id] = isValidChoiceOrder(q, order) ? order : shuffledChoiceOrder(q);
+  });
+  const answers: Record<string, number> = {};
+  questions.forEach((q) => {
+    const a = saved.answers[q.id];
+    if (typeof a === 'number' && a >= 0 && a < q.choices.length) answers[q.id] = a;
+  });
+  return {
+    questions,
+    choiceOrders,
+    answers,
+    current: Math.min(Math.max(0, Math.floor(saved.current)), questions.length - 1),
+    deadlineAt: saved.deadlineAt,
+    resumed: true,
+  };
+}
+
+/** 과목별 점수와 합격 여부 (채점 기준은 그대로) */
+function evaluate(questions: WrittenQuestion[], answers: Record<string, number>, isQuick: boolean) {
+  const scores: SubjectScore[] = SUBJECTS.map((subject) => {
+    const subjectQuestions = questions.filter((q) => q.subject === subject);
+    const correct = subjectQuestions.filter((q) => answers[q.id] === q.answer).length;
+    return { subject, correct, total: subjectQuestions.length };
+  });
+  const correctCount = questions.filter((q) => answers[q.id] === q.answer).length;
+  const avgScore = questions.length === 0 ? 0 : (correctCount / questions.length) * 100;
+  const hasSubjectFail = scores.some((s) => s.total > 0 && (s.correct / s.total) * 100 < 40);
+  const passed = isQuick ? avgScore >= 60 : avgScore >= 60 && !hasSubjectFail;
+  return { scores, correctCount, avgScore, passed };
+}
+
 interface Props {
   onExit: () => void;
   mode?: ExamMode;
@@ -28,69 +128,85 @@ export default function CbtExam({ onExit, mode = 'full', onGoWrongNote }: Props)
   const isQuick = mode === 'quick';
   const examSeconds = isQuick ? QUICK_EXAM_SECONDS : FULL_EXAM_SECONDS;
 
-  const [questions, setQuestions] = useState<WrittenQuestion[]>(
-    isQuick ? buildQuickExam : buildFullExam
+  // 풀다 만 시험이 있으면 이어서, 없으면 새로 시작한다 (처음 그릴 때 한 번만)
+  const [session, setSession] = useState<Session>(
+    () => resumeSession(mode) ?? startSession(mode, examSeconds)
   );
-  const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [current, setCurrent] = useState(0);
-  const [remaining, setRemaining] = useState(examSeconds);
+  const { questions, choiceOrders, answers, current, deadlineAt } = session;
+  const [remaining, setRemaining] = useState(() => secondsLeft(deadlineAt));
   const [submitted, setSubmitted] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>(isQuick ? 'all' : 'wrong');
 
-  useEffect(() => {
-    if (submitted) return;
-    const timer = setInterval(() => {
-      setRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setSubmitted(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [submitted]);
-
-  const scores: SubjectScore[] = useMemo(() => {
-    return SUBJECTS.map((subject) => {
-      const subjectQuestions = questions.filter((q) => q.subject === subject);
-      const correct = subjectQuestions.filter((q) => answers[q.id] === q.answer).length;
-      return { subject, correct, total: subjectQuestions.length };
-    });
-  }, [questions, answers]);
-
-  const correctCount = useMemo(
-    () => questions.filter((q) => answers[q.id] === q.answer).length,
-    [questions, answers]
+  const { scores, correctCount, avgScore, passed } = useMemo(
+    () => evaluate(questions, answers, isQuick),
+    [questions, answers, isQuick]
   );
 
-  const avgScore = questions.length === 0 ? 0 : (correctCount / questions.length) * 100;
-  const hasSubjectFail = scores.some((s) => s.total > 0 && (s.correct / s.total) * 100 < 40);
-  const passed = isQuick ? avgScore >= 60 : avgScore >= 60 && !hasSubjectFail;
-
-  // 제출 시 기록 저장 (오답노트 + 응시 이력)
-  useEffect(() => {
-    if (!submitted) return;
+  /** 답안 제출 — 기록 저장(오답노트 + 응시 이력)과 진행 중 시험 삭제를 한 번에 */
+  const submit = (finalAnswers: Record<string, number> = answers) => {
+    if (submitted) return;
+    const result = evaluate(questions, finalAnswers, isQuick);
     const wrong = questions
-      .filter((q) => answers[q.id] !== q.answer)
+      .filter((q) => finalAnswers[q.id] !== q.answer)
       .map((q) => ({
         questionId: q.id,
-        myAnswer: answers[q.id] ?? -1,
+        myAnswer: finalAnswers[q.id] ?? -1,
         savedAt: new Date().toISOString(),
       }));
     addWrongNotes(wrong);
-    addHistory({ date: new Date().toISOString(), scores, passed, mode });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submitted]);
+    addHistory({ date: new Date().toISOString(), scores: result.scores, passed: result.passed, mode });
+    clearInProgressExam();
+    if (finalAnswers !== answers) setSession((prev) => ({ ...prev, answers: finalAnswers }));
+    setSubmitted(true);
+  };
+  // 타이머 콜백에서 항상 최신 submit 을 부르도록
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+
+  // 남은 시간은 마감 시각에서 계산한다 — 백그라운드로 갔다 와도 정확하다
+  useEffect(() => {
+    if (submitted) return;
+    const tick = () => {
+      const left = secondsLeft(deadlineAt);
+      setRemaining(left);
+      if (left <= 0) submitRef.current();
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('focus', tick);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', tick);
+      window.removeEventListener('focus', tick);
+    };
+  }, [submitted, deadlineAt]);
+
+  // 답을 고르거나 문제를 옮길 때마다 저장해 두어, 나갔다 와도 이어서 풀 수 있다
+  useEffect(() => {
+    if (!submitted) saveInProgressExam(toSaved(session, mode));
+  }, [session, mode, submitted]);
+
+  const updateSession = (patch: Partial<Session>) => setSession((prev) => ({ ...prev, ...patch }));
+  const setCurrent = (index: number) => updateSession({ current: index });
 
   const restart = () => {
-    setQuestions(isQuick ? buildQuickExam() : buildFullExam());
-    setAnswers({});
-    setCurrent(0);
-    setRemaining(examSeconds);
+    const s = startSession(mode, examSeconds);
+    setSession(s);
+    setRemaining(secondsLeft(s.deadlineAt));
     setReviewFilter(isQuick ? 'all' : 'wrong');
     setSubmitted(false);
+  };
+
+  /** 아직 다 풀지 않은 시험을 떠날 때 — 답안은 저장돼 있어 다음에 이어서 풀 수 있다 */
+  const confirmExit = () => {
+    if (
+      window.confirm(
+        '시험을 종료할까요?\n지금까지 푼 답안과 남은 시간은 저장되어 다음에 이어서 풀 수 있습니다.'
+      )
+    ) {
+      onExit();
+    }
   };
 
   const wrongCount = questions.length - correctCount;
@@ -113,14 +229,14 @@ export default function CbtExam({ onExit, mode = 'full', onGoWrongNote }: Props)
                 {i + 1}. {q.question}
               </p>
               <div className="choices">
-                {q.choices.map((choice, ci) => {
+                {choiceOrders[q.id].map((orig, ci) => {
                   let cls = 'choice';
-                  if (ci === q.answer) cls += ' correct';
-                  else if (ci === my) cls += ' wrong';
+                  if (orig === q.answer) cls += ' correct';
+                  else if (orig === my) cls += ' wrong';
                   return (
                     <div key={ci} className={cls}>
                       <span className="num">{ci + 1}</span>
-                      <span>{choice}</span>
+                      <span>{q.choices[orig]}</span>
                     </div>
                   );
                 })}
@@ -248,21 +364,24 @@ export default function CbtExam({ onExit, mode = 'full', onGoWrongNote }: Props)
   const q = questions[current];
   const answeredCount = Object.keys(answers).length;
 
-  // 답을 고르면: 간이시험은 다음 미응답 문제로 자동 이동, 마지막까지 풀면 바로 채점
+  // 답을 고르면(원래 보기 인덱스로 기록): 간이시험은 다음 미응답 문제로 자동 이동,
+  // 마지막까지 풀면 바로 채점. 고를 때마다 저장해 두어 이어서 풀 수 있다.
   const pickChoice = (choiceIndex: number) => {
     const next = { ...answers, [q.id]: choiceIndex };
-    setAnswers(next);
-    if (!isQuick) return;
+    if (!isQuick) {
+      updateSession({ answers: next });
+      return;
+    }
 
     const unansweredAfter = questions.filter((item) => next[item.id] === undefined);
     if (unansweredAfter.length === 0) {
-      setSubmitted(true);
+      submit(next);
       return;
     }
     const order = questions.map((_, i) => i);
     const rotated = [...order.slice(current + 1), ...order.slice(0, current)];
     const nextIndex = rotated.find((i) => next[questions[i].id] === undefined);
-    if (nextIndex !== undefined) setCurrent(nextIndex);
+    updateSession({ answers: next, current: nextIndex ?? current });
   };
 
   const timerWarning = isQuick ? remaining < 60 : remaining < 600;
@@ -282,12 +401,16 @@ export default function CbtExam({ onExit, mode = 'full', onGoWrongNote }: Props)
               unanswered > 0
                 ? `아직 ${unanswered}문제를 풀지 않았습니다. 제출하시겠습니까?`
                 : '답안을 제출하시겠습니까?';
-            if (window.confirm(message)) setSubmitted(true);
+            if (window.confirm(message)) submit();
           }}
         >
           {isQuick ? '바로 채점' : '답안 제출'}
         </button>
       </div>
+
+      {session.resumed && (
+        <div className="quick-hint">⏯ 풀다 만 시험을 이어서 풉니다. 답안과 남은 시간이 그대로예요.</div>
+      )}
 
       {isQuick && (
         <div className="quick-hint">
@@ -307,19 +430,20 @@ export default function CbtExam({ onExit, mode = 'full', onGoWrongNote }: Props)
           {current + 1}. {q.question}
         </p>
         <div className="choices">
-          {q.choices.map((choice, ci) => (
+          {/* 보기는 문제마다 섞인 순서로 보여주되, 답은 원래 보기 인덱스로 기록한다 */}
+          {choiceOrders[q.id].map((orig, ci) => (
             <button
               // 문제가 바뀌면 새 버튼으로 그린다. 같은 버튼을 재사용하면
               // 탭한 흔적(포커스)이 다음 문제의 같은 자리에 남는다.
               key={`${q.id}-${ci}`}
-              className={`choice ${answers[q.id] === ci ? 'selected' : ''}`}
+              className={`choice ${answers[q.id] === orig ? 'selected' : ''}`}
               onClick={(e) => {
                 e.currentTarget.blur();
-                pickChoice(ci);
+                pickChoice(orig);
               }}
             >
               <span className="num">{ci + 1}</span>
-              <span>{choice}</span>
+              <span>{q.choices[orig]}</span>
             </button>
           ))}
         </div>
@@ -329,17 +453,17 @@ export default function CbtExam({ onExit, mode = 'full', onGoWrongNote }: Props)
         <button
           className="btn secondary"
           disabled={current === 0}
-          onClick={() => setCurrent((c) => c - 1)}
+          onClick={() => setCurrent(current - 1)}
         >
           ← 이전
         </button>
-        <button className="btn secondary" onClick={onExit}>
+        <button className="btn secondary" onClick={confirmExit}>
           시험 종료
         </button>
         <button
           className="btn"
           disabled={current === questions.length - 1}
-          onClick={() => setCurrent((c) => c + 1)}
+          onClick={() => setCurrent(current + 1)}
         >
           다음 →
         </button>

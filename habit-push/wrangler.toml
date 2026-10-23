@@ -22,6 +22,8 @@ ALLOWED_ORIGIN = "https://goong2001-jpg.github.io"
 # 푸시 서비스가 문제 생겼을 때 연락할 곳. mailto: 또는 https: 여야 한다
 VAPID_SUBJECT = "mailto:goong2001@gmail.com"
 
-# 알림 키와 암호는 여기 적지 않습니다.
-# KV 에 config:vapid / config:passphrase 로 넣어두면 Worker 가 읽어 씁니다.
-# 그래서 API 토큰도, wrangler secret 도 필요 없습니다.
+# 알림 키와 암호는 여기 적지 않습니다. Worker 시크릿으로 넣으세요:
+#   npx wrangler secret put VAPID_PUBLIC_KEY
+#   npx wrangler secret put VAPID_PRIVATE_KEY
+#   npx wrangler secret put PASSPHRASE
+# 시크릿이 없을 때만 KV 의 config:vapid({"publicKey":...}) / config:passphrase 를 읽습니다.

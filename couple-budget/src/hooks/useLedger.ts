@@ -1,10 +1,11 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CollName, DEFAULT_PERSONS, Expense, ExpenseCategory, FixedExpense, GiftDirection,
-  GiftEntry, GiftKind, IncomeEntry, MonthKey, Person, RemoteBatch, Syncable, SyncSettings,
+  CategoryBudget, CollName, DEFAULT_PERSONS, Expense, ExpenseCategory, FixedExpense,
+  GiftDirection, GiftEntry, GiftKind, IncomeEntry, MonthKey, Person, RemoteBatch, Syncable,
+  SyncSettings, budgetIdOf,
 } from '../types';
-import { KEYS, load, save } from '../utils/storage';
-import { mergeById } from '../utils/merge';
+import { KEYS, load, remove, save } from '../utils/storage';
+import { localWinners, mergeById } from '../utils/merge';
 import { Backup } from '../utils/backup';
 import { addMonths, monthIncome, monthOf } from '../utils/budget';
 import { newId } from '../utils/id';
@@ -47,49 +48,83 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
   const [fixed, setFixed] = useState<FixedExpense[]>(() => load(KEYS.fixedExpenses, []));
   const [expenses, setExpenses] = useState<Expense[]>(() => load(KEYS.expenses, []));
   const [gifts, setGifts] = useState<GiftEntry[]>(() => load(KEYS.gifts, []));
+  const [budgets, setBudgets] = useState<CategoryBudget[]>(() => load(KEYS.budgets, []));
+
+  /**
+   * 스냅샷 병합에서 로컬이 이긴 레코드 — 렌더가 끝난 뒤 서버로 되밀어 올린다.
+   *
+   * 왜 되밀어 올리나: push 는 setDoc 이라 서버가 updatedAt 을 비교하지 않는다.
+   * 오프라인에서 묵힌 낡은 수정이 나중에 올라와 상대 폰의 최신 기록을 덮어쓰면,
+   * 이 기기는 mergeById 로 제 최신본을 지키지만 서버는 낡은 채로 남는다.
+   * 그 최신본을 다시 올려야 서버와 상대 폰도 같은 값으로 수렴한다.
+   *
+   * 왜 업데이터 안에서 바로 push 하지 않나: StrictMode 가 업데이터를 두 번 돌린다.
+   * 승자는 Map 에 모아두고(두 번 넣어도 하나) 렌더 뒤 effect 에서 한 번만 올린다.
+   */
+  const pendingPushRef = useRef(new Map<string, { coll: CollName; rec: Syncable }>());
+  /**
+   * 되밀어 올린 (컬렉션·id·updatedAt) 묶음. 같은 판본은 한 번만 올린다 —
+   * 서버가 그 쓰기를 거부하면(보안 규칙 등) 스냅샷이 원격값으로 되돌아오고,
+   * 그때마다 다시 올리면 끝없는 핑퐁이 되기 때문이다.
+   */
+  const pushedBackRef = useRef(new Set<string>());
+
+  /** 들어온 레코드를 id 기준으로 합치고, 로컬이 이긴 것은 되밀어 올릴 목록에 적는다 */
+  const mergeIn = useCallback(<T extends Syncable>(
+    coll: CollName,
+    storageKey: string,
+    setter: Dispatch<SetStateAction<T[]>>,
+    incoming: T[],
+  ) => {
+    setter(prev => {
+      for (const w of localWinners(prev, incoming)) {
+        pendingPushRef.current.set(`${coll}:${w.id}`, { coll, rec: w });
+      }
+      const next = mergeById(prev, incoming);
+      save(storageKey, next);
+      return next;
+    });
+  }, []);
 
   /** 클라우드에서 온 스냅샷을 로컬과 합친다 (id 기준 last-write-wins) */
   const onBatch = useCallback((batch: RemoteBatch) => {
     switch (batch.coll) {
       case 'persons':
-        setPersons(prev => {
-          const next = mergeById(prev, batch.records);
-          save(KEYS.persons, next);
-          return next;
-        });
+        mergeIn('persons', KEYS.persons, setPersons, batch.records);
         break;
       case 'incomes':
-        setIncomes(prev => {
-          const next = mergeById(prev, batch.records);
-          save(KEYS.incomes, next);
-          return next;
-        });
+        mergeIn('incomes', KEYS.incomes, setIncomes, batch.records);
         break;
       case 'fixedExpenses':
-        setFixed(prev => {
-          const next = mergeById(prev, batch.records);
-          save(KEYS.fixedExpenses, next);
-          return next;
-        });
+        mergeIn('fixedExpenses', KEYS.fixedExpenses, setFixed, batch.records);
         break;
       case 'expenses':
-        setExpenses(prev => {
-          const next = mergeById(prev, batch.records);
-          save(KEYS.expenses, next);
-          return next;
-        });
+        mergeIn('expenses', KEYS.expenses, setExpenses, batch.records);
         break;
       case 'gifts':
-        setGifts(prev => {
-          const next = mergeById(prev, batch.records);
-          save(KEYS.gifts, next);
-          return next;
-        });
+        mergeIn('gifts', KEYS.gifts, setGifts, batch.records);
+        break;
+      case 'budgets':
+        mergeIn('budgets', KEYS.budgets, setBudgets, batch.records);
         break;
     }
-  }, []);
+  }, [mergeIn]);
 
   const { status, error, push, fetchAllExpenses, isLive } = useSync({ sync, month, onBatch });
+
+  // 병합에서 로컬이 이긴 레코드를 서버로 되밀어 올린다 (mergeIn 주석 참고).
+  // 의존성 없이 매 렌더 뒤에 돌지만, 목록이 비어 있으면 아무 일도 하지 않는다.
+  useEffect(() => {
+    const pending = pendingPushRef.current;
+    if (!pending.size) return;
+    pending.forEach(({ coll, rec }) => {
+      const key = `${coll}:${rec.id}:${rec.updatedAt}`;
+      if (pushedBackRef.current.has(key)) return;
+      pushedBackRef.current.add(key);
+      push(coll, rec);
+    });
+    pending.clear();
+  });
 
   /** 로컬에 저장(수정이면 교체, 아니면 추가)하고 클라우드로 던진다 */
   const commit = useCallback(<T extends Syncable>(
@@ -109,22 +144,27 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     push(coll, rec);
   }, [push]);
 
-  /** 삭제는 툼스톤으로 표시한다 — 이유는 utils/merge.ts 주석 참고 */
+  /**
+   * 삭제는 툼스톤으로 표시한다 — 이유는 utils/merge.ts 주석 참고.
+   * 툼스톤은 commit 처럼 업데이터 '밖에서' 만들고 올린다 —
+   * 안에서 push 하면 StrictMode 가 업데이터를 두 번 돌려 두 번 올라간다.
+   */
   const softDelete = useCallback(<T extends Syncable>(
     coll: CollName,
     storageKey: string,
     setter: Dispatch<SetStateAction<T[]>>,
+    list: T[],
     id: string,
   ) => {
+    const target = list.find(r => r.id === id);
+    if (!target) return;
+    const tomb = { ...target, deleted: true, updatedAt: Date.now() };
     setter(prev => {
-      const target = prev.find(r => r.id === id);
-      if (!target) return prev;
-      const tomb = { ...target, deleted: true, updatedAt: Date.now() };
       const next = prev.map(r => (r.id === id ? tomb : r));
       save(storageKey, next);
-      push(coll, tomb);
       return next;
     });
+    push(coll, tomb);
   }, [push]);
 
   // ------------------------------- 사람 -------------------------------
@@ -146,8 +186,8 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
   }, [persons, commit]);
 
   const deletePerson = useCallback(
-    (id: string) => softDelete('persons', KEYS.persons, setPersons, id),
-    [softDelete],
+    (id: string) => softDelete('persons', KEYS.persons, setPersons, persons, id),
+    [persons, softDelete],
   );
 
   // ------------------------------- 수입 -------------------------------
@@ -171,8 +211,8 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
   }, [incomes, commit]);
 
   const deleteIncome = useCallback(
-    (id: string) => softDelete('incomes', KEYS.incomes, setIncomes, id),
-    [softDelete],
+    (id: string) => softDelete('incomes', KEYS.incomes, setIncomes, incomes, id),
+    [incomes, softDelete],
   );
 
   // ----------------------------- 고정지출 -----------------------------
@@ -197,8 +237,8 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
   }, [fixed, commit]);
 
   const deleteFixed = useCallback(
-    (id: string) => softDelete('fixedExpenses', KEYS.fixedExpenses, setFixed, id),
-    [softDelete],
+    (id: string) => softDelete('fixedExpenses', KEYS.fixedExpenses, setFixed, fixed, id),
+    [fixed, softDelete],
   );
 
   // ----------------------------- 변동지출 -----------------------------
@@ -225,8 +265,8 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
   }, [expenses, commit]);
 
   const deleteExpense = useCallback(
-    (id: string) => softDelete('expenses', KEYS.expenses, setExpenses, id),
-    [softDelete],
+    (id: string) => softDelete('expenses', KEYS.expenses, setExpenses, expenses, id),
+    [expenses, softDelete],
   );
 
   // -------------------------- 경조사 · 용돈 --------------------------
@@ -255,9 +295,33 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
   }, [gifts, commit]);
 
   const deleteGift = useCallback(
-    (id: string) => softDelete('gifts', KEYS.gifts, setGifts, id),
-    [softDelete],
+    (id: string) => softDelete('gifts', KEYS.gifts, setGifts, gifts, id),
+    [gifts, softDelete],
   );
+
+  // -------------------------- 카테고리별 월 상한 --------------------------
+
+  /**
+   * 카테고리 하나의 월 상한을 정한다. 0 이하(빈 칸)는 '상한 없음' = 툼스톤.
+   * id 가 카테고리에서 정해지므로(budgetIdOf) 같은 카테고리에 두 건이 생기지 않는다.
+   */
+  const setCategoryBudget = useCallback((category: ExpenseCategory, monthlyLimit: number) => {
+    const id = budgetIdOf(category);
+    const existing = budgets.find(b => b.id === id);
+    const limit = Math.max(0, Math.round(monthlyLimit));
+
+    if (limit <= 0) {
+      // 없던 상한을 지우는 건 아무 일도 아니다 — 툼스톤을 괜히 만들지 않는다
+      if (!existing || existing.deleted) return;
+      softDelete('budgets', KEYS.budgets, setBudgets, budgets, id);
+      return;
+    }
+    if (existing && !existing.deleted && existing.monthlyLimit === limit) return;
+
+    // 툼스톤이던 카테고리에 다시 상한을 넣으면 deleted 없는 새 레코드로 되살린다
+    const rec: CategoryBudget = { id, category, monthlyLimit: limit, updatedAt: Date.now() };
+    commit('budgets', KEYS.budgets, setBudgets, rec);
+  }, [budgets, commit, softDelete]);
 
   /**
    * 지난달 수입을 이 달로 그대로 가져온다.
@@ -329,8 +393,9 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
       fixed: apply('fixedExpenses', KEYS.fixedExpenses, setFixed, fixed, backup.fixedExpenses),
       expenses: apply('expenses', KEYS.expenses, setExpenses, expenses, backup.expenses),
       gifts: apply('gifts', KEYS.gifts, setGifts, gifts, backup.gifts),
+      budgets: apply('budgets', KEYS.budgets, setBudgets, budgets, backup.budgets),
     };
-  }, [persons, incomes, fixed, expenses, gifts, push]);
+  }, [persons, incomes, fixed, expenses, gifts, budgets, push]);
 
   // -------------------------- 클라우드 보조작업 --------------------------
 
@@ -342,8 +407,9 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     for (const r of fixed) { push('fixedExpenses', r); n++; }
     for (const r of expenses) { push('expenses', r); n++; }
     for (const r of gifts) { push('gifts', r); n++; }
+    for (const r of budgets) { push('budgets', r); n++; }
     return n;
-  }, [persons, incomes, fixed, expenses, gifts, push]);
+  }, [persons, incomes, fixed, expenses, gifts, budgets, push]);
 
   /**
    * 연결된 뒤 이 기기의 기존 기록을 방에 딱 한 번 올린다.
@@ -377,19 +443,22 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
   const pullAllExpenses = useCallback(async (): Promise<number> => {
     const remote = await fetchAllExpenses();
     if (!remote.length) return 0;
-    setExpenses(prev => {
-      const next = mergeById(prev, remote);
-      save(KEYS.expenses, next);
-      return next;
-    });
+    mergeIn('expenses', KEYS.expenses, setExpenses, remote);
     return remote.length;
-  }, [fetchAllExpenses]);
+  }, [fetchAllExpenses, mergeIn]);
 
-  /** 이 기기의 모든 기록을 지운다 (클라우드는 건드리지 않는다) */
+  /**
+   * 이 기기의 모든 기록을 지운다 (클라우드는 건드리지 않는다).
+   * 사람 목록은 기본값으로 되돌리고, '이 방에 이미 올렸다' 표시도 지운다 —
+   * 안 지우면 같은 방에 다시 연결했을 때 기록이 다시 올라가지 않는다.
+   */
   const clearLocal = useCallback(() => {
-    setIncomes([]); setFixed([]); setExpenses([]); setGifts([]);
+    setIncomes([]); setFixed([]); setExpenses([]); setGifts([]); setBudgets([]);
     save(KEYS.incomes, []); save(KEYS.fixedExpenses, []);
-    save(KEYS.expenses, []); save(KEYS.gifts, []);
+    save(KEYS.expenses, []); save(KEYS.gifts, []); save(KEYS.budgets, []);
+    remove(KEYS.persons);
+    setPersons(loadPersons());
+    remove(KEYS.seeded);
   }, []);
 
   const counts = useMemo(
@@ -399,12 +468,14 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
       fixed: fixed.filter(r => !r.deleted).length,
       expenses: expenses.filter(r => !r.deleted).length,
       gifts: gifts.filter(r => !r.deleted).length,
+      budgets: budgets.filter(r => !r.deleted).length,
     }),
-    [persons, incomes, fixed, expenses, gifts],
+    [persons, incomes, fixed, expenses, gifts, budgets],
   );
 
   return {
-    persons, incomes, fixed, expenses, gifts,
+    persons, incomes, fixed, expenses, gifts, budgets,
+    setCategoryBudget,
     savePerson, deletePerson,
     saveIncome, deleteIncome,
     saveFixed, deleteFixed,

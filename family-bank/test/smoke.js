@@ -17,7 +17,8 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   p.on('dialog', d => { dialogs.push(d.message()); return d.type() === 'prompt' && answers.length ? d.accept(answers.shift()) : d.accept(); });
   await p.goto(BASE + '/index.html');
   const t = sel => p.textContent(sel);
-  const pin = async v => { await p.fill('#pinInput', v); await p.click('#pinOk'); };
+  const pin = async v => { await p.fill('#pinInput', v); await p.click('#pinOk'); await p.waitForTimeout(250); };   // 해시 계산은 비동기
+  const stored = () => p.evaluate(() => JSON.parse(localStorage.getItem('hwr-bank-v1')));
 
   // ---- 처음 ----
   check('처음엔 0원', (await t('#balance')) === '0원');
@@ -63,6 +64,8 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   check('승인 → 40,000원', (await t('#balance')) === '40,000원', await t('#balance'));
   check('대기 사라짐', !(await p.isVisible('#pendingCard')));
   check('엄마아빠 설정 보임', await p.isVisible('#admin'));
+  const st = await stored();
+  check('비밀번호는 해시로만 저장', st.pin === undefined && /^[0-9a-f]{64}$/.test(st.pinHash) && /^[0-9a-f]{32}$/.test(st.pinSalt), JSON.stringify([st.pin, st.pinHash, st.pinSalt]));
   check('내역 찾으신 돈', (await p.locator('.lrow').nth(1).textContent()).includes('10,000'));
 
   // ---- 잠그고 거절은 비밀번호 확인 ----
@@ -112,12 +115,16 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
     s.tax = true;
     localStorage.setItem('hwr-bank-v1', JSON.stringify(s));
   }, [ds(m2), ds(m3).slice(0, 7)]);
-  await p.evaluate(() => {   // 버전 2 기본 이름으로 저장돼 있던 기기
+  await p.evaluate(() => {   // 버전 2 기본 이름으로 저장돼 있던 기기 + 버전 4까지 그대로 저장돼 있던 비밀번호
     const s = JSON.parse(localStorage.getItem('hwr-bank-v1'));
     s.kids[0].name = '구름'; s.kids[1].name = '열매';
+    s.pin = '1234'; delete s.pinHash; delete s.pinSalt;
     localStorage.setItem('hwr-bank-v1', JSON.stringify(s));
   });
   await p.reload();
+  await p.waitForTimeout(300);
+  const mig = await stored();
+  check('옛 비밀번호 → 해시로 옮김', mig.pin === undefined && /^[0-9a-f]{64}$/.test(mig.pinHash), JSON.stringify([mig.pin, mig.pinHash]));
   check('옛 기본 이름 → 하율·호윤', (await p.locator('#kids button').allTextContents()).join(',') === '하율,호윤');
   await p.click('#kids [data-kid="1"]');
   check('이자 축하 창', await p.isVisible('#giftSheet'));
@@ -159,11 +166,64 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   await p.click('#saveSettings');
   check('이자율 0.1%', (await t('#rate')) === '연 0.1%', await t('#rate'));
 
+  // ---- 백업: 비밀번호는 빠지고, 불러오기는 합치기(확인)/바꾸기 ----
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#exportBtn')]);
+  const bkFile = await dl.path();
+  const bk = JSON.parse(require('fs').readFileSync(bkFile, 'utf8'));
+  check('백업에 비밀번호 없음', !('pin' in bk.state) && !('pinHash' in bk.state) && !('pinSalt' in bk.state), Object.keys(bk.state).join(','));
+  const balBefore = await t('#balance');
+  await p.setInputFiles('#importInput', bkFile);   // confirm 은 모두 확인 → 합치기
+  await p.waitForTimeout(500);
+  check('합치기: 같은 기록은 한 번만', (await t('#balance')) === balBefore && dialogs.some(m => m.includes('합칠까요')), (await t('#balance')) + ' vs ' + balBefore);
+  check('합친 뒤에도 비밀번호 유지', (await stored()).pinHash === mig.pinHash);
+
+  // ---- 통장 내역 고치기 (엄마아빠 모드): 호윤 세뱃돈의 날짜·금액·메모 ----
+  const lbl = d => (d.slice(0, 4) !== ds(now).slice(0, 4) ? d.slice(2, 4) + '.' : '') + (+d.slice(5, 7)) + '.' + (+d.slice(8, 10));
+  await p.click('#kids [data-kid="1"]');
+  check('호윤 잔액', (await t('#balance')) === expect.toLocaleString('ko-KR') + '원', await t('#balance'));
+  await p.click('.lrow >> nth=0');
+  check('고치기 창', (await p.isVisible('#editSheet')) && (await t('#editTitle')) === '기록 고치기' && (await p.isVisible('#editSave')));
+  check('창에 날짜·금액', (await p.inputValue('#editDate')) === ds(m2) && (await p.inputValue('#editAmount')) === '1,000,000',
+    (await p.inputValue('#editDate')) + ' ' + (await p.inputValue('#editAmount')));
+  const d2 = ds(new Date(m2.getFullYear(), m2.getMonth(), 2));
+  await p.fill('#editDate', d2);
+  await p.fill('#editAmount', '100만500');
+  await p.fill('#editNote', '세뱃돈 고침');
+  let nDlg = dialogs.length;
+  await p.click('#editSave');
+  check('이자 준 달이면 한 번 묻기', dialogs.slice(nDlg).some(m => m.includes('이미 이자를 준 달')), dialogs.slice(nDlg).join(' / '));
+  check('고친 뒤 창 닫힘', !(await p.isVisible('#editSheet')));
+  const row0 = await p.locator('.lrow').first().textContent();
+  check('고친 날짜·금액·메모 반영', row0.startsWith(lbl(d2)) && row0.includes('1,000,500') && row0.includes('세뱃돈 고침'), row0);
+  check('잔액 +500', (await t('#balance')) === (expect + 500).toLocaleString('ko-KR') + '원', await t('#balance'));
+  const edited = (await stored()).kids[1].tx.filter(x => x.id === 'x1')[0];
+  check('id 그대로, 저장된 날짜', edited && edited.date === d2 && edited.amount === 1000500, JSON.stringify(edited));
+  check('이자는 다시 계산하지 않음', (await p.locator('.lrow.interest').count()) === 2);
+
+  // ---- 지난 날짜로 맡기기: 지난달 1일에 1,000원 → 이자 줄 뒤, 같은 날짜 순서로 ----
+  await p.click('#modeSeg [data-mode="in"]');
+  check('맡긴 날짜 기본 오늘', (await p.inputValue('#dateInput')) === ds(now), await p.inputValue('#dateInput'));
+  await p.fill('#dateInput', ds(m1));
+  nDlg = dialogs.length;
+  await p.click('.bill.b1000');
+  check('지난 달이면 한 번 묻기', dialogs.slice(nDlg).some(m => m.includes('이미 이자를 준 달')));
+  check('잔액 +1,000', (await t('#balance')) === (expect + 1500).toLocaleString('ko-KR') + '원', await t('#balance'));
+  const allRows = await p.locator('.lrow').allTextContents();
+  check('지난 날짜 줄이 제자리에', allRows.length === 6 && allRows[3].startsWith(lbl(ds(m1))) && allRows[3].includes('1,000') && allRows[1].includes('월 이자'), allRows.join(' | '));
+  check('토스트에 날짜', (await t('#toastText')).includes('날짜로'), await t('#toastText'));
+  const past = (await stored()).kids[1].tx.filter(x => x.type === 'in' && x.amount === 1000)[0];
+  check('저장된 날짜 = 지난달 1일', past && past.date === ds(m1), JSON.stringify(past));
+
   // ---- 화면 ----
   const sw = await p.evaluate(() => document.documentElement.scrollWidth);
   check('가로 스크롤 없음', sw <= 390, String(sw));
   await p.click('#lockBtn');
   await p.click('#kids [data-kid="1"]');
+  // 아이 모드에서는 내역을 보기만 한다
+  await p.click('.lrow >> nth=0');
+  check('아이 모드는 보기만', (await p.isVisible('#editSheet')) && (await t('#editTitle')) === '통장 내역' && !(await p.isVisible('#editSave')) && (await p.locator('#editAmount').isDisabled()));
+  await p.click('#editClose');
+  check('보기 창 닫힘', !(await p.isVisible('#editSheet')));
   await p.screenshot({ path: 'test/shot.png', fullPage: true });
   // 하율 화면 + 이자 축하 창
   await p.click('#kids [data-kid="0"]');
@@ -172,6 +232,65 @@ const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getD
   await p.reload();
   await p.waitForTimeout(600);
   await p.screenshot({ path: 'test/shot-gift.png' });
+
+  // ---- 출금 신청 알림: 설정이 있으면 /bank/notify 를 부르고, 없으면 안 부른다 ----
+  // 새 컨텍스트(빈 통장)에서. 서비스워커는 같은 사이트 GET 만 다루므로 다른 사이트로 가는 POST 는 route 가 그대로 본다.
+  // (serviceWorkers: 'block' 을 주면 navigator.serviceWorker.ready 가 영영 안 풀려서 켜기 흐름이 멈춘다)
+  const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await ctx2.grantPermissions(['notifications']);   // 권한은 주되, 헤드리스엔 푸시 서비스가 없어서 구독에서 실패한다
+  const q = await ctx2.newPage();
+  const notifies = [], dialogs2 = [];
+  q.on('pageerror', e => errors.push(String(e)));
+  q.on('dialog', d => { dialogs2.push(d.message()); d.accept(); });
+  const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
+  await q.route('https://push.example/**', route => {
+    const req = route.request();
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    if (req.url().endsWith('/bank/notify')) {
+      notifies.push(JSON.parse(req.postData()));
+      return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: '{"sent":1,"parents":1}' });
+    }
+    if (req.url().endsWith('/health')) return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: '{"ok":true,"configured":true,"vapidPublicKey":"BAAA"}' });
+    return route.fulfill({ status: 404, headers: cors, contentType: 'application/json', body: '{}' });
+  });
+  const qpin = async v => { await q.fill('#pinInput', v); await q.click('#pinOk'); await q.waitForTimeout(250); };
+  const qstored = () => q.evaluate(() => JSON.parse(localStorage.getItem('hwr-bank-v1')));
+  await q.goto(BASE + '/index.html');
+  await q.click('.bill.b10000');
+  await q.click('#modeSeg [data-mode="out"]');
+  await q.click('.bill.b5000');
+  await q.waitForTimeout(400);
+  check('알림 설정 없으면 요청 안 함', notifies.length === 0 && (await q.locator('.req').count()) === 1);
+  await q.click('#lockBtn');
+  await qpin('1234');
+  await qpin('1234');
+  await q.fill('#pushEndpoint', 'https://push.example/');
+  await q.fill('#pushPass', 'secret');
+  await q.click('#saveSettings');
+  const pc = (await qstored()).push;
+  check('서버 주소·암호 저장 (끝 / 정리)', pc && pc.endpoint === 'https://push.example' && pc.passphrase === 'secret' && !pc.enabled, JSON.stringify(pc));
+  await q.click('#lockBtn');   // 아이 모드로
+  await q.fill('#noteInput', '포켓몬 카드');
+  await q.click('.bill.b1000');
+  await q.waitForTimeout(600);
+  check('찾기 신청 → /bank/notify 한 번', notifies.length === 1, JSON.stringify(notifies));
+  const n = notifies[0] || {};
+  check('알림 내용', n.passphrase === 'secret' && n.title === '엄마아빠 은행' && n.body === '하율이가 1,000원 찾기 신청했어요 (포켓몬 카드)' &&
+    n.url === BASE + '/index.html' && /^hwr-bank-req-/.test(n.tag), JSON.stringify(n));
+  check('알림 보냄 토스트', (await q.isVisible('#pushToast')) && (await q.textContent('#pushToast')) === '엄마아빠 폰에 알림 보냄');
+  check('되돌리기 토스트는 그대로', (await q.textContent('#toastText')).includes('찾기 신청했어요'));
+  await q.click('#lockBtn');
+  await qpin('1234');
+  const [dl2] = await Promise.all([q.waitForEvent('download'), q.click('#exportBtn')]);
+  const bk2 = JSON.parse(require('fs').readFileSync(await dl2.path(), 'utf8'));
+  check('백업에 알림 암호 없음 (주소만)', bk2.state.push && bk2.state.push.endpoint === 'https://push.example' && !('passphrase' in bk2.state.push) && !('deviceId' in bk2.state.push), JSON.stringify(bk2.state.push));
+  // 헤드리스에는 푸시 서비스가 없다 → 켜기는 한국어 안내와 함께 실패하고 스위치는 꺼진 채로
+  const nd2 = dialogs2.length;
+  await q.click('#pushParent');
+  await q.waitForTimeout(2000);
+  check('켜기 실패는 한국어 안내', dialogs2.length > nd2 && /[가-힣]/.test(dialogs2[dialogs2.length - 1]) && !/[A-Za-z]{4,}/.test(dialogs2[dialogs2.length - 1]), dialogs2.slice(nd2).join(' / '));
+  check('실패하면 스위치 꺼짐', !(await q.isChecked('#pushParent')) && !(await qstored()).push.enabled);
+  await ctx2.close();
 
   check('스크립트 오류 없음', errors.length === 0, errors.join(' / '));
   await browser.close();

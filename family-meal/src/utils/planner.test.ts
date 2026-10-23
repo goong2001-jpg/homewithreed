@@ -1,6 +1,6 @@
 import { getRecipe, RECIPES } from '../data/recipes';
 import { DEFAULT_SETTINGS, Settings } from '../types';
-import { cookedRecipeIds, generateWeek, planRecipeIds } from './planner';
+import { cookedRecipeIds, generateWeek, planRecipeIds, swapMeal } from './planner';
 
 const SEEDS = [1, 7, 42, 1234, 98765, 2468013];
 
@@ -189,4 +189,57 @@ test('매운 메뉴는 주 2회를 넘지 않는다', () => {
     const spicy = planRecipeIds(plan).filter((id) => getRecipe(id)!.spicy).length;
     expect(spicy).toBeLessThanOrEqual(2);
   }
+});
+
+test('같은 씨앗에서 같은 자리를 바꾸면 언제나 같은 메뉴가 나온다', () => {
+  const plan = generateWeek(42, DEFAULT_SETTINGS);
+  const a = swapMeal(plan, 2, 'main', DEFAULT_SETTINGS);
+  const b = swapMeal(plan, 2, 'main', DEFAULT_SETTINGS);
+  expect(a.days[2].main).toBe(b.days[2].main);
+  expect(a.days[2].main).not.toBe(plan.days[2].main);
+  // 몇 번째 바꾸기인지가 다르면 다른 메뉴도 나올 수 있어야 연달아 누르는 의미가 있다.
+  const results = new Set([0, 1, 2, 3, 4].map((nth) => swapMeal(plan, 2, 'main', DEFAULT_SETTINGS, [], nth).days[2].main));
+  expect(results.size).toBeGreaterThan(1);
+});
+
+test('바꾼 메뉴는 그날 상과 그 주 같은 자리, 최근 이력과 겹치지 않는다', () => {
+  SEEDS.forEach((seed) => {
+    const plan = generateWeek(seed, DEFAULT_SETTINGS);
+    const recent = RECIPES.filter((r) => r.slot === 'soup').slice(0, 5).map((r) => r.id);
+    const swapped = swapMeal(plan, 3, 'soup', DEFAULT_SETTINGS, recent);
+    const next = swapped.days[3].soup;
+    expect(plan.days.map((d) => d.soup)).not.toContain(next);
+    expect(recent).not.toContain(next);
+    const others = [swapped.days[3].breakfast, swapped.days[3].lunch, swapped.days[3].main, swapped.days[3].side];
+    expect(others).not.toContain(next);
+  });
+});
+
+test('만들어 둔 반찬을 이어 먹는 날은 앞날 반찬을 바꾸면 같이 바뀐다', () => {
+  const plan = generateWeek(21, { ...DEFAULT_SETTINGS, saveShopping: true });
+  expect(plan.days[1].reusedSide).toBe(true);
+  const swapped = swapMeal(plan, 0, 'side', DEFAULT_SETTINGS);
+  expect(swapped.days[0].side).not.toBe(plan.days[0].side);
+  expect(swapped.days[1].side).toBe(swapped.days[0].side);
+  expect(swapped.days[1].reusedSide).toBe(true);
+  // 이틀 뒤 반찬은 다른 것이므로 건드리지 않는다.
+  expect(swapped.days[2].side).toBe(plan.days[2].side);
+});
+
+test('돌려 먹는 아침을 바꾸면 그 아침을 이어 먹는 날도 같이 바뀐다', () => {
+  const plan = generateWeek(21, { ...DEFAULT_SETTINGS, saveShopping: true });
+  expect(plan.days[4].reusedBreakfast).toBe(true);
+  expect(plan.days[4].breakfast).toBe(plan.days[0].breakfast);
+  const swapped = swapMeal(plan, 0, 'breakfast', DEFAULT_SETTINGS);
+  expect(swapped.days[4].breakfast).toBe(swapped.days[0].breakfast);
+  expect(swapped.days[4].reusedBreakfast).toBe(true);
+});
+
+test('이어 먹는 날의 반찬을 직접 바꾸면 그날은 새로 만드는 날이 된다', () => {
+  const plan = generateWeek(21, { ...DEFAULT_SETTINGS, saveShopping: true });
+  const swapped = swapMeal(plan, 1, 'side', DEFAULT_SETTINGS);
+  expect(swapped.days[1].reusedSide).toBe(false);
+  expect(swapped.days[1].side).not.toBe(plan.days[0].side);
+  expect(swapped.days[0].side).toBe(plan.days[0].side);
+  expect(cookedRecipeIds(swapped.days[1]).map((r) => r.slot)).toContain('side');
 });

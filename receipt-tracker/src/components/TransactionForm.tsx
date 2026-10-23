@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Transaction, Category, TransactionType, PaymentMethod, ExtractedFields } from '../types';
+import { newId } from '../utils/id';
 
 const CATEGORIES: Category[] = ['식비', '교통', '쇼핑', '의료', '생활', '여가', '기타'];
 const PAYMENT_METHODS: PaymentMethod[] = ['카드', '현금', '계좌이체', '기타'];
@@ -15,8 +16,16 @@ interface Props {
   onCancel: () => void;
 }
 
+/**
+ * 로컬 시간대 기준 오늘.
+ * ⚠️ toISOString() 은 UTC 라서 한국(UTC+9)에서는 새벽 0시~8시 59분 사이에 '어제'가 나온다.
+ */
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 export default function TransactionForm({ extracted, onSave, onCancel }: Props) {
@@ -35,7 +44,7 @@ export default function TransactionForm({ extracted, onSave, onCancel }: Props) 
     if (!amt || amt <= 0) { setError('금액을 올바르게 입력해주세요.'); return; }
 
     onSave({
-      id: crypto.randomUUID(),
+      id: newId(),
       date,
       category,
       content: content.trim(),

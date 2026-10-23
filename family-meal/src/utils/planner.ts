@@ -335,25 +335,94 @@ const SLOT_FIELD: Record<Slot, keyof Omit<DayPlan, 'day'>> = {
   side: 'side',
 };
 
+/** 만들어 둔 것을 이어 먹는 표시가 붙는 자리와 그 칸 이름 */
+const REUSE_FLAG: Partial<Record<Slot, 'reusedBreakfast' | 'reusedSide'>> = {
+  breakfast: 'reusedBreakfast',
+  side: 'reusedSide',
+};
+
 /**
- * 한 끼만 다른 메뉴로 바꾼다. 그날 상에 이미 오른 메뉴와
- * 그 주에 같은 자리에 나온 메뉴는 후보에서 뺀다.
+ * 이 자리를 바꾸면 같이 바뀌어야 하는 날들.
+ * 만들어 둔 아침·반찬을 이어 먹는 날은 앞날의 메뉴를 그대로 들고 있으므로,
+ * 앞날을 바꾸면 이어 먹는 날도 같은 메뉴로 따라가야 한다.
  */
-export function swapMeal(plan: WeekPlan, dayIndex: number, slot: Slot, settings: Settings): WeekPlan {
+function linkedDays(plan: WeekPlan, dayIndex: number, slot: Slot): number[] {
+  const flag = REUSE_FLAG[slot];
+  if (!flag) return [];
   const field = SLOT_FIELD[slot];
   const current = plan.days[dayIndex][field];
+  const linked: number[] = [];
+  for (let i = dayIndex + 1; i < plan.days.length; i++) {
+    const d = plan.days[i];
+    if (d[flag] && d[field] === current) linked.push(i);
+  }
+  return linked;
+}
+
+/**
+ * 한 끼만 다른 메뉴로 바꾼다. 그날 상에 이미 오른 메뉴, 그 주에 같은 자리에
+ * 나온 메뉴, 최근 몇 주에 올렸던 메뉴(`recent`), 오늘 이미 쓴 단백질원은
+ * 되도록 피한다. 같은 씨앗·같은 자리에서 `nth` 번째 바꾸기는 언제나 같은
+ * 결과가 나온다 — 새로고침해도 식단이 흔들리지 않게 하기 위해서다.
+ * 이어 먹는 날이 이 자리를 가리키고 있으면 그날도 같이 바꾸고,
+ * 반대로 이어 먹는 날 자체를 바꾸면 그날은 새로 만드는 날이 된다.
+ */
+export function swapMeal(
+  plan: WeekPlan,
+  dayIndex: number,
+  slot: Slot,
+  settings: Settings,
+  recent: string[] = [],
+  nth = 0
+): WeekPlan {
+  const field = SLOT_FIELD[slot];
+  const day = plan.days[dayIndex];
+  const current = day[field];
   const sameSlotThisWeek = new Set(plan.days.map((d) => d[field]));
+  const onTable = new Set(dayRecipeIds(day).map((x) => x.id));
+  const dayProteins = new Set(
+    dayRecipeIds(day)
+      .filter((x) => x.slot !== slot)
+      .map((x) => getRecipe(x.id)?.protein)
+      .filter((p) => p && p !== 'none')
+  );
   const list = pool(slot, settings);
 
-  let options = list.filter((r) => !sameSlotThisWeek.has(r.id));
-  // 후보를 다 써 버렸으면 "지금 것만 아니면 된다"로 조건을 푼다.
-  if (options.length === 0) options = list.filter((r) => r.id !== current);
+  // 조건을 하나씩 풀어 가며 후보를 찾는다. 맨 끝은 "지금 것만 아니면 된다".
+  const tiers: ((r: Recipe) => boolean)[] = [
+    (r) =>
+      !sameSlotThisWeek.has(r.id) &&
+      !onTable.has(r.id) &&
+      !recent.includes(r.id) &&
+      !(r.protein !== 'none' && dayProteins.has(r.protein)),
+    (r) => !sameSlotThisWeek.has(r.id) && !onTable.has(r.id) && !recent.includes(r.id),
+    (r) => !sameSlotThisWeek.has(r.id) && !onTable.has(r.id),
+    (r) => r.id !== current,
+  ];
+  let options: Recipe[] = [];
+  for (const keep of tiers) {
+    options = list.filter(keep);
+    if (options.length > 0) break;
+  }
   if (options.length === 0) return plan;
 
-  const next = options[Math.floor(Math.random() * options.length)];
+  // 씨앗 + 날 + 자리 + 몇 번째 바꾸기인지로 난수를 만든다.
+  const slotIndex = (Object.keys(SLOT_FIELD) as Slot[]).indexOf(slot);
+  const rng = makeRng(plan.seed + dayIndex * 101 + slotIndex * 7 + nth * 1009);
+  const next = options[Math.floor(rng() * options.length)];
+
+  const flag = REUSE_FLAG[slot];
+  const followers = new Set(linkedDays(plan, dayIndex, slot));
   return {
     ...plan,
-    days: plan.days.map((d, i) => (i === dayIndex ? { ...d, [field]: next.id } : d)),
+    days: plan.days.map((d, i) => {
+      if (i === dayIndex) {
+        // 이어 먹던 날을 직접 바꾸면 그날은 새로 만드는 날이 된다.
+        return flag ? { ...d, [field]: next.id, [flag]: false } : { ...d, [field]: next.id };
+      }
+      if (followers.has(i)) return { ...d, [field]: next.id };
+      return d;
+    }),
   };
 }
 

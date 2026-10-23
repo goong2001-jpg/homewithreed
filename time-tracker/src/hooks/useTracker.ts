@@ -4,7 +4,7 @@ import {
 } from '../types';
 import { Backup } from '../utils/backup';
 import { runningOf } from '../utils/entry';
-import { mergeById } from '../utils/merge';
+import { mergeById, purgeTombstones } from '../utils/merge';
 import { KEYS, clearAll, load, save } from '../utils/storage';
 
 /**
@@ -82,16 +82,27 @@ export interface TrackerStore {
   resetAll: () => void;
 }
 
+/** 지운 지 90일이 넘은 툼스톤은 휴지통에서도 치운다 — 되살릴 일이 없는 흔적이 쌓이지 않게 */
+const TOMBSTONE_TTL_MS = 90 * 86_400_000;
+
 export function useTracker(newId: () => string): TrackerStore {
+  // ⚠️ 분류·블록의 툼스톤은 정리하지 않는다 — withDefaults 가 '저장에 없는 기본 레코드'를
+  //    다시 넣기 때문에, 지운 기본 분류의 툼스톤을 치우면 다음 실행에서 되살아난다.
   const [categories, setCategories] = useState<Category[]>(
     () => withDefaults(load(KEYS.categories, DEFAULT_CATEGORIES), DEFAULT_CATEGORIES),
   );
-  const [entries, setEntries] = useState<Entry[]>(() => load(KEYS.entries, []));
+  const [entries, setEntries] = useState<Entry[]>(
+    () => purgeTombstones(load(KEYS.entries, []), TOMBSTONE_TTL_MS),
+  );
   const [blocks, setBlocks] = useState<TimeBlock[]>(
     () => withDefaults(load(KEYS.blocks, DEFAULT_BLOCKS), DEFAULT_BLOCKS),
   );
-  const [plans, setPlans] = useState<BlockPlan[]>(() => load(KEYS.plans, []));
-  const [resists, setResists] = useState<Resist[]>(() => load(KEYS.resists, []));
+  const [plans, setPlans] = useState<BlockPlan[]>(
+    () => purgeTombstones(load(KEYS.plans, []), TOMBSTONE_TTL_MS),
+  );
+  const [resists, setResists] = useState<Resist[]>(
+    () => purgeTombstones(load(KEYS.resists, []), TOMBSTONE_TTL_MS),
+  );
 
   useEffect(() => { save(KEYS.categories, categories); }, [categories]);
   useEffect(() => { save(KEYS.entries, entries); }, [entries]);

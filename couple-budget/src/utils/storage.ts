@@ -9,6 +9,7 @@ export const KEYS = {
   fixedExpenses: 'couple_budget_fixed',
   expenses: 'couple_budget_expenses',
   gifts: 'couple_budget_gifts',
+  budgets: 'couple_budget_budgets',
   settings: 'couple_budget_settings',
   /** 이 기기의 기존 기록을 어느 방에 이미 올렸는지 (방 코드 저장) */
   seeded: 'couple_budget_seeded_room',
@@ -28,5 +29,13 @@ export function save(key: string, value: unknown): void {
   } catch (e) {
     // 사파리 프라이빗 모드 등에서 저장이 막힐 수 있다. 앱을 죽이지는 않는다.
     console.warn('저장 실패:', e);
+  }
+}
+
+export function remove(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch (e) {
+    console.warn('삭제 실패:', e);
   }
 }

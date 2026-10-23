@@ -127,6 +127,17 @@ describe('우리집 코드', () => {
     expect(isValidRoomCode('abcd/efgh/ijkl')).toBe(false);
   });
 
+  it('보안 규칙의 패턴과 같다 — 영문·숫자·하이픈 12~64자만 통과한다', () => {
+    expect(isValidRoomCode('k7fq-2mx9-tv58-hd3p')).toBe(true);
+    expect(isValidRoomCode('  k7fq-2mx9-tv58-hd3p  ')).toBe(true);   // 앞뒤 공백은 잘라낸다
+    expect(isValidRoomCode('ABCDEF123456')).toBe(true);
+    expect(isValidRoomCode('abcd efgh ijkl')).toBe(false);          // 공백
+    expect(isValidRoomCode('우리집코드우리집코드우리집')).toBe(false);   // 한글
+    expect(isValidRoomCode('abcd.efgh.ijkl')).toBe(false);          // 점
+    expect(isValidRoomCode('a'.repeat(64))).toBe(true);
+    expect(isValidRoomCode('a'.repeat(65))).toBe(false);
+  });
+
   it('만들어진 코드는 항상 유효하고 매번 다르다', () => {
     const codes = new Set<string>();
     for (let i = 0; i < 50; i++) {

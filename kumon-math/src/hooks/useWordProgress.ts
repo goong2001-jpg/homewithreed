@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import { CouponId } from '../words/coupons';
-import { todayKey, TEST_COUNT, MAX_MISSED_PER_DAY, DayPlan } from '../words/dailySet';
+import { todayKey, TEST_COUNT, MAX_MISSED_PER_DAY, DayPlan, reviewForDay } from '../words/dailySet';
 import { UNITS, SETS_PER_UNIT } from '../words/units';
+import { SrsMap, applyResult, seenEntry, migrateSrs } from '../words/srs';
 
 const FRESH_QUEUE = () => Array.from({ length: TEST_COUNT }, (_, i) => i);
 
@@ -73,6 +74,18 @@ export interface WordProgress {
   seen: Record<string, number>;
   /** 문제에서 한 번에 맞힌 횟수 — 그림책 별(⭐)로 보여준다 */
   known: Record<string, number>;
+  /** 간격 반복 상자 — 단어마다 몇 번 상자인지, 언제 다시 볼지 (seen/known/missed 는 호환용으로 남긴다) */
+  srs: SrsMap;
+  /** 오늘 복습 차례라 오늘 단어에 넣은 단어 — 날이 바뀌거나 새 묶음을 시작할 때 정한다 */
+  todayReview: string[];
+  /** 오늘 한 번에 맞힌 단어 — 요정이 기억해 뒀다가 말해 준다 */
+  todayCorrect: string[];
+  /** 어제 틀린 단어 (날이 바뀔 때 정한다) */
+  yesterdayMissed: string[];
+  /** 어제 본 단어 카드 수 */
+  yesterdayLearned: number;
+  /** 오늘이 시작될 때의 totalLearned — 하루에 몇 개 봤는지 세는 기준 */
+  dayStartLearned: number;
 }
 
 /** 오답 노트에 이만큼 오래 남은 단어는 정리한다 */
@@ -99,6 +112,12 @@ const DEFAULT: WordProgress = {
   todayPlan: { unit: 0, unitDay: 0 },
   seen: {},
   known: {},
+  srs: {},
+  todayReview: [],
+  todayCorrect: [],
+  yesterdayMissed: [],
+  yesterdayLearned: 0,
+  dayStartLearned: 0,
 };
 
 function daysAgo(dateKey: string): number {
@@ -122,6 +141,8 @@ function load(): WordProgress {
       saved.missed = Object.fromEntries(
         Object.entries(saved.missed ?? {}).filter(([, at]) => daysAgo(at) <= MISSED_KEEP_DAYS),
       );
+      // 예전 저장 데이터에는 간격 반복 상자가 없다 — 본/맞힌/틀린 기록으로 만든다
+      if (!parsed.srs) saved.srs = migrateSrs(saved.seen ?? {}, saved.known ?? {}, saved.missed, todayKey());
       // 날이 바뀌면 오늘 치만 초기화한다 (쿠폰과 누적 기록은 그대로)
       if (saved.date !== todayKey()) {
         // 가장 최근에 틀린 단어부터 오늘 다시 본다
@@ -129,12 +150,22 @@ function load(): WordProgress {
           .sort((a, b) => daysAgo(a[1]) - daysAgo(b[1]))
           .map(([en]) => en)
           .slice(0, MAX_MISSED_PER_DAY);
+        const todayPlan: DayPlan = { unit: saved.unit, unitDay: saved.unitDays };
+        const wasYesterday = daysAgo(saved.date) === 1;
         return {
           ...saved, date: todayKey(), learned: 0, phase: 'learn',
           round: 0, attempt: 0, results: [], queue: FRESH_QUEUE(), rewardedRounds: [],
           todayMissed,
           // 오늘 배울 소리 단계를 정해 둔다
-          todayPlan: { unit: saved.unit, unitDay: saved.unitDays },
+          todayPlan,
+          // 간격 반복에서 오늘 복습 차례인 단어
+          todayReview: reviewForDay(saved.srs, todayPlan),
+          todayCorrect: [],
+          yesterdayMissed: Object.entries(saved.missed).filter(([, at]) => daysAgo(at) === 1).map(([en]) => en),
+          // 어제 몇 개 봤는지 — 예전 데이터엔 기준값이 없으니 0으로 둔다
+          yesterdayLearned: wasYesterday && typeof parsed.dayStartLearned === 'number'
+            ? Math.max(0, saved.totalLearned - saved.dayStartLearned) : 0,
+          dayStartLearned: saved.totalLearned,
         };
       }
       return saved;
@@ -159,13 +190,14 @@ export function useWordProgress() {
     });
   }, []);
 
-  /** 단어 하나를 다 봤을 때 */
+  /** 단어 하나를 다 봤을 때 — 처음 보는 단어는 1번 상자에 넣는다 (내일 복습) */
   const learnNext = useCallback((perDay: number, en?: string) => {
     setProgress(prev => {
       const learned = Math.min(prev.learned + 1, perDay);
       const next: WordProgress = {
         ...prev,
         seen: en ? { ...prev.seen, [en]: (prev.seen[en] ?? 0) + 1 } : prev.seen,
+        srs: en && !prev.srs[en] ? { ...prev.srs, [en]: seenEntry(todayKey()) } : prev.srs,
         learned,
         totalLearned: prev.totalLearned + 1,
         phase: learned >= perDay ? 'test' : 'learn',
@@ -186,7 +218,11 @@ export function useWordProgress() {
       if (!correct) missed[en] = today;
       else if (firstTry && missed[en] && missed[en] !== today) delete missed[en];
       const known = correct && firstTry ? { ...prev.known, [en]: (prev.known[en] ?? 0) + 1 } : prev.known;
-      const next = { ...prev, results: [...prev.results, correct], queue, missed, known };
+      // 간격 반복 상자: 처음 푸는 답만 반영한다 (틀린 문제를 바로 다시 맞힌 건 올리지 않는다)
+      const srs = firstTry ? { ...prev.srs, [en]: applyResult(prev.srs[en], correct, today) } : prev.srs;
+      const todayCorrect = correct && firstTry && !prev.todayCorrect.includes(en)
+        ? [...prev.todayCorrect, en] : prev.todayCorrect;
+      const next = { ...prev, results: [...prev.results, correct], queue, missed, known, srs, todayCorrect };
       try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
       return next;
     });
@@ -270,21 +306,25 @@ export function useWordProgress() {
     update({
       unit, unitDays: 0, unitDoneDate: '',
       todayPlan: { unit, unitDay: 0 },
+      todayReview: reviewForDay(progress.srs, { unit, unitDay: 0 }),
       learned: 0, phase: 'learn', round: 0, attempt: 0, results: [], queue: FRESH_QUEUE(),
     });
-  }, [update]);
+  }, [progress.srs, update]);
 
   const finishWithoutCoupon = useCallback(() => update({ phase: 'done' }), [update]);
 
   /** 오늘 것을 또 연습 (쿠폰은 안 나온다) */
   const practiceAgain = useCallback(() => {
+    const todayPlan: DayPlan = { unit: progress.unit, unitDay: progress.unitDays };
     update({
       learned: 0, phase: 'learn',
       round: progress.round + 1, attempt: 0, results: [], queue: FRESH_QUEUE(),
       // 다음 묶음은 올라간 진도의 단계로 배운다
-      todayPlan: { unit: progress.unit, unitDay: progress.unitDays },
+      todayPlan,
+      // 복습 단어도 새로 고른다 (방금 맞힌 단어는 복습 차례가 아니므로 빠진다)
+      todayReview: reviewForDay(progress.srs, todayPlan),
     });
-  }, [progress.round, progress.unit, progress.unitDays, update]);
+  }, [progress.round, progress.unit, progress.unitDays, progress.srs, update]);
 
   const totalCoupons = Object.values(progress.coupons).reduce<number>((s, n) => s + (n ?? 0), 0);
   const roundsToday = progress.rewardedDate === todayKey() ? progress.rewardedRounds : [];

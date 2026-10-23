@@ -53,6 +53,8 @@ function makeQuestion(set: LessonSet, kind: QuizKind, pool: LessonSet[], rng: Rn
   const distractors = pickDistractors(set, pool, rng);
   const id = `${set.id}-${kind}`;
   const wordChoice = (l: LessonSet): QuizChoice => ({ label: l.word.hanzi, sub: l.word.pinyin });
+  // 병음 문제는 보기에 병음을 붙이면 정답이 그대로 보이므로 한자만 보여준다
+  const hanziOnlyChoice = (l: LessonSet): QuizChoice => ({ label: l.word.hanzi });
   const meaningChoice = (l: LessonSet): QuizChoice => ({ label: l.word.meaning });
 
   switch (kind) {
@@ -70,7 +72,7 @@ function makeQuestion(set: LessonSet, kind: QuizKind, pool: LessonSet[], rng: Rn
       };
     }
     case 'pinyinWord': {
-      const { choices, answerIndex } = buildChoices(set, distractors, wordChoice, rng);
+      const { choices, answerIndex } = buildChoices(set, distractors, hanziOnlyChoice, rng);
       return {
         id,
         kind,

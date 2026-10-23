@@ -1,7 +1,11 @@
-import * as XLSX from 'xlsx';
 import { Transaction } from '../types';
 
-export function exportMonthToExcel(transactions: Transaction[], month: string) {
+/**
+ * xlsx는 400KB가 넘는다. 내보내기는 어쩌다 한 번 쓰는 기능이므로
+ * 정적 import를 하지 않고 누를 때만 받아온다.
+ */
+export async function exportMonthToExcel(transactions: Transaction[], month: string): Promise<void> {
+  const XLSX = await import('xlsx');
   const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
 
   const rows = sorted.map(t => ({

@@ -58,3 +58,15 @@ export function addMonths(key: DateKey, n: number): DateKey {
   const nd = Math.min(d, daysInMonth(ny, nm));
   return `${ny}-${String(nm).padStart(2, '0')}-${String(nd).padStart(2, '0')}`;
 }
+
+/** 'YYYY-MM-DD' → 'YYYY-MM' */
+export function monthKey(key: DateKey): string {
+  return key.slice(0, 7);
+}
+
+/** n일 뒤 날짜. UTC 자정 기준으로 더해서 서머타임에 흔들리지 않는다 */
+export function addDays(key: DateKey, n: number): DateKey {
+  const { y, m, d } = parseDate(key);
+  const t = new Date(Date.UTC(y, m - 1, d + n));
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+}

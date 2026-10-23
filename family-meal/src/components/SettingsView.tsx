@@ -23,7 +23,7 @@ export default function SettingsView({ settings, onChange, onReset }: Props) {
     <div>
       <h1 style={{ fontSize: 21, margin: '0 0 4px' }}>설정</h1>
       <p style={{ margin: '0 0 14px', fontSize: 12.5, color: C.muted }}>
-        바꾸면 이번 주 식단을 그 자리에서 다시 맞춥니다.
+        메뉴 조건을 바꾸면 이번 주 식단을 그 자리에서 다시 맞춥니다. 인분 수와 양념 접기는 식단을 건드리지 않습니다.
       </p>
 
       <div style={{ ...CARD, marginBottom: 12 }}>

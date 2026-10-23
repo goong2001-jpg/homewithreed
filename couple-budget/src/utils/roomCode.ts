@@ -1,5 +1,12 @@
-/** 우리집 코드의 최소 길이 — 보안 규칙(roomCode.size() >= 12)과 반드시 일치해야 한다 */
+/** 우리집 코드의 최소 길이 — 보안 규칙(ROOM_CODE_PATTERN)과 반드시 일치해야 한다 */
 export const MIN_ROOM_CODE_LENGTH = 12;
+
+/**
+ * 보안 규칙의 `roomCode.matches('^[A-Za-z0-9-]{12,64}$')` 와 같은 패턴.
+ * 영문·숫자·하이픈만 — 규칙이 거부할 코드는 여기서 미리 빨간 테두리로 알려준다.
+ * (generateRoomCode 가 만드는 19자 코드는 항상 통과한다)
+ */
+export const ROOM_CODE_PATTERN = /^[A-Za-z0-9-]{12,64}$/;
 
 /** 헷갈리는 글자(0/o/O, 1/l/I) 를 뺀 32자 알파벳 */
 const ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -27,11 +34,10 @@ export function generateRoomCode(): string {
 
 export function isValidRoomCode(code: string): boolean {
   const c = code.trim();
-  // Firestore 문서 ID 제약: '/' 금지, '.' 과 '..' 단독 금지, 1500바이트 이하
   if (c.length < MIN_ROOM_CODE_LENGTH) return false;
-  if (c.includes('/')) return false;
-  if (c === '.' || c === '..') return false;
-  return true;
+  // 영문·숫자·하이픈만 허용하면 Firestore 문서 ID 제약('/' 금지, '.'·'..' 단독 금지,
+  // 1500바이트 이하)도 저절로 만족한다
+  return ROOM_CODE_PATTERN.test(c);
 }
 
 /**

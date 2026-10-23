@@ -1,13 +1,18 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useMemo, useState } from 'react';
 import { useWordProgress } from '../hooks/useWordProgress';
 import { useGameState } from '../hooks/useGameState';
+import { useMissions } from '../hooks/useMissions';
+import { useStreak } from '../hooks/useStreak';
 import { learnedPool } from '../words/pool';
 import { playClick } from '../utils/sounds';
-import MatchGame from '../components/games/MatchGame';
-import SpellGame from '../components/games/SpellGame';
-import TeacherGame from '../components/games/TeacherGame';
-import FindGame from '../components/games/FindGame';
-import PictureBook from '../components/games/PictureBook';
+import Loading from '../components/Loading';
+
+// 놀이는 고를 때 하나씩 내려받는다
+const MatchGame = lazy(() => import('../components/games/MatchGame'));
+const SpellGame = lazy(() => import('../components/games/SpellGame'));
+const TeacherGame = lazy(() => import('../components/games/TeacherGame'));
+const FindGame = lazy(() => import('../components/games/FindGame'));
+const PictureBook = lazy(() => import('../components/games/PictureBook'));
 
 type Game = 'match' | 'spell' | 'book' | 'teacher' | 'find';
 
@@ -22,11 +27,18 @@ const GAMES: { id: Game; emoji: string; title: string; desc: string; color: stri
 export default function PlayScreen() {
   const { progress } = useWordProgress();
   const { gameState, addPoints } = useGameState();
+  const { bump } = useMissions();
+  const { markActive } = useStreak();
   const [game, setGame] = useState<Game | null>(null);
   const pool = useMemo(() => learnedPool(progress.seen, progress.unit), [progress.seen, progress.unit]);
   const learnedCount = Object.keys(progress.seen).length;
 
-  const onStars = useCallback((n: number) => addPoints(n), [addPoints]);
+  // 별을 받는 순간 = 놀이를 한 판 한 것 → 오늘 미션 "놀이터 게임 1판" 과 스트릭에 반영
+  const onStars = useCallback((n: number) => {
+    addPoints(n);
+    bump('play');
+    markActive();
+  }, [addPoints, bump, markActive]);
   const back = useCallback(() => { setGame(null); playClick(); }, []);
 
   return (
@@ -75,11 +87,13 @@ export default function PlayScreen() {
           cursor: 'pointer', fontFamily: 'inherit',
         }}>← 놀이 고르기</button>
       )}
-      {game === 'match' && <MatchGame pool={pool} onStars={onStars} onBack={back} />}
-      {game === 'spell' && <SpellGame pool={pool} onStars={onStars} onBack={back} />}
-      {game === 'teacher' && <TeacherGame pool={pool} onStars={onStars} onBack={back} />}
-      {game === 'find' && <FindGame pool={pool} onStars={onStars} onBack={back} />}
-      {game === 'book' && <PictureBook seen={progress.seen} known={progress.known} onBack={back} />}
+      <Suspense fallback={<Loading />}>
+        {game === 'match' && <MatchGame pool={pool} onStars={onStars} onBack={back} />}
+        {game === 'spell' && <SpellGame pool={pool} onStars={onStars} onBack={back} />}
+        {game === 'teacher' && <TeacherGame pool={pool} onStars={onStars} onBack={back} />}
+        {game === 'find' && <FindGame pool={pool} onStars={onStars} onBack={back} />}
+        {game === 'book' && <PictureBook seen={progress.seen} known={progress.known} onBack={back} />}
+      </Suspense>
     </div>
   );
 }

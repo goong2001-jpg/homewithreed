@@ -1,9 +1,11 @@
 import {
-  BACKUP_FORMAT, backupFileName, backupSummary, buildBackup,
+  BACKUP_FORMAT, BACKUP_VERSION, backupFileName, backupSummary, buildBackup,
   parseBackup, serializeBackup,
 } from './backup';
 import { mergeById } from './merge';
-import { Expense, FixedExpense, GiftEntry, IncomeEntry, Person } from '../types';
+import {
+  CategoryBudget, Expense, FixedExpense, GiftEntry, IncomeEntry, Person, budgetIdOf,
+} from '../types';
 
 const PERSONS: Person[] = [
   { id: 'p1', name: '나', color: '#3498db', order: 0, createdAt: 0, updatedAt: 0 },
@@ -283,5 +285,57 @@ describe('경조사도 함께 오간다', () => {
     const theirs = [giftRec('g2', 50_000)];
     const merged = mergeById(mine, theirs);
     expect(merged.map(g => g.id).sort()).toEqual(['g1', 'g2']);
+  });
+});
+
+describe('카테고리 예산도 함께 오간다 (버전 2)', () => {
+  const limit = (category: '식비' | '교통', monthlyLimit: number, updatedAt = 100): CategoryBudget =>
+    ({ id: budgetIdOf(category), category, monthlyLimit, updatedAt });
+
+  it('버전은 2 이고 왕복해도 그대로다', () => {
+    const b = buildBackup({
+      persons: PERSONS, incomes: [], fixedExpenses: [], expenses: [], gifts: [],
+      budgets: [limit('식비', 300_000)],
+    });
+    expect(b.version).toBe(2);
+    expect(BACKUP_VERSION).toBe(2);
+    const out = parseBackup(serializeBackup(b));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.backup.budgets).toEqual([limit('식비', 300_000)]);
+  });
+
+  it('예산만 들어 있는 파일도 받아준다', () => {
+    const b = buildBackup({
+      persons: [], incomes: [], fixedExpenses: [], expenses: [], gifts: [],
+      budgets: [limit('교통', 50_000)],
+    });
+    expect(parseBackup(serializeBackup(b)).ok).toBe(true);
+  });
+
+  it('버전 1 파일(예산 없음)도 그대로 열린다', () => {
+    const old = {
+      format: BACKUP_FORMAT, version: 1, exportedAt: 1,
+      persons: PERSONS, incomes: [], fixedExpenses: [], expenses: [expense('e1', 30_000)],
+      gifts: [giftRec('g1', 1_000)],
+    };
+    const out = parseBackup(JSON.stringify(old));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.backup.budgets).toEqual([]);
+    expect(out.backup.gifts).toHaveLength(1);
+    expect(out.backup.expenses).toHaveLength(1);
+  });
+
+  it('budgets 를 생략하고 만들면 빈 배열이다 (옛 호출부 호환)', () => {
+    expect(sample().budgets).toEqual([]);
+  });
+
+  it('같은 카테고리 상한은 id 가 같아서 하나로 합쳐지고 나중 것이 이긴다', () => {
+    const mine = [limit('식비', 200_000, 100)];
+    const theirs = [limit('식비', 300_000, 900)];
+    const merged = mergeById(mine, theirs);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].monthlyLimit).toBe(300_000);
   });
 });

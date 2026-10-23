@@ -27,10 +27,23 @@ export function saveLearned(ids: number[]): void {
   save(STORAGE_KEYS.learned, Array.from(new Set(ids)).sort((a, b) => a - b));
 }
 
+/** 저장된 기록이 제대로 된 모양인지 (손상된 기록은 화면을 깨뜨리므로 버린다) */
+export function isExamRecord(value: unknown): value is ExamRecord {
+  if (typeof value !== 'object' || value === null) return false;
+  const r = value as Record<string, unknown>;
+  return (
+    typeof r.takenAt === 'string' &&
+    typeof r.total === 'number' &&
+    typeof r.correct === 'number' &&
+    Array.isArray(r.wrongSetIds) &&
+    r.wrongSetIds.every((id) => typeof id === 'number')
+  );
+}
+
 /** 최근 시험 기록 (새 기록이 앞) */
 export function loadExams(): ExamRecord[] {
-  const list = load<ExamRecord[]>(STORAGE_KEYS.exams, []);
-  return Array.isArray(list) ? list : [];
+  const list = load<unknown>(STORAGE_KEYS.exams, []);
+  return Array.isArray(list) ? list.filter(isExamRecord) : [];
 }
 
 export function addExam(record: ExamRecord): ExamRecord[] {

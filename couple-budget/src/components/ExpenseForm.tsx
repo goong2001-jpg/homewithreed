@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  CATEGORIES, CATEGORY_EMOJI, Expense, ExpenseCategory, MonthBudget, Person,
+  CATEGORIES, CATEGORY_EMOJI, Expense, ExpenseCategory, FrequentExpense, MonthBudget, Person,
 } from '../types';
 import { todayKey } from '../utils/budget';
 import { formatAmountInput, parseAmountInput, signedWon, won } from '../utils/format';
@@ -10,6 +10,11 @@ interface Props {
   budget: MonthBudget;
   /** 있으면 새로 쓰는 게 아니라 이 내역을 고치는 화면이 된다 */
   initial?: Expense;
+  /**
+   * '자주 쓰는 지출' 칩을 눌렀을 때 — 칸만 채우고 저장 버튼에 초점을 준다.
+   * seq 는 같은 칩을 두 번 눌러도 다시 채워지게 하는 일련번호.
+   */
+  preset?: { item: FrequentExpense; seq: number };
   onSave: (input: {
     id?: string;
     date: string; amount: number; category: ExpenseCategory; content: string; personId: string;
@@ -19,7 +24,7 @@ interface Props {
 }
 
 export default function ExpenseForm({
-  persons, budget, initial, onSave, onDelete, onDone,
+  persons, budget, initial, preset, onSave, onDelete, onDone,
 }: Props) {
   const sorted = [...persons].sort((a, b) => a.order - b.order);
   const editing = !!initial;
@@ -33,6 +38,22 @@ export default function ExpenseForm({
   const [date, setDate] = useState(initial?.date ?? todayKey());
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const saveRef = useRef<HTMLButtonElement>(null);
+
+  // 칩을 누르면 오늘 날짜로 칸을 채우고 저장 버튼에 초점 — 저장은 사용자가 한 번 더 누른다
+  useEffect(() => {
+    if (!preset) return;
+    const it = preset.item;
+    setAmountText(formatAmountInput(String(it.amount)));
+    setCategory(it.category);
+    setContent(it.content);
+    if (persons.some(p => p.id === it.personId)) setPersonId(it.personId);
+    setDate(todayKey());
+    setError('');
+    saveRef.current?.focus();
+    // persons 는 초점 대상이 아니라 일부러 뺀다 — 칩을 눌렀을 때만 돈다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset?.seq]);
 
   const amount = parseAmountInput(amountText);
   // 수정할 땐 '이만큼 더/덜 쓰는 것'이므로 원래 금액과의 차이만 반영해야 맞다
@@ -220,6 +241,7 @@ export default function ExpenseForm({
           취소
         </button>
         <button
+          ref={saveRef}
           onClick={handleSubmit}
           style={{
             flex: 2, padding: 15, background: '#27ae60', border: 'none', borderRadius: 10,

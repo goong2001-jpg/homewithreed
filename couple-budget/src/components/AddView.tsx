@@ -1,7 +1,10 @@
-import React from 'react';
-import { AddMode, Expense, IncomeEntry, MonthBudget, MonthKey, Person } from '../types';
+import React, { useState } from 'react';
+import {
+  AddMode, Expense, FrequentExpense, IncomeEntry, MonthBudget, MonthKey, Person,
+} from '../types';
 import ExpenseForm from './ExpenseForm';
 import IncomeForm from './IncomeForm';
+import FrequentChips from './FrequentChips';
 
 interface Props {
   month: MonthKey;
@@ -12,6 +15,8 @@ interface Props {
   /** 고치는 중인 내역 (둘 중 하나만 들어온다) */
   editingExpense?: Expense;
   editingIncome?: IncomeEntry;
+  /** 자주 쓰는 지출 후보 (budget.ts frequentExpenses) — 새로 쓸 때만 보여준다 */
+  frequent: FrequentExpense[];
   onSaveExpense: React.ComponentProps<typeof ExpenseForm>['onSave'];
   onDeleteExpense: (id: string) => void;
   onSaveIncome: React.ComponentProps<typeof IncomeForm>['onSave'];
@@ -27,10 +32,12 @@ interface Props {
  */
 export default function AddView({
   month, persons, budget, mode, onModeChange,
-  editingExpense, editingIncome,
+  editingExpense, editingIncome, frequent,
   onSaveExpense, onDeleteExpense, onSaveIncome, onDeleteIncome, onDone,
 }: Props) {
   const editing = !!(editingExpense || editingIncome);
+  // 칩으로 고른 지출. seq 로 같은 칩 재선택도 구분한다
+  const [preset, setPreset] = useState<{ item: FrequentExpense; seq: number } | undefined>();
 
   const title = editingExpense ? '내역 수정'
     : editingIncome ? '수입 수정'
@@ -81,14 +88,24 @@ export default function AddView({
           onDone={onDone}
         />
       ) : (
-        <ExpenseForm
-          persons={persons}
-          budget={budget}
-          initial={editingExpense}
-          onSave={onSaveExpense}
-          onDelete={onDeleteExpense}
-          onDone={onDone}
-        />
+        <>
+          {/* 자주 쓰는 지출 — 누르면 칸만 채워지고, 저장은 한 번 더 눌러야 한다 */}
+          {!editing && (
+            <FrequentChips
+              items={frequent}
+              onPick={item => setPreset(p => ({ item, seq: (p?.seq ?? 0) + 1 }))}
+            />
+          )}
+          <ExpenseForm
+            persons={persons}
+            budget={budget}
+            initial={editingExpense}
+            preset={editing ? undefined : preset}
+            onSave={onSaveExpense}
+            onDelete={onDeleteExpense}
+            onDone={onDone}
+          />
+        </>
       )}
     </div>
   );

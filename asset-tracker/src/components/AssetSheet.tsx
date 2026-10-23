@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import {
-  Asset, AssetEquity, AssetKind, DEFAULT_LIQUIDITY, FALLBACK_LIQUIDITY,
-  LIQUIDITY_LEVELS, LIQUIDITY_META, Liquidity,
+  Asset, AssetEquity, AssetKind, DateKey, DEFAULT_LIQUIDITY, FALLBACK_LIQUIDITY,
+  LIQUIDITY_LEVELS, LIQUIDITY_META, Liquidity, ValuePoint,
 } from '../types';
-import { formatAmountInput, parseAmountInput, signedPercent, signedWon, won } from '../utils/format';
+import { addMonths, todayKey } from '../utils/date';
+import { formatAmountInput, parseAmountInput, shortDate, signedPercent, signedWon, won } from '../utils/format';
+import { appendHistory, returnSince } from '../utils/history';
 import { AmountField, ChoiceField, DateField, PreviewBox, TextField } from './Field';
 import Sheet from './Sheet';
 import { COLOR } from './ui';
@@ -14,10 +16,12 @@ interface Props {
   kinds: AssetKind[];
   /** 새로 추가할 때 미리 골라둘 분류 */
   defaultKindId: string;
+  today: DateKey;
   onSave: (v: {
     kindId: string; name: string; value: number;
     principal: number | null; maturity: string | null;
     liquidity: Liquidity | null; memo: string;
+    valueHistory: ValuePoint[];
   }) => void;
   onDelete?: () => void;
   onClose: () => void;
@@ -34,7 +38,7 @@ const NAME_PLACEHOLDER: Record<string, string> = {
 };
 
 export default function AssetSheet({
-  asset, kinds, defaultKindId, onSave, onDelete, onClose, equity,
+  asset, kinds, defaultKindId, today, onSave, onDelete, onClose, equity,
 }: Props) {
   const [kindId, setKindId] = useState(asset?.kindId ?? defaultKindId);
   const [name, setName] = useState(asset?.name ?? '');
@@ -44,6 +48,19 @@ export default function AssetSheet({
     asset?.principal != null ? formatAmountInput(String(asset.principal)) : '');
   const [maturity, setMaturity] = useState(asset?.maturity ?? '');
   const [memo, setMemo] = useState(asset?.memo ?? '');
+
+  /**
+   * 평가액 이력. 시트 안에서 줄을 지울 수 있으므로 상태로 들고 있다가 저장할 때 같이 넘긴다.
+   * 이력이 아예 없는 예전 기록은 '마지막으로 고친 날의 평가액'을 첫 줄로 깔아준다 —
+   * 불러올 때가 아니라 저장할 때 하는 이유는, 안 고친 기록까지 updatedAt 이 바뀌면 안 되기 때문이다.
+   */
+  const [history, setHistory] = useState<ValuePoint[]>(() => {
+    if (!asset) return [];
+    if (asset.valueHistory && asset.valueHistory.length) return asset.valueHistory;
+    const seedDate = asset.updatedAt > 0 ? todayKey(new Date(asset.updatedAt)) : today;
+    return appendHistory([], seedDate, asset.value);
+  });
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   /**
    * 유동성. 직접 고르기 전까지는 null로 두고 분류 기본값을 따라간다 —
@@ -64,6 +81,15 @@ export default function AssetSheet({
     : !value.trim() ? '지금 얼마인지 적어주세요.'
     : undefined;
 
+  /** 저장할 이력: 평가액이 바뀌었거나(새 자산 포함) 이력이 비었으면 오늘 값을 한 줄 더한다 */
+  const historyToSave = (): ValuePoint[] =>
+    (!asset || valueNum !== asset.value || history.length === 0)
+      ? appendHistory(history, today, valueNum)
+      : history;
+
+  const sinceFirst = history.length ? returnSince(history, history[0].date, valueNum) : null;
+  const sinceMonth = returnSince(history, addMonths(today, -1), valueNum);
+
   return (
     <Sheet
       title={asset ? '자산 수정' : '자산 추가'}
@@ -78,6 +104,7 @@ export default function AssetSheet({
         maturity: maturity || null,
         liquidity,
         memo: memo.trim(),
+        valueHistory: historyToSave(),
       })}
     >
       <ChoiceField
@@ -139,6 +166,78 @@ export default function AssetSheet({
         ]} />
       )}
 
+      {/* ── 평가액 이력 (수정할 때만) ───────────── */}
+      {asset && (
+        <div style={{ marginBottom: 14, border: `1px solid ${COLOR.line}`, borderRadius: 9, overflow: 'hidden' }}>
+          <button
+            onClick={() => setHistoryOpen(o => !o)}
+            aria-expanded={historyOpen}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+              padding: '11px 13px', background: '#fbfcfd', border: 'none',
+              cursor: 'pointer', font: 'inherit', color: COLOR.text, textAlign: 'left',
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 600, color: COLOR.sub, flex: 1 }}>
+              평가액 이력
+              <span style={{ fontWeight: 500, color: COLOR.faint, marginLeft: 5 }}>{history.length}건</span>
+            </span>
+            {sinceFirst && sinceFirst.ratio !== null && (
+              <span style={{ fontSize: 12, fontWeight: 700, color: sinceFirst.change < 0 ? COLOR.debt : COLOR.plus }}>
+                {signedPercent(sinceFirst.ratio)}
+              </span>
+            )}
+            <span style={{ fontSize: 11, color: COLOR.faint }}>{historyOpen ? '▴' : '▾'}</span>
+          </button>
+
+          {historyOpen && (
+            <div>
+              {(sinceFirst || sinceMonth) && (
+                <div style={{ padding: '10px 13px', background: '#f4f7f9', fontSize: 12 }}>
+                  {sinceFirst && (
+                    <ReturnRow label={`첫 기록(${shortDate(sinceFirst.from.date)}) 이후`} r={sinceFirst} />
+                  )}
+                  {sinceMonth && (
+                    <ReturnRow label="한 달 전 대비" r={sinceMonth} />
+                  )}
+                </div>
+              )}
+              {history.length === 0 && (
+                <p style={{ margin: 0, padding: '12px 13px', fontSize: 12, color: COLOR.faint }}>
+                  저장하면 오늘 평가액이 첫 줄로 들어가요.
+                </p>
+              )}
+              {history.slice().reverse().map((p, i, arr) => (
+                <div
+                  key={p.date}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px',
+                    borderTop: i === 0 && !(sinceFirst || sinceMonth) ? 'none' : `1px solid ${COLOR.line}`,
+                    fontSize: 13,
+                  }}
+                >
+                  <span style={{ color: COLOR.sub, width: 84 }}>{shortDate(p.date)}</span>
+                  <strong style={{ flex: 1, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{won(p.value)}</strong>
+                  <button
+                    onClick={() => setHistory(h => h.filter(q => q.date !== p.date))}
+                    aria-label={`${shortDate(p.date)} 이력 지우기`}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: COLOR.faint, fontSize: 15, padding: '0 2px', lineHeight: 1,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <p style={{ margin: 0, padding: '8px 13px 10px', fontSize: 11, color: COLOR.faint, lineHeight: 1.5 }}>
+                '지금 얼마'를 고쳐 저장하면 오늘 날짜로 한 줄 쌓여요. 같은 날은 마지막 값만 남습니다.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       <DateField
         label="만기일 · 계약 만료일 (선택)"
         value={maturity}
@@ -149,5 +248,18 @@ export default function AssetSheet({
 
       <TextField label="메모 (선택)" value={memo} onChange={setMemo} placeholder="" />
     </Sheet>
+  );
+}
+
+function ReturnRow({ label, r }: { label: string; r: { change: number; ratio: number | null } }) {
+  const color = r.change < 0 ? COLOR.debt : r.change > 0 ? COLOR.plus : COLOR.sub;
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
+      <span style={{ color: COLOR.sub }}>{label}</span>
+      <strong style={{ color, fontVariantNumeric: 'tabular-nums' }}>
+        {signedWon(r.change)}
+        {r.ratio !== null && <span style={{ marginLeft: 5, opacity: 0.85 }}>{signedPercent(r.ratio)}</span>}
+      </strong>
+    </div>
   );
 }

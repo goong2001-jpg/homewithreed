@@ -224,6 +224,16 @@ input[type="date"] {
 .row.out .amt { color: var(--spend); }
 .row:not(.out) .amt { color: var(--good); }
 
+/* ---- 백업 알림 ---- */
+.nudge {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 10px 12px;
+  border-radius: 14px; background: var(--accent-soft); color: var(--text); font-size: 14px;
+}
+.nudge[hidden] { display: none; }
+.nudge span { flex: 1; }
+.nudge button { font: inherit; font-size: 13px; font-weight: 700; border: 0; border-radius: 10px; padding: 7px 12px; background: var(--accent); color: #fff; cursor: pointer; }
+.nudge .close { background: transparent; color: var(--dim); font-size: 20px; line-height: 1; padding: 0 4px; }
+
 /* ---- 시작 실패 안내 ---- */
 .bootFail {
   position: fixed; left: 16px; right: 16px; top: max(16px, env(safe-area-inset-top)); z-index: 10;

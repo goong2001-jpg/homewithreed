@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AppState, CheckItem, Friend, Slot } from '../types';
 import { FRIEND_COLORS, FRIEND_EMOJIS } from '../data/defaults';
 import {
@@ -37,6 +37,12 @@ export default function SettingsView({
 }: Props) {
   const [editingFriend, setEditingFriend] = useState<string | null>(null);
   const [importMsg, setImportMsg] = useState('');
+  // 암호는 글자마다 서버에 올리면 글자 수만큼 401 이 뜬다.
+  // 여기서만 들고 있다가 칸을 벗어나거나 저장을 누를 때 한 번에 넘긴다.
+  const [passphraseDraft, setPassphraseDraft] = useState(state.push.passphrase);
+  const [showPassphrase, setShowPassphrase] = useState(false);
+  // 백업을 불러오는 등 바깥에서 암호가 바뀌면 입력칸도 따라간다
+  useEffect(() => setPassphraseDraft(state.push.passphrase), [state.push.passphrase]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const patch = (over: Partial<AppState>) => onChange({ ...state, ...over });
@@ -58,6 +64,11 @@ export default function SettingsView({
 
   const canPush = pushReady && pushConfigured() && pushSupported();
   const mustInstall = needsInstallFirst();
+
+  const commitPassphrase = () => {
+    if (passphraseDraft === state.push.passphrase) return;
+    patch({ push: { ...state.push, passphrase: passphraseDraft, syncedHash: '' } });
+  };
 
   const onImportFile = async (file: File) => {
     const text = await file.text();
@@ -176,15 +187,37 @@ export default function SettingsView({
           {pushConfigured() && (
             <div className="field" style={{ marginTop: 8 }}>
               <label htmlFor="passphrase">알림 암호 (부모가 정한 값)</label>
-              <input
-                id="passphrase"
-                value={state.push.passphrase}
-                onChange={(e) =>
-                  patch({ push: { ...state.push, passphrase: e.target.value, syncedHash: '' } })
-                }
-                placeholder="알림 서버에 등록한 암호"
-                autoComplete="off"
-              />
+              <div className="row">
+                <input
+                  id="passphrase"
+                  className="grow"
+                  type={showPassphrase ? 'text' : 'password'}
+                  value={passphraseDraft}
+                  onChange={(e) => setPassphraseDraft(e.target.value)}
+                  onBlur={commitPassphrase}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitPassphrase();
+                  }}
+                  placeholder="알림 서버에 등록한 암호"
+                  autoComplete="off"
+                />
+                <button
+                  className="btn"
+                  type="button"
+                  aria-label={showPassphrase ? '암호 숨기기' : '암호 보기'}
+                  onClick={() => setShowPassphrase((v) => !v)}
+                >
+                  {showPassphrase ? '🙈' : '👁'}
+                </button>
+                <button
+                  className="btn primary"
+                  type="button"
+                  disabled={passphraseDraft === state.push.passphrase}
+                  onClick={commitPassphrase}
+                >
+                  저장
+                </button>
+              </div>
             </div>
           )}
 

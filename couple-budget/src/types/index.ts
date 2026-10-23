@@ -104,6 +104,44 @@ export interface Expense extends Syncable {
   createdAt: number;
 }
 
+// ================= 카테고리별 월 상한 (예산) =================
+
+/**
+ * 카테고리 하나의 한 달 쓸 수 있는 상한.
+ *
+ * id 는 `budget-식비` 처럼 **카테고리에서 결정**된다 — 두 폰이 각자 같은 카테고리에
+ * 상한을 넣어도 문서가 하나로 합쳐지고(last-write-wins), 카테고리당 한 건만 남는다.
+ * 상한을 지우면 툼스톤(deleted)으로 남긴다 — 다른 레코드와 같은 이유 (Syncable 주석).
+ */
+export interface CategoryBudget extends Syncable {
+  category: ExpenseCategory;
+  monthlyLimit: number;   // 원. 0 이하는 저장하지 않는다 (= 상한 없음)
+}
+
+export const budgetIdOf = (category: ExpenseCategory): string => `budget-${category}`;
+
+/** 상한 경고가 켜지는 비율 — 80% 부터 주황, 100% 부터 빨강 */
+export const BUDGET_WARN_RATIO = 0.8;
+
+/** 카테고리별 상한 대비 사용 현황 (budget.ts budgetStatus 산출물) */
+export interface BudgetStatusRow {
+  category: ExpenseCategory;
+  spent: number;
+  limit: number;
+  ratio: number;    // spent / limit (상한을 넘으면 1 보다 크다)
+}
+
+/** 자주 쓰는 지출 후보 (budget.ts frequentExpenses 산출물) */
+export interface FrequentExpense {
+  category: ExpenseCategory;
+  content: string;
+  amount: number;
+  /** 가장 최근에 이 조합으로 쓴 사람 — 원탭 입력 때 기본값으로 쓴다 */
+  personId: string;
+  count: number;
+  lastDate: DateKey;
+}
+
 // ================= 경조사 · 용돈 (오고 간 돈, 별도 장부) =================
 
 /**
@@ -256,11 +294,13 @@ export type AddMode = 'expense' | 'income';
 
 export type SyncStatus = 'off' | 'connecting' | 'live' | 'error';
 
-export type CollName = 'persons' | 'incomes' | 'fixedExpenses' | 'expenses' | 'gifts';
+export type CollName =
+  | 'persons' | 'incomes' | 'fixedExpenses' | 'expenses' | 'gifts' | 'budgets';
 
 export type RemoteBatch =
   | { coll: 'persons'; records: Person[] }
   | { coll: 'incomes'; records: IncomeEntry[] }
   | { coll: 'fixedExpenses'; records: FixedExpense[] }
   | { coll: 'expenses'; records: Expense[] }
-  | { coll: 'gifts'; records: GiftEntry[] };
+  | { coll: 'gifts'; records: GiftEntry[] }
+  | { coll: 'budgets'; records: CategoryBudget[] };

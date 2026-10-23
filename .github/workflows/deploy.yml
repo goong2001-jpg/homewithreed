@@ -16,13 +16,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 테스트(ci.yml)를 먼저 통과해야 빌드·배포로 넘어간다.
+  test:
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
 
       - name: Build kumon-math
         working-directory: kumon-math
@@ -100,9 +105,10 @@ jobs:
           cp -r habit-talk/build/. site/habit-talk/
           mkdir -p site/family-meal
           cp -r family-meal/build/. site/family-meal/
-          # walkie-talkie 는 빌드가 없는 정적 앱이라 그대로 복사한다.
+          # walkie-talkie 는 빌드가 없는 정적 앱이라 그대로 복사한다. 테스트 폴더는 빼고 올린다.
           mkdir -p site/walkie-talkie
           cp -r walkie-talkie/. site/walkie-talkie/
+          rm -rf site/walkie-talkie/test
           # allowance(구름이 용돈기입장)도 빌드 없는 정적 앱이다. 테스트 폴더는 빼고 올린다.
           mkdir -p site/allowance
           cp -r allowance/. site/allowance/

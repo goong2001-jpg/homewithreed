@@ -18,7 +18,18 @@ const RULES = `rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /rooms/{roomCode}/{document=**} {
-      allow read, write: if roomCode.size() >= 12;
+      // 우리집 코드: 영문·숫자·하이픈 12~64자 (앱이 만드는 코드는 19자)
+      function roomOk() {
+        return roomCode.matches('^[A-Za-z0-9-]{12,64}$');
+      }
+      allow read, delete: if roomOk();
+      // 쓰기는 updatedAt(숫자)이 서버에 있는 것보다 오래되면 거부한다 —
+      // 오프라인에서 묵힌 낡은 수정이 최신 기록을 덮어쓰지 못하게
+      allow create, update: if roomOk()
+        && request.resource.data.updatedAt is number
+        && (resource == null
+            || !('updatedAt' in resource.data)
+            || request.resource.data.updatedAt >= resource.data.updatedAt);
     }
   }
 }`;

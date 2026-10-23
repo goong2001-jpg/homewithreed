@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import BlockEditSheet from './components/BlockEditSheet';
 import BlockSheet from './components/BlockSheet';
 import CategoriesView from './components/CategoriesView';
@@ -13,7 +13,7 @@ import { COLOR } from './components/ui';
 import { useNow } from './hooks/useNow';
 import { CollName, useTracker } from './hooks/useTracker';
 import { Category, DateKey, Entry, Span, TimeBlock, View } from './types';
-import { backupSummary, parseBackup } from './utils/backup';
+import { Backup, backupSummary } from './utils/backup';
 import { blockRanges, blockReports, blockRollups, guardCategoryIds } from './utils/block';
 import { gapsOf, segmentsOfDay } from './utils/entry';
 import { newId } from './utils/id';
@@ -67,6 +67,16 @@ export default function App() {
   const [day, setDay] = useState<DateKey>(() => todayKey());
   const [span, setSpan] = useState<Span>('week');
   const [anchor, setAnchor] = useState<DateKey>(() => todayKey());
+
+  // 자정을 넘기면 '오늘' 화면도 새 날로 넘어간다.
+  // 다만 사용자가 일부러 다른 날을 보고 있었다면(day !== 어제의 오늘) 그대로 둔다.
+  const prevTodayRef = useRef(today);
+  useEffect(() => {
+    const prevToday = prevTodayRef.current;
+    if (prevToday === today) return;
+    prevTodayRef.current = today;
+    setDay(d => (d === prevToday ? today : d));
+  }, [today]);
 
   const liveCategories = useMemo(
     () => alive(store.categories).slice().sort((a, b) => a.order - b.order),
@@ -170,11 +180,10 @@ export default function App() {
     else store.start(categoryId);
   };
 
-  const handleImport = (text: string) => {
-    const parsed = parseBackup(text);
-    if (!parsed.ok) return { ok: false, message: parsed.error };
-    store.importBackup(parsed.backup);
-    return { ok: true, message: `불러왔어요. (${backupSummary(parsed.backup)})` };
+  // 파일 검사와 오류 문구는 SettingsView(parseBackup)가 맡는다 — 여기선 합치기만
+  const handleImport = (backup: Backup) => {
+    store.importBackup(backup);
+    return { ok: true, message: `불러왔어요. (${backupSummary(backup)})` };
   };
 
   const handleRestore = (coll: CollName, id: string) => store.restore(coll, id);

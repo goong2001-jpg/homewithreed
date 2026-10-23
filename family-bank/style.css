@@ -273,3 +273,37 @@ body.parent .lrow { cursor: pointer; }
 .gift h3 { margin: 16px 0 6px; }
 .giftAmount { font-size: 40px; font-weight: 900; color: var(--gold); font-variant-numeric: tabular-nums; }
 .gift .primaryBtn { margin-top: 16px; }
+
+/* ---- 맡긴 날짜 (지난 날짜로 맡기기) ---- */
+.dateRow { display: flex; align-items: center; gap: 8px; margin: -4px 0 12px; font-size: 13px; color: var(--dim); }
+.dateRow input {
+  font: inherit; font-size: 14px; color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; min-width: 0;
+}
+.dateRow small { font-size: 12px; }
+.modeOut .dateRow { display: none; }
+
+/* ---- 기록 고치기 ---- */
+.editBtn {
+  display: none; font: inherit; font-size: 12px; line-height: 1; padding: 0; margin-left: 4px;
+  border: 0; background: transparent; cursor: pointer; vertical-align: middle;
+}
+.editBtn::before { content: '✏️'; }
+body.parent .editBtn { display: inline-block; }
+.lrow { cursor: pointer; }
+.editField select {
+  flex: 1; min-width: 0; max-width: 160px; font: inherit; font-size: 16px; color: var(--text);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px;
+}
+.editField input[type="date"] { text-align: left; }
+.editField input:disabled, .editField select:disabled { opacity: 0.7; }
+.sheetBtns.three { grid-template-columns: 1fr 1fr 1.4fr; }
+.ghost.danger { color: var(--danger); }
+#editKind { margin: 6px 0 4px; }
+
+/* ---- 알림 보냄 (되돌리기 토스트 위에 작게) ---- */
+.toast.mini {
+  bottom: calc(84px + env(safe-area-inset-bottom)); width: auto; max-width: calc(100% - 32px);
+  padding: 9px 14px; font-size: 13px; justify-content: center; opacity: 0.92;
+}
+#pushStatus { margin-top: 0; }

@@ -257,6 +257,33 @@ export function buildFullExam(): WrittenQuestion[] {
 }
 
 /**
+ * 저장해 둔 문제 id 목록으로 시험지를 다시 만든다 (풀다 만 시험 이어서 풀기).
+ * 문제은행에서 사라진 id가 하나라도 있으면 null — 그 시험은 이어서 풀 수 없다.
+ */
+export function findWrittenByIds(ids: string[]): WrittenQuestion[] | null {
+  const byId = new Map(getAllWritten().map((q) => [q.id, q]));
+  const found: WrittenQuestion[] = [];
+  for (const id of ids) {
+    const q = byId.get(id);
+    if (!q) return null;
+    found.push(q);
+  }
+  return found;
+}
+
+/** 보기 순서를 섞은 순열 (원래 보기 인덱스의 배열). 예: [2, 0, 3, 1] */
+export function shuffledChoiceOrder(question: WrittenQuestion): number[] {
+  return shuffle(question.choices.map((_, i) => i));
+}
+
+/** 저장된 순열이 이 문제의 보기와 맞는지 (문제가 수정됐으면 다시 섞는다) */
+export function isValidChoiceOrder(question: WrittenQuestion, order: number[] | undefined): order is number[] {
+  if (!order || order.length !== question.choices.length) return false;
+  const sorted = [...order].sort((a, b) => a - b);
+  return sorted.every((n, i) => n === i);
+}
+
+/**
  * 간이시험: 여러 과목이 고루 섞이도록 과목별로 한 문제씩 번갈아 뽑는다.
  * 문제은행이 부족하면 가능한 만큼만 반환한다.
  */
