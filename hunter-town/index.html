@@ -10,24 +10,25 @@
 <link rel="icon" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>헌터 마을</title>
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
-<!-- 사냥터: 픽셀 캔버스 + 그 위에 얹는 HUD -->
+<!-- 화면: 픽셀 캔버스(마을 / 사냥터) + 그 위에 얹는 HUD -->
 <section class="field">
-  <canvas id="field" aria-label="사냥터"></canvas>
+  <canvas id="field" aria-label="마을과 사냥터"></canvas>
   <div id="labels" class="labels"></div>
   <div class="hud hud-tl">
     <button id="zoneBadge" class="badge" type="button"><span class="skull">💀</span><b id="zoneNo">1</b><small id="zoneName">초원</small></button>
     <div class="res">
       <div id="gold">🪙 0</div>
       <div id="gem">💎 0</div>
-      <div id="mats">🪵 0 · ⛏️ 0</div>
+      <div id="mats">🪵 0 · ⛏️ 0 · 🌿 0</div>
     </div>
   </div>
   <div class="hud hud-tr">
     <div id="hunterCount" class="pill">👤 0/4</div>
     <div id="zoneProg" class="pill">0 / 20</div>
+    <button id="sceneBtn" class="pill btnpill" type="button">🏘️ 마을 보기</button>
   </div>
   <div class="hud hud-ml">
     <div class="mission" id="mission">
@@ -40,8 +41,11 @@
     <div id="spawnTimer" class="timer">--:--</div>
   </div>
   <div class="hud hud-br">
+    <button id="shoutBtn" class="pill btnpill" type="button">📣 함성</button>
+    <button id="sleepBtn" class="pill btnpill" type="button">🌙 절전</button>
     <button id="soundBtn" class="pill btnpill" type="button">🔊</button>
   </div>
+  <div id="hint" class="hint-bar">👆 몬스터를 탭하면 촌장의 일격!</div>
 </section>
 
 <!-- 헌터 수다 -->
@@ -55,27 +59,41 @@
   <button class="navbtn" data-panel="town" type="button"><i>🏗️</i>건설</button>
   <button class="navbtn" data-panel="hunters" type="button"><i>🧑‍🤝‍🧑</i>헌터</button>
   <button class="navbtn" data-panel="items" type="button"><i>📦</i>창고</button>
-  <button class="navbtn" data-panel="forge" type="button"><i>🔨</i>대장간</button>
+  <button class="navbtn" data-panel="shop" type="button"><i>🏪</i>상점</button>
   <button class="navbtn" data-panel="log" type="button"><i>📜</i>기록</button>
 </nav>
 
-<!-- 패널 시트(건설/헌터/창고/대장간/기록) -->
+<!-- 패널 시트 -->
 <div id="panel" class="sheet" hidden>
   <div class="sheet-bg" data-close></div>
   <div class="sheet-body">
     <div class="sheet-grab"></div>
     <div class="sheet-title"><h2 id="panelTitle">헌터</h2><button class="x" data-close type="button">✕</button></div>
     <section id="tab-hunters" class="pane"><div id="hunterList" class="list"></div></section>
-    <section id="tab-items" class="pane"><div class="pane-head"><span id="itemCount">장비 0개</span></div><div id="itemList" class="list"></div></section>
-    <section id="tab-forge" class="pane">
-      <div class="forge-box">
-        <div class="forge-ic">🔨</div>
-        <div><b>대장간 <span id="forgeLv"></span></b><div class="sub">골드와 재료로 장비를 만듭니다. 💎가 있으면 절반 확률로 써서 S+ 확률이 오릅니다.</div></div>
-      </div>
-      <button id="craftBtn" class="btn primary wide" type="button">🔨 만들기</button>
+    <section id="tab-items" class="pane">
+      <div class="pane-head"><span id="itemCount">장비 0개</span><button id="craftBtn" class="btn" type="button">🔨 만들기</button></div>
       <div id="craftResult" class="craft-result"></div>
+      <p class="hint">창고 장비는 <b>팔기</b>, 광석으로 <b>강화</b>, 상점에 <b>진열</b>해서 헌터에게 팔 수 있습니다.</p>
+      <div id="itemList" class="list"></div>
     </section>
-    <section id="tab-town" class="pane"><div id="townList" class="list"></div></section>
+    <section id="tab-shop" class="pane">
+      <div class="shop-box">
+        <div class="shop-head"><b>🧪 물약상점 <span id="potionLv"></span></b><span id="potionStock"></span></div>
+        <div class="sub">🌿 약초 1개로 물약 1개. 아래 버튼을 <b>연타</b>해서 양조하세요. 헌터는 정비할 때 물약을 사 갑니다.</div>
+        <div class="brew"><div class="bar big"><i id="brewBar"></i></div><button id="brewBtn" class="btn primary" type="button">🫧 양조!</button></div>
+        <div class="row price"><span>가격</span><button class="btn seg" data-price="10" type="button">🪙10 저렴</button><button class="btn seg on" data-price="15" type="button">🪙15 보통</button><button class="btn seg" data-price="25" type="button">🪙25 비쌈</button></div>
+      </div>
+      <div class="shop-box">
+        <div class="shop-head"><b>🗡️ 무기상점 <span id="weaponLv"></span></b><span id="weaponCnt"></span></div>
+        <div id="weaponShelf" class="list small"></div>
+      </div>
+      <div class="shop-box">
+        <div class="shop-head"><b>🛡️ 방어구상점 <span id="armorLv"></span></b><span id="armorCnt"></span></div>
+        <div id="armorShelf" class="list small"></div>
+      </div>
+      <p class="hint">진열은 <b>창고</b> 패널에서 장비의 <b>진열</b> 버튼으로 합니다. 헌터는 지금 것보다 좋고 돈이 있으면 삽니다. 판 돈은 마을 금고로.</p>
+    </section>
+    <section id="tab-town" class="pane"><p class="hint">건물을 지으면 마을 화면에 집이 생기고, 올릴수록 커집니다. 상점은 지어야 헌터가 들릅니다.</p><div id="townList" class="list"></div></section>
     <section id="tab-log" class="pane"><div id="logList" class="log"></div></section>
   </div>
 </div>
@@ -125,6 +143,8 @@
     <label>장비 드롭 확률(%) <input id="gDrop" type="number" min="0" max="100" step="1"></label>
     <label>쓰러진 뒤 회복(초) <input id="gRest" type="number" min="0" step="5"></label>
     <label>마을 정원 보너스 <input id="gCapBonus" type="number" min="0" step="1"></label>
+    <label>오프라인 보상 비율(%) <input id="gOffPct" type="number" min="0" max="100" step="5"></label>
+    <label>오프라인 최대(시간) <input id="gOffHours" type="number" min="1" max="72" step="1"></label>
     <h3>타격감</h3>
     <label>흔들림 <input id="gShake" type="range" min="0" max="3" step="0.1"></label>
     <label>멈칫(히트스톱) <input id="gHitstop" type="range" min="0" max="3" step="0.1"></label>
@@ -132,12 +152,19 @@
     <h3>장비 만들기</h3>
     <div class="row"><select id="gIKind"></select><select id="gITier"></select><button class="btn" id="gMakeItem" type="button">장비 만들기</button></div>
     <h3>자원</h3>
-    <div class="row"><button class="btn" id="gGold" type="button">🪙 +10,000</button><button class="btn" id="gGem" type="button">💎 +10</button><button class="btn" id="gMats" type="button">재료 +100</button><button class="btn" id="gZoneUp" type="button">구역 +1</button></div>
+    <div class="row"><button class="btn" id="gGold" type="button">🪙 +10,000</button><button class="btn" id="gGem" type="button">💎 +10</button><button class="btn" id="gMats" type="button">재료 +100</button><button class="btn" id="gZoneUp" type="button">구역 +1</button><button class="btn" id="gHunterGold" type="button">헌터 전원 🪙+500</button></div>
     <h3>데이터</h3>
     <div class="row"><button class="btn" id="gExport" type="button">내보내기</button><button class="btn" id="gImport" type="button">가져오기</button><button class="btn danger" id="gReset" type="button">전부 초기화</button></div>
     <textarea id="gData" rows="4" placeholder="저장 데이터(JSON)"></textarea>
     <div class="row"><button class="btn primary" id="gApply" type="button">적용</button><button class="btn" data-close type="button">닫기</button></div>
   </div>
+</div>
+
+<!-- 절전 모드 -->
+<div id="sleep" class="sleep" hidden>
+  <div class="sleep-clock" id="sleepClock">00:00</div>
+  <div class="sleep-stats" id="sleepStats"></div>
+  <div class="sleep-hint">🌙 절전 모드 — 마을은 계속 돌아갑니다 (보상 100%)<br>화면을 탭하면 돌아갑니다</div>
 </div>
 
 <div id="toast" class="toast" hidden></div>
@@ -149,6 +176,6 @@
   </div>
 </div>
 
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
