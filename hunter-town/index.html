@@ -10,7 +10,7 @@
 <link rel="icon" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>헌터 마을</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <!-- 화면: 픽셀 캔버스(마을 / 사냥터) + 그 위에 얹는 HUD -->
@@ -28,13 +28,6 @@
   <div class="hud hud-tr">
     <div id="hunterCount" class="pill">👤 0/4</div>
     <div id="zoneProg" class="pill">0 / 20</div>
-    <button id="sceneBtn" class="pill btnpill" type="button">🏘️ 마을 보기</button>
-  </div>
-  <div class="hud hud-ml">
-    <div class="mission" id="mission">
-      <b>오늘 할 일 <span id="missionDone">(0/3)</span></b>
-      <div id="missionList"></div>
-    </div>
   </div>
   <div class="hud hud-bl">
     <button id="waitBtn" class="waitbtn" type="button">🔥 헌터<br>대기소<span id="waitBadge" class="cnt" hidden>0</span></button>
@@ -45,11 +38,12 @@
     <button id="sleepBtn" class="pill btnpill" type="button">🌙 절전</button>
     <button id="soundBtn" class="pill btnpill" type="button">🔊</button>
   </div>
-  <div id="hint" class="hint-bar">👆 몬스터를 탭하면 촌장의 일격!</div>
+  <div id="hint" class="hint-bar">👆 몬스터 탭: 촌장의 일격 · 건물 탭: 관리</div>
 </section>
 
 <!-- 헌터 수다 -->
 <section class="chat">
+  <div class="mission-line" id="missionLine"></div>
   <div class="chat-tabs"><span class="on">일반</span><span id="huntInfo">사냥 중 0명</span></div>
   <div id="chatList" class="chat-list"></div>
 </section>
@@ -176,6 +170,6 @@
   </div>
 </div>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

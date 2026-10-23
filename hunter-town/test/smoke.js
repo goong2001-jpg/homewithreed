@@ -21,14 +21,12 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('대기소 타이머', /다음 \d\d:\d\d/.test(await t('#spawnTimer')), await t('#spawnTimer'));
   check('헌터 0/4', (await t('#hunterCount')) === '👤 0/4', await t('#hunterCount'));
   check('픽셀 캔버스', await ev(() => document.getElementById('field').width < 200));
-  check('오늘 할 일 3개', (await p.locator('#missionList div').count()) === 3);
+  check('오늘 할 일 한 줄', (await t('#missionLine')).includes('오늘 할 일 0/3'));
   check('기본 건물: 숙소·대장간·물약상점·잡화상', await ev(() => { const T = window.__ht.S.town; return T.inn === 1 && T.forge === 1 && T.potion === 1 && T.market === 1 && T.weapon === 0; }));
 
-  // ---- 마을 화면 ----
-  await p.click('#sceneBtn');
-  check('마을 보기 전환', (await t('#sceneBtn')).includes('사냥터'));
-  check('건물 이름표', (await p.locator('#labels .tag.bld').count()) === 4 && (await p.locator('#labels .tag.lot').count()) === 4);
-  await p.click('#sceneBtn');
+  // ---- 한 지도: 마을(위) + 사냥터(아래) ----
+  check('건물 이름표 4 + 빈 터 4', (await p.locator('#labels .tag.bld').count()) === 4 && (await p.locator('#labels .tag.lot').count()) === 4);
+  check('성벽이 마을과 사냥터 사이', await ev(() => { const F = window.__ht.F; return F.wallY > F.top + 40 && F.fTop < F.h - 40; }));
 
   // ---- 신 모드: 구역 배지 7번 탭 ----
   for (let i = 0; i < 7; i++) await p.click('#zoneBadge');
@@ -103,6 +101,15 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('판매 수입이 마을 금고로', await ev(g => window.__ht.S.gold > g, goldBefore));
   check('헌터 주머니 줄어듦', await ev(() => window.__ht.S.hunters[0].gold < 5000));
   check('장비 옵션이 능력치에 반영', await ev(() => { const h = window.__ht.S.hunters[0]; return h.mspd >= 1 && h.cdmg >= 2 && h.atk > 30; }));
+
+  check('출발 위치는 문 앞(사냥터 쪽)', await ev(() => { const h = window.__ht.S.hunters[0], F = window.__ht.F; return h.y >= F.fTop && Math.abs(h.x - F.w / 2) < 12; }));
+
+  // ---- 회귀: 체력 낮고 물약 없어도 출발 직후 되돌아오지 않는다 ----
+  await ev(() => { const S = window.__ht.S, h = S.hunters[0]; S.shops.potionStock = 0; h.status = 'town'; h.phase = 'ready'; h.act = 0; h.hp = 1; h.potions = 0; h.gold = 0; const g = window.__ht.townSpot('market'); h.x = g.x; h.y = g.y; });
+  await p.waitForFunction(() => window.__ht.S.hunters[0].status === 'hunt', null, { timeout: 20000 });
+  check('출발할 때 체력 완전 회복', await ev(() => { const h = window.__ht.S.hunters[0]; return h.hp === h.maxHp; }));
+  await p.waitForTimeout(4000);
+  check('출발 4초 뒤에도 사냥 중', await ev(() => { const h = window.__ht.S.hunters[0]; return h.status === 'hunt' && !h.returning; }));
 
   // ---- 사냥: 처치 → 헌터 주머니·가방 ----
   await p.waitForFunction(() => window.__ht.S.stats.kills >= 3, null, { timeout: 30000 });
