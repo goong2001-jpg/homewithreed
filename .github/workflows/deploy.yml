@@ -133,6 +133,10 @@ jobs:
           mkdir -p site/hunter-town
           cp -r hunter-town/. site/hunter-town/
           rm -rf site/hunter-town/test site/hunter-town/*.md
+          # god-village(신의 마을)도 빌드 없는 정적 앱이다. 테스트 폴더와 문서는 빼고 올린다.
+          mkdir -p site/god-village
+          cp -r god-village/. site/god-village/
+          rm -rf site/god-village/test site/god-village/*.md
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
