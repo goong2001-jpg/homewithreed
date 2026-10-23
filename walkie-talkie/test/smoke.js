@@ -44,6 +44,10 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   await join(a, '아빠', '1234');
   check('A 입장 → 무전 화면', await a.isVisible('#talkView'));
   check('A 혼자 표시', await a.evaluate(() => document.querySelectorAll('#members li').length) === 1);
+  // 허브 선점은 입장 뒤 타이머로 진행된다(최대 몇 초). 느린 러너에서도 안정되게 될 때까지 기다린다.
+  try {
+    await a.waitForFunction(() => (document.getElementById('members').textContent || '').includes('⭐'), null, { timeout: 15000, polling: 200 });
+  } catch (_) {}
   check('A 가 허브가 됨', (await a.textContent('#members')).includes('⭐'), await a.textContent('#members'));
   check('A 초기 상태 = 대기', (await a.textContent('#statusLine')).includes('기다리는'), await a.textContent('#statusLine'));
 
@@ -72,8 +76,9 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   // 게이트가 실제로 소리를 흘려보내는지 (마이크 레벨 바가 움직이는지)
   let micMoved = false;
   try {
+    // 가짜 마이크(--use-fake-device-for-media-stream)는 소리가 났다 멈췄다 하므로 넉넉히 기다린다
     await a.waitForFunction(() => parseFloat(document.getElementById('micBar').style.width) > 0,
-      null, { timeout: 8000, polling: 200 });
+      null, { timeout: 15000, polling: 200 });
     micMoved = true;
   } catch (_) {}
   check('송신 중 마이크 레벨이 잡힘 (게이트 열림)', micMoved,
