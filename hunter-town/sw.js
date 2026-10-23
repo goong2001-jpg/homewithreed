@@ -1,7 +1,7 @@
 /* 앱 껍데기만 캐시합니다. 게임 저장은 localStorage 에 있어서 오프라인에서도 돌아갑니다.
  * 온라인이면 항상 서버에서 새로 받는다 (allowance 와 같은 방식). */
-var CACHE = 'hwr-hunter-town-v2';
-var SHELL = ['./', './index.html', './style.css?v=2', './app.js?v=2', './manifest.json', './icon.svg'];
+var CACHE = 'hwr-hunter-town-v3';
+var SHELL = ['./', './index.html', './style.css?v=3', './app.js?v=3', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));

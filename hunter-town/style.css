@@ -127,3 +127,34 @@ h3 { font-size: 13px; margin: 14px 0 6px; color: var(--accent); }
 .modal-body { background: var(--panel); border: 3px solid var(--line); border-radius: 12px; padding: 18px 20px; width: min(86vw, 360px); text-align: center; }
 .modal-body p { color: var(--muted); font-size: 14px; white-space: pre-line; }
 [hidden] { display: none !important; }
+
+/* ---- v3: 상점·절전·마을 ---- */
+.hud-tr { gap: 4px; }
+.hud-br { flex-direction: row; gap: 4px; }
+.btnpill:active { background: #5a4028; }
+.btnpill:disabled { opacity: .5; }
+.hint-bar { position: absolute; left: 50%; top: 54px; transform: translateX(-50%); background: #000a; color: #ffe9a8; font-size: 11px; padding: 3px 10px; border-radius: 6px; pointer-events: none; white-space: nowrap; }
+.tag.bld { color: #ffe9a8; font-size: 10px; font-weight: 700; }
+.tag.lot { color: #b9a88a; font-size: 9px; }
+.shop-box { background: var(--panel2); border: 2px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+.shop-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.shop-head span { font-size: 12px; color: var(--muted); }
+.brew { display: flex; gap: 10px; align-items: center; margin: 8px 0; }
+.brew .bar { flex: 1; height: 14px; margin: 0; }
+.bar.big i { background: #7fd3c0; }
+.row.price { align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.btn.seg { padding: 5px 8px; font-size: 12px; }
+.btn.seg.on { border-color: var(--accent); color: var(--accent); }
+.list.small .item { padding: 6px 8px; }
+.list.small:empty::after { content: "진열된 장비가 없어요. 창고에서 진열해 보세요."; }
+.opt { font-size: 11px; color: #7fd3c0; }
+.plus { color: var(--accent); font-weight: 800; }
+.bag { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.bag span { font-size: 11px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+.phase { font-size: 11px; color: #7fd3c0; }
+.sleep { position: fixed; inset: 0; background: #000; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: #666; }
+.sleep-clock { font-size: 56px; font-weight: 200; color: #888; letter-spacing: 2px; }
+.sleep-stats { font-size: 14px; color: #777; text-align: center; line-height: 1.6; }
+.sleep-hint { font-size: 12px; color: #555; text-align: center; line-height: 1.6; }
+.item .btns { display: flex; flex-direction: column; gap: 4px; }
+.item .btns .btn { padding: 4px 8px; font-size: 12px; }
