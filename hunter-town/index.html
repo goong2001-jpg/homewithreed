@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#1b1f2a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>헌터 마을</title>
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<header class="top">
+  <h1 id="title">⚔️ 헌터 마을</h1>
+  <div class="res">
+    <span id="gold" title="골드">🪙 0</span>
+    <span id="mats" title="재료">🪵 0 · ⛏️ 0 · 💎 0</span>
+  </div>
+</header>
+
+<section class="gate card" id="gateCard">
+  <div class="gate-head">
+    <b>🚪 마을 입구</b>
+    <span id="spawnTimer">다음 헌터까지 --:--</span>
+  </div>
+  <div id="gateList" class="gate-list"></div>
+</section>
+
+<section class="field card">
+  <div class="field-head">
+    <span id="zoneLabel">🌲 1구역 · 초원</span>
+    <span id="zoneProg">0 / 20</span>
+  </div>
+  <canvas id="field" aria-label="사냥터"></canvas>
+  <div class="field-foot">
+    <span id="huntInfo">사냥 중인 헌터 0명</span>
+    <button id="soundBtn" class="mini" type="button">🔊 소리</button>
+  </div>
+</section>
+
+<nav class="tabs">
+  <button class="tab on" data-tab="hunters" type="button">🧑‍🤝‍🧑 헌터</button>
+  <button class="tab" data-tab="items" type="button">🎒 장비</button>
+  <button class="tab" data-tab="town" type="button">🏘️ 마을</button>
+  <button class="tab" data-tab="log" type="button">📜 기록</button>
+</nav>
+
+<main>
+  <section id="tab-hunters" class="pane on">
+    <div class="pane-head"><span id="hunterCount">헌터 0 / 4</span></div>
+    <div id="hunterList" class="list"></div>
+  </section>
+  <section id="tab-items" class="pane">
+    <div class="pane-head">
+      <span id="itemCount">장비 0개</span>
+      <button id="craftBtn" class="btn" type="button">🔨 대장간에서 만들기</button>
+    </div>
+    <div id="itemList" class="list"></div>
+  </section>
+  <section id="tab-town" class="pane">
+    <div id="townList" class="list"></div>
+  </section>
+  <section id="tab-log" class="pane">
+    <div id="logList" class="log"></div>
+  </section>
+</main>
+
+<!-- 헌터 상세 시트 -->
+<div id="sheet" class="sheet" hidden>
+  <div class="sheet-bg" data-close></div>
+  <div class="sheet-body">
+    <div class="sheet-grab"></div>
+    <div id="sheetContent"></div>
+  </div>
+</div>
+
+<!-- 신(관리자) 모드 -->
+<div id="god" class="sheet" hidden>
+  <div class="sheet-bg" data-close></div>
+  <div class="sheet-body god">
+    <div class="sheet-grab"></div>
+    <h2>✨ 신 모드</h2>
+    <p class="hint">이 마을의 규칙을 직접 바꿉니다. 바꾼 값은 저장됩니다.</p>
+
+    <h3>헌터 등장</h3>
+    <label>등장 간격(분) <input id="gSpawnMin" type="number" min="0.1" step="0.5"></label>
+    <label>입구 대기 최대 <input id="gGateCap" type="number" min="1" step="1"></label>
+    <label>등급 가중치 C/B/A/S/S+ <input id="gTierW" type="text" placeholder="40,30,18,9,3"></label>
+    <div class="row">
+      <button class="btn" id="gCallNow" type="button">📯 지금 헌터 부르기</button>
+    </div>
+    <div class="row">
+      <input id="gHName" type="text" placeholder="이름(비우면 랜덤)">
+      <select id="gHCls"></select>
+      <select id="gHTier"></select>
+      <button class="btn" id="gMakeHunter" type="button">내 헌터 만들기</button>
+    </div>
+
+    <h3>성장·전투</h3>
+    <label>경험치 배율 <input id="gExpMul" type="number" min="0.1" step="0.5"></label>
+    <label>골드 배율 <input id="gGoldMul" type="number" min="0.1" step="0.5"></label>
+    <label>몬스터 강함 배율 <input id="gMonMul" type="number" min="0.1" step="0.1"></label>
+    <label>장비 드롭 확률(%) <input id="gDrop" type="number" min="0" max="100" step="1"></label>
+    <label>쓰러진 뒤 회복(초) <input id="gRest" type="number" min="0" step="5"></label>
+    <label>마을 정원 보너스 <input id="gCapBonus" type="number" min="0" step="1"></label>
+
+    <h3>타격감</h3>
+    <label>흔들림 <input id="gShake" type="range" min="0" max="3" step="0.1"></label>
+    <label>멈칫(히트스톱) <input id="gHitstop" type="range" min="0" max="3" step="0.1"></label>
+    <label>파편 <input id="gParticles" type="range" min="0" max="3" step="0.1"></label>
+
+    <h3>장비 만들기</h3>
+    <div class="row">
+      <select id="gIKind"></select>
+      <select id="gITier"></select>
+      <button class="btn" id="gMakeItem" type="button">장비 만들기</button>
+    </div>
+
+    <h3>자원</h3>
+    <div class="row">
+      <button class="btn" id="gGold" type="button">🪙 +10,000</button>
+      <button class="btn" id="gMats" type="button">재료 +100</button>
+      <button class="btn" id="gZoneUp" type="button">구역 +1</button>
+    </div>
+
+    <h3>데이터</h3>
+    <div class="row">
+      <button class="btn" id="gExport" type="button">내보내기</button>
+      <button class="btn" id="gImport" type="button">가져오기</button>
+      <button class="btn danger" id="gReset" type="button">전부 초기화</button>
+    </div>
+    <textarea id="gData" rows="4" placeholder="저장 데이터(JSON)"></textarea>
+    <div class="row">
+      <button class="btn" id="gApply" type="button">적용</button>
+      <button class="btn" data-close type="button">닫기</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<div id="welcome" class="modal" hidden>
+  <div class="modal-body">
+    <h2>🌅 돌아온 사이에</h2>
+    <p id="welcomeText"></p>
+    <button class="btn" id="welcomeOk" type="button">확인</button>
+  </div>
+</div>
+
+<script src="app.js?v=1"></script>
+</body>
+</html>

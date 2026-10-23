@@ -1,0 +1,13 @@
+{
+  "short_name": "헌터 마을",
+  "name": "헌터 마을 — 나만의 방치형 헌터 타이쿤",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#1b1f2a",
+  "background_color": "#12151d"
+}

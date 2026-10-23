@@ -129,6 +129,10 @@ jobs:
           mkdir -p site/handwriting
           cp -r handwriting/. site/handwriting/
           rm -f site/handwriting/*.md
+          # hunter-town(헌터 마을)도 빌드 없는 정적 앱이다. 테스트 폴더와 문서는 빼고 올린다.
+          mkdir -p site/hunter-town
+          cp -r hunter-town/. site/hunter-town/
+          rm -rf site/hunter-town/test site/hunter-town/*.md
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
