@@ -26,6 +26,26 @@ window.GV = {
     dayLength: 150        // 낮밤 한 바퀴(초)
   },
 
+  // ---------- 세계(지도) ----------
+  // 가로 cols × 세로 rows 칸. 우리 마을은 home 칸(오른쪽 아래), 적 부족은 enemy 칸(왼쪽 위). 안 가 본 칸은 안개.
+  WORLD: { cols: 3, rows: 4, cellW: 130, cellH: 150, home: { c: 2, r: 3 }, enemy: { c: 0, r: 0 } },
+  // 가운데 칸들에 무작위로 놓이는 것들 (weight 가 클수록 자주)
+  OBJECTS: [
+    { id: 'hunt',     nm: '사냥터',     ic: '🦌', weight: 3, desc: '사슴과 멧돼지가 많다' },
+    { id: 'grove',    nm: '열매 숲',    ic: '🍇', weight: 3, desc: '열매 덤불이 빽빽하다' },
+    { id: 'quarry',   nm: '채석장',     ic: '⛰️', weight: 2, desc: '바위와 광맥' },
+    { id: 'bandit',   nm: '산적 소굴',  ic: '🏴‍☠️', weight: 3, units: 3, loot: { faith: 15, food: 40, wood: 40 }, desc: '산적 셋이 지키고 있다. 전사로 물리치면 전리품' },
+    { id: 'treasure', nm: '보물 상자',  ic: '💎', weight: 2, reward: { faith: 25 }, desc: '탐험가가 찾아오면 믿음 +25' },
+    { id: 'ruins',    nm: '옛 유적',    ic: '🏛️', weight: 2, reward: { know: 80 }, desc: '탐험가가 찾아오면 지식 +80' }
+  ],
+  // 적 부족
+  ENEMY: { nm: '회색 부족', units: 4, growEvery: 150, growMax: 14, raidEvery: 240, firstRaid: 420, raidSize: 3, raidTime: 45, lootPct: 0.15, unitHp: 30, unitAtk: 5, conquerFaith: 120 },
+  // 전투 수치 (hp, atk). 우리 쪽은 시대마다 +20%, 무기 기술 효과 추가
+  UNITS: { warrior: { hp: 44, atk: 7 }, hunter: { hp: 30, atk: 4 }, citizen: { hp: 16, atk: 1 }, child: { hp: 8, atk: 0 }, bandit: { hp: 30, atk: 5 }, enemy: { hp: 30, atk: 5 } },
+  // 가족·세대·군락
+  FAMILY: { adultAfter: 240, marryEvery: 50, birthEvery: 80, maxChildren: 3, lifeSec: 3000, settleAt: 12, settleGroup: 4, maxSettlements: 4, settleCost: { wood: 40, food: 30 } },
+  SETTLE_NAMES: ['새벽골', '물가 마을', '바람 언덕', '돌밭 마을', '해 뜨는 터', '달빛 고을', '푸른 들'],
+
   // ---------- 시대 ----------
   // house: 그 시대 집 모양(app.js drawBuilding 의 style), cloth: 시민 옷 색 [몸, 어두운 부분], hat: 머리 장식 종류
   // key: 시대를 넘기려면 지어야 하는 건물. 그 시대 기술을 다 발견하고 key 건물이 있으면 다음 시대로.
@@ -47,10 +67,12 @@ window.GV = {
     { id: 'fire',      era: 0, nm: '불',       ic: '🔥', cost: 20,  effect: { know: 1.3, food: 1.1 }, unlock: 'campfire', msg: '불을 발견했다! 밤이 따뜻해지고 모닥불 곁에서 생각이 깊어진다.' },
     { id: 'tools',     era: 0, nm: '돌도끼',   ic: '🪓', cost: 35,  effect: { wood: 1.4, stone: 1.3 }, msg: '돌도끼를 만들었다. 나무와 돌을 더 빨리 모은다.' },
     { id: 'hunting',   era: 0, nm: '사냥',     ic: '🏹', cost: 50,  effect: { food: 1.3 }, job: 'hunter', msg: '창으로 사슴을 사냥한다. 늑대와도 맞선다.' },
+    { id: 'weapons',   era: 0, nm: '창과 방패', ic: '🛡️', cost: 70,  effect: { atk: 1.2 }, job: 'warrior', msg: '전사가 생겼다. 산적과 적 부족에 맞선다.' },
     { id: 'farming',   era: 1, nm: '농사',     ic: '🌾', cost: 60,  effect: { food: 1.3 }, unlock: 'farm', job: 'farmer', msg: '씨앗을 심었다. 밭에서 식량이 자란다.' },
     { id: 'bronze',    era: 1, nm: '청동',     ic: '🥉', cost: 90,  effect: { metal: 1.5, build: 1.2 }, unlock: 'forge', job: 'smith', msg: '구리와 주석을 녹여 청동을 만들었다.' },
     { id: 'writing',   era: 1, nm: '문자',     ic: '✍️', cost: 120, effect: { know: 1.5 }, msg: '문자를 만들었다. 지식이 쌓여 전해진다.' },
     { id: 'iron',      era: 2, nm: '철',       ic: '⚔️', cost: 180, effect: { metal: 1.5, wood: 1.2, stone: 1.3 }, msg: '철을 다룬다. 도구가 단단해졌다.' },
+    { id: 'tactics',   era: 2, nm: '진법',     ic: '🏹', cost: 200, effect: { atk: 1.3, hp: 1.2 }, msg: '전사들이 대열을 이뤄 싸운다.' },
     { id: 'wheel',     era: 2, nm: '수레',     ic: '🛞', cost: 220, effect: { food: 1.2, wood: 1.2, stone: 1.2, build: 1.3 }, msg: '수레를 만들었다. 짐을 한 번에 많이 나른다.' },
     { id: 'school',    era: 2, nm: '학문',     ic: '📚', cost: 280, effect: { know: 1.5 }, unlock: 'school', msg: '학당을 세워 아이들을 가르친다.' },
     { id: 'masonry',   era: 3, nm: '석공술',   ic: '🧱', cost: 400, effect: { build: 1.4, stone: 1.3 }, unlock: 'castle', msg: '돌을 다듬어 튼튼한 집과 성을 쌓는다.' },
@@ -109,6 +131,9 @@ window.GV = {
     miner:   { nm: '광부',     ic: '🪨', res: 'stone', node: 'rock' },
     smith:   { nm: '대장장이', ic: '⚒️', res: 'metal', node: 'ore', tech: 'bronze' },
     builder: { nm: '건축가',   ic: '🔨' },
+    scout:   { nm: '탐험가',   ic: '🧭' },
+    warrior: { nm: '전사',     ic: '⚔️', tech: 'weapons' },
+    child:   { nm: '아이',     ic: '🧒' },
     scholar: { nm: '학자',     ic: '📜', res: 'know', at: 'research' },
     priest:  { nm: '사제',     ic: '🙏', at: 'faith' }
   },
@@ -121,13 +146,19 @@ window.GV = {
     { id: 'stone', nm: '돌',    ic: '🪨', cost: 5,  amount: 25, hint: '토템·창고에 필요' },
     { id: 'idea',  nm: '영감',  ic: '💡', cost: 8,  amount: 25, hint: '지식 +25, 발견이 빨라집니다' },
     { id: 'rain',  nm: '비',    ic: '🌧️', cost: 10, amount: 60, hint: '밭이 자라고 모두 기뻐합니다 (행복 +5)' },
-    { id: 'smite', nm: '번개',  ic: '⚡', cost: 6,  hint: '늑대를 쫓아냅니다. 시민에게 치면 혼냅니다' }
+    { id: 'smite', nm: '번개',  ic: '⚡', cost: 6,  hint: '늑대·산적·적에게 30 피해. 시민에게 치면 혼냅니다' },
+    { id: 'rally', nm: '집결',  ic: '🚩', cost: 3,  hint: '깃발을 꽂으면 전사·사냥꾼이 모여 근처의 적과 싸웁니다 (60초)' },
+    { id: 'fire',  nm: '불벼락', ic: '🔥', cost: 14, hint: '그 자리 근처 적·산적 모두에게 큰 피해' },
+    { id: 'heal',  nm: '치유',  ic: '💗', cost: 8,  hint: '근처 시민들의 상처를 고칩니다' }
   ],
   ORACLES: [
     { id: 'food',  nm: '먹을 것을 모아라', ic: '🍖', cost: 15, weight: { gather: 4, hunter: 4, farmer: 4 } },
     { id: 'build', nm: '집을 지어라',     ic: '🏠', cost: 15, weight: { builder: 4, lumber: 3, miner: 3 } },
     { id: 'know',  nm: '지혜를 구하라',   ic: '📜', cost: 15, weight: { scholar: 5 } },
     { id: 'pray',  nm: '기도하라',        ic: '🙏', cost: 10, weight: { priest: 5 } },
+    { id: 'explore', nm: '세상을 보라',   ic: '🧭', cost: 10, weight: { scout: 5 } },
+    { id: 'arm',   nm: '무기를 들어라',   ic: '⚔️', cost: 15, weight: { warrior: 6 } },
+    { id: 'invade', nm: '적을 쳐라',      ic: '🔥', cost: 25, miracle: 'invade', hint: '전사들이 적 부족 마을로 진군합니다. 이기면 그 마을이 우리 군락이 됩니다' },
     { id: 'harvest', nm: '풍년의 기적',   ic: '🌟', cost: 30, miracle: 'harvest', era: 1, hint: '60초 동안 식량 3배' },
     { id: 'insight', nm: '계시의 기적',   ic: '✨', cost: 45, miracle: 'insight', era: 2, hint: '지금 연구 중인 것을 바로 발견' }
   ],
@@ -142,7 +173,10 @@ window.GV = {
     { id: 'rain',  txt: '밭이 말라요',            ic: '🌧️', when: 'farm',     done: 'power:rain', hint: '🌧️ 비를 내려 주세요' },
     { id: 'wolf',  txt: '늑대가 무서워요!',       ic: '🐺', when: 'wolf',     done: 'wolfDead', hint: '⚡ 번개로 늑대를 쫓아 주세요' },
     { id: 'move',  txt: '토템 곁에 가고 싶어요',  ic: '🗿', when: 'totem',    done: 'nearTotem', hint: '이 시민을 집어서 토템 옆에 내려 주세요' },
-    { id: 'home',  txt: '잘 곳이 없어요',         ic: '🏠', when: 'homeless', done: 'housing', hint: '집이 지어지면 들어준 것. 신탁 "집을 지어라"가 빠릅니다' }
+    { id: 'home',  txt: '잘 곳이 없어요',         ic: '🏠', when: 'homeless', done: 'housing', hint: '집이 지어지면 들어준 것. 신탁 "집을 지어라"가 빠릅니다' },
+    { id: 'bandit', txt: '산적이 무서워요',       ic: '🏴‍☠️', when: 'bandit',   done: 'banditDead', hint: '🚩 집결로 전사를 보내거나 🔥 불벼락으로 소굴을 치세요' },
+    { id: 'love',  txt: '짝을 만나고 싶어요',     ic: '💕', when: 'single',   done: 'married', hint: '결혼은 시민들이 알아서 합니다. 💗 치유를 내리면 마음이 열립니다' },
+    { id: 'enemy', txt: '적이 쳐들어와요!',       ic: '⚔️', when: 'raid',     done: 'raidOver', hint: '🚩 집결·⚡ 번개·🔥 불벼락으로 막으세요' }
   ],
 
   // ---------- 오늘의 과제 ----------
@@ -167,7 +201,13 @@ window.GV = {
     { id: 'wish50', nm: '기도의 응답', ic: '🙏', type: 'wish', n: 50, faith: 80 },
     { id: 'move20', nm: '신의 손길', ic: '🖐️', type: 'move', n: 20, faith: 25 },
     { id: 'faith500', nm: '믿음의 탑', ic: '✨', type: 'faith', n: 500, faith: 50 },
-    { id: 'world2', nm: '두 번째 세계', ic: '🌍', type: 'world', n: 2, faith: 0 }
+    { id: 'world2', nm: '두 번째 세계', ic: '🌍', type: 'world', n: 2, faith: 0 },
+    { id: 'marry1', nm: '첫 결혼', ic: '💕', type: 'marry', n: 1, faith: 10 },
+    { id: 'settle2', nm: '두 번째 군락', ic: '🏕️', type: 'settle', n: 2, faith: 30 },
+    { id: 'explore', nm: '세상 끝까지', ic: '🧭', type: 'explored', n: 12, faith: 40 },
+    { id: 'bandit3', nm: '산적 토벌', ic: '🏴‍☠️', type: 'bandit', n: 3, faith: 30 },
+    { id: 'defend', nm: '마을을 지켰다', ic: '🛡️', type: 'defend', n: 1, faith: 25 },
+    { id: 'conquer', nm: '정복자', ic: '👑', type: 'conquer', n: 1, faith: 100 }
   ],
 
   // ---------- 자원 나무·바위 등 (지도에 놓이는 것) ----------
@@ -176,7 +216,8 @@ window.GV = {
     tree: { nm: '나무',     res: 'wood', max: 30, regrow: 0.08, count: 8 },
     rock: { nm: '바위',     res: 'stone', max: 40, regrow: 0.05, count: 4 },
     ore:  { nm: '광맥',     res: 'metal', max: 40, regrow: 0.06, count: 3 },
-    deer: { nm: '사슴',     res: 'food', max: 12, regrow: 0.1,  count: 3, moves: true }
+    deer: { nm: '사슴',     res: 'food', max: 12, regrow: 0.1,  count: 3, moves: true },
+    boar: { nm: '멧돼지',   res: 'food', max: 20, regrow: 0.08, count: 0, moves: true }
   },
 
   // ---------- 대사 ----------
@@ -191,7 +232,16 @@ window.GV = {
     era: ['새로운 시대다!', '세상이 바뀌었어!', '우리가 해냈어!'],
     born: ['아기가 태어났어요!', '축하해요!', '우리 가족이 늘었다'],
     oracle: ['신탁이 내렸다!', '신의 뜻대로!', '알겠습니다, 신이시여'],
-    scold: ['죄송해요…', '다신 안 그럴게요', '으악, 벼락!']
+    scold: ['죄송해요…', '다신 안 그럴게요', '으악, 벼락!'],
+    marry: ['평생 함께할게', '행복하자!', '우리 집을 짓자'],
+    child: ['엄마! 아빠!', '놀자~', '나도 커서 사냥할래', '별이 반짝여'],
+    grow: ['이제 어른이야!', '내 몫은 내가 할게'],
+    elder: ['좋은 세월이었다…', '아이들아, 잘 지내라', '별이 되어 지켜볼게'],
+    explore: ['저 너머엔 뭐가 있을까', '새 땅이다!', '여기 처음 와 봐'],
+    war: ['마을을 지켜라!', '덤벼라!', '신이 우리와 함께!', '물러서지 마!'],
+    raid: ['적이다!', '숨어!', '전사들은 어디 있어!'],
+    settle: ['여기에 새 마을을 세우자', '우리끼리 잘 살 수 있어', '새 출발이다'],
+    loot: ['보물이다!', '옛사람의 지혜야', '이걸 마을로 가져가자']
   },
   NAMES: ['우가', '마루', '두리', '보리', '나래', '가온', '하늘', '한결', '바위', '시내', '이슬', '별', '솔', '여울', '다솜', '누리', '푸름', '아름', '슬기', '으뜸', '온', '빛나', '새벽', '노을', '구름', '강', '샘', '들', '뫼', '미르', '라온', '초록', '하랑', '서리', '달'],
   HAIR: ['#2b2320', '#6b3f23', '#e8c060', '#d04a2a', '#e879b0', '#4f7fe0', '#4fb06a', '#9a5cf0', '#f0ede0', '#48b8b0'],
