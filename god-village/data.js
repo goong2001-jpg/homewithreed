@@ -359,19 +359,43 @@ window.GV = {
   },
   // ---------- RPG: 강림·장비·던전·이벤트·출석 (rpg.js 가 씁니다) ----------
   RPG: {
-    descendCost: 15,      // 강림 비용(믿음). 한 번 내려오면 승천할 때까지 지도에 남는다(저장됨)
-    deathFaith: 20,       // 화신이 쓰러지면 잃는 믿음
-    deathCd: 180,         // 쓰러진 뒤 토템에서 부활하기까지(초)
-    base: { hp: 80, hpLv: 15, atk: 8, atkLv: 2, spd: 44, range: 16, atkCd: 0.5 },
-    chase: 60,            // 조종 중 가만히 있으면 이 거리 안의 적에게 알아서 다가감
-    guard: 90,            // 조종을 끄면 서 있던 자리 주변 이 거리의 적과 싸우고 돌아옴
+    // 화신 = 신이 고른 시민. 죽을 때까지 바꿀 수 없고, 죽으면 다른 시민을 고른다. 레벨·장비는 "화신의 자리"에 남아 다음 시민이 이어받는다
+    avatarCost: 15,       // 시민을 화신으로 삼는 비용(믿음)
+    deathFaith: 20,       // 조종 중 화신이 쓰러지면 잃는 믿음
+    retreatPct: 0.25,     // 조종하지 않을 때(오프라인 포함) 체력이 이 비율 아래로 떨어지면 토템으로 귀환 — 절대 죽지 않음
+    restSec: 30,          // 귀환 뒤 토템에서 쉬는 시간(초). 쉬는 동안 공격받지 않고 빠르게 회복
+    base: { hp: 90, hpLv: 15, atk: 9, atkLv: 2, spd: 44, range: 16, atkCd: 0.5 },
+    chase: 60,            // 조종 중 가만히 있으면 이 거리 안의 적·사냥감에게 알아서 다가감
+    guard: 130,           // 조종을 끄면 마을 둘레 이 거리 안의 적과 싸우고
+    hunt: 110,            //   이 거리 안의 사냥감을 알아서 사냥해 레벨업한다
     dash: { cd: 1.2, range: 60, radius: 20, mult: 1.6, knock: 10 },   // ⚔️ 베기: 돌진 + 광역 + 넉백
     xpBase: 40, xpPow: 1.4,   // 다음 레벨까지 = xpBase × lv^xpPow
     xp:    { enemy: 20, bandit: 20, wolf: 10, monster: 120, dmob: 15, boss: 80 },
     faith: { enemy: 2, bandit: 2, wolf: 1, monster: 20, dmob: 1, boss: 10 },
+    offlineXpPerH: 25, offlineXpLv: 5,   // 오프라인 1시간마다 경험치 25 + 레벨×5 (알아서 사냥한 셈)
     morale: 1.2,          // 화신 곁(40px) 전사의 공격 배율
-    champCost: 20,        // 시민을 용사로 삼는 비용(믿음). 용사는 화신을 따라다니며 싸우고 제 경험치로 레벨업
-    champXpBase: 30, champHpLv: 10, champAtkLv: 2,
+    // 사냥감: 칸마다 돌아다니는 동물. 먼저 건드리지 않으면 공격하지 않는다. weight 는 [마을 근처, 중간, 먼 곳] 등장 가중치
+    BEASTS: [
+      { id: 'rabbit', nm: '토끼',   hp: 8,   atk: 0, xp: 4,  food: 2,  spd: 14, weight: [6, 3, 1] },
+      { id: 'deer',   nm: '사슴',   hp: 22,  atk: 1, xp: 9,  food: 6,  spd: 16, weight: [4, 4, 2] },
+      { id: 'boar',   nm: '멧돼지', hp: 45,  atk: 4, xp: 16, food: 10, spd: 12, weight: [1, 3, 3] },
+      { id: 'bear',   nm: '곰',     hp: 130, atk: 9, xp: 45, food: 20, spd: 9,  weight: [0, 1, 3], drop: [70, 25, 5, 0] }
+    ],
+    beastsPerCell: 3, beastsMax: 80, beastEvery: 60,   // 탐험한 칸마다 최대 3마리, 60초마다 빈자리를 채움
+    // 탐험 이벤트 지점(❓): 안개 속 칸마다 1~2개. 화신이 밟거나 탐험가가 찾으면 하나가 일어난다. 20분마다 새 지점이 생긴다
+    EVENTS: [
+      { id: 'treasure', nm: '숨겨진 보물',  ic: '💎', weight: 16, item: [40, 45, 13, 2] },
+      { id: 'cache',    nm: '버려진 창고',  ic: '📦', weight: 20, res: { wood: [30, 80], stone: [20, 60], metal: [5, 20] } },
+      { id: 'refugees', nm: '떠도는 난민',  ic: '🏃', weight: 14, pop: [1, 3] },
+      { id: 'mercs',    nm: '용병단',       ic: '⚔️', weight: 8,  warriors: [2, 3] },
+      { id: 'altar',    nm: '옛 제단',      ic: '🛐', weight: 12, faith: [20, 40] },
+      { id: 'herbs',    nm: '약초밭',       ic: '🌿', weight: 10, heal: true },
+      { id: 'trap',     nm: '함정',         ic: '🕳️', weight: 7,  hurt: 0.3 },
+      { id: 'ambush',   nm: '매복',         ic: '🏴‍☠️', weight: 7, bandits: [2, 3] },
+      { id: 'child',    nm: '길 잃은 아이', ic: '🧒', weight: 5,  child: true },
+      { id: 'sage',     nm: '떠돌이 현자',  ic: '📜', weight: 6,  know: [40, 90] }
+    ],
+    eventsPerCell: [1, 2], eventEvery: 20 * 60 * 1000,
     skills: [
       { id: 'bolt', nm: '번개 베기', ic: '⚡', cd: 8, mult: 2.5, radius: 26, desc: '주위 적 모두에게 공격력 2.5배' },
       { id: 'heal', nm: '치유 파동', ic: '💗', cd: 15, heal: 0.4, radius: 40, desc: '화신 체력 40% 회복, 근처 시민 전부 회복' }

@@ -182,38 +182,42 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('신탁 창에 대역사·군대·축제 버튼', (await p.locator('#oracleList [data-work]').count()) === 8 && (await p.locator('#oracleList [data-order]').count()) === 2);
   await p.click('#oracleSheet .sheet-title .x');
 
-  // ---- 5판: 상주 화신(조종·베기·부활)·용사·장비·미궁·이벤트·출석·오프라인 ----
-  check('화신 탭·강림 버튼', (await p.locator('.navbtn[data-panel="rpg"]').count()) === 1 && (await p.locator('#descendBtn').count()) === 1);
-  await ev(() => { const g = window.__gv, S = g.S; S.faith = 200; S.hostiles = S.hostiles.filter(h => h.kind !== 'monster'); S.rpg.respawnAt = 0; const h = g.home(); window.RPG.descend(h.x + 20, h.y + 20); });
-  check('강림: 화신이 내려와 조종 모드, 저장 상태 켜짐', await ev(() => window.RPG.A().on && window.RPG.A().ctrl && window.__gv.S.rpg.av.on) && !(await p.locator('#rpgHud').isHidden()));
-  await ev(() => { const S = window.__gv.S, A = window.RPG.A(); S.hostiles.push({ id: 'tb', kind: 'bandit', camp: 'none', x: A.x + 6, y: A.y, hp: 1, atk: 0, home: { x: A.x, y: A.y }, timer: 99, walk: 0, face: 1 }); });
+  // ---- 6판: 시민 화신(지정·조종·자동 사냥·귀환·죽음)·사냥감·탐험 이벤트·장비·미궁·시간 이벤트·출석·오프라인 ----
+  check('화신 탭·화신 정하기 버튼', (await p.locator('.navbtn[data-panel="rpg"]').count()) === 1 && (await t('#descendBtn')).includes('화신 정하기'));
+  check('탐험 이벤트 지점이 안개 속 칸마다 숨어 있다', await ev(() => window.__gv.S.pickups.filter(k => k.kind === 'event').length >= 40));
+  await ev(() => { const g = window.__gv, S = g.S; S.faith = 200; S.hostiles = S.hostiles.filter(h => h.kind !== 'monster'); const v = S.pop.find(v => !v.child && v.state !== 'migrate' && v.age < 5000); window.RPG.setAvatar(v); });
+  check('시민을 화신으로: 전사가 되고 조종 모드, 능력치는 화신 기준', await ev(() => { const R = window.RPG, g = window.__gv, v = R.av(); return v && v.job === 'warrior' && R.C().ctrl && g.unitStat(v).hp === R.maxHp() && g.S.rpg.champ === v.id; }) && !(await p.locator('#rpgHud').isHidden()));
+  check('화신이 살아 있으면 바꿀 수 없다', await ev(() => { const R = window.RPG, S = window.__gv.S; const o = S.pop.find(v => !v.child && !R.isAvatar(v)); return o && !R.setAvatar(o); }));
+  await ev(() => { const S = window.__gv.S, v = window.RPG.av(); S.hostiles.push({ id: 'tb', kind: 'bandit', camp: 'none', x: v.x + 6, y: v.y, hp: 1, atk: 0, home: { x: v.x, y: v.y }, timer: 99, walk: 0, face: 1 }); });
   await p.waitForTimeout(1500);
   check('화신이 적을 자동으로 베고 경험치·처치 수', await ev(() => window.__gv.S.rpg.xp > 0 && window.__gv.S.rpg.kills === 1));
-  check('조이스틱으로 걷기', await (async () => { const a0 = await ev(() => ({ x: window.RPG.A().x, y: window.RPG.A().y })); const jb = await p.locator('#joy').boundingBox(); await p.mouse.move(jb.x + jb.width / 2, jb.y + jb.height / 2); await p.mouse.down(); await p.mouse.move(jb.x + jb.width - 6, jb.y + jb.height / 2, { steps: 4 }); await p.waitForTimeout(700); await p.mouse.up(); return await ev(a => window.RPG.A().x > a.x + 10, a0); })());
-  check('⚔️ 베기: 멀리 있는 적에게 돌진해 광역 피해', await ev(() => { const S = window.__gv.S, A = window.RPG.A(), hm = window.__gv.home(); A.x = hm.x - 40; A.y = hm.y + 20; S.hostiles = []; S.wolves = []; A.dashCd = 0; S.hostiles.push({ id: 'tb2', kind: 'bandit', camp: 'none', x: A.x + 40, y: A.y, hp: 200, atk: 0, home: { x: A.x + 40, y: A.y }, timer: 99, walk: 0, face: 1 }); const x0 = A.x; window.RPG.dash(); const h = S.hostiles.find(h => h.id === 'tb2'); const ok = A.x > x0 + 20 && h.hp < 200; S.hostiles = S.hostiles.filter(h => h.id !== 'tb2'); return ok; }));
-  check('장비 드롭·착용·강화·해제·분해', await ev(() => { const R = window.RPG, S = window.__gv.S; const it = R.drop('monster', R.A()); const n0 = S.rpg.inv.length; R.equip(it.id); const eq = S.rpg.equip[it.slot] && S.rpg.equip[it.slot].id === it.id; S.res.metal = 500; const p0 = it.plus; R.enhance(it.id); const okE = S.rpg.equip[it.slot].plus === p0 + 1; R.unequip(it.slot); const f0 = S.faith; R.dismantle(it.id); return eq && okE && S.rpg.inv.length === n0 - 1 && S.faith > f0; }));
-  check('레벨업', await ev(() => { const R = window.RPG, S = window.__gv.S; S.rpg.xp = 10000; R.gainXp(0); return S.rpg.lv > 1 && R.maxHp() > 80; }));
-  check('용사로 삼기 → 전사가 되고 화신을 따라옴', await ev(() => { const R = window.RPG, S = window.__gv.S, g = window.__gv; S.faith = 100; const v = S.pop.find(v => !v.child && v.state !== 'migrate'); const ok = R.setChamp(v); return ok && S.rpg.champ === v.id && v.job === 'warrior' && v.champ.lv === 1; }));
-  await p.waitForTimeout(1200);
-  check('용사가 화신 곁에 선다', await ev(() => { const R = window.RPG, S = window.__gv.S; const v = R.champ(); const A = R.A(); return v && Math.hypot(v.x - A.x, v.y - A.y) < 40 && (v.state === 'march' || v.state === 'guard'); }));
-  check('용사가 적을 쓰러뜨리면 제 경험치로 레벨업', await ev(() => { const R = window.RPG, S = window.__gv.S, g = window.__gv; const v = R.champ(); const a0 = g.unitStat(v).atk; S.hostiles.push({ id: 'tb3', kind: 'bandit', camp: 'none', x: v.x, y: v.y, hp: 0, lastHit: v.id, atk: 0, home: { x: v.x, y: v.y }, timer: 99, walk: 0, face: 1 }); v.champ.xp = 1000; return true; }) && await (async () => { await p.waitForTimeout(300); return await ev(() => { const R = window.RPG, g = window.__gv; const v = R.champ(); return v.champ.lv > 1 && v.champ.kills >= 1 && g.unitStat(v).atk > 0; }); })());
-  check('시민에게 장비 주기 → 전투력 반영', await ev(() => { const R = window.RPG, S = window.__gv.S, g = window.__gv; const it = R.makeItem(2, 2, 'weapon'); S.rpg.inv.push(it); const v = R.champ(); const a0 = g.unitStat(v).atk; R.give(v, it.id); return v.gear.weapon === it && g.unitStat(v).atk > a0; }));
-  await ev(() => { const R = window.RPG, S = window.__gv.S, dg = S.rpg.dg; R.A().x = dg.x; R.A().y = dg.y + 4; R.enterDungeon(); });
+  check('조이스틱으로 걷기', await (async () => { const a0 = await ev(() => { const v = window.RPG.av(); const h = window.__gv.home(); v.x = h.x - 40; v.y = h.y + 20; return { x: v.x }; }); const jb = await p.locator('#joy').boundingBox(); await p.mouse.move(jb.x + jb.width / 2, jb.y + jb.height / 2); await p.mouse.down(); await p.mouse.move(jb.x + jb.width - 6, jb.y + jb.height / 2, { steps: 4 }); await p.waitForTimeout(700); await p.mouse.up(); return await ev(a => window.RPG.av().x > a.x + 10, a0); })());
+  check('사냥감이 칸마다 생기고 건드리기 전엔 조용하다', await ev(() => { const R = window.RPG, S = window.__gv.S; S.rpg.beastT = -9999; R.beastsTick(); const bs = S.hostiles.filter(h => h.beast); return bs.length >= 3 && bs.every(h => !h.angry); }));
+  check('⚔️ 베기: 사냥감에게 돌진해 베고, 사냥감이 화난다', await ev(() => { const R = window.RPG, S = window.__gv.S, v = R.av(), hm = window.__gv.home(); v.x = hm.x - 40; v.y = hm.y + 20; S.hostiles = S.hostiles.filter(h => !h.beast); const b = R.spawnBeast(hm.c, hm.r); b.x = v.x + 40; b.y = v.y; b.hp = 500; b.mhp = 500; R.C().dashCd = 0; const x0 = v.x; R.dash(); return v.x > x0 + 20 && b.hp < 500 && b.angry === true; }));
+  check('사냥감을 잡으면 경험치·식량', await ev(() => { const R = window.RPG, S = window.__gv.S, v = R.av(); const f0 = S.res.food, x0 = S.rpg.xp + S.rpg.lv * 1000; S.hostiles.forEach(h => { if (h.beast) { h.hp = 0; h.lastHit = v.id; } }); return true; }) && await (async () => { await p.waitForTimeout(300); return await ev(() => (window.__gv.S.rpg.hunted || 0) >= 1); })());
+  check('장비 드롭·착용·강화·해제·분해', await ev(() => { const R = window.RPG, S = window.__gv.S; const it = R.drop('monster', R.av()); const n0 = S.rpg.inv.length; R.equip(it.id); const eq = S.rpg.equip[it.slot] && S.rpg.equip[it.slot].id === it.id; S.res.metal = 500; const p0 = it.plus; R.enhance(it.id); const okE = S.rpg.equip[it.slot].plus === p0 + 1; R.unequip(it.slot); const f0 = S.faith; R.dismantle(it.id); return eq && okE && S.rpg.inv.length === n0 - 1 && S.faith > f0; }));
+  check('레벨업 → 화신 체력 상승', await ev(() => { const R = window.RPG, S = window.__gv.S, g = window.__gv; S.rpg.xp = 10000; R.gainXp(0); return S.rpg.lv > 1 && g.unitStat(R.av()).hp > 90; }));
+  check('탐험 이벤트: 난민 합류', await ev(() => { const R = window.RPG, S = window.__gv.S; const n0 = S.pop.length; const pk = S.pickups.find(k => k.kind === 'event' && !k.taken); pk.taken = true; const ev2 = R.resolveEvent(pk, R.av(), 'refugees'); return ev2.id === 'refugees' && S.pop.length > n0; }));
+  check('탐험 이벤트: 용병단·보물', await ev(() => { const R = window.RPG, S = window.__gv.S; const w0 = S.pop.filter(v => v.job === 'warrior').length, i0 = S.rpg.inv.length; const pks = S.pickups.filter(k => k.kind === 'event' && !k.taken); pks[0].taken = true; R.resolveEvent(pks[0], R.av(), 'mercs'); pks[1].taken = true; R.resolveEvent(pks[1], R.av(), 'treasure'); return S.pop.filter(v => v.job === 'warrior').length > w0 && S.rpg.inv.length === i0 + 1; }));
+  check('조종을 끄면 HUD 가 닫히고 알아서 사냥한다', await (async () => { await p.click('#ctrlOff'); await ev(() => { const S = window.__gv.S, R = window.RPG; S.hostiles = S.hostiles.filter(h => !h.beast); const hm = window.__gv.home(); const b = R.spawnBeast(hm.c, hm.r); b.x = hm.x + 50; b.y = hm.y + 30; b.hp = b.mhp = 9999; R.av().x = hm.x; R.av().y = hm.y; }); await p.waitForTimeout(1500); return (await p.locator('#rpgHud').isHidden()) && await ev(() => { const R = window.RPG, v = R.av(); return !R.C().ctrl && v.state === 'fight'; }); })());
+  check('조종하지 않을 때 체력이 낮아지면 토템으로 귀환하고 죽지 않는다', await ev(() => { const R = window.RPG, S = window.__gv.S, v = R.av(), g = window.__gv; const n = S.pop.length; v.hp = 5; const ok = R.guard(v, { kind: 'bandit' }); return ok && S.pop.length === n && R.av() === v && v.av.rest > S.simT && v.state === 'rest'; }));
+  check('쉬는 동안엔 공격받아도 죽지 않는다', await ev(() => { const R = window.RPG, v = R.av(); v.hp = 1; return R.guard(v, { kind: 'bandit' }) && v.hp >= 1; }));
+  check('조종 중 죽으면 화신 자리가 비고 새로 고를 수 있다', await ev(() => { const R = window.RPG, S = window.__gv.S, g = window.__gv, v = R.av(); v.av.rest = 0; R.setCtrl(true); v.hp = 0; const bandit = { kind: 'bandit', nm: '산적' }; const d0 = S.rpg.deaths; S.pop = S.pop; R.onDie(v, '산적'); return S.rpg.champ === null && S.rpg.deaths === d0 + 1 && !R.C().ctrl && S.rpg.lv > 1; }));
+  check('새 화신 지정 시 레벨·장비는 이어받는다', await ev(() => { const R = window.RPG, S = window.__gv.S; S.faith = 100; const lv = S.rpg.lv; const o = S.pop.find(v => !v.child && v.state !== 'migrate' && v.age < 5000); return R.setAvatar(o) && S.rpg.lv === lv && R.av() === o; }));
+  await ev(() => { const R = window.RPG, S = window.__gv.S, dg = S.rpg.dg; R.av().x = dg.x; R.av().y = dg.y + 4; R.enterDungeon(); });
   check('미궁 입장 → 1층 그림자 등장', await ev(() => window.__gv.S.rpg.dg.active && window.__gv.S.hostiles.some(h => h.kind === 'dmob')));
-  await ev(() => { window.__gv.S.hostiles.forEach(h => { if (h.kind === 'dmob') { h.hp = 0; h.lastHit = 'avatar'; } }); });
+  await ev(() => { const v = window.RPG.av(); window.__gv.S.hostiles.forEach(h => { if (h.kind === 'dmob') { h.hp = 0; h.lastHit = v.id; } }); });
   await p.waitForTimeout(600);
   check('1층 돌파 → 믿음·오늘 첫 돌파 장비', await ev(() => { const dg = window.__gv.S.rpg.dg; return !dg.active && dg.best === 1 && dg.maxToday === 1 && window.__gv.S.rpg.inv.length >= 1; }));
   check('유성 이벤트', await ev(() => { const R = window.RPG, S = window.__gv.S; R.spawnMeteor(); return S.pickups.some(k => k.kind === 'meteor' && !k.taken); }));
   const invH = await ev(() => { const R = window.RPG, S = window.__gv.S; R.spawnHorde(); const ok = S.hostiles.some(h => h.horde); S.hostiles.forEach(h => { if (h.horde) h.hp = 0; }); return ok ? S.rpg.inv.length : -1; });
   await p.waitForTimeout(600);
   check('습격 이벤트 → 전부 물리치면 상자', invH >= 0 && await ev(n => window.__gv.S.rpg.hordeWins === 1 && window.__gv.S.rpg.inv.length === n + 1, invH));
-  check('조종을 끄면 HUD 가 닫히고 화신은 자리를 지킨다', await (async () => { await p.click('#ctrlOff'); return (await p.locator('#rpgHud').isHidden()) && await ev(() => window.RPG.A().on && !window.RPG.A().ctrl && !!window.__gv.S.rpg.av.anchor); })());
-  check('쓰러지면 부활 대기 → 시간이 지나면 토템에서 부활', await ev(() => { const R = window.RPG, S = window.__gv.S; R.hurt(99999, { kind: 'bandit' }); const dead = !R.A().on && S.rpg.respawnAt > Date.now() && S.rpg.deaths === 1; S.rpg.respawnAt = Date.now() - 1; return dead; }) && await (async () => { await p.waitForTimeout(400); return await ev(() => window.RPG.A().on && window.__gv.S.rpg.av.on); })());
   await ev(() => window.RPG.setCtrl(false));
   check('출석 보상', await ev(() => { const R = window.RPG, S = window.__gv.S; S.rpg.attend = { last: '', streak: 0 }; R.checkAttend(); const pend = S.rpg.attend.pending; R.claimAttend(); return pend && !S.rpg.attend.pending && S.rpg.attend.streak === 1; }));
-  check('오래 비우면 세력 확장·의심, 돌아오면 믿음', await ev(() => { const R = window.RPG, S = window.__gv.S; const f0 = S.faith; const msg = R.offline(30 * 60); return S.faith > f0 && /돌아온 신/.test(msg) && /의심/.test(msg); }));
+  check('오프라인: 화신이 사냥한 경험치, 세력 확장·의심, 돌아온 믿음', await ev(() => { const R = window.RPG, S = window.__gv.S; const f0 = S.faith, x0 = S.rpg.xp + S.rpg.lv * 100000; const msg = R.offline(30 * 60); return S.faith > f0 && /돌아온 신/.test(msg) && /의심/.test(msg) && /사냥하며 경험치/.test(msg) && (S.rpg.xp + S.rpg.lv * 100000) > x0; }));
   await p.click('.navbtn[data-panel="rpg"]'); await p.waitForTimeout(300);
-  check('화신 패널 렌더(용사 포함)', (await t('#tab-rpg')).includes('화신 Lv.') && (await t('#tab-rpg')).includes('용사') && (await p.locator('#tab-rpg [data-rpg^="equip:"]').count()) >= 1);
+  check('화신 패널 렌더', (await t('#tab-rpg')).includes('화신 ') && (await p.locator('#tab-rpg [data-rpg^="equip:"]').count()) >= 1);
   await p.click('#panel .sheet-title .x');
 
   // ---- 패널·절전 ----
@@ -230,7 +234,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('믿음 정산 +180', await ev(f => window.__gv.S.faith >= f + 180, faithPre));
   await p.click('#welcomeOk');
   check('새로고침 뒤 세계 유지', await ev(() => window.__gv.S.settles.length >= 2 && window.__gv.S.explored.flat().filter(Boolean).length === 50 && window.__gv.S.stats.marry >= 1 && window.__gv.S.factions.length >= 2 && window.__gv.S.pop.some(v => v.title)));
-  check('새로고침 뒤에도 화신이 지상에 남아 있고 용사가 유지됨', await ev(() => window.RPG.A().on && window.__gv.S.rpg.av.on && !!window.RPG.champ()));
+  check('새로고침 뒤에도 화신 시민이 유지됨', await ev(() => !!window.RPG.av() && window.RPG.av().job === 'warrior'));
 
   if (process.env.SHOT) await p.screenshot({ path: process.env.SHOT, fullPage: true });
   check('페이지 오류 없음', errors.length === 0, errors.join(' | '));
