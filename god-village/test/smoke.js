@@ -172,6 +172,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('오래 산 시민은 장로', await ev(() => window.__gv.S.pop.some(v => v.title === 'elder')));
   await ev(() => { const S = window.__gv.S; S.res.wood = 500; S.res.stone = 500; S.res.metal = 300; S.res.food = 300; S.faith = 300; });
   check('대역사 명령 → 신전 공사 시작, 자원·믿음 차감', await ev(() => { const g = window.__gv, S = g.S; const ok = g.orderWork('shrine'); return ok && S.blds.some(b => b.type === 'shrine' && !b.done) && S.faith === 280 && S.res.wood === 420; }));
+  check('자리가 빽빽해도 대역사는 지어진다 (나무를 베어내서라도)', await ev(() => { const g = window.__gv, S = g.S, h = g.home(); for (let i = 0; i < 40; i++) S.blds.push({ id: 'fill' + i, type: 'hut', x: h.x + ((i % 8) - 4) * 16, y: h.y + (Math.floor(i / 8) - 2) * 20, progress: 16, done: true, settle: h.id }); S.res.stone = 500; S.faith = 300; const ok = g.orderWork('monument'); S.blds = S.blds.filter(b => !String(b.id).startsWith('fill')); return ok && S.blds.some(b => b.type === 'monument'); }));
   check('군대 무장 1단계', await ev(() => { const g = window.__gv, S = g.S; const hp0 = S.pop.filter(v => v.job === 'warrior')[0]; return g.orderArmy() && S.armyLv === 1 && S.res.metal === 260; }));
   check('축제 열기', await ev(() => { const g = window.__gv, S = g.S; S.fest = null; return g.orderFest() && !!S.fest && S.res.food <= 240 && S.res.food > 230; }));
   await p.click('.pw[data-power="oracle"]'); await p.waitForSelector('#oracleSheet:not([hidden])');
