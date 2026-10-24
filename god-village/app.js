@@ -160,13 +160,14 @@
   function stepVillager(v, dt, now) {
     if (v.held) return;
     v.anim = Math.max(0, (v.anim || 0) - dt); v.age += dt;
+    if (v.down) { if (S.simT < v.down) { v.hp = Math.min(unitStat(v).hp, v.hp + dt * unitStat(v).hp / 30); return; } v.down = 0; v.state = 'idle'; }
     var cc = cellOf(v); if (!isExplored(cc.c, cc.r)) reveal(cc.c, cc.r);
     if (F.time > v.nextTalk) { v.nextTalk = F.time + rnd(20, 60); say(v, v.child ? 'child' : v.state === 'pray' ? 'pray' : v.state === 'fight' ? 'war' : v.job === 'scout' ? 'explore' : 'idle', true); }
     if (v.hp < unitStat(v).hp && v.state !== 'fight') v.hp = Math.min(unitStat(v).hp, v.hp + dt * 0.5);
     // 위협: 싸울 수 있으면 싸우고, 아니면 도망
-    var threat = nearestHostile(v, fighter(v) ? 40 : 18);
+    var threat = nearestHostile(v, fighter(v) ? 40 : 28);
     if (threat && !fighter(v) && v.state !== 'migrate') { v.state = 'flee'; }
-    if (v.state === 'flee') { var w2 = nearestHostile(v, 30); if (!w2) { v.state = 'idle'; return; } var dx = v.x - w2.x, dy = v.y - w2.y, d = Math.sqrt(dx * dx + dy * dy) || 1; v.x = clamp(v.x + dx / d * 20 * dt, 4, WW - 4); v.y = clamp(v.y + dy / d * 20 * dt, 4, WH - 4); v.walk += dt * 8; v.face = dx < 0 ? -1 : 1; return; }
+    if (v.state === 'flee') { var w2 = nearestHostile(v, 40); if (!w2) { v.state = 'idle'; return; } var dx = v.x - w2.x, dy = v.y - w2.y, d = Math.sqrt(dx * dx + dy * dy) || 1; var st0 = settleOf(v); if (dist(v, st0) > 30) { dx += (st0.x - v.x) * 0.02; dy += (st0.y - v.y) * 0.02; } v.x = clamp(v.x + dx / d * 24 * dt, 4, WW - 4); v.y = clamp(v.y + dy / d * 24 * dt, 4, WH - 4); v.walk += dt * 8; v.face = dx < 0 ? -1 : 1; return; }
     if (fighter(v) && !v.carry && v.state !== 'migrate') {
       var tgt = threat; var rallyOn = S.rally && v.job === 'warrior' || (S.rally && S.rally.all);
       if (!tgt && rallyOn) { if (dist(v, S.rally) > 10) { v.state = 'fight'; moveToward(v, S.rally.x + rnd(-6, 6), S.rally.y + rnd(-4, 4), 24, dt); return; } tgt = nearestHostile(v, 70); }
@@ -303,6 +304,8 @@
   // ---- 가족·세대·군락 ----
   function family() {
     S.marryT += 2; S.birthT += 2; var now = Date.now();
+    // 마을이 거의 비면 피난민이 찾아온다 (기술·건물은 그대로)
+    if (adults().length <= 1) { S.refugeeT = (S.refugeeT || 0) + 2; if (S.refugeeT >= 20) { S.refugeeT = 0; var h0 = home(); for (var q = 0; q < 2; q++) { var nv = makeVillager(h0.x + rnd(-10, 10), h0.y + rnd(-4, 8), q ? 'lumber' : 'gather', h0); nv.hp = unitStat(nv).hp; S.pop.push(nv); } sysChat('🏃 피난민 두 사람이 마을을 찾아왔다. 다시 시작할 수 있다.'); addLog('🏃 <b>피난민</b> 도착'); toast('🏃 피난민이 찾아왔다'); ui.dirty.pop = true; } }
     // 어른이 됨
     S.pop.forEach(function (v) { if (v.child && v.age >= FM.adultAfter) { v.child = false; v.job = 'gather'; v.hp = unitStat(v).hp; say(v, 'grow', true); sysChat('🧑 ' + v.name + '이(가) 어른이 됐다'); } });
     // 결혼: 같은 군락의 짝 없는 어른 둘
@@ -335,10 +338,11 @@
     e.growT += 2; if (e.growT >= EN.growEvery) { e.growT = 0; if (e.units < EN.growMax + S.era * 2) e.units++; }
     if (!e.met && S.simT < EN.firstRaid) return;
     var since = S.simT - Math.max(e.lastRaid, e.metAt || 0);
-    if (since >= EN.raidEvery && !raidActive() && !S.invading && e.units >= 2) {
-      e.lastRaid = S.simT; e.raids++; var n = Math.min(e.units, EN.raidSize + Math.floor(e.raids / 2)); e.units -= n;
-      var target = pick(S.settles); for (var i = 0; i < n; i++) S.hostiles.push({ id: uid(), kind: 'enemy', raid: true, x: e.x + rnd(-6, 6), y: e.y + rnd(-6, 6), hp: EN.unitHp * (1 + S.era * 0.25), atk: EN.unitAtk * (1 + S.era * 0.25), target: { x: target.x, y: target.y }, until: S.simT + 400, timer: 0, walk: 0, face: 1, pillage: 0 });
-      sysChat('⚔️ ' + EN.nm + ' ' + n + '명이 "' + target.nm + '"을 향해 쳐들어온다!'); addLog('⚔️ <b>' + EN.nm + '</b> 침략 (' + n + '명)'); toast('⚔️ 적이 쳐들어온다! 🚩 집결·⚡ 번개로 막으세요'); S.pop.forEach(function (v) { if (Math.random() < 0.3) say(v, 'raid', true); }); S.rally = { x: target.x, y: target.y + 6, until: now + 60000, all: true }; panTo(target); ui.dirty.head = true;
+    if (since >= EN.raidEvery && !raidActive() && !S.invading && e.units >= 2 && S.pop.length >= 6) {
+      var fighters = S.pop.filter(fighter).length;
+      e.lastRaid = S.simT; e.raids++; var n = Math.max(1, Math.min(e.units, EN.raidSize + Math.floor(e.raids / 2), fighters + 2)); e.units -= n;
+      var target = pick(S.settles); for (var i = 0; i < n; i++) S.hostiles.push({ id: uid(), kind: 'enemy', raid: true, x: e.x + rnd(-6, 6), y: e.y + rnd(-6, 6), hp: EN.unitHp * (1 + S.era * 0.25), atk: EN.unitAtk * (1 + S.era * 0.25), target: { x: target.x, y: target.y }, until: S.simT + EN.raidTime, timer: 0, walk: 0, face: 1, pillage: 0 });
+      sysChat('⚔️ ' + EN.nm + ' ' + n + '명이 "' + target.nm + '"을 향해 쳐들어온다! (' + EN.raidTime + '초 뒤 물러감)'); addLog('⚔️ <b>' + EN.nm + '</b> 침략 (' + n + '명)'); toast('⚔️ 적이 쳐들어온다! 🚩 집결·⚡ 번개로 막으세요'); S.pop.forEach(function (v) { if (Math.random() < 0.3) say(v, 'raid', true); }); S.rally = { x: target.x, y: target.y + 6, until: now + 60000, all: true }; panTo(target); ui.dirty.head = true;
     }
   }
   function respawnEnemy() { var corners = [{ c: 0, r: 0 }, { c: W.cols - 1, r: 0 }, { c: 0, r: W.rows - 1 }].filter(function (k) { return !S.settles.some(function (s) { return s.c === k.c && s.r === k.r; }); }); if (!corners.length) return; var k = pick(corners), cc = cellCenter(k.c, k.r); S.enemy = { c: k.c, r: k.r, x: Math.round(cc.x), y: Math.round(cc.y), units: EN.units + 4 + S.era * 2, met: isExplored(k.c, k.r), metAt: S.simT, lastRaid: S.simT, growT: 0, alive: true, raids: 0 }; sysChat('👁️ 새로운 부족이 먼 땅에 자리 잡았다…'); ui.dirty.map = true; }
@@ -361,7 +365,17 @@
     // 침략(우리가 적 마을로): 전사들이 적 기지 근처에 있고 적이 없으면 정복
     if (S.invading && S.enemy && S.enemy.alive) { var near = S.pop.filter(function (v) { return v.job === 'warrior' && dist(v, S.enemy) < 30; }).length; if (near > 0 && !S.hostiles.some(function (o) { return o.defend; })) { if (!S.enemy.defSpawned) { S.enemy.defSpawned = true; var n = Math.min(S.enemy.units, 10); for (var q = 0; q < n; q++) S.hostiles.push({ id: uid(), kind: 'enemy', defend: true, x: S.enemy.x + rnd(-10, 10), y: S.enemy.y + rnd(-6, 8), hp: EN.unitHp * (1 + S.era * 0.25) * 1.2, atk: EN.unitAtk * (1 + S.era * 0.25), timer: 0, walk: 0, face: 1 }); sysChat('⚔️ ' + EN.nm + '의 전사 ' + n + '명이 마을을 지키러 나왔다!'); } else conquer(); } if (S.simT > S.invading) { S.invading = 0; S.rally = null; } }
   }
-  function attackV(h, v, dt) { h.timer = (h.timer || 0) - dt; if (h.timer > 0) return; h.timer = 1.2; h.anim = 0.3; var dmg = Math.round((h.atk || 3) * rnd(0.8, 1.2)); v.hp -= dmg; F.fx.push({ kind: 'num', x: v.x, y: v.y - 14, txt: '-' + dmg, color: '#ff7a70', size: 5, t: 0, life: 0.6 }); if (v.state !== 'fight' && !fighter(v)) { v.state = 'flee'; } if (v.hp <= 0) dieV(v, h.kind === 'wolf' || h.until ? '늑대' : h.kind === 'bandit' ? '산적' : EN.nm); }
+  function attackV(h, v, dt) {
+    h.timer = (h.timer || 0) - dt; if (h.timer > 0) return; h.timer = 1.2; h.anim = 0.3;
+    var dmg = Math.round((h.atk || 3) * rnd(0.8, 1.2)); v.hp -= dmg; F.fx.push({ kind: 'num', x: v.x, y: v.y - 14, txt: '-' + dmg, color: '#ff7a70', size: 5, t: 0, life: 0.6 });
+    if (v.state !== 'fight' && !fighter(v)) v.state = 'flee';
+    if (v.hp > 0) return;
+    var by = h.kind === 'wolf' ? '늑대' : h.kind === 'bandit' ? '산적' : EN.nm;
+    if (fighter(v)) { dieV(v, by); return; }
+    // 일반 시민·아이는 죽지 않고 쓰러진다: 집으로 옮겨져 30초 쉬고 일어난다
+    v.hp = 1; v.down = S.simT + 30; var st = settleOf(v); v.x = st.x + rnd(-8, 8); v.y = st.y + rnd(2, 10); v.state = 'wander'; v.tx = v.x; v.ty = v.y; v.timer = 30; v.carry = null;
+    S.happy = Math.max(0, S.happy - 2); sysChat('💫 ' + v.name + '이(가) ' + by + '에게 쓰러져 집으로 옮겨졌다'); v.bubble = { txt: '으으… 아파', until: Date.now() + 2500 };
+  }
   function dieV(v, by) { S.pop = S.pop.filter(function (o) { return o !== v; }); var mate = S.pop.find(function (o) { return o.id === v.partner; }); if (mate) mate.partner = null; S.stats.died++; S.happy = Math.max(0, S.happy - 4); sysChat('💀 ' + v.name + '이(가) ' + by + '에게 쓰러졌다…'); addLog('💀 <b>' + v.name + '</b> 전사 (' + by + ')'); burst(v, '#e06a5a', 10); S.wishes = S.wishes.filter(function (w) { return w.vid !== v.id; }); ui.dirty.pop = true; ui.dirty.wish = true; }
   function hit(v, t, atk) { var dmg = Math.round(atk * rnd(0.8, 1.2)); t.hp -= dmg; t.anim = 0.3; F.fx.push({ kind: 'num', x: t.x, y: t.y - 10, txt: String(dmg), color: '#fff', size: 6, t: 0, life: 0.6 }); for (var i = 0; i < 3; i++) F.fx.push({ kind: 'spark', x: t.x, y: t.y - 4, vx: rnd(-20, 20), vy: rnd(-30, -5), color: '#ffd34f', t: 0, life: 0.4 }); }
   function conquer() {
