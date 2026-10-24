@@ -32,24 +32,61 @@ window.GV = {
   },
 
   // ---------- 세계(지도) ----------
-  // 가로 cols × 세로 rows 칸. 우리 마을은 home 칸(오른쪽 아래), 적 부족은 enemy 칸(왼쪽 위). 안 가 본 칸은 안개.
-  WORLD: { cols: 3, rows: 4, cellW: 130, cellH: 150, home: { c: 2, r: 3 }, enemy: { c: 0, r: 0 } },
+  // 가로 cols × 세로 rows 칸(5×10 = 50칸). 우리 마을은 home 칸(오른쪽 아래), 첫 적 부족은 enemy 칸(왼쪽 위). 안 가 본 칸은 안개.
+  WORLD: { cols: 5, rows: 10, cellW: 130, cellH: 150, home: { c: 4, r: 9 }, enemy: { c: 0, r: 0 } },
   // 가운데 칸들에 무작위로 놓이는 것들 (weight 가 클수록 자주)
   OBJECTS: [
     { id: 'hunt',     nm: '사냥터',     ic: '🦌', weight: 3, desc: '사슴과 멧돼지가 많다' },
     { id: 'grove',    nm: '열매 숲',    ic: '🍇', weight: 3, desc: '열매 덤불이 빽빽하다' },
     { id: 'quarry',   nm: '채석장',     ic: '⛰️', weight: 2, desc: '바위와 광맥' },
-    { id: 'bandit',   nm: '산적 소굴',  ic: '🏴‍☠️', weight: 3, units: 3, loot: { faith: 15, food: 40, wood: 40 }, desc: '산적 셋이 지키고 있다. 전사로 물리치면 전리품' },
+    { id: 'bandit',   nm: '산적 소굴',  ic: '🏴‍☠️', weight: 2, units: 3, loot: { faith: 15, food: 40, wood: 40 }, desc: '산적 셋이 지키고 있다. 전사로 물리치면 전리품' },
     { id: 'treasure', nm: '보물 상자',  ic: '💎', weight: 2, reward: { faith: 25 }, desc: '탐험가가 찾아오면 믿음 +25' },
-    { id: 'ruins',    nm: '옛 유적',    ic: '🏛️', weight: 2, reward: { know: 80 }, desc: '탐험가가 찾아오면 지식 +80' }
+    { id: 'ruins',    nm: '옛 유적',    ic: '🏛️', weight: 2, reward: { know: 80 }, desc: '탐험가가 찾아오면 지식 +80' },
+    { id: 'lair',     nm: '괴물의 둥지', ic: '👹', weight: 1, max: 5, desc: '괴물이 산다. 쓰러뜨린 전사는 영웅이 된다 (세계에 최대 5개)' }
   ],
-  // 적 부족
+  // 괴물 (둥지가 우리 마을에서 멀수록 센 놈). hp·atk 는 시대마다 +30%
+  MONSTERS: [
+    { id: 'boarking', nm: '거대 멧돼지', ic: '🐗', hp: 120, atk: 8,  loot: { faith: 30, food: 60 } },
+    { id: 'wolfking', nm: '늑대 왕',     ic: '🐺', hp: 170, atk: 10, loot: { faith: 40, food: 40 } },
+    { id: 'bear',     nm: '동굴 곰',     ic: '🐻', hp: 230, atk: 13, loot: { faith: 50, stone: 60 } },
+    { id: 'troll',    nm: '트롤',        ic: '👹', hp: 320, atk: 17, loot: { faith: 70, metal: 40 } }
+  ],
+  // 적 세력 공통 수치. 세력은 여럿 생기고(FACTIONS), 각 세력은 기지(base)를 여러 개 가질 수 있다
   ENEMY: { nm: '회색 부족', units: 4, growEvery: 240, growMax: 14, raidEvery: 360, firstRaid: 900, raidSize: 3, raidTime: 45, lootPct: 0.15, unitHp: 30, unitAtk: 5, conquerFaith: 120 },
+  FACTIONS: {
+    max: 3,            // 동시에 살아 있는 세력 수
+    newEvery: 600,     // 이 간격(초)마다 자리가 비면 새 부족이 먼 땅에 생긴다
+    expandAt: 9,       // 세력의 전사 합이 이만큼 되면 옆 칸에 기지를 하나 더 세운다
+    maxBases: 3,       // 세력 하나의 최대 기지 수
+    schismMin: 3,      // 신을 의심하는 어른이 이만큼(그리고 어른의 20%) 모이면 마을을 떠나 자기들 군락을 세운다
+    schismPct: 0.2,
+    exileWary: 600,    // 떠난 자들은 이 시간(초) 동안은 쳐들어오지 않는다. 그 안에 신탁 "돌아오라"로 되돌릴 수 있다
+    names: ['회색 부족', '검은 늑대 부족', '붉은 모래 부족', '서리 부족', '안개 부족', '불꽃 부족', '돌가면 부족'],
+    colors: ['#a02a2a', '#3a3a4a', '#b06a2a', '#4a7aa0', '#6a6a8a', '#c04a2a', '#7a6a4a']
+  },
   // 전투 수치 (hp, atk). 우리 쪽은 시대마다 +20%, 무기 기술 효과 추가
   UNITS: { warrior: { hp: 44, atk: 7 }, hunter: { hp: 30, atk: 4 }, citizen: { hp: 16, atk: 1 }, child: { hp: 8, atk: 0 }, bandit: { hp: 30, atk: 5 }, enemy: { hp: 30, atk: 5 } },
   // 가족·세대·군락
-  FAMILY: { adultAfter: 480, marryEvery: 90, birthEvery: 150, maxChildren: 3, lifeSec: 5400, settleAt: 16, settleGroup: 4, maxSettlements: 4, settleCost: { wood: 60, food: 40 } },
-  SETTLE_NAMES: ['새벽골', '물가 마을', '바람 언덕', '돌밭 마을', '해 뜨는 터', '달빛 고을', '푸른 들'],
+  FAMILY: { adultAfter: 480, marryEvery: 90, birthEvery: 150, maxChildren: 3, lifeSec: 5400, settleAt: 16, settleGroup: 4, maxSettlements: 8, settleCost: { wood: 60, food: 40 } },
+  SETTLE_NAMES: ['새벽골', '물가 마을', '바람 언덕', '돌밭 마을', '해 뜨는 터', '달빛 고을', '푸른 들', '눈꽃 마을', '별내 마을', '소나무 골'],
+
+  // ---------- 칭호 ----------
+  // 시민이 살아온 길에 따라 하나씩 붙습니다(app.js checkTitles). 효과는 app.js 에서 칭호 id 로 찾습니다.
+  TITLES: {
+    hero:       { nm: '영웅',   ic: '🦸', desc: '괴물을 쓰러뜨린 자. 체력 1.5배, 모두가 우러러본다(행복 +3)' },
+    general:    { nm: '장군',   ic: '🎖️', desc: '전투에서 세 번 이긴 전사. 공격력 1.3배, 대열 맨 앞에 선다' },
+    prophet:    { nm: '예언자', ic: '🔮', desc: '기도 200번. 믿음 1.3배' },
+    sage:       { nm: '현자',   ic: '📜', desc: '지식 500을 쌓은 학자. 연구 1.3배' },
+    master:     { nm: '명장',   ic: '🔨', desc: '건물 5채를 올린 건축가. 건설 1.3배' },
+    pathfinder: { nm: '탐험왕', ic: '🧭', desc: '땅 5칸을 밝힌 탐험가. 걸음이 빠르다' },
+    elder:      { nm: '장로',   ic: '🧓', desc: '오래 산 시민. 곁에 있으면 마을이 차분해진다(행복 +2, 셋까지)' },
+    matriarch:  { nm: '대가족', ic: '👨‍👩‍👧‍👦', desc: '아이 셋을 둔 부모. 아이들이 더 빨리 자란다' }
+  },
+  // 신이 자원과 믿음으로 명하는 것 (신탁 창의 "군대"·"축제")
+  ORDERS: {
+    arm:  { nm: '군대 무장', ic: '🛡️', cost: { metal: 40, faith: 10 }, max: 5, desc: '단계마다 전사·사냥꾼의 전투력·체력 +10% (비용은 단계마다 오름)' },
+    fest: { nm: '축제 열기', ic: '🎉', cost: { food: 60, faith: 15 }, desc: '30초 축제. 행복 +10, 모두의 기분 +10, 출산이 앞당겨짐' }
+  },
 
   // ---------- 시대 ----------
   // house: 그 시대 집 모양(app.js drawBuilding 의 style), cloth: 시민 옷 색 [몸, 어두운 부분], hat: 머리 장식 종류
@@ -123,7 +160,16 @@ window.GV = {
     lab:        { nm: '연구소',   ic: '🔬', era: 6, cost: { metal: 300, stone: 150 }, work: 160, role: 'research', research: 8, style: 'lab', auto: 'one', msg: '연구소가 세워졌다.' },
     park:       { nm: '공원',     ic: '🌳', era: 6, cost: { wood: 150, stone: 80 }, work: 80, role: 'happy', happy: 12, style: 'park', auto: 'one', msg: '공원에서 쉰다.' },
     dome:       { nm: '돔 주거지', ic: '🛖', era: 7, cost: { metal: 500, stone: 300 }, work: 160, housing: 80, style: 'dome', auto: 'house' },
-    rocket:     { nm: '우주선',   ic: '🚀', era: 7, cost: { metal: 1200, stone: 400 }, work: 400, role: 'launch', style: 'rocket', auto: 'one', msg: '우주선이 완성됐다! 새 세계를 열 수 있다.' }
+    rocket:     { nm: '우주선',   ic: '🚀', era: 7, cost: { metal: 1200, stone: 400 }, work: 400, role: 'launch', style: 'rocket', auto: 'one', msg: '우주선이 완성됐다! 새 세계를 열 수 있다.' },
+    // ---- 대역사: 시민이 알아서 짓지 않고(auto: 'order') 신이 신탁 창에서 자원+믿음으로 명한다. effect 는 기술처럼 배율, storage 는 보관 추가 ----
+    shrine:     { nm: '신전',     ic: '⛩️', era: 0, cost: { wood: 80, stone: 60, faith: 20 }, work: 80, role: 'faith', faith: 2, effect: { faith: 1.3 }, style: 'shrine', auto: 'order', wonder: true, msg: '신전이 섰다. 믿음이 더 빨리 쌓인다.', desc: '믿음 1.3배, 사제가 기도하는 곳' },
+    monument:   { nm: '기념비',   ic: '🗿', era: 0, cost: { stone: 120, faith: 15 }, work: 60, role: 'happy', happy: 6, style: 'monument', auto: 'order', wonder: true, msg: '기념비가 섰다.', desc: '행복 +6' },
+    wall:       { nm: '성벽',     ic: '🧱', era: 1, cost: { stone: 200, wood: 60, faith: 25 }, work: 120, style: 'wall', auto: 'order', wonder: true, msg: '성벽이 마을을 두른다.', desc: '침략군 규모 -2, 늑대가 못 들어옴' },
+    granary:    { nm: '대창고',   ic: '🏺', era: 1, cost: { wood: 150, stone: 80, faith: 15 }, work: 80, role: 'storage', storage: 400, style: 'granary', auto: 'order', wonder: true, msg: '대창고가 완성됐다.', desc: '보관 +400' },
+    library:    { nm: '대도서관', ic: '📚', era: 2, cost: { wood: 200, stone: 150, metal: 30, faith: 40 }, work: 160, role: 'research', research: 4, style: 'library', auto: 'order', wonder: true, msg: '대도서관이 문을 열었다.', desc: '지식 ×4 연구 건물' },
+    arena:      { nm: '훈련장',   ic: '🏟️', era: 2, cost: { stone: 150, metal: 40, faith: 30 }, work: 120, effect: { atk: 1.2, hp: 1.2 }, style: 'arena', auto: 'order', wonder: true, msg: '훈련장에서 전사들이 단련한다.', desc: '전투력·체력 1.2배' },
+    garden:     { nm: '공중정원', ic: '🌺', era: 3, cost: { wood: 300, stone: 300, faith: 60 }, work: 200, role: 'happy', happy: 15, effect: { growth: 1.3 }, style: 'garden', auto: 'order', wonder: true, msg: '공중정원이 피어났다.', desc: '행복 +15, 출산 1.3배' },
+    beacon:     { nm: '등대',     ic: '🗼', era: 3, cost: { stone: 250, metal: 80, faith: 50 }, work: 160, style: 'beacon', auto: 'order', wonder: true, msg: '등대가 먼 땅을 비춘다.', desc: '탐험가 걸음 1.5배, 보물·유적 보상 2배' }
   },
 
   // ---------- 직업 ----------
@@ -165,7 +211,8 @@ window.GV = {
     { id: 'arm',   nm: '무기를 들어라',   ic: '⚔️', cost: 15, weight: { warrior: 6 } },
     { id: 'invade', nm: '적을 쳐라',      ic: '🔥', cost: 25, miracle: 'invade', hint: '전사들이 적 부족 마을로 진군합니다. 이기면 그 마을이 우리 군락이 됩니다' },
     { id: 'harvest', nm: '풍년의 기적',   ic: '🌟', cost: 30, miracle: 'harvest', era: 1, hint: '60초 동안 식량 3배' },
-    { id: 'insight', nm: '계시의 기적',   ic: '✨', cost: 45, miracle: 'insight', era: 2, hint: '지금 연구 중인 것을 바로 발견' }
+    { id: 'insight', nm: '계시의 기적',   ic: '✨', cost: 45, miracle: 'insight', era: 2, hint: '지금 연구 중인 것을 바로 발견' },
+    { id: 'return', nm: '돌아오라',       ic: '🕊️', cost: 30, miracle: 'return', hint: '신을 원망하고 떠난 자들의 마을을 찾았고 행복이 60 이상이면, 그들이 돌아옵니다' }
   ],
 
   // ---------- 소원 (시민이 올리고, 들어주면 믿음) ----------
@@ -245,14 +292,20 @@ window.GV = {
     { id: 'world2', nm: '두 번째 세계', ic: '🌍', type: 'world', n: 2, faith: 0 },
     { id: 'marry1', nm: '첫 결혼', ic: '💕', type: 'marry', n: 1, faith: 10 },
     { id: 'settle2', nm: '두 번째 군락', ic: '🏕️', type: 'settle', n: 2, faith: 30 },
-    { id: 'explore', nm: '세상 끝까지', ic: '🧭', type: 'explored', n: 12, faith: 40 },
+    { id: 'explore', nm: '세상 끝까지', ic: '🧭', type: 'explored', n: 25, faith: 40 },
+    { id: 'explore50', nm: '온 세상', ic: '🌐', type: 'explored', n: 50, faith: 80 },
     { id: 'bandit3', nm: '산적 토벌', ic: '🏴‍☠️', type: 'bandit', n: 3, faith: 30 },
     { id: 'defend', nm: '마을을 지켰다', ic: '🛡️', type: 'defend', n: 1, faith: 25 },
     { id: 'conquer', nm: '정복자', ic: '👑', type: 'conquer', n: 1, faith: 100 },
     { id: 'voice20', nm: '귀 기울이는 신', ic: '👂', type: 'voice', n: 20, faith: 30 },
     { id: 'bless10', nm: '축복의 손', ic: '✨', type: 'bless', n: 10, faith: 25 },
     { id: 'offer5', nm: '제단의 향기', ic: '🎁', type: 'offer', n: 5, faith: 20 },
-    { id: 'gen3', nm: '삼대', ic: '👴', type: 'gen', n: 3, faith: 40 }
+    { id: 'gen3', nm: '삼대', ic: '👴', type: 'gen', n: 3, faith: 40 },
+    { id: 'hero', nm: '괴물 사냥꾼', ic: '🦸', type: 'hero', n: 1, faith: 50 },
+    { id: 'titles5', nm: '이름난 이들', ic: '🏅', type: 'titles', n: 5, faith: 40 },
+    { id: 'wonder3', nm: '대역사', ic: '🏛️', type: 'wonder', n: 3, faith: 60 },
+    { id: 'conquer3', nm: '패왕', ic: '👑', type: 'conquer', n: 3, faith: 120 },
+    { id: 'return', nm: '돌아온 탕자', ic: '🕊️', type: 'returned', n: 1, faith: 40 }
   ],
 
   // ---------- 자원 나무·바위 등 (지도에 놓이는 것) ----------
@@ -294,7 +347,13 @@ window.GV = {
     wed: ['오늘부터 가족이야', '우리 집을 꾸미자', '행복하게 살자'],
     fest: ['축하해!', '춤추자!', '오늘은 축제다!', '노래하자~'],
     drill: ['하나, 둘!', '대열을 맞춰라!', '방패 들어!', '오늘도 훈련이다'],
-    march: ['진군!', '발 맞춰!', '신이 우리와 함께!']
+    march: ['진군!', '발 맞춰!', '신이 우리와 함께!'],
+    title: ['이 이름에 부끄럽지 않게', '마을을 위해!', '드디어 인정받았어'],
+    elderTalk: ['내가 젊었을 땐 말이야…', '서두르지 마라', '별을 봐라, 아이들아', '다 지나간다'],
+    hero: ['그놈은 내가 잡았지', '두려움은 없다', '괴물 따위!'],
+    schism: ['우린 떠난다', '신 없이도 살 수 있어', '다시는 안 돌아와'],
+    returned: ['…돌아왔습니다', '용서해 주세요', '집이 그리웠어요'],
+    wonder: ['우리 손으로 세웠다!', '후손들이 기억할 거야', '신께 바칩니다']
   },
   NAMES: ['우가', '마루', '두리', '보리', '나래', '가온', '하늘', '한결', '바위', '시내', '이슬', '별', '솔', '여울', '다솜', '누리', '푸름', '아름', '슬기', '으뜸', '온', '빛나', '새벽', '노을', '구름', '강', '샘', '들', '뫼', '미르', '라온', '초록', '하랑', '서리', '달'],
   HAIR: ['#2b2320', '#6b3f23', '#e8c060', '#d04a2a', '#e879b0', '#4f7fe0', '#4fb06a', '#9a5cf0', '#f0ede0', '#48b8b0'],
