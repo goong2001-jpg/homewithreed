@@ -28,7 +28,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('카메라가 우리 마을을 비춤', await ev(() => { const g = window.__gv, h = g.home(); return h.x > g.cam.x && h.x < g.cam.x + g.F.vw && h.y > g.cam.y && h.y < g.cam.y + g.F.vh; }));
 
   // ---- 스스로 발전 ----
-  await p.waitForFunction(() => window.__gv.S.blds.some(b => b.type === 'totem' && b.done), null, { timeout: 70000 });
+  await p.waitForFunction(() => window.__gv.S.blds.some(b => b.type === 'totem' && b.done), null, { timeout: 100000 });
   check('시민들이 스스로 토템을 세움', true);
 
   // ---- 지도 끌기(패닝) ----
@@ -52,8 +52,9 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   // ---- 영감 → 발견 ----
   await ev(() => { window.__gv.S.faith = 100; });
   await p.click('.pw[data-power="idea"]'); s = await scr(h.x, h.y); await p.mouse.click(s.x, s.y);
-  await ev(() => window.__gv.slowTick(Date.now()));
-  check('불 발견', await ev(() => window.__gv.S.techs.includes('fire')));
+  check('영감으로 지식 +15', await ev(() => window.__gv.S.res.know >= 15));
+  await ev(() => { window.__gv.S.res.know = 60; window.__gv.slowTick(Date.now()); });
+  check('불 발견(지식 60)', await ev(() => window.__gv.S.techs.includes('fire')));
   check('업적 "첫 불꽃"', await ev(() => window.__gv.S.ach.includes('first_fire')));
 
   // ---- 신탁 ----

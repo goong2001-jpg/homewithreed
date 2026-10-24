@@ -218,7 +218,7 @@
     var amt;
     if (v.state === 'pray') { amt = C.prayFaith * mul('faith'); addFaith(amt); rateAcc.faith += amt; F.fx.push({ kind: 'spark', x: v.x, y: v.y - 14, vx: 0, vy: -8, color: '#ffe9a8', t: 0, life: 1 }); v.state = 'idle'; return; }
     if (v.bld) { var b = S.blds.find(function (x) { return x.id === v.bld; }), d = b ? D.BUILDINGS[b.type] : null;
-      if (d && d.research && v.job === 'scholar') { amt = C.gatherAmount * (d.research === true ? 1 : d.research) * mul('know'); S.res.know += amt; rateAcc.know += amt; F.fx.push({ kind: 'num', x: v.x, y: v.y - 15, txt: '+' + Math.round(amt) + '📜', color: RES_COL.know, size: 5, t: 0, life: 0.8 }); v.state = 'idle'; return; }
+      if (d && d.research && v.job === 'scholar') { amt = (C.knowPerWork || 1) * (d.research === true ? 1 : d.research) * mul('know'); S.res.know += amt; rateAcc.know += amt; F.fx.push({ kind: 'num', x: v.x, y: v.y - 15, txt: '+' + Math.round(amt) + '📜', color: RES_COL.know, size: 5, t: 0, life: 0.8 }); v.state = 'idle'; return; }
       if (d && d.role === 'food') { v.carry = { res: 'food', n: Math.round(C.gatherAmount * 1.5 * mul('food')) }; v.state = 'carry'; return; }
       if (d && d.role === 'faith') { amt = C.prayFaith * (d.faith || 1) * mul('faith'); addFaith(amt); rateAcc.faith += amt; v.state = 'idle'; return; }
       v.state = 'idle'; return; }
@@ -260,8 +260,8 @@
   }
   function checkEra() {
     var e = era(), allTech = D.TECHS.filter(function (t) { return t.era === S.era; }).every(function (t) { return hasTech(t.id); });
-    var key = S.blds.some(function (b) { return b.done && b.type === e.key; });
-    if (allTech && key && S.era < D.ERAS.length - 1) { S.era++; var ne = era(); addFaith(20); S.happy = Math.min(100, S.happy + 10); addLog('🎉 <b>' + ne.nm + '</b>가 열렸다! ' + ne.msg); sysChat('🎉 ' + ne.nm + '가 열렸다! ' + ne.msg); toast('🎉 ' + ne.nm + '!'); burst(home(), '#ffd34f', 40); S.pop.forEach(function (v) { if (Math.random() < 0.4) say(v, 'era', true); }); F.mapKey = ''; ui.dirty.tech = true; }
+    var key = S.blds.some(function (b) { return b.done && b.type === e.key; }), popOk = S.pop.length >= (e.minPop || 0);
+    if (allTech && key && popOk && S.era < D.ERAS.length - 1) { S.era++; var ne = era(); addFaith(20); S.happy = Math.min(100, S.happy + 10); addLog('🎉 <b>' + ne.nm + '</b>가 열렸다! ' + ne.msg); sysChat('🎉 ' + ne.nm + '가 열렸다! ' + ne.msg); toast('🎉 ' + ne.nm + '!'); burst(home(), '#ffd34f', 40); S.pop.forEach(function (v) { if (Math.random() < 0.4) say(v, 'era', true); }); F.mapKey = ''; ui.dirty.tech = true; }
   }
   function nextBuilding(st) {
     var pop = popOf(st).length, pending = S.blds.filter(function (b) { return !b.done && b.settle === st.id; }); if (pending.length >= 2) return null;
@@ -649,7 +649,7 @@
     $('#resRow').innerHTML = RES.filter(function (k) { return k !== 'metal' || S.era >= 1 || S.res.metal > 0; }).map(function (k) { return '<span>' + RES_IC[k] + ' ' + fmt(S.res[k]) + '</span>'; }).join('');
     $('#cap').textContent = '보관 ' + fmt(storageCap()) + ' · 군락 ' + S.settles.length + ' · 탐험 ' + exploredCount() + '/' + (W.cols * W.rows);
     $('#faith').textContent = '✨ ' + fmt(S.faith); $('#popCnt').textContent = '👥 ' + S.pop.length + '/' + housing() + (S.pop.filter(function (v) { return v.child; }).length ? ' (아이 ' + S.pop.filter(function (v) { return v.child; }).length + ')' : ''); $('#happy').textContent = (S.happy >= 70 ? '😊' : S.happy >= 40 ? '🙂' : '😟') + ' ' + Math.round(S.happy);
-    var t = currentTech(), tb = researchBld() || totem(); $('#techLine').innerHTML = t ? ('🔬 ' + t.ic + ' ' + t.nm + ' <i style="width:' + Math.round(clamp(S.res.know / t.cost, 0, 1) * 100) + '%"></i><span>' + fmt(S.res.know) + '/' + t.cost + (tb ? '' : ' · 토템이 있어야 연구') + '</span>') : (S.era === D.ERAS.length - 1 ? '🚀 ' + (S.launched ? '새 세계를 열 수 있다' : '우주선을 짓는 중') : '다음 시대 준비 중');
+    var t = currentTech(), tb = researchBld() || totem(); $('#techLine').innerHTML = t ? ('🔬 ' + t.ic + ' ' + t.nm + ' <i style="width:' + Math.round(clamp(S.res.know / t.cost, 0, 1) * 100) + '%"></i><span>' + fmt(S.res.know) + '/' + t.cost + (tb ? '' : ' · 토템이 있어야 연구') + '</span>') : (S.era === D.ERAS.length - 1 ? '🚀 ' + (S.launched ? '새 세계를 열 수 있다' : '우주선을 짓는 중') : '🏁 다음 시대까지: ' + (S.pop.length < (era().minPop || 0) ? '인구 ' + S.pop.length + '/' + era().minPop : D.BUILDINGS[era().key].nm + ' 짓는 중'));
     var warriors = S.pop.filter(function (v) { return v.job === 'warrior'; }).length;
     $('#oracleLine').textContent = (S.oracle ? '📣 ' + D.ORACLES.find(function (o) { return o.id === S.oracle.id; }).nm + ' ' + Math.ceil((S.oracle.until - Date.now()) / 1000) + 's · ' : '') + (S.invading ? '🔥 출정 중 · ' : raidActive() ? '⚔️ 침략 중! · ' : '') + '⚔️ 전사 ' + warriors + (S.enemy && S.enemy.met && S.enemy.alive ? ' · 적 ' + S.enemy.units : '');
     document.querySelectorAll('.pw').forEach(function (b) { var p = D.POWERS.find(function (x) { return x.id === b.dataset.power; }); if (p) b.classList.toggle('poor', S.faith < p.cost); b.classList.toggle('on', ui.power === b.dataset.power); });
@@ -673,7 +673,7 @@
   }
   function renderTech() {
     ui.dirty.tech = false; var cur = currentTech();
-    $('#techList').innerHTML = D.ERAS.map(function (e, i) { if (i > S.era + 1) return ''; return '<div class="era' + (i === S.era ? ' on' : i < S.era ? ' past' : ' future') + '"><b>' + e.ic + ' ' + e.nm + '</b><span class="sub">' + e.msg + '</span>' + D.TECHS.filter(function (t) { return t.era === i; }).map(function (t) { var done = hasTech(t.id); return '<div class="tech ' + (done ? 'done' : cur && cur.id === t.id ? 'cur' : '') + '">' + t.ic + ' ' + t.nm + ' <span class="sub">📜' + t.cost + (done ? ' ✓' : cur && cur.id === t.id ? ' · 연구 중 ' + Math.round(clamp(S.res.know / t.cost, 0, 1) * 100) + '%' : '') + (t.unlock ? ' · ' + D.BUILDINGS[t.unlock].nm + ' 해금' : '') + (t.job ? ' · ' + D.JOBS[t.job].nm + ' 직업' : '') + '</span></div>'; }).join('') + (i === S.era ? '<div class="sub">시대를 넘기려면: 이 시대 기술 전부 + ' + D.BUILDINGS[e.key].ic + ' ' + D.BUILDINGS[e.key].nm + '</div>' : '') + '</div>'; }).join('');
+    $('#techList').innerHTML = D.ERAS.map(function (e, i) { if (i > S.era + 1) return ''; return '<div class="era' + (i === S.era ? ' on' : i < S.era ? ' past' : ' future') + '"><b>' + e.ic + ' ' + e.nm + '</b><span class="sub">' + e.msg + '</span>' + D.TECHS.filter(function (t) { return t.era === i; }).map(function (t) { var done = hasTech(t.id); return '<div class="tech ' + (done ? 'done' : cur && cur.id === t.id ? 'cur' : '') + '">' + t.ic + ' ' + t.nm + ' <span class="sub">📜' + t.cost + (done ? ' ✓' : cur && cur.id === t.id ? ' · 연구 중 ' + Math.round(clamp(S.res.know / t.cost, 0, 1) * 100) + '%' : '') + (t.unlock ? ' · ' + D.BUILDINGS[t.unlock].nm + ' 해금' : '') + (t.job ? ' · ' + D.JOBS[t.job].nm + ' 직업' : '') + '</span></div>'; }).join('') + (i === S.era ? '<div class="sub">시대를 넘기려면: 이 시대 기술 전부 + ' + D.BUILDINGS[e.key].ic + ' ' + D.BUILDINGS[e.key].nm + (e.minPop ? ' + 인구 ' + e.minPop + '명 (지금 ' + S.pop.length + ')' : '') + '</div>' : '') + '</div>'; }).join('');
   }
   function renderAch() {
     ui.dirty.ach = false; var d = S.daily;
@@ -737,7 +737,7 @@
     $('#newWorldBtn').addEventListener('click', function () { if (!S.launched) return; if (!confirm('새 세계를 열까요? 처음부터 다시 시작하고, 세계 ' + (S.world + 1) + '에서는 모든 생산이 +' + (S.world * 10) + '% 됩니다. 업적과 누적 믿음은 남습니다.')) return; newWorld(); $('#panel').hidden = true; });
     $('#welcomeOk').addEventListener('click', function () { $('#welcome').hidden = true; });
     $('#godFaith').addEventListener('click', function () { addFaith(100); renderHead(); save(); }); $('#godKnow').addEventListener('click', function () { S.res.know += 500; renderHead(); save(); });
-    $('#godEra').addEventListener('click', function () { D.TECHS.filter(function (t) { return t.era === S.era; }).forEach(function (t) { if (!hasTech(t.id)) S.techs.push(t.id); }); var k = era().key, h = home(); if (!S.blds.some(function (b) { return b.type === k; })) { var pos = freeSlotFor(S, h, bw(k)) || h; S.blds.push({ id: uid(), type: k, x: pos.x, y: pos.y, progress: 0, done: true, settle: h.id }); } checkEra(); renderAll(); save(); });
+    $('#godEra').addEventListener('click', function () { D.TECHS.filter(function (t) { return t.era === S.era; }).forEach(function (t) { if (!hasTech(t.id)) S.techs.push(t.id); }); var k = era().key, h = home(); if (!S.blds.some(function (b) { return b.type === k; })) { var pos = freeSlotFor(S, h, bw(k)) || h; S.blds.push({ id: uid(), type: k, x: pos.x, y: pos.y, progress: 0, done: true, settle: h.id }); } while (S.pop.length < (era().minPop || 0)) S.pop.push(makeVillager(h.x + rnd(-14, 14), h.y + rnd(-6, 10), 'gather', h)); checkEra(); renderAll(); save(); });
     $('#godRes').addEventListener('click', function () { ['food', 'wood', 'stone', 'metal'].forEach(function (k) { S.res[k] += 300; }); renderHead(); save(); });
     $('#godReveal').addEventListener('click', function () { for (var r = 0; r < W.rows; r++) for (var c = 0; c < W.cols; c++) reveal(c, r); campsTick(); renderAll(); save(); });
     $('#godPop').addEventListener('click', function () { var h = home(); for (var i = 0; i < 5; i++) S.pop.push(makeVillager(h.x + rnd(-14, 14), h.y + rnd(-6, 10), 'gather', h)); renderAll(); save(); });
