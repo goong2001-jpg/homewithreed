@@ -21,6 +21,11 @@ window.GV = {
     wolfEvery: 300,       // 늑대가 오는 간격(초), 중세 이후엔 안 옴
     wolfHp: 40,
     oracleTime: 120,      // 신탁 지속(초)
+    voiceEvery: 60,       // 시민이 신에게 말을 거는 간격(초) — 제물·원망·부탁·질문
+    voiceTime: 75,        // 답을 기다리는 시간(초). 원망을 무시하면 믿음이 깎이고 그 시민은 신을 의심한다
+    blessCost: 4,         // 축복 비용(믿음). 축복받은 시민은 blessTime 동안 일 1.4배
+    blessTime: 120,
+    comfortCost: 3,       // 위로 비용(믿음)
     offPct: 50,           // 오프라인 보상 비율(%)
     offHours: 24,         // 오프라인 최대 정산 시간
     dayLength: 150        // 낮밤 한 바퀴(초)
@@ -166,22 +171,58 @@ window.GV = {
   // ---------- 소원 (시민이 올리고, 들어주면 믿음) ----------
   // when: 이 조건일 때만 나옴. done: 이렇게 하면 들어준 것.
   WISHES: [
-    { id: 'food',  txt: '배가 고파요…',          ic: '🍖', when: 'foodLow',  done: 'power:food', hint: '🍖 식량을 떨어뜨려 주세요' },
-    { id: 'wood',  txt: '집 지을 나무가 없어요',  ic: '🪵', when: 'woodLow',  done: 'power:wood', hint: '🪵 나무를 떨어뜨려 주세요' },
-    { id: 'stone', txt: '돌이 모자라요',          ic: '🪨', when: 'stoneLow', done: 'power:stone', hint: '🪨 돌을 떨어뜨려 주세요' },
-    { id: 'idea',  txt: '좋은 생각이 안 나요',    ic: '💡', when: 'research', done: 'power:idea', hint: '💡 영감을 내려 주세요' },
-    { id: 'rain',  txt: '밭이 말라요',            ic: '🌧️', when: 'farm',     done: 'power:rain', hint: '🌧️ 비를 내려 주세요' },
-    { id: 'wolf',  txt: '늑대가 무서워요!',       ic: '🐺', when: 'wolf',     done: 'wolfDead', hint: '⚡ 번개로 늑대를 쫓아 주세요' },
-    { id: 'move',  txt: '토템 곁에 가고 싶어요',  ic: '🗿', when: 'totem',    done: 'nearTotem', hint: '이 시민을 집어서 토템 옆에 내려 주세요' },
-    { id: 'home',  txt: '잘 곳이 없어요',         ic: '🏠', when: 'homeless', done: 'housing', hint: '집이 지어지면 들어준 것. 신탁 "집을 지어라"가 빠릅니다' },
-    { id: 'bandit', txt: '산적이 무서워요',       ic: '🏴‍☠️', when: 'bandit',   done: 'banditDead', hint: '🚩 집결로 전사를 보내거나 🔥 불벼락으로 소굴을 치세요' },
-    { id: 'love',  txt: '짝을 만나고 싶어요',     ic: '💕', when: 'single',   done: 'married', hint: '결혼은 시민들이 알아서 합니다. 💗 치유를 내리면 마음이 열립니다' },
-    { id: 'enemy', txt: '적이 쳐들어와요!',       ic: '⚔️', when: 'raid',     done: 'raidOver', hint: '🚩 집결·⚡ 번개·🔥 불벼락으로 막으세요' }
+    // act: 시민을 탭했을 때 팝업에 뜨는 버튼. power:힘id / oracle:신탁id / move:totem / match(짝 맺기). @wolf·@bandit·@enemy·@home 을 붙이면 그 대상 자리에 씁니다.
+    { id: 'food',  txt: '배가 고파요…',          ic: '🍖', when: 'foodLow',  done: 'power:food', act: ['power:food'], hint: '🍖 식량을 떨어뜨려 주세요' },
+    { id: 'wood',  txt: '집 지을 나무가 없어요',  ic: '🪵', when: 'woodLow',  done: 'power:wood', act: ['power:wood'], hint: '🪵 나무를 떨어뜨려 주세요' },
+    { id: 'stone', txt: '돌이 모자라요',          ic: '🪨', when: 'stoneLow', done: 'power:stone', act: ['power:stone'], hint: '🪨 돌을 떨어뜨려 주세요' },
+    { id: 'idea',  txt: '좋은 생각이 안 나요',    ic: '💡', when: 'research', done: 'power:idea', act: ['power:idea'], hint: '💡 영감을 내려 주세요' },
+    { id: 'rain',  txt: '밭이 말라요',            ic: '🌧️', when: 'farm',     done: 'power:rain', act: ['power:rain'], hint: '🌧️ 비를 내려 주세요' },
+    { id: 'wolf',  txt: '늑대가 무서워요!',       ic: '🐺', when: 'wolf',     done: 'wolfDead', act: ['power:smite@wolf'], hint: '⚡ 번개로 늑대를 쫓아 주세요' },
+    { id: 'move',  txt: '토템 곁에 가고 싶어요',  ic: '🗿', when: 'totem',    done: 'nearTotem', act: ['move:totem'], hint: '이 시민을 집어서 토템 옆에 내려 주세요' },
+    { id: 'home',  txt: '잘 곳이 없어요',         ic: '🏠', when: 'homeless', done: 'housing', act: ['oracle:build', 'power:wood'], hint: '집이 지어지면 들어준 것. 신탁 "집을 지어라"가 빠릅니다' },
+    { id: 'bandit', txt: '산적이 무서워요',       ic: '🏴‍☠️', when: 'bandit',   done: 'banditDead', act: ['power:rally@bandit', 'power:fire@bandit'], hint: '🚩 집결로 전사를 보내거나 🔥 불벼락으로 소굴을 치세요' },
+    { id: 'love',  txt: '짝을 만나고 싶어요',     ic: '💕', when: 'single',   done: 'married', act: ['match'], hint: '💞 짝 맺어 주기(믿음 6)로 바로 맺어 주거나, 기다리면 알아서 합니다' },
+    { id: 'enemy', txt: '적이 쳐들어와요!',       ic: '⚔️', when: 'raid',     done: 'raidOver', act: ['power:rally@home', 'power:fire@enemy'], hint: '🚩 집결·⚡ 번개·🔥 불벼락으로 막으세요' }
   ],
+
+  // ---------- 목소리 (시민이 신에게 거는 말: 제물·원망·부탁·질문) ----------
+  // kind: offer(제물) / complaint(원망) / wish(부탁) / question(질문). when: app.js voiceCond 의 조건 이름, event: 사건이 나면 바로(grief 죽음, smited 벼락, newborn 출생).
+  // opts: 팝업 버튼. act 종류 — accept(제물 받기) return(축복으로 돌려주기) comfort(위로) bless(축복) scold(혼내기) rename(이름 짓기) grantjob/deny(직업 부탁)
+  //   rest(쉬게 하기) remember(기억한다) star(별똥별) value:지혜|힘|화합(마을의 가치) power:힘id oracle:신탁id. {name} {job} 은 자동으로 채워집니다.
+  // 답을 안 하면: 원망 → 믿음 -2, 그 시민은 신을 의심(기도 안 함). 제물 → 믿음 +1 만. 부탁 → 기분 -8.
+  VOICES: [
+    { id: 'hungry',    kind: 'complaint', when: 'foodLow',  weight: 3, txt: '며칠째 굶고 있어요. 신은 보고만 계시나요…', opts: [{ act: 'power:food' }, { act: 'comfort' }] },
+    { id: 'forgotten', kind: 'complaint', when: 'unhappy',  weight: 2, txt: '신께서 우리를 잊으신 것 같아요.', opts: [{ act: 'comfort' }, { act: 'power:rain' }, { act: 'scold' }] },
+    { id: 'homeless',  kind: 'complaint', when: 'homeless', weight: 2, txt: '밤마다 밖에서 자요. 집이 필요해요.', opts: [{ act: 'oracle:build' }, { act: 'power:wood' }, { act: 'comfort' }] },
+    { id: 'fear',      kind: 'complaint', when: 'fear',     weight: 2, txt: '밤마다 늑대 소리가 들려요. 지켜 주세요.', opts: [{ act: 'bless' }, { act: 'comfort' }] },
+    { id: 'grief',     kind: 'complaint', event: 'grief',   txt: '왜 {name}을(를) 데려가셨나요…', opts: [{ act: 'comfort' }, { act: 'bless' }] },
+    { id: 'smited',    kind: 'complaint', event: 'smited',  txt: '제가 뭘 잘못했나요? 벼락은 너무해요.', opts: [{ act: 'comfort' }, { act: 'bless' }, { act: 'scold', nm: '⚡ 한 번 더' }] },
+    { id: 'offer_food', kind: 'offer', when: 'surplus', weight: 3, txt: '첫 수확을 신께 바칩니다. 받아 주소서.', gives: { food: 6 }, opts: [{ act: 'accept' }, { act: 'return' }] },
+    { id: 'offer_hunt', kind: 'offer', when: 'hunter',  weight: 2, txt: '오늘 잡은 사슴을 신께 올립니다.', gives: { food: 10 }, opts: [{ act: 'accept' }, { act: 'return' }] },
+    { id: 'offer_craft', kind: 'offer', when: 'metal',  weight: 2, txt: '처음 만든 그릇입니다. 신께 드리고 싶어요.', gives: { metal: 3 }, opts: [{ act: 'accept' }, { act: 'return' }] },
+    { id: 'offer_flower', kind: 'offer', when: 'happy', weight: 1, txt: '들꽃을 꺾어 왔어요. 신께 드릴게요.', gives: {}, opts: [{ act: 'accept', nm: '🌼 받다' }, { act: 'return', nm: '🎁 축복으로 돌려주다' }] },
+    { id: 'name_child', kind: 'wish', event: 'newborn', txt: '아이 {name}의 이름을 지어 주세요!', opts: [{ act: 'rename' }, { act: 'bless', nm: '✨ 축복만 하기' }] },
+    { id: 'see_star',  kind: 'wish', when: 'night',   weight: 2, txt: '별똥별을 보고 싶어요.', opts: [{ act: 'star' }] },
+    { id: 'want_job',  kind: 'wish', when: 'adult',   weight: 2, txt: '저는 {job}이(가) 되고 싶어요.', opts: [{ act: 'grantjob' }, { act: 'deny' }] },
+    { id: 'rest',      kind: 'wish', when: 'tired',   weight: 2, txt: '하루만 쉬고 싶어요…', opts: [{ act: 'rest' }, { act: 'deny' }] },
+    { id: 'remember',  kind: 'wish', when: 'any',     weight: 1, txt: '신이시여, 제 이름을 기억해 주시나요?', opts: [{ act: 'remember' }] },
+    { id: 'q_value',   kind: 'question', when: 'question', weight: 2, txt: '우리는 무엇을 가장 소중히 여겨야 할까요?', opts: [{ act: 'value:wisdom' }, { act: 'value:strength' }, { act: 'value:harmony' }] },
+    { id: 'q_enemy',   kind: 'question', when: 'enemyMet', weight: 2, txt: '회색 부족과는 어떻게 지내야 할까요?', opts: [{ act: 'value:strength', nm: '⚔️ 맞서라' }, { act: 'value:harmony', nm: '🕊️ 경계하되 평화를' }] },
+    { id: 'q_child',   kind: 'question', when: 'kids',     weight: 2, txt: '아이들에게 무엇을 먼저 가르칠까요?', opts: [{ act: 'value:wisdom', nm: '📜 글' }, { act: 'value:strength', nm: '🏹 사냥' }, { act: 'value:harmony', nm: '🎵 노래' }] },
+    { id: 'q_night',   kind: 'question', when: 'question', weight: 1, txt: '밤은 왜 이렇게 길까요? 신께서도 주무시나요?', opts: [{ act: 'value:wisdom', nm: '📜 별을 세어 보렴' }, { act: 'value:harmony', nm: '🤝 서로 곁에 있으렴' }] }
+  ],
+  // 마을의 가치 — 질문에 답할 때마다 쌓이고(최대 5까지 효과), 마을 패널에 보입니다
+  VALUES: {
+    wisdom:   { nm: '지혜', ic: '📜', desc: '지식 생산 +4%씩' },
+    strength: { nm: '힘',   ic: '⚔️', desc: '전투력·체력 +4%씩' },
+    harmony:  { nm: '화합', ic: '🤝', desc: '행복 +1.5, 믿음 +3%씩' }
+  },
 
   // ---------- 오늘의 과제 ----------
   DAILY: [
     { id: 'wish', nm: '소원 들어주기', n: 3 },
+    { id: 'voice', nm: '목소리에 답하기', n: 2 },
+    { id: 'bless', nm: '축복하기', n: 1 },
     { id: 'gift', nm: '선물 내리기', n: 5 },
     { id: 'move', nm: '시민 옮기기', n: 5 }
   ],
@@ -207,7 +248,11 @@ window.GV = {
     { id: 'explore', nm: '세상 끝까지', ic: '🧭', type: 'explored', n: 12, faith: 40 },
     { id: 'bandit3', nm: '산적 토벌', ic: '🏴‍☠️', type: 'bandit', n: 3, faith: 30 },
     { id: 'defend', nm: '마을을 지켰다', ic: '🛡️', type: 'defend', n: 1, faith: 25 },
-    { id: 'conquer', nm: '정복자', ic: '👑', type: 'conquer', n: 1, faith: 100 }
+    { id: 'conquer', nm: '정복자', ic: '👑', type: 'conquer', n: 1, faith: 100 },
+    { id: 'voice20', nm: '귀 기울이는 신', ic: '👂', type: 'voice', n: 20, faith: 30 },
+    { id: 'bless10', nm: '축복의 손', ic: '✨', type: 'bless', n: 10, faith: 25 },
+    { id: 'offer5', nm: '제단의 향기', ic: '🎁', type: 'offer', n: 5, faith: 20 },
+    { id: 'gen3', nm: '삼대', ic: '👴', type: 'gen', n: 3, faith: 40 }
   ],
 
   // ---------- 자원 나무·바위 등 (지도에 놓이는 것) ----------
@@ -241,7 +286,15 @@ window.GV = {
     war: ['마을을 지켜라!', '덤벼라!', '신이 우리와 함께!', '물러서지 마!'],
     raid: ['적이다!', '숨어!', '전사들은 어디 있어!'],
     settle: ['여기에 새 마을을 세우자', '우리끼리 잘 살 수 있어', '새 출발이다'],
-    loot: ['보물이다!', '옛사람의 지혜야', '이걸 마을로 가져가자']
+    loot: ['보물이다!', '옛사람의 지혜야', '이걸 마을로 가져가자'],
+    thanks: ['고맙습니다!', '신께서 들어주셨어!', '역시 우리 신이야', '마음이 놓여요'],
+    doubt: ['신은 정말 계신 걸까…', '기도해도 소용없어', '우리끼리 살아야지'],
+    sleep: ['쿨쿨…', '내일은 좋은 날이길', '별이 많다…'],
+    offer: ['신께 올립니다', '받아 주소서', '정성을 다했어요'],
+    wed: ['오늘부터 가족이야', '우리 집을 꾸미자', '행복하게 살자'],
+    fest: ['축하해!', '춤추자!', '오늘은 축제다!', '노래하자~'],
+    drill: ['하나, 둘!', '대열을 맞춰라!', '방패 들어!', '오늘도 훈련이다'],
+    march: ['진군!', '발 맞춰!', '신이 우리와 함께!']
   },
   NAMES: ['우가', '마루', '두리', '보리', '나래', '가온', '하늘', '한결', '바위', '시내', '이슬', '별', '솔', '여울', '다솜', '누리', '푸름', '아름', '슬기', '으뜸', '온', '빛나', '새벽', '노을', '구름', '강', '샘', '들', '뫼', '미르', '라온', '초록', '하랑', '서리', '달'],
   HAIR: ['#2b2320', '#6b3f23', '#e8c060', '#d04a2a', '#e879b0', '#4f7fe0', '#4fb06a', '#9a5cf0', '#f0ede0', '#48b8b0'],

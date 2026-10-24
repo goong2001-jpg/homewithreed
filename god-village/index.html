@@ -10,7 +10,7 @@
 <link rel="icon" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>신의 마을</title>
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <!-- 지도: 픽셀 캔버스 + HUD -->
@@ -29,21 +29,30 @@
     <canvas id="minimap" class="minimap" title="지도 — 탭하면 그곳으로"></canvas>
     <button id="homeBtn" class="pill btnpill" type="button">🏠 우리 마을</button>
   </div>
-  <div class="hud hud-r" style="top: 186px">
+  <div class="hud hud-r" style="top: 218px">
     <div id="wishList" class="wishes"></div>
   </div>
   <div class="hud hud-bl">
     <div id="techLine" class="techline"></div>
     <div id="oracleLine" class="oracleline"></div>
+    <div id="watchLine" class="oracleline watchline"></div>
   </div>
   <div class="hud hud-br">
-    <button id="sleepBtn" class="pill btnpill" type="button">🌙 절전</button>
+    <button id="battleBtn" class="pill btnpill battle" type="button" hidden>⚔️ 전투 보기</button>
+    <div class="hud-row"><button id="soundPill" class="pill btnpill" type="button" title="소리 켜기/끄기">🔊</button><button id="sleepBtn" class="pill btnpill" type="button">🌙 절전</button></div>
+  </div>
+  <!-- 시민을 탭하면 뜨는 작은 팝업: 지금 하는 말 + 바로 할 수 있는 일 -->
+  <div id="needPop" class="needpop" hidden>
+    <div class="np-head"><b id="npName"></b><span id="npKind" class="sub"></span><button class="x" id="npClose" type="button">✕</button></div>
+    <div id="npTxt" class="np-txt"></div>
+    <div id="npOpts" class="np-opts"></div>
+    <div class="np-foot"><button type="button" data-np-more>👤 자세히</button><button type="button" id="npLeave">✋ 가만히 두기</button></div>
   </div>
 </section>
 
 <!-- 신의 힘 -->
 <section class="powers">
-  <div class="powers-hint">👆 힘을 고르고 지도를 탭 · 시민은 집어서 옮기기 · 빈 땅을 끌면 지도 이동</div>
+  <div class="powers-hint">👆 힘을 고르고 지도를 탭 · ❗ 붙은 시민을 탭하면 바로 들어주기 · 시민은 집어서 옮기기 · 빈 땅을 끌면 지도 이동</div>
   <div id="powerBar" class="powerbar"></div>
 </section>
 
@@ -66,8 +75,8 @@
   <div class="sheet-body">
     <div class="sheet-grab"></div>
     <div class="sheet-title"><h2 id="panelTitle">시민</h2><button class="x" data-close type="button">✕</button></div>
-    <section id="tab-pop" class="pane"><div id="jobSummary" class="jobs"></div><div id="popList" class="list"></div></section>
-    <section id="tab-bld" class="pane"><p id="bldNext" class="hint"></p><div id="bldList" class="list"></div></section>
+    <section id="tab-pop" class="pane"><div id="jobSummary" class="jobs"></div><div id="famList" class="fam"></div><div id="popList" class="list"></div></section>
+    <section id="tab-bld" class="pane"><p id="bldNext" class="hint"></p><p id="society" class="hint society"></p><div id="bldList" class="list"></div></section>
     <section id="tab-tech" class="pane"><p class="hint">학자가 토템·모닥불·학당에서 지식📜을 쌓으면 차례로 발견합니다. 💡 영감을 내리면 빨라집니다.</p><div id="techList"></div></section>
     <section id="tab-ach" class="pane"><h3>오늘의 과제</h3><div id="dailyList" class="daily"></div><h3>업적</h3><div id="achList" class="list"></div></section>
     <section id="tab-more" class="pane">
@@ -110,7 +119,7 @@
   <div class="modal-body"><h2>🌅 돌아온 사이에</h2><p id="welcomeText"></p><button class="btn primary" id="welcomeOk" type="button">확인</button></div>
 </div>
 
-<script src="data.js?v=2"></script>
-<script src="app.js?v=2"></script>
+<script src="data.js?v=3"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
