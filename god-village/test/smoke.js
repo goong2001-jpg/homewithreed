@@ -20,8 +20,9 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   // ---- 첫 화면 ----
   check('석기 시대로 시작', (await t('#eraNm')) === '석기 시대');
   check('시민 3명, 군락 1개', await ev(() => window.__gv.S.pop.length === 3 && window.__gv.S.settles.length === 1));
-  check('세계 12칸, 우리 칸만 탐험됨', await ev(() => window.__gv.S.explored.flat().length === 12 && window.__gv.S.explored.flat().filter(Boolean).length === 1));
-  check('적 부족은 왼쪽 위, 아직 못 만남', await ev(() => { const e = window.__gv.S.enemy; return e && e.c === 0 && e.r === 0 && !e.met; }));
+  check('세계 50칸, 우리 칸만 탐험됨', await ev(() => window.__gv.S.explored.flat().length === 50 && window.__gv.S.explored.flat().filter(Boolean).length === 1));
+  check('첫 적 세력은 왼쪽 위, 아직 못 만남', await ev(() => { const f = window.__gv.S.factions[0]; return f && f.bases[0].c === 0 && f.bases[0].r === 0 && !f.met; }));
+  check('괴물 둥지가 있다', await ev(() => window.__gv.S.lairs.length >= 1));
   check('산적·보물 등 오브젝트 배치', await ev(() => window.__gv.S.camps.length + window.__gv.S.pickups.length >= 3));
   check('신의 힘 버튼 10개', (await p.locator('.pw').count()) === 10);
   check('미니맵', (await p.locator('#minimap').count()) === 1);
@@ -113,7 +114,8 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   await ev(() => { window.__gv.S.nextWish = 0; window.__gv.slowTick(Date.now()); });
   check('소원 생성·카드', await ev(() => window.__gv.S.wishes.length >= 1) && (await p.locator('#wishList .wish').count()) >= 1);
   await p.click('.navbtn[data-panel="more"]'); await p.click('#godReveal'); await p.click('#panel .sheet-title .x');
-  check('안개 걷기 → 12칸 탐험, 적 발견', await ev(() => window.__gv.S.explored.flat().filter(Boolean).length === 12 && window.__gv.S.enemy.met));
+  check('안개 걷기 → 50칸 탐험, 적 발견', await ev(() => window.__gv.S.explored.flat().filter(Boolean).length === 50 && window.__gv.S.factions[0].met));
+  check('괴물이 둥지에서 나옴', await ev(() => window.__gv.S.hostiles.some(h => h.kind === 'monster')));
   check('산적이 나타남', await ev(() => window.__gv.S.hostiles.some(h => h.kind === 'bandit')));
 
   // ---- 전투: 불벼락으로 산적 소굴 ----
@@ -138,7 +140,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('어른이 1명 이하면 피난민 도착', await ev(() => window.__gv.S.pop.length === 3));
 
   // ---- 적 침략 → 격퇴 / 출정 → 정복 ----
-  await ev(() => { const g = window.__gv, S = g.S; if (!S.techs.includes('hunting')) S.techs.push('hunting'); if (!S.techs.includes('weapons')) S.techs.push('weapons'); const h = g.home(); while (S.pop.length < 8) { const v = { ...S.pop[0], id: 'p' + S.pop.length, name: '주민' + S.pop.length, partner: null, child: false, age: 999, kids: 0, job: 'gather', state: 'idle', held: false, down: 0, x: h.x, y: h.y, settle: h.id, hp: 16 }; S.pop.push(v); } S.enemy.lastRaid = -9999; S.enemy.metAt = -9999; S.simT = 9999; g.slowTick(Date.now()); });
+  await ev(() => { const g = window.__gv, S = g.S; if (!S.techs.includes('hunting')) S.techs.push('hunting'); if (!S.techs.includes('weapons')) S.techs.push('weapons'); const h = g.home(); while (S.pop.length < 8) { const v = { ...S.pop[0], id: 'p' + S.pop.length, name: '주민' + S.pop.length, partner: null, child: false, age: 999, kids: 0, job: 'gather', state: 'idle', held: false, down: 0, x: h.x, y: h.y, settle: h.id, hp: 16 }; S.pop.push(v); } S.hostiles = S.hostiles.filter(h => h.kind !== 'monster'); S.factions[0].lastRaid = -9999; S.factions[0].metAt = -9999; S.factions[0].bases[0].units = 8; S.simT = 9999; g.slowTick(Date.now()); });
   check('적 침략 시작', await ev(() => window.__gv.S.hostiles.some(h => h.kind === 'enemy' && h.raid)));
   check('침략 소원 조건·HUD', (await t('#oracleLine')).includes('침략 중'));
   await ev(() => { window.__gv.S.hostiles.forEach(h => { if (h.raid) h.hp = 0; }); });
@@ -146,15 +148,38 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('침략 격퇴 업적', await ev(() => window.__gv.S.stats.defend >= 1 && window.__gv.S.ach.includes('defend')));
   await ev(() => { const g = window.__gv, S = g.S; S.faith = 300; S.pop.slice(0, 4).forEach(v => { v.job = 'warrior'; v.child = false; }); g.useOracle('invade'); });
   check('출정 명령', await ev(() => !!window.__gv.S.invading && window.__gv.S.rally));
-  await ev(() => { const g = window.__gv, S = g.S; S.pop.filter(v => v.job === 'warrior').forEach(v => { v.x = S.enemy.x; v.y = S.enemy.y + 4; }); });
-  await p.waitForFunction(() => window.__gv.S.hostiles.some(h => h.defend), null, { timeout: 5000 });
-  check('적 수비대 등장', true);
+  const bid = await ev(() => { const g = window.__gv, S = g.S; const b = g.allBases().find(x => x.b.id === S.invading.bid).b; S.pop.filter(v => v.job === 'warrior').forEach(v => { v.x = b.x; v.y = b.y + 30; }); return b.id; });
+  await p.waitForFunction(() => window.__gv.S.hostiles.some(h => h.defend), null, { timeout: 8000 });
+  check('적 수비대 등장 (전사가 기지 30px 밖에 있어도)', true);
   await ev(() => { window.__gv.S.hostiles.forEach(h => { if (h.defend) h.hp = 0; }); });
-  await p.waitForFunction(() => window.__gv.S.stats.conquer >= 1, null, { timeout: 5000 });
-  check('정복 → 적 땅이 우리 군락', await ev(() => !window.__gv.S.enemy.alive && window.__gv.S.settles.some(s => s.nm.startsWith('정복지')) && window.__gv.S.ach.includes('conquer')));
+  await p.waitForFunction(() => window.__gv.S.stats.conquer >= 1, null, { timeout: 8000 });
+  check('정복 → 기지가 사라지고 우리 군락이 됨', await ev(id => { const g = window.__gv, S = g.S; return !g.allBases().some(x => x.b.id === id) && S.settles.some(s => s.nm.startsWith('정복지')) && S.ach.includes('conquer') && !S.invading; }, bid));
+  check('정복에 참여한 전사가 승리 1', await ev(() => window.__gv.S.pop.some(v => v.job === 'warrior' && v.wins >= 1)));
+
+  // ---- 4판: 세력 확장·새 세력·배교·귀향·괴물→영웅·칭호·대역사·군대·축제 ----
+  const nf = await ev(() => { const g = window.__gv, S = g.S; const n = g.factions().length; S.simT = 20000; g.spawnFaction(); return n; });
+  check('새 세력이 먼 땅에 생김', await ev(n => window.__gv.factions().length === n + 1 && window.__gv.factions().some(f => f.nm !== '회색 부족'), nf));
+  await ev(() => { const g = window.__gv; const f = g.factions()[0]; f.bases[0].units = 12; g.expandFaction(f); });
+  check('세력이 옆 칸에 기지를 하나 더 세움', await ev(() => window.__gv.factions()[0].bases.length === 2));
+  const popBefore = await ev(() => { const g = window.__gv, S = g.S; S.pop.filter(v => !v.child && v.state !== 'migrate').slice(0, 3).forEach(v => { v.doubt = true; }); S.lastSchism = -9999; const n = S.pop.length; g.checkSchism(); return n; });
+  check('신을 의심하는 셋이 떠나 자기들 마을을 세움', await ev(n => { const g = window.__gv, S = g.S; const ex = g.factions().find(f => f.kind === 'exile'); return ex && S.pop.length === n - 3 && ex.bases[0].units === 3 && ex.relation === 'wary'; }, popBefore));
+  await ev(() => { const g = window.__gv, S = g.S; const ex = g.factions().find(f => f.kind === 'exile'); ex.met = true; S.happy = 80; S.faith = 100; g.useOracle('return'); });
+  check('신탁 "돌아오라" → 떠난 자들이 돌아옴', await ev(n => { const g = window.__gv, S = g.S; return !g.factions().some(f => f.kind === 'exile') && S.pop.length === n && S.stats.returned === 1; }, popBefore));
+  await ev(() => { const g = window.__gv, S = g.S; const w = S.pop.find(v => v.job === 'warrior') || S.pop[0]; w.job = 'warrior'; const l = S.lairs[0]; l.spawned = false; l.dead = false; S.explored[l.r][l.c] = true; g.lairsTick(); const m = S.hostiles.find(h => h.kind === 'monster'); m.lastHit = w.id; m.hp = 0; w.fought = S.simT; });
+  await p.waitForTimeout(300);
+  check('괴물을 쓰러뜨린 전사는 영웅', await ev(() => window.__gv.S.pop.some(v => v.title === 'hero') && window.__gv.S.stats.hero === 1 && window.__gv.S.ach.includes('hero')));
+  await ev(() => { const g = window.__gv, S = g.S; const v = S.pop.find(v => !v.title && !v.child); v.age = 99999; g.checkTitles(); });
+  check('오래 산 시민은 장로', await ev(() => window.__gv.S.pop.some(v => v.title === 'elder')));
+  await ev(() => { const S = window.__gv.S; S.res.wood = 500; S.res.stone = 500; S.res.metal = 300; S.res.food = 300; S.faith = 300; });
+  check('대역사 명령 → 신전 공사 시작, 자원·믿음 차감', await ev(() => { const g = window.__gv, S = g.S; const ok = g.orderWork('shrine'); return ok && S.blds.some(b => b.type === 'shrine' && !b.done) && S.faith === 280 && S.res.wood === 420; }));
+  check('군대 무장 1단계', await ev(() => { const g = window.__gv, S = g.S; const hp0 = S.pop.filter(v => v.job === 'warrior')[0]; return g.orderArmy() && S.armyLv === 1 && S.res.metal === 260; }));
+  check('축제 열기', await ev(() => { const g = window.__gv, S = g.S; S.fest = null; return g.orderFest() && !!S.fest && S.res.food <= 240 && S.res.food > 230; }));
+  await p.click('.pw[data-power="oracle"]'); await p.waitForSelector('#oracleSheet:not([hidden])');
+  check('신탁 창에 대역사·군대·축제 버튼', (await p.locator('#oracleList [data-work]').count()) === 8 && (await p.locator('#oracleList [data-order]').count()) === 2);
+  await p.click('#oracleSheet .sheet-title .x');
 
   // ---- 패널·절전 ----
-  await p.click('.navbtn[data-panel="ach"]'); check('업적 23개', (await p.locator('#achList .item').count()) === 23);
+  await p.click('.navbtn[data-panel="ach"]'); check('업적 29개', (await p.locator('#achList .item').count()) === 29);
   await p.click('.navbtn[data-panel="bld"]'); check('마을 패널에 군락·적 정보', (await t('#bldNext')).includes('첫 마을'));
   await p.click('#panel .sheet-title .x');
   await p.click('#sleepBtn'); check('절전 화면', !(await p.locator('#sleep').isHidden())); await p.click('#sleep');
@@ -166,7 +191,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('오프라인 정산 창(2시간, 50%)', (await t('#welcomeText')).includes('2시간'));
   check('믿음 정산 +180', await ev(f => window.__gv.S.faith >= f + 180, faithPre));
   await p.click('#welcomeOk');
-  check('새로고침 뒤 세계 유지', await ev(() => window.__gv.S.settles.length >= 2 && window.__gv.S.explored.flat().filter(Boolean).length === 12 && window.__gv.S.stats.marry >= 1));
+  check('새로고침 뒤 세계 유지', await ev(() => window.__gv.S.settles.length >= 2 && window.__gv.S.explored.flat().filter(Boolean).length === 50 && window.__gv.S.stats.marry >= 1 && window.__gv.S.factions.length >= 2 && window.__gv.S.pop.some(v => v.title)));
 
   if (process.env.SHOT) await p.screenshot({ path: process.env.SHOT, fullPage: true });
   check('페이지 오류 없음', errors.length === 0, errors.join(' | '));
