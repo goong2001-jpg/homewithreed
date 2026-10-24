@@ -353,7 +353,65 @@ window.GV = {
     hero: ['그놈은 내가 잡았지', '두려움은 없다', '괴물 따위!'],
     schism: ['우린 떠난다', '신 없이도 살 수 있어', '다시는 안 돌아와'],
     returned: ['…돌아왔습니다', '용서해 주세요', '집이 그리웠어요'],
-    wonder: ['우리 손으로 세웠다!', '후손들이 기억할 거야', '신께 바칩니다']
+    wonder: ['우리 손으로 세웠다!', '후손들이 기억할 거야', '신께 바칩니다'],
+    avatar: ['신이 내려오셨다!', '신이시여!', '빛이다!', '우리와 함께 싸우신다!'],
+    meteor: ['하늘에서 돌이 떨어졌어!', '저게 뭐지?', '반짝이는 돌이다']
+  },
+  // ---------- RPG: 강림·장비·던전·이벤트·출석 (rpg.js 가 씁니다) ----------
+  RPG: {
+    descendCost: 15,      // 강림 비용(믿음)
+    drain: 0.15,          // 강림 중 초당 믿음 소모 (분당 9)
+    charges: 3,           // 강림 횟수. chargeEvery(ms)마다 1회 충전
+    chargeEvery: 8 * 3600 * 1000,
+    deathFaith: 30,       // 화신이 쓰러지면 잃는 믿음
+    deathCd: 600,         // 쓰러진 뒤 강림 쿨타임(초)
+    base: { hp: 80, hpLv: 15, atk: 8, atkLv: 2, spd: 40, range: 16, atkCd: 0.6 },
+    xpBase: 50, xpPow: 1.4,   // 다음 레벨까지 = xpBase × lv^xpPow
+    xp:    { enemy: 10, bandit: 10, wolf: 5, monster: 60, dmob: 8, boss: 40 },
+    faith: { enemy: 2, bandit: 2, wolf: 1, monster: 20, dmob: 1, boss: 10 },
+    morale: 1.2,          // 화신 곁(40px) 전사의 공격 배율
+    skills: [
+      { id: 'bolt', nm: '번개 베기', ic: '⚡', cd: 8, mult: 2.5, radius: 26, desc: '주위 적 모두에게 공격력 2.5배' },
+      { id: 'heal', nm: '치유 파동', ic: '💗', cd: 15, heal: 0.4, radius: 40, desc: '화신 체력 40% 회복, 근처 시민 전부 회복' }
+    ],
+    RARITY: [
+      { id: 'common', nm: '일반', col: '#c8c8d0', opts: 1, mult: 1 },
+      { id: 'rare',   nm: '희귀', col: '#6fb3ff', opts: 2, mult: 1.5 },
+      { id: 'epic',   nm: '영웅', col: '#c58cff', opts: 3, mult: 2.2 },
+      { id: 'legend', nm: '전설', col: '#ffd34f', opts: 4, mult: 3.2 }
+    ],
+    // primary: 기본 능력. base: [기본, 등급(tier)마다 추가]. tier 는 시대와 미궁 층에 따라 1~5
+    SLOTS: {
+      weapon: { nm: '무기', ic: '🗡️', primary: 'atk', base: [4, 3],  names: ['돌칼', '청동검', '철검', '빛의 검', '별의 검'] },
+      armor:  { nm: '갑옷', ic: '🛡️', primary: 'hp',  base: [20, 12], names: ['가죽옷', '청동 갑옷', '철 갑옷', '별빛 갑옷', '신의 갑옷'] },
+      charm:  { nm: '부적', ic: '📿', primary: 'faith', base: [5, 3], names: ['조개 부적', '뼈 부적', '옥 부적', '신의 눈', '별의 눈물'] }
+    },
+    OPTS: [
+      { id: 'atk',   nm: '공격',      unit: '',  base: [2, 6] },
+      { id: 'hp',    nm: '체력',      unit: '',  base: [10, 30] },
+      { id: 'spd',   nm: '이동속도',  unit: '%', base: [5, 15] },
+      { id: 'crit',  nm: '치명타',    unit: '%', base: [3, 10] },
+      { id: 'faith', nm: '믿음 획득', unit: '%', base: [5, 15] },
+      { id: 'xp',    nm: '경험치',    unit: '%', base: [5, 15] },
+      { id: 'regen', nm: '초당 회복', unit: '',  base: [1, 3] }
+    ],
+    enhance: { costMetal: 10, rates: [1, 1, 1, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2], max: 10, step: 0.1 }, // +1마다 기본 능력 +10%, 비용 = costMetal × (현재 강화 + 1)
+    dismantle: { faith: [3, 8, 20, 50], metal: [2, 5, 12, 30] },
+    invMax: 20,
+    // 드롭 등급 가중치 [일반, 희귀, 영웅, 전설]
+    drops: { monster: [0, 60, 35, 5], camp: [70, 28, 2, 0], base: [30, 50, 18, 2], meteor: [30, 50, 18, 2], horde: [10, 50, 35, 5], boss: [0, 30, 55, 15], floor: [40, 45, 13, 2] },
+    dungeon: { nm: '고대 미궁', ic: '🕳️', minDist: 5, mobsBase: 3, mobHp: 25, mobAtk: 4, hpPer: 0.25, atkPer: 0.15, bossEvery: 5, bossMult: 5, radius: 100, leaveDist: 110, faithPerFloor: 5 },
+    events: {
+      meteorEvery: 3 * 3600 * 1000, meteorLife: 3600 * 1000, meteorReward: { metal: 40, faith: 20 },
+      hordeEvery: 6 * 3600 * 1000, hordeSize: 6, hordePerEra: 2, hordeFaith: 30
+    },
+    // 출석 7일 보상. item: 등급 번호(RARITY 순서)
+    attend: [
+      { ic: '✨', nm: '믿음 20', faith: 20 }, { ic: '⛏️', nm: '금속 30', metal: 30 }, { ic: '📦', nm: '일반 장비', item: 0 },
+      { ic: '✨', nm: '믿음 40', faith: 40 }, { ic: '📦', nm: '희귀 장비', item: 1 }, { ic: '⚡', nm: '강림 완충 + 믿음 50', charges: true, faith: 50 },
+      { ic: '🎁', nm: '영웅 장비', item: 2 }
+    ],
+    offline: { dangerAfterH: 24, returnFaithPerH: 10, returnMax: 100 }
   },
   NAMES: ['우가', '마루', '두리', '보리', '나래', '가온', '하늘', '한결', '바위', '시내', '이슬', '별', '솔', '여울', '다솜', '누리', '푸름', '아름', '슬기', '으뜸', '온', '빛나', '새벽', '노을', '구름', '강', '샘', '들', '뫼', '미르', '라온', '초록', '하랑', '서리', '달'],
   HAIR: ['#2b2320', '#6b3f23', '#e8c060', '#d04a2a', '#e879b0', '#4f7fe0', '#4fb06a', '#9a5cf0', '#f0ede0', '#48b8b0'],
