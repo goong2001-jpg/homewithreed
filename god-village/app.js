@@ -194,7 +194,8 @@
   }
   function decide(v) {
     var st = settleOf(v), j = D.JOBS[v.job];
-    var g = S.gifts.find(function (x) { return !x.taken && dist(v, x) < 70; }); if (g && !v.child) { g.taken = true; v.gift = g.id; v.state = 'gift'; return; }
+    // 선물: 아무도 가지러 가고 있지 않으면(주우러 가던 사람이 다른 일로 바뀌었어도) 내가 간다
+    var g = S.gifts.find(function (x) { return dist(v, x) < 70 && !S.pop.some(function (o) { return o !== v && o.state === 'gift' && o.gift === x.id; }); }); if (g && !v.child) { g.taken = true; v.gift = g.id; v.state = 'gift'; return; }
     if (v.child) { v.tx = clamp(st.x + rnd(-20, 20), 4, WW - 4); v.ty = clamp(st.y + rnd(-8, 12), 4, WH - 4); v.timer = rnd(2, 5); v.state = 'wander'; return; }
     if (v.job === 'scout') {
       var pk = null, bd = 1e9; S.pickups.forEach(function (k) { if (k.taken || !isExplored(k.c, k.r)) return; var d = dist(v, k); if (d < bd) { bd = d; pk = k; } }); if (pk) { v.pick = pk.id; v.state = 'pickup'; return; }
