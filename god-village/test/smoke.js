@@ -81,6 +81,34 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('아이 출생', await ev(() => window.__gv.S.pop.some(v => v.child) && window.__gv.S.stats.born >= 1));
   check('아이는 일 안 함', await ev(() => window.__gv.S.pop.filter(v => v.child).every(v => v.job === 'child')));
 
+  // ---- 3판: 목소리(원망·제물·질문)·팝업·축복·가족·오와열·밤 ----
+  await ev(() => { const S = window.__gv.S; S.faith = 100; S.voices = []; S.nextVoice = Date.now() + 1e7; S.nextWish = Date.now() + 1e7; window.__gv.voice('hungry'); });
+  check('원망 목소리 생성·카드', await ev(() => window.__gv.S.voices.length === 1 && window.__gv.S.voices[0].kind === 'complaint') && (await p.locator('#wishList .voice.complaint').count()) === 1);
+  await p.click('#wishList .voice');
+  check('카드를 탭하면 시민 옆 팝업', !(await p.locator('#needPop').isHidden()) && (await p.locator('#needPop [data-vact="comfort"]').count()) === 1);
+  const faithC = await ev(() => window.__gv.S.faith);
+  await p.click('#needPop [data-vact="comfort"]');
+  check('위로하면 목소리 해결·믿음 소모·팝업 닫힘', await ev(f => window.__gv.S.voices.length === 0 && window.__gv.S.stats.voices === 1 && window.__gv.S.stats.comfort === 1, faithC) && (await p.locator('#needPop').isHidden()));
+  await ev(() => { window.__gv.voice('offer_food'); });
+  check('제물: 시민이 토템으로 간다', await ev(() => window.__gv.S.pop.some(v => v.state === 'offer')));
+  await ev(() => { const g = window.__gv; g.doAct('accept', g.S.pop.find(v => v.state === 'offer')); });
+  check('제물 받기 → 제단 +1', await ev(() => window.__gv.S.altar === 1 && window.__gv.S.stats.offers === 1 && !window.__gv.S.pop.some(v => v.state === 'offer')));
+  await ev(() => { const g = window.__gv; g.voice('q_value'); g.doAct('value:wisdom', g.S.pop.find(v => v.id === g.S.voices[0].vid)); });
+  check('물음에 답하면 마을의 가치 +1', await ev(() => window.__gv.S.values.wisdom === 1 && window.__gv.S.asked.includes('q_value')));
+  await ev(() => { const g = window.__gv; g.voice('hungry'); g.S.voices[0].until = 0; g.slowTick(Date.now()); });
+  check('원망을 무시하면 신을 의심', await ev(() => window.__gv.S.voices.length === 0 && window.__gv.S.pop.some(v => v.doubt)));
+  await ev(() => { const g = window.__gv; g.bless(g.S.pop.find(v => v.doubt)); });
+  check('축복: 의심이 풀리고 축복 상태', await ev(() => !window.__gv.S.pop.some(v => v.doubt) && window.__gv.S.pop.some(v => v.bless > 0) && window.__gv.S.stats.bless === 1));
+  check('아이에게 부모·세대·집이 있다', await ev(() => { const k = window.__gv.S.pop.find(v => v.child); return k && k.parents.length === 2 && k.gen === 2; }));
+  check('시민 패널에 가족 묶음', (await (async () => { await p.click('.navbtn[data-panel="pop"]'); const ok = (await t('#famList')).includes('💕'); await p.click('#panel .sheet-title .x'); return ok; })()));
+  await ev(() => { const g = window.__gv, S = g.S; if (!S.techs.includes('weapons')) S.techs.push('weapons'); S.pop.filter(v => !v.child).slice(0, 4).forEach(v => { v.job = 'warrior'; v.nudge = Date.now() + 99999; v.state = 'idle'; }); });
+  await p.waitForTimeout(3500);
+  check('전사들이 군기 옆에 오와열로 선다', await ev(() => { const g = window.__gv, st = g.home(); const ws = g.S.pop.filter(v => v.job === 'warrior'); return st.army && ws.length >= 3 && ws.every(v => (v.state === 'guard' || v.state === 'march') && Math.hypot(v.x - st.army.x, v.y - st.army.y) < 16); }), await ev(() => JSON.stringify(window.__gv.S.pop.filter(v => v.job === 'warrior').map(v => v.state))));
+  await ev(() => { window.__gv.F.time = 75; window.__gv.S.fest = null; });
+  await p.waitForTimeout(1500);
+  check('깊은 밤엔 집으로 가서 잔다', await ev(() => window.__gv.daylight() < 0.08 && window.__gv.S.pop.some(v => v.state === 'sleep')));
+  await ev(() => { window.__gv.F.time = 0; window.__gv.S.pop.forEach(v => { if (v.job === 'warrior') { v.job = 'gather'; v.nudge = 0; v.state = 'idle'; } }); });
+
   // ---- 탐험·소원 ----
   await ev(() => { window.__gv.S.nextWish = 0; window.__gv.slowTick(Date.now()); });
   check('소원 생성·카드', await ev(() => window.__gv.S.wishes.length >= 1) && (await p.locator('#wishList .wish').count()) >= 1);
@@ -126,7 +154,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('정복 → 적 땅이 우리 군락', await ev(() => !window.__gv.S.enemy.alive && window.__gv.S.settles.some(s => s.nm.startsWith('정복지')) && window.__gv.S.ach.includes('conquer')));
 
   // ---- 패널·절전 ----
-  await p.click('.navbtn[data-panel="ach"]'); check('업적 19개', (await p.locator('#achList .item').count()) === 19);
+  await p.click('.navbtn[data-panel="ach"]'); check('업적 23개', (await p.locator('#achList .item').count()) === 23);
   await p.click('.navbtn[data-panel="bld"]'); check('마을 패널에 군락·적 정보', (await t('#bldNext')).includes('첫 마을'));
   await p.click('#panel .sheet-title .x');
   await p.click('#sleepBtn'); check('절전 화면', !(await p.locator('#sleep').isHidden())); await p.click('#sleep');
