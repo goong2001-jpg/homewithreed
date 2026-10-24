@@ -12,6 +12,9 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   await p.goto(BASE + '/index.html');
   await p.waitForFunction(() => window.__gv && window.__gv.S);
   const t = sel => p.textContent(sel);
+  check('첫 접속 출석 창', !(await p.locator('#attend').isHidden()));
+  await p.click('#attendOk');
+  check('출석 보상 받으면 닫힘·믿음 +20', (await p.locator('#attend').isHidden()) && await p.evaluate(() => window.__gv.S.faith >= 32 && window.__gv.S.rpg.attend.streak === 1));
   const ev = (fn, arg) => p.evaluate(fn, arg);
   const box = await p.locator('#field').boundingBox();
   // 세계 좌표 → 화면 좌표
@@ -178,6 +181,33 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   await p.click('.pw[data-power="oracle"]'); await p.waitForSelector('#oracleSheet:not([hidden])');
   check('신탁 창에 대역사·군대·축제 버튼', (await p.locator('#oracleList [data-work]').count()) === 8 && (await p.locator('#oracleList [data-order]').count()) === 2);
   await p.click('#oracleSheet .sheet-title .x');
+
+  // ---- 5판: 화신·장비·미궁·이벤트·출석·오프라인 ----
+  check('화신 탭·강림 버튼', (await p.locator('.navbtn[data-panel="rpg"]').count()) === 1 && (await p.locator('#descendBtn').count()) === 1);
+  await ev(() => { const g = window.__gv, S = g.S; S.faith = 200; S.hostiles = S.hostiles.filter(h => h.kind !== 'monster'); S.rpg.cd = 0; const h = g.home(); window.RPG.descend(h.x + 20, h.y + 20); });
+  check('강림: 화신이 내려오고 충전 1 소모, 조작 HUD', await ev(() => window.RPG.A().on && window.__gv.S.rpg.charges === 2) && !(await p.locator('#rpgHud').isHidden()));
+  await ev(() => { const S = window.__gv.S, A = window.RPG.A(); S.hostiles.push({ id: 'tb', kind: 'bandit', camp: 'none', x: A.x + 6, y: A.y, hp: 1, atk: 0, home: { x: A.x, y: A.y }, timer: 99, walk: 0, face: 1 }); });
+  await p.waitForTimeout(1500);
+  check('화신이 적을 자동으로 베고 경험치·처치 수', await ev(() => window.__gv.S.rpg.xp > 0 && window.__gv.S.rpg.kills === 1));
+  check('장비 드롭·착용·강화·해제·분해', await ev(() => { const R = window.RPG, S = window.__gv.S; const it = R.drop('monster', R.A()); const n0 = S.rpg.inv.length; R.equip(it.id); const eq = S.rpg.equip[it.slot] && S.rpg.equip[it.slot].id === it.id; S.res.metal = 500; const p0 = it.plus; R.enhance(it.id); const okE = S.rpg.equip[it.slot].plus === p0 + 1; R.unequip(it.slot); const f0 = S.faith; R.dismantle(it.id); return eq && okE && S.rpg.inv.length === n0 - 1 && S.faith > f0; }));
+  check('레벨업', await ev(() => { const R = window.RPG, S = window.__gv.S; S.rpg.xp = 10000; R.gainXp(0); return S.rpg.lv > 1 && R.maxHp() > 80; }));
+  check('시민에게 장비 주기 → 전투력 반영', await ev(() => { const R = window.RPG, S = window.__gv.S, g = window.__gv; const it = R.makeItem(2, 2, 'weapon'); S.rpg.inv.push(it); const v = S.pop.find(v => !v.child && v.job === 'warrior') || S.pop.find(v => !v.child); const a0 = g.unitStat(v).atk; R.give(v, it.id); return v.gear.weapon === it && g.unitStat(v).atk > a0; }));
+  await ev(() => { const R = window.RPG, S = window.__gv.S, dg = S.rpg.dg; R.A().x = dg.x; R.A().y = dg.y + 4; R.enterDungeon(); });
+  check('미궁 입장 → 1층 그림자 등장', await ev(() => window.__gv.S.rpg.dg.active && window.__gv.S.hostiles.some(h => h.kind === 'dmob')));
+  await ev(() => { window.__gv.S.hostiles.forEach(h => { if (h.kind === 'dmob') { h.hp = 0; h.lastHit = 'avatar'; } }); });
+  await p.waitForTimeout(600);
+  check('1층 돌파 → 믿음·오늘 첫 돌파 장비', await ev(() => { const dg = window.__gv.S.rpg.dg; return !dg.active && dg.best === 1 && dg.maxToday === 1 && window.__gv.S.rpg.inv.length >= 1; }));
+  check('유성 이벤트', await ev(() => { const R = window.RPG, S = window.__gv.S; R.spawnMeteor(); return S.pickups.some(k => k.kind === 'meteor' && !k.taken); }));
+  const invH = await ev(() => { const R = window.RPG, S = window.__gv.S; R.spawnHorde(); const ok = S.hostiles.some(h => h.horde); S.hostiles.forEach(h => { if (h.horde) h.hp = 0; }); return ok ? S.rpg.inv.length : -1; });
+  await p.waitForTimeout(600);
+  check('습격 이벤트 → 전부 물리치면 상자', invH >= 0 && await ev(n => window.__gv.S.rpg.hordeWins === 1 && window.__gv.S.rpg.inv.length === n + 1, invH));
+  await ev(() => window.RPG.ascend('test'));
+  check('승천', await ev(() => !window.RPG.A().on) && (await p.locator('#rpgHud').isHidden()));
+  check('출석 보상', await ev(() => { const R = window.RPG, S = window.__gv.S; S.rpg.attend = { last: '', streak: 0 }; R.checkAttend(); const pend = S.rpg.attend.pending; R.claimAttend(); return pend && !S.rpg.attend.pending && S.rpg.attend.streak === 1; }));
+  check('오래 비우면 세력 확장·의심, 돌아오면 믿음', await ev(() => { const R = window.RPG, S = window.__gv.S; const f0 = S.faith; const msg = R.offline(30 * 60); return S.faith > f0 && /돌아온 신/.test(msg) && /의심/.test(msg); }));
+  await p.click('.navbtn[data-panel="rpg"]'); await p.waitForTimeout(300);
+  check('화신 패널 렌더', (await t('#tab-rpg')).includes('화신 Lv.') && (await p.locator('#tab-rpg [data-rpg^="equip:"]').count()) >= 1);
+  await p.click('#panel .sheet-title .x');
 
   // ---- 패널·절전 ----
   await p.click('.navbtn[data-panel="ach"]'); check('업적 29개', (await p.locator('#achList .item').count()) === 29);

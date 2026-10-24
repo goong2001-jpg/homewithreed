@@ -1,4 +1,4 @@
-/* 신의 마을 — 원시인 셋이 스스로 문명을 일구는 걸 지켜보는 신 게임 (4판: 50칸 세계·여러 세력·배교자 군락·괴물·칭호·대역사).
+/* 신의 마을 — 원시인 셋이 스스로 문명을 일구는 걸 지켜보는 신 게임 (5판: 화신 강림·장비·미궁·시간 이벤트·출석은 rpg.js).
  * 데이터(시대·기술·건물·소원·목소리·대사·수치)는 data.js, 여기는 로직만.
  * 구성: 상태 → 세계 생성 → 시뮬레이션(시민·가족·건물·기술·소원·목소리·전투·군대·적) → 신의 힘(이펙트·소리) → 픽셀 그리기(카메라) → 화면(DOM) → 입력 → 시작
  * 서버 없이 이 기기 브라우저(localStorage)에만 저장합니다. 테스트·콘솔용 핸들: window.__gv */
@@ -25,7 +25,7 @@
     return {
       v: 3, world: 1, era: 0, faith: C.startFaith, faithTotal: 0, happy: 50, res: { food: 25, wood: 12, stone: 6, metal: 0, know: 0 }, simT: 0,
       pop: [], blds: [], nodes: [], techs: [], wolves: [], gifts: [], wishes: [], ach: [], settles: [], explored: [], camps: [], pickups: [], hostiles: [], lairs: [],
-      factions: [], lastFaction: 0, lastSchism: 0, armyLv: 0, invading: null, rally: null, oracle: null, miracle: null, rainUntil: 0, lastTick: Date.now(), nextWish: Date.now() + 40000, nextWolf: Date.now() + C.wolfEvery * 1000,
+      factions: [], lastFaction: 0, lastSchism: 0, armyLv: 0, invading: null, rally: null, rpg: null, oracle: null, miracle: null, rainUntil: 0, lastTick: Date.now(), nextWish: Date.now() + 40000, nextWolf: Date.now() + C.wolfEvery * 1000,
       voices: [], nextVoice: Date.now() + 50000, values: { wisdom: 0, strength: 0, harmony: 0 }, asked: [], altar: 0, watch: null, fest: null,
       marryT: 0, birthT: 0, log: [], chat: [], stats: { wishes: 0, gifts: 0, moves: 0, born: 0, wolves: 0, smites: 0, marry: 0, bandit: 0, defend: 0, conquer: 0, died: 0, voices: 0, bless: 0, offers: 0, comfort: 0, hero: 0, titles: 0, wonder: 0, returned: 0, schism: 0, monsters: 0 },
       cfg: { offPct: C.offPct, offHours: C.offHours, sound: true }, daily: { date: today(), wish: 0, gift: 0, move: 0, voice: 0, bless: 0, claimed: false },
@@ -126,7 +126,7 @@
     S.lairs.forEach(function (l) { if (l.c === c && l.r === r && !l.dead) objs.push(D.MONSTERS[l.mon].ic + ' ' + D.MONSTERS[l.mon].nm + '의 둥지'); });
     sysChat('🧭 새 땅을 발견했다' + (objs.length ? ': ' + objs.join(', ') : '')); ui.dirty.map = true; F.mapKey = ''; ui.dirty.head = true; }
   function exploredCount() { var n = 0; S.explored.forEach(function (row) { row.forEach(function (x) { if (x) n++; }); }); return n; }
-  function unitStat(v) { var base = D.UNITS[v.child ? 'child' : v.job === 'warrior' ? 'warrior' : v.job === 'hunter' ? 'hunter' : 'citizen']; var m = 1 + S.era * 0.2, lv = fighter(v) ? 1 + 0.1 * (S.armyLv || 0) : 1; return { hp: Math.round(base.hp * m * mul('hp') * lv * (v.title === 'hero' ? 1.5 : 1)), atk: base.atk * m * mul('atk') * lv * (v.title === 'general' ? 1.3 : 1) }; }
+  function unitStat(v) { var base = D.UNITS[v.child ? 'child' : v.job === 'warrior' ? 'warrior' : v.job === 'hunter' ? 'hunter' : 'citizen']; var m = 1 + S.era * 0.2, lv = fighter(v) ? 1 + 0.1 * (S.armyLv || 0) : 1, rb = window.RPG ? RPG.vb(v) : null; return { hp: Math.round(base.hp * m * mul('hp') * lv * (v.title === 'hero' ? 1.5 : 1) + (rb ? rb.hp : 0)), atk: (base.atk * m * mul('atk') * lv * (v.title === 'general' ? 1.3 : 1) + (rb ? rb.atk : 0)) * (rb ? rb.mul : 1) }; }
   // ---- 세력(적 부족·떠난 자들): 기지 여러 개, 성장·확장, 새 세력 등장 ----
   function makeBase(c, r, units) { var cc = cellCenter(c, r); return { id: uid(), c: c, r: r, x: Math.round(cc.x), y: Math.round(cc.y), units: units, defSpawned: false }; }
   function makeFaction(kind, c, r, units, nm, col, simT) { return { id: uid(), nm: nm, kind: kind, col: col, alive: true, met: false, metAt: 0, lastRaid: 0, raids: 0, growT: 0, born: simT || 0, relation: kind === 'exile' ? 'wary' : 'hostile', bases: [makeBase(c, r, units)], names: [] }; }
@@ -203,7 +203,7 @@
     S.nodes.forEach(function (n) { var d = D.NODES[n.type]; if (n.amount < d.max) n.amount = Math.min(d.max, n.amount + d.regrow * dt); if (d.moves) { if (Math.random() < dt * 0.3) { n.vx = rnd(-6, 6); n.vy = rnd(-4, 4); } n.x = clamp(n.x + n.vx * dt, 6, WW - 6); n.y = clamp(n.y + n.vy * dt, 6, WH - 6); } });
     S.res.food = Math.max(0, S.res.food - S.pop.length * C.foodPerPop * dt);
     S.pop.forEach(function (v) { stepVillager(v, dt, now); });
-    stepHostiles(dt, now); stepArmies(dt);
+    stepHostiles(dt, now); stepArmies(dt); if (window.RPG) RPG.step(dt, now);
     S.gifts.forEach(function (g) { if (!g.landed && F.time - (g.born || 0) >= 0.55) { g.landed = true; ring(g, '#d8c8a0', 2, 10, 0.5); burst(g, '#c0b090', 8); SFX.play('thud'); } });
     if (S.fest && Math.random() < dt * 6) F.fx.push({ kind: 'spark', x: S.fest.x + rnd(-16, 16), y: S.fest.y + rnd(-6, 6), vx: rnd(-6, 6), vy: rnd(-30, -10), color: pick(['#ffd34f', '#ff6a9a', '#6fb3ff', '#7fd36b']), t: 0, life: rnd(0.6, 1.2) });
     for (var j = F.fx.length - 1; j >= 0; j--) { var f = F.fx[j]; f.t += dt; if (f.kind === 'spark') { f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 60 * dt; } if (f.kind === 'num') f.y -= 8 * dt; if (f.kind === 'heart') f.y -= 6 * dt; if (f.kind === 'shoot') { f.x += f.vx * dt; f.y += f.vy * dt; } if (f.kind === 'z') { f.y -= 4 * dt; f.x += 2 * dt; } if (f.t > f.life) F.fx.splice(j, 1); }
@@ -219,6 +219,7 @@
     if (now > S.nextWish) { S.nextWish = now + C.wishEvery * 1000; makeWish(); }
     checkWishes(now); makeVoice(now); checkVoices(now); updateMoods(); family(); factionTick(now); campsTick(); lairsTick();
     if (slow.n % 5 === 0) { checkTitles(); checkSchism(); }
+    if (window.RPG) RPG.slowTick(now);
     if (S.fest && S.simT > S.fest.until) S.fest = null;
     if (slow.n % 3 === 0) { checkAch(); checkDaily(); }
     if (S.oracle && now > S.oracle.until) { S.oracle = null; sysChat('📣 신탁의 효력이 다했다'); }
@@ -267,7 +268,7 @@
     if (v.state === 'idle') { decide(v); return; }
     if (v.state === 'wander') { if (moveToward(v, v.tx, v.ty, v.child ? 6 : 8, dt) < 1 || (v.timer -= dt) <= 0) v.state = 'idle'; return; }
     if (v.state === 'explore') { if (moveToward(v, v.tx, v.ty, scoutSpeed(v), dt) < 2 || (v.timer -= dt) <= 0) { v.state = 'idle'; } return; }
-    if (v.state === 'pickup') { var pk = S.pickups.find(function (x) { return x.id === v.pick; }); if (!pk || pk.taken) { v.state = 'idle'; return; } if (moveToward(v, pk.x, pk.y, scoutSpeed(v), dt) < 2) { pk.taken = true; var rw = {}, bm = hasWonder('beacon') ? 2 : 1; Object.keys(pk.reward).forEach(function (k) { rw[k] = pk.reward[k] * bm; }); if (rw.faith) addFaith(rw.faith); if (rw.know) S.res.know += rw.know; sysChat(pk.ic + ' ' + v.name + '이(가) ' + pk.nm + '을(를) 찾았다! ' + (rw.faith ? '믿음 +' + rw.faith : '지식 +' + rw.know)); addLog(pk.ic + ' <b>' + pk.nm + '</b> 발견'); burst(pk, '#ffe9a8', 16); say(v, 'loot', true); v.state = 'idle'; ui.dirty.map = true; } return; }
+    if (v.state === 'pickup') { var pk = S.pickups.find(function (x) { return x.id === v.pick; }); if (!pk || pk.taken) { v.state = 'idle'; return; } if (moveToward(v, pk.x, pk.y, scoutSpeed(v), dt) < 2) { pk.taken = true; var rw = {}, bm = hasWonder('beacon') ? 2 : 1; Object.keys(pk.reward).forEach(function (k) { rw[k] = pk.reward[k] * bm; }); if (rw.faith) addFaith(rw.faith); if (rw.know) S.res.know += rw.know; sysChat(pk.ic + ' ' + v.name + '이(가) ' + pk.nm + '을(를) 찾았다! ' + (rw.faith ? '믿음 +' + rw.faith : '지식 +' + rw.know)); addLog(pk.ic + ' <b>' + pk.nm + '</b> 발견'); burst(pk, '#ffe9a8', 16); say(v, 'loot', true); v.state = 'idle'; ui.dirty.map = true; if (window.RPG) RPG.onPickup(pk, v); } return; }
     if (v.state === 'go') {
       var tg = v.node ? S.nodes.find(function (n) { return n.id === v.node; }) : (v.bld ? S.blds.find(function (b) { return b.id === v.bld; }) : null);
       if (!tg) { v.state = 'idle'; return; }
@@ -430,7 +431,7 @@
   // ---- 전투: 산적·늑대·적 부족 ----
   function campsTick() {
     S.camps.forEach(function (k) { if (k.cleared || k.spawned || !isExplored(k.c, k.r)) return; k.spawned = true; for (var i = 0; i < k.units; i++) S.hostiles.push({ id: uid(), kind: 'bandit', camp: k.id, x: k.x + rnd(-8, 8), y: k.y + rnd(-4, 6), hp: D.UNITS.bandit.hp * (1 + S.era * 0.2), atk: D.UNITS.bandit.atk * (1 + S.era * 0.2), home: { x: k.x, y: k.y }, timer: 0, walk: 0, face: 1 }); });
-    S.camps.forEach(function (k) { if (k.cleared || !k.spawned) return; if (!S.hostiles.some(function (h) { return h.camp === k.id && h.hp > 0; })) { k.cleared = true; S.stats.bandit++; Object.keys(k.loot).forEach(function (r) { if (r === 'faith') addFaith(k.loot[r]); else addRes(r, k.loot[r]); }); sysChat('🏴‍☠️ 산적 소굴을 소탕했다! 전리품 ' + Object.keys(k.loot).map(function (r) { return RES_IC[r] + k.loot[r]; }).join(' ')); addLog('🏴‍☠️ <b>산적 소굴</b> 소탕'); toast('🏴‍☠️ 산적 소굴 소탕! 전리품을 얻었다'); burst(k, '#ffd34f', 24); ui.dirty.map = true; checkAch(); } });
+    S.camps.forEach(function (k) { if (k.cleared || !k.spawned) return; if (!S.hostiles.some(function (h) { return h.camp === k.id && h.hp > 0; })) { k.cleared = true; S.stats.bandit++; Object.keys(k.loot).forEach(function (r) { if (r === 'faith') addFaith(k.loot[r]); else addRes(r, k.loot[r]); }); sysChat('🏴‍☠️ 산적 소굴을 소탕했다! 전리품 ' + Object.keys(k.loot).map(function (r) { return RES_IC[r] + k.loot[r]; }).join(' ')); if (window.RPG) RPG.drop('camp', k); addLog('🏴‍☠️ <b>산적 소굴</b> 소탕'); toast('🏴‍☠️ 산적 소굴 소탕! 전리품을 얻었다'); burst(k, '#ffd34f', 24); ui.dirty.map = true; checkAch(); } });
   }
   function raidActive() { return S.hostiles.some(function (h) { return h.kind === 'enemy' && h.raid; }); }
   function lairsTick() {
@@ -492,11 +493,13 @@
       var h = S.hostiles[i]; h.anim = Math.max(0, (h.anim || 0) - dt);
       if (h.hp <= 0) { S.hostiles.splice(i, 1); burst(h, '#e06a5a', 8);
         if (h.kind === 'monster') monsterDown(h);
+        if (window.RPG) RPG.onKill(h);
         if (h.kind === 'enemy' && h.raid && !S.hostiles.some(function (o) { return o.raid; })) { S.stats.defend++; addFaith(15); sysChat('🛡️ 침략을 막아냈다! 믿음 +15'); addLog('🛡️ 침략 격퇴'); battleWon(); S.wishes.slice().forEach(function (w) { if (w.type === 'enemy') fulfill(w, S.pop.find(function (x) { return x.id === w.vid; })); }); checkAch(); }
         continue; }
-      var tgt = null, bd = h.kind === 'bandit' ? 40 : h.kind === 'monster' ? 34 : 60; S.pop.forEach(function (v) { if (v.held) return; var d = dist(h, v); if (d < bd) { bd = d; tgt = v; } });
+      var tgt = null, bd = h.kind === 'bandit' ? 40 : h.kind === 'monster' ? 34 : h.kind === 'dmob' ? 50 : 60; S.pop.forEach(function (v) { if (v.held) return; var d = dist(h, v); if (d < bd) { bd = d; tgt = v; } });
+      var av = window.RPG ? RPG.target() : null; if (av && dist(h, av) < bd) { bd = dist(h, av); tgt = av; }
       if (h.kind === 'bandit') { if (tgt && dist(h, h.home) < 70) { if (dist(h, tgt) > 6) moveToward(h, tgt.x, tgt.y, 14, dt); else attackV(h, tgt, dt); } else if (dist(h, h.home) > 4) moveToward(h, h.home.x, h.home.y, 10, dt); continue; }
-      if (h.kind === 'monster') { if (tgt && dist(h, h.home) < 80) { if (dist(h, tgt) > 8) moveToward(h, tgt.x, tgt.y, 11, dt); else attackV(h, tgt, dt, 1.6); } else if (dist(h, h.home) > 10) moveToward(h, h.home.x, h.home.y, 8, dt); else if (Math.random() < dt * 0.2) { h.face = Math.random() < 0.5 ? -1 : 1; } continue; }
+      if (h.kind === 'monster' || h.kind === 'dmob') { var dm = h.kind === 'dmob'; if (tgt && dist(h, h.home) < (dm ? 100 : 80)) { if (dist(h, tgt) > 8) moveToward(h, tgt.x, tgt.y, dm ? 14 : 11, dt); else attackV(h, tgt, dt, dm ? 1.2 : 1.6); } else if (dist(h, h.home) > 10) moveToward(h, h.home.x, h.home.y, 8, dt); else if (Math.random() < dt * 0.2) { h.face = Math.random() < 0.5 ? -1 : 1; } continue; }
       if (h.kind === 'enemy' && h.raid) {
         if (h.until && S.simT > h.until) { S.hostiles.splice(i, 1); var rb = baseById(h.bid); if (rb) rb.units++; if (!S.hostiles.some(function (o) { return o.raid; })) sysChat('🏃 침략군이 물러갔다'); continue; }
         if (tgt) { if (dist(h, tgt) > 6) moveToward(h, tgt.x, tgt.y, 13, dt); else attackV(h, tgt, dt); continue; }
@@ -519,6 +522,7 @@
     Object.keys(m.loot).forEach(function (k) { if (k === 'faith') addFaith(m.loot[k]); else addRes(k, m.loot[k]); });
     sysChat(m.ic + ' ' + m.nm + '을(를) 쓰러뜨렸다! ' + Object.keys(m.loot).map(function (k) { return RES_IC[k] + m.loot[k]; }).join(' ')); addLog(m.ic + ' <b>' + m.nm + '</b> 처치'); toast(m.ic + ' ' + m.nm + ' 처치!'); burst(h, '#ffd34f', 30); SFX.play('fanfare'); F.mapKey = ''; ui.dirty.map = true;
     var killer = S.pop.find(function (v) { return v.id === h.lastHit; }); if (killer) { S.stats.hero++; giveTitle(killer, 'hero'); say(killer, 'hero', true); }
+    if (window.RPG) RPG.drop('monster', h);
     battleWon(); checkAch();
   }
   function battleWon() { S.pop.forEach(function (v) { if (fighter(v) && v.fought && S.simT - v.fought < 90) { v.wins = (v.wins || 0) + 1; } }); checkTitles(); }
@@ -529,7 +533,7 @@
     battleWon();
     if (!f.bases.length) { f.alive = false; f.diedAt = S.simT; addFaith(50); sysChat('👑 ' + f.nm + '의 마지막 기지를 정복했다! ' + f.nm + '은(는) 역사 속으로 사라졌다 (믿음 +' + (EN.conquerFaith + 50) + ')'); addLog('👑 <b>' + f.nm + '</b> 멸망'); toast('👑 ' + f.nm + ' 정복! 그들은 사라졌다'); }
     else { sysChat('👑 ' + f.nm + '의 기지를 정복했다! 믿음 +' + EN.conquerFaith + (st ? ', 그 땅은 우리 군락 "' + st.nm + '"이 됐다' : '') + ' (남은 기지 ' + f.bases.length + ')'); addLog('👑 <b>' + f.nm + '</b> 기지 정복'); toast('👑 기지 정복! 남은 기지 ' + f.bases.length); }
-    burst(b, '#ffd34f', 40); SFX.play('fanfare'); F.mapKey = ''; ui.dirty.map = true; ui.dirty.bld = true; ui.dirty.head = true; checkAch();
+    burst(b, '#ffd34f', 40); SFX.play('fanfare'); F.mapKey = ''; ui.dirty.map = true; ui.dirty.bld = true; ui.dirty.head = true; checkAch(); if (window.RPG) RPG.drop('base', b);
   }
   // ---- 칭호 ----
   function giveTitle(v, id) {
@@ -542,10 +546,12 @@
   function scoutSpeed(v) { return 18 * (hasWonder('beacon') ? 1.5 : 1) * (v.title === 'pathfinder' ? 1.3 : 1); }
   function attackV(h, v, dt, cd) {
     h.timer = (h.timer || 0) - dt; if (h.timer > 0) return; h.timer = cd || 1.2; h.anim = 0.3;
-    var dmg = Math.round((h.atk || 3) * rnd(0.8, 1.2)); v.hp -= dmg; F.fx.push({ kind: 'num', x: v.x, y: v.y - 14, txt: '-' + dmg, color: '#ff7a70', size: 5, t: 0, life: 0.6 }); F.fx.push({ kind: 'slash', x: v.x, y: v.y - 8, f: h.face || 1, t: 0, life: 0.15 }); F.battle = { x: v.x, y: v.y, t: F.time }; SFX.play('hurt');
+    var dmg = Math.round((h.atk || 3) * rnd(0.8, 1.2)); F.fx.push({ kind: 'slash', x: v.x, y: v.y - 8, f: h.face || 1, t: 0, life: 0.15 }); F.battle = { x: v.x, y: v.y, t: F.time }; SFX.play('hurt');
+    if (v.isAvatar) { RPG.hurt(dmg, h); return; }
+    v.hp -= dmg; F.fx.push({ kind: 'num', x: v.x, y: v.y - 14, txt: '-' + dmg, color: '#ff7a70', size: 5, t: 0, life: 0.6 });
     if (v.state !== 'fight' && !fighter(v)) v.state = 'flee';
     if (v.hp > 0) return;
-    var by = h.kind === 'wolf' ? '늑대' : h.kind === 'bandit' ? '산적' : h.kind === 'monster' ? D.MONSTERS[h.mon].nm : (function () { var f = S.factions.find(function (x) { return x.id === h.fid; }); return f ? f.nm : EN.nm; })();
+    var by = h.kind === 'wolf' ? '늑대' : h.kind === 'bandit' ? '산적' : h.kind === 'monster' ? D.MONSTERS[h.mon].nm : h.nm ? h.nm : (function () { var f = S.factions.find(function (x) { return x.id === h.fid; }); return f ? f.nm : EN.nm; })();
     if (fighter(v)) { dieV(v, by); return; }
     // 일반 시민·아이는 죽지 않고 쓰러진다: 집으로 옮겨져 30초 쉬고 일어난다
     v.hp = 1; v.down = S.simT + 30; var st = settleOf(v); v.x = st.x + rnd(-8, 8); v.y = st.y + rnd(2, 10); v.state = 'wander'; v.tx = v.x; v.ty = v.y; v.timer = 30; v.carry = null;
@@ -783,7 +789,7 @@
     var kn = Math.floor(r.know * mins * pct); if (kn > 0) { S.res.know += kn; got.push('📜' + fmt(kn)); for (var i = 0; i < 10; i++) checkTech(); checkEra(); }
     var fa = Math.floor(r.faith * mins * pct); if (fa > 0) { addFaith(fa); got.push('✨' + fmt(fa)); }
     var born = Math.min(Math.floor(r.born * mins * pct), Math.max(0, housing() - S.pop.length)); for (var j = 0; j < born; j++) { var h = home(); S.pop.push(makeVillager(h.x + rnd(-12, 12), h.y + rnd(-8, 8), 'gather', h)); } if (born) got.push('👶' + born);
-    S.simT += mins * 60 * pct; S.pop.forEach(function (v) { v.age += mins * 60 * pct; });
+    S.simT += mins * 60 * pct; S.pop.forEach(function (v) { v.age += mins * 60 * pct; }); F.offlineMins = el / 60000;
     var hrs = Math.floor(mins / 60), mm = Math.floor(mins % 60);
     $('#welcomeText').textContent = (hrs ? hrs + '시간 ' : '') + mm + '분 동안 (오프라인 보상 ' + S.cfg.offPct + '%' + (el / 60000 > S.cfg.offHours * 60 ? ', 최대 ' + S.cfg.offHours + '시간' : '') + ')\n' + (got.length ? '시민들이 모은 것: ' + got.join(' · ') : '시민들은 조용히 지냈습니다') + '\n\n💡 절전 모드로 켜 두면 100%를 받습니다.';
     $('#welcome').hidden = false;
@@ -817,6 +823,7 @@
     // 강 (왼쪽 아래에서 오른쪽 위로 굽이치는 물길, 칸 경계는 피해서)
     var rx = 20; for (y = WH - 1; y >= 0; y--) { rx += (r() - 0.5) * 2 + 0.25; rx = clamp(rx, 10, WW - 10); var skip = S.settles.some(function (st) { return Math.abs(y - st.y) < 50 && Math.abs(rx - st.x) < 60; }) || allBases().some(function (xb) { return Math.abs(y - xb.b.y) < 40 && Math.abs(rx - xb.b.x) < 50; }); if (skip) continue; P(c, rx - 3, y, '#3a6a9a', 7, 1); if (r() < 0.3) P(c, rx - 2 + Math.floor(r() * 5), y, '#5a8ac0', 1, 1); }
     for (i = 0; i < 120; i++) P(c, Math.floor(r() * WW), Math.floor(r() * WH), r() < 0.5 ? '#ffd0e0' : '#fff6c0', 1, 1);
+    if (window.RPG) RPG.paintMap(c);
     F.map = cv; F.mapKey = 'e' + S.era + 'w' + S.world + 's' + S.settles.length + basesKey();
   }
   function daylight() { var t = (F.time % C.dayLength) / C.dayLength; return 0.5 + 0.5 * Math.cos(t * Math.PI * 2); }
@@ -843,7 +850,9 @@
     if (S.rally) ents.push({ y: S.rally.y, rally: S.rally });
     S.settles.forEach(function (st) { if (st.army && inView(st.army, 20) && warriorsOf(st).length >= 2) ents.push({ y: st.army.y - 1, army: st }); });
     ents.sort(function (a, b) { return a.y - b.y; });
+    if (window.RPG) RPG.drawUnder(ctx);
     ents.forEach(function (e) { if (e.n) drawNode(ctx, e.n); else if (e.b) drawBuilding(ctx, e.b); else if (e.k) drawCamp(ctx, e.k); else if (e.pk) drawPickup(ctx, e.pk); else if (e.en) drawEnemyBase(ctx, e.en, e.f); else if (e.lair) drawLair(ctx, e.lair); else if (e.g) drawGift(ctx, e.g); else if (e.v) drawVillager(ctx, e.v, Math.round(e.v.x), Math.round(e.v.y)); else if (e.w) drawWolf(ctx, e.w); else if (e.h) drawHostile(ctx, e.h); else if (e.rally) drawRally(ctx, e.rally); else if (e.army) drawBanner(ctx, e.army); });
+    if (window.RPG) RPG.draw(ctx);
     // 안개
     for (var r = 0; r < W.rows; r++) for (var c = 0; c < W.cols; c++) { if (isExplored(c, r)) continue; var x0 = c * W.cellW, y0 = r * W.cellH; if (x0 > cam.x + F.vw || x0 + W.cellW < cam.x || y0 > cam.y + F.vh || y0 + W.cellH < cam.y) continue; ctx.fillStyle = 'rgba(8,12,20,.86)'; ctx.fillRect(x0, y0, W.cellW, W.cellH); ctx.fillStyle = '#1a2230'; for (var i = 0; i < 40; i++) ctx.fillRect(x0 + (i * 37) % W.cellW, y0 + (i * 53) % W.cellH, 2, 1); }
     var night = 1 - daylight(); if (S.era >= 5) night *= 0.5;
@@ -875,7 +884,7 @@
     else if (n.type === 'boar') { var b2 = Math.floor((F.time * 5) % 2); P(ctx, x - 4, y - 4 + b2, '#5a4030', 8, 4); P(ctx, x + 4, y - 4 + b2, '#5a4030', 2, 3); P(ctx, x + 5, y - 2 + b2, '#f0e0c0', 1, 1); P(ctx, x - 3, y, '#3a2a1a', 1, 1); P(ctx, x + 2, y, '#3a2a1a', 1, 1); P(ctx, x + 4, y - 4 + b2, '#ff5050', 1, 1); }
   }
   function drawGift(ctx, g) { var x = Math.round(g.x), y = Math.round(g.y), bob = Math.round(Math.sin(F.time * 5)), age = F.time - (g.born || -9); if (age < 0.55) { var fy = Math.round(y - (0.55 - age) / 0.55 * 60); P(ctx, x - 3, fy - 4, RES_COL[g.res], 6, 4); ctx.globalAlpha = 0.3; P(ctx, x - 3, y - 1, '#000', 6, 2); ctx.globalAlpha = 1; return; } P(ctx, x - 3, y - 4 + bob, RES_COL[g.res], 6, 4); P(ctx, x - 3, y - 2 + bob, mix(RES_COL[g.res], '#000', 0.3), 6, 1); P(ctx, x, y - 5 + bob, '#ffe9a8', 1, 1); ctx.globalAlpha = 0.25; ctx.fillStyle = '#ffe9a8'; ctx.beginPath(); ctx.arc(x, y - 2, 6, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
-  function drawPickup(ctx, k) { var x = Math.round(k.x), y = Math.round(k.y), bob = Math.round(Math.sin(F.time * 4)); if (k.kind === 'treasure') { P(ctx, x - 4, y - 4 + bob, '#8a5a2a', 8, 4); P(ctx, x - 4, y - 5 + bob, '#c08a3a', 8, 1); P(ctx, x - 1, y - 3 + bob, '#ffd34f', 2, 2); } else { P(ctx, x - 5, y - 1, '#9a9aa0', 10, 1); P(ctx, x - 4, y - 7, '#b0b0b8', 2, 6); P(ctx, x + 2, y - 7, '#b0b0b8', 2, 6); P(ctx, x - 1, y - 5, '#b0b0b8', 2, 4); P(ctx, x - 5, y - 8, '#c8c8d0', 10, 1); } ctx.globalAlpha = 0.2; ctx.fillStyle = '#ffe9a8'; ctx.beginPath(); ctx.arc(x, y - 3, 8, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
+  function drawPickup(ctx, k) { var x = Math.round(k.x), y = Math.round(k.y), bob = Math.round(Math.sin(F.time * 4)); if (k.kind === 'meteor') { ctx.globalAlpha = 0.25 + 0.1 * Math.sin(F.time * 4); ctx.fillStyle = '#ff9a3c'; ctx.beginPath(); ctx.arc(x, y - 3, 10, 0, 7); ctx.fill(); ctx.globalAlpha = 1; P(ctx, x - 5, y - 6, '#4a3a3a', 10, 6); P(ctx, x - 4, y - 7, '#5a4a4a', 8, 1); P(ctx, x - 3, y - 5, '#ff7a2a', 2, 2); P(ctx, x + 1, y - 4, '#ffd040', 2, 1); P(ctx, x - 1, y - 2, '#ff7a2a', 1, 1); return; } if (k.kind === 'treasure') { P(ctx, x - 4, y - 4 + bob, '#8a5a2a', 8, 4); P(ctx, x - 4, y - 5 + bob, '#c08a3a', 8, 1); P(ctx, x - 1, y - 3 + bob, '#ffd34f', 2, 2); } else { P(ctx, x - 5, y - 1, '#9a9aa0', 10, 1); P(ctx, x - 4, y - 7, '#b0b0b8', 2, 6); P(ctx, x + 2, y - 7, '#b0b0b8', 2, 6); P(ctx, x - 1, y - 5, '#b0b0b8', 2, 4); P(ctx, x - 5, y - 8, '#c8c8d0', 10, 1); } ctx.globalAlpha = 0.2; ctx.fillStyle = '#ffe9a8'; ctx.beginPath(); ctx.arc(x, y - 3, 8, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
   function drawCamp(ctx, k) { var x = k.x, y = k.y; if (k.cleared) { P(ctx, x - 6, y - 2, '#3a3a3a', 12, 2); P(ctx, x - 3, y - 4, '#2a2a2a', 6, 2); return; } P(ctx, x - 7, y - 1, '#4a3a2a', 14, 1); P(ctx, x - 5, y - 7, '#5a4a3a', 10, 6); P(ctx, x - 6, y - 8, '#3a2a1a', 12, 1); P(ctx, x - 1, y - 4, '#1a1410', 3, 3); P(ctx, x + 6, y - 14, '#6a5a3a', 1, 13); P(ctx, x + 7, y - 14, '#1a1a1a', 5, 3); P(ctx, x + 8, y - 13, '#fff', 1, 1); P(ctx, x + 10, y - 13, '#fff', 1, 1); var f = Math.floor(F.time * 8) % 2; P(ctx, x - 9, y - 3 - f, '#ff7a2a', 2, 2 + f); }
   function drawEnemyBase(ctx, e, f) { var x = e.x, y = e.y, ex = f.kind === 'exile', wall = ex ? '#6a6a5a' : mix('#5a3030', f.col, 0.3), roof = ex ? era().cloth[0] : mix('#6a3a3a', f.col, 0.5), n = Math.min(7, 1 + Math.ceil(e.units / 3)), pos = [[0, -8], [-16, 2], [16, 2], [-6, 12], [8, 12], [-20, -10], [20, -10]]; for (var i = 0; i < n; i++) { var hx = x + pos[i][0], hy = y + pos[i][1]; P(ctx, hx - 5, hy - 4, wall, 10, 4); P(ctx, hx - 4, hy - 6, roof, 8, 2); P(ctx, hx - 3, hy - 7, roof, 6, 1); P(ctx, hx - 1, hy - 3, '#1a1010', 2, 3); } P(ctx, x - 1, y - 20, '#6a5a3a', 1, 14); P(ctx, x, y - 20, ex ? '#8a8a6a' : f.col, 6, 4); P(ctx, x + 1, y - 19, '#fff', 2, 2); ctx.font = 'bold 6px monospace'; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText('x' + e.units, x + 1, y - 23); ctx.fillStyle = ex ? '#e0e0c0' : '#ff8a80'; ctx.fillText('x' + e.units, x, y - 24); }
   function drawLair(ctx, l) { var x = l.x, y = l.y; P(ctx, x - 9, y - 2, '#3a3a3a', 18, 2); P(ctx, x - 7, y - 9, '#4a4a4a', 14, 7); P(ctx, x - 5, y - 11, '#5a5a5a', 10, 2); if (!l.dead) { P(ctx, x - 3, y - 7, '#0a0a0a', 6, 5); P(ctx, x - 2, y - 6 + Math.floor(F.time * 2) % 2, '#ff3030', 1, 1); P(ctx, x + 1, y - 6 + Math.floor(F.time * 2) % 2, '#ff3030', 1, 1); P(ctx, x - 11, y - 1, '#e8e0d0', 3, 1); P(ctx, x + 9, y - 1, '#e8e0d0', 2, 1); } else P(ctx, x - 3, y - 7, '#2a2a2a', 6, 5); }
@@ -886,7 +895,7 @@
   function drawBanner(ctx, st) { var a = st.army, x = Math.round(a.x), y = Math.round(a.y) - 3, w = Math.floor(F.time * 6) % 2, e = era(); P(ctx, x, y - 14, '#6a5a3a', 1, 14); P(ctx, x + 1, y - 14, e.cloth[0], 5 + w, 3); P(ctx, x + 1, y - 11, e.cloth[1], 4 + w, 1); P(ctx, x + 2, y - 13, '#ffe9a8', 1, 1); }
   function drawRally(ctx, r) { var x = Math.round(r.x), y = Math.round(r.y), w = Math.floor(F.time * 6) % 2; P(ctx, x, y - 12, '#6a5a3a', 1, 12); P(ctx, x + 1, y - 12, '#e04040', 5 + w, 3); P(ctx, x + 1, y - 9, '#c03030', 4 + w, 1); ctx.globalAlpha = 0.15; ctx.fillStyle = '#ff4040'; ctx.beginPath(); ctx.arc(x, y, 10, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
   function drawWolf(ctx, w) { var x = Math.round(w.x), y = Math.round(w.y), b = Math.floor((w.walk || F.time * 6) % 2); P(ctx, x - 4, y - 4 + b, '#6a6f78', 8, 3); P(ctx, x + 3, y - 6 + b, '#6a6f78', 3, 3); P(ctx, x + 3, y - 7 + b, '#5a5f68', 1, 1); P(ctx, x + 5, y - 7 + b, '#5a5f68', 1, 1); P(ctx, x - 5, y - 5 + b, '#5a5f68', 2, 1); P(ctx, x - 3, y - 1, '#4a4f58', 1, 1); P(ctx, x + 1, y - 1, '#4a4f58', 1, 1); P(ctx, x + 4, y - 5 + b, '#ff3030', 1, 1); if (w.anim > 0) P(ctx, x + 6, y - 4 + b, '#fff', 1, 1); }
-  function drawHostile(ctx, h) { if (h.kind === 'monster') return drawMonster(ctx, h); var hf = h.fid ? S.factions.find(function (q) { return q.id === h.fid; }) : null, x = Math.round(h.x), y = Math.round(h.y), t = y - 13, cl = h.kind === 'bandit' ? '#2a2a2a' : hf ? (hf.kind === 'exile' ? '#6a6a5a' : hf.col) : '#8a2a2a', cd = mix(cl, '#000', 0.4), f = h.face || 1; P(ctx, x - 3, t + 2, '#d8b890', 6, 4); P(ctx, x - 3, t, h.kind === 'bandit' ? '#a02020' : '#3a2a1a', 6, 2); P(ctx, x - 2 * f, t + 4, '#1a1410', 1, 1); P(ctx, x + (f > 0 ? 1 : -1), t + 4, '#1a1410', 1, 1); if (h.kind === 'bandit') P(ctx, x - 3, t + 3, '#1a1a1a', 6, 1); P(ctx, x - 3, t + 6, cl, 6, 5); P(ctx, x - 3, t + 9, cd, 6, 1); P(ctx, x + 3 * f, t + 5 - (h.anim > 0 ? 2 : 0), '#9a9aa0', 1, 5); P(ctx, x - 2, t + 11, '#1a1410', 2, 2); P(ctx, x, t + 11, '#1a1410', 2, 2); var mh = h.kind === 'bandit' ? D.UNITS.bandit.hp * (1 + S.era * 0.2) : EN.unitHp * (1 + S.era * 0.25) * (h.defend ? 1.2 : 1); P(ctx, x - 4, y + 1, '#000', 8, 1); P(ctx, x - 4, y + 1, '#e04040', Math.round(8 * clamp(h.hp / mh, 0, 1)), 1); }
+  function drawHostile(ctx, h) { if (h.kind === 'monster') return drawMonster(ctx, h); if (h.kind === 'dmob') return RPG.drawMob(ctx, h); var hf = h.fid ? S.factions.find(function (q) { return q.id === h.fid; }) : null, x = Math.round(h.x), y = Math.round(h.y), t = y - 13, cl = h.kind === 'bandit' ? '#2a2a2a' : hf ? (hf.kind === 'exile' ? '#6a6a5a' : hf.col) : '#8a2a2a', cd = mix(cl, '#000', 0.4), f = h.face || 1; P(ctx, x - 3, t + 2, '#d8b890', 6, 4); P(ctx, x - 3, t, h.kind === 'bandit' ? '#a02020' : '#3a2a1a', 6, 2); P(ctx, x - 2 * f, t + 4, '#1a1410', 1, 1); P(ctx, x + (f > 0 ? 1 : -1), t + 4, '#1a1410', 1, 1); if (h.kind === 'bandit') P(ctx, x - 3, t + 3, '#1a1a1a', 6, 1); P(ctx, x - 3, t + 6, cl, 6, 5); P(ctx, x - 3, t + 9, cd, 6, 1); P(ctx, x + 3 * f, t + 5 - (h.anim > 0 ? 2 : 0), '#9a9aa0', 1, 5); P(ctx, x - 2, t + 11, '#1a1410', 2, 2); P(ctx, x, t + 11, '#1a1410', 2, 2); var mh = h.kind === 'bandit' ? D.UNITS.bandit.hp * (1 + S.era * 0.2) : EN.unitHp * (1 + S.era * 0.25) * (h.defend ? 1.2 : 1); P(ctx, x - 4, y + 1, '#000', 8, 1); P(ctx, x - 4, y + 1, '#e04040', Math.round(8 * clamp(h.hp / mh, 0, 1)), 1); }
   function drawBuilding(ctx, b) {
     var d = D.BUILDINGS[b.type], x = Math.round(b.x), y = Math.round(b.y), w = bw(b.type), st = d.style;
     if (!b.done) { P(ctx, x - w / 2, y - 1, '#3a2a1a', w, 1); P(ctx, x - w / 2, y - 8, '#8a6a3a', 1, 8); P(ctx, x + w / 2 - 1, y - 8, '#8a6a3a', 1, 8); P(ctx, x - w / 2, y - 8, '#8a6a3a', w, 1); var p = b.progress / d.work; P(ctx, x - w / 2, y - 11, '#000', w, 2); P(ctx, x - w / 2, y - 11, '#ffd34f', Math.round(w * clamp(p, 0, 1)), 2); if (p > 0.3) P(ctx, x - w / 2 + 1, y - 4, mix('#8a6a3a', '#000', 0.2), w - 2, 3); return; }
@@ -942,6 +951,7 @@
     var tool = { lumber: '#8a6a3a', miner: '#9a9aa0', hunter: '#c0a070', builder: '#d0a040', farmer: '#8a6a3a', smith: '#d0a040', warrior: '#9a9aa0', scout: '#6a5a3a' }[v.job];
     if (tool && (v.state === 'work' || v.state === 'go' || v.state === 'fight' || v.state === 'explore')) { P(ctx, x + 3 * f, t + 4 - a * 2, tool, 1, 4); P(ctx, x + 3 * f + (f > 0 ? 1 : -2), t + 3 - a * 2, v.job === 'lumber' || v.job === 'miner' || v.job === 'builder' || v.job === 'warrior' ? '#c0c0c8' : tool, 2, 2); }
     if (v.job === 'warrior') P(ctx, x - 5 * f, t + 6, '#6a4a2a', 2, 4);
+    if (window.RPG) RPG.drawVillagerExtra(ctx, v, x, t, f);
     if (v.state === 'pray') { P(ctx, x - 1, t + 6, skin, 2, 2); if (Math.floor(F.time * 2) % 2) P(ctx, x - 1, t - 3, '#ffe9a8', 2, 1); }
     if (v.state === 'offer') { P(ctx, x - 2, t - 4, '#e06a5a', 4, 3); P(ctx, x - 1, t - 5, '#ffe9a8', 2, 1); }
     if (v.state === 'guard' && v.job === 'warrior') P(ctx, x - 5 * f, t + 5, '#8a7a5a', 2, 5);
@@ -1013,7 +1023,7 @@
     var t = currentTech(), tb = researchBld() || totem(); $('#techLine').innerHTML = t ? ('🔬 ' + t.ic + ' ' + t.nm + ' <i style="width:' + Math.round(clamp(S.res.know / t.cost, 0, 1) * 100) + '%"></i><span>' + fmt(S.res.know) + '/' + t.cost + (tb ? '' : ' · 토템이 있어야 연구') + '</span>') : (S.era === D.ERAS.length - 1 ? '🚀 ' + (S.launched ? '새 세계를 열 수 있다' : '우주선을 짓는 중') : '🏁 다음 시대까지: ' + (S.pop.length < (era().minPop || 0) ? '인구 ' + S.pop.length + '/' + era().minPop : D.BUILDINGS[era().key].nm + ' 짓는 중'));
     var warriors = S.pop.filter(function (v) { return v.job === 'warrior'; }).length;
     var wv = S.watch ? S.pop.find(function (x) { return x.id === S.watch; }) : null; $('#watchLine').textContent = wv ? '★ ' + wv.name + ' · ' + D.JOBS[wv.job].nm + ' · ' + (STATE_NM[wv.state] || wv.state) + ' ' + moodFace(wv.mood) + (wv.bless ? ' ✨' : '') : '';
-    $('#battleBtn').hidden = !(F.battle && F.time - F.battle.t < 5 && !inView(F.battle, 0)); $('#soundPill').textContent = S.cfg.sound ? '🔊' : '🔇';
+    $('#battleBtn').hidden = !(F.battle && F.time - F.battle.t < 5 && !inView(F.battle, 0)); $('#soundPill').textContent = S.cfg.sound ? '🔊' : '🔇'; if (window.RPG) RPG.hud();
     $('#oracleLine').textContent = (S.oracle ? '📣 ' + D.ORACLES.find(function (o) { return o.id === S.oracle.id; }).nm + ' ' + Math.ceil((S.oracle.until - Date.now()) / 1000) + 's · ' : '') + (S.invading ? '🔥 출정 중 ' + Math.max(0, Math.ceil(S.invading.until - S.simT)) + 's · ' : raidActive() ? '⚔️ 침략 중! · ' : '') + '⚔️ 전사 ' + warriors + (S.armyLv ? ' (무장 ' + S.armyLv + ')' : '') + (function () { var fs = factions().filter(function (f) { return f.met; }); return fs.length ? ' · 세력 ' + fs.length : ''; })();
     document.querySelectorAll('.pw').forEach(function (b) { var p = D.POWERS.find(function (x) { return x.id === b.dataset.power; }); if (p) b.classList.toggle('poor', S.faith < p.cost); b.classList.toggle('on', ui.power === b.dataset.power); });
     $('#huntInfo').textContent = '시민 ' + S.pop.length + '명 · ' + (raidActive() ? '⚔️ 침략 중' : S.hostiles.length ? '🏴‍☠️ 산적 ' + S.hostiles.length : S.wolves.length ? '🐺 늑대 ' + S.wolves.length : '평화로움');
@@ -1055,14 +1065,15 @@
   function renderSleep() { var d = new Date(); $('#sleepClock').textContent = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); $('#sleepStats').textContent = '절전 ' + Math.floor((Date.now() - ui.sleepAt) / 60000) + '분 · ' + era().nm + ' · 👥 ' + S.pop.length + ' · ✨ ' + fmt(S.faith) + ' · 발견 ' + S.techs.length + '/' + D.TECHS.length + (raidActive() ? ' · ⚔️ 침략 중!' : ''); }
   function setSleep(on) { ui.sleep = on; $('#sleep').hidden = !on; if (on) { ui.sleepAt = Date.now(); renderSleep(); if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { ui.wake = l; }).catch(function () {}); } else { if (ui.wake) { ui.wake.release().catch(function () {}); ui.wake = null; } renderAll(); } }
   function renderAll() { renderHead(); renderWishes(); renderChat(); renderPop(); renderBld(); renderTech(); renderAch(); renderLog(); ui.dirty.map = true; }
-  var PANEL_TITLE = { pop: '👥 시민', bld: '🏘️ 마을', tech: '🔬 발견', ach: '🏆 업적·과제', more: '⋯ 더보기' };
-  function openPanel(name) { document.querySelectorAll('#panel .pane').forEach(function (p) { p.classList.toggle('on', p.id === 'tab-' + name); }); $('#panelTitle').textContent = PANEL_TITLE[name]; if (name === 'pop') renderPop(); if (name === 'bld') renderBld(); if (name === 'tech') renderTech(); if (name === 'ach') renderAch(); if (name === 'more') { renderMore(); renderLog(); } $('#panel').hidden = false; document.querySelectorAll('.navbtn').forEach(function (b) { b.classList.toggle('on', b.dataset.panel === name); }); }
+  var PANEL_TITLE = { pop: '👥 시민', bld: '🏘️ 마을', tech: '🔬 발견', ach: '🏆 업적·과제', more: '⋯ 더보기', rpg: '⚔️ 화신' };
+  function openPanel(name) { document.querySelectorAll('#panel .pane').forEach(function (p) { p.classList.toggle('on', p.id === 'tab-' + name); }); $('#panelTitle').textContent = PANEL_TITLE[name]; if (name === 'pop') renderPop(); if (name === 'bld') renderBld(); if (name === 'tech') renderTech(); if (name === 'ach') renderAch(); if (name === 'more') { renderMore(); renderLog(); } if (name === 'rpg' && window.RPG) RPG.renderPanel(); $('#panel').hidden = false; document.querySelectorAll('.navbtn').forEach(function (b) { b.classList.toggle('on', b.dataset.panel === name); }); }
   function openVillager(v) {
     var j = D.JOBS[v.job], mate = v.partner ? S.pop.find(function (o) { return o.id === v.partner; }) : null, parents = (v.parents || []).map(function (id) { return S.pop.find(function (o) { return o.id === id; }); }).filter(Boolean), kids = S.pop.filter(function (o) { return o.parents && o.parents.indexOf(v.id) >= 0; }), hb = homeBld(v), vo = voiceOf(v), w = S.wishes.find(function (x) { return x.vid === v.id; });
     $('#sheetContent').innerHTML = '<div class="h-head"><canvas id="portrait"></canvas><div><div class="nm">' + (S.watch === v.id ? '★ ' : '') + titleIc(v) + esc(v.name) + (v.child ? ' 🧒' : '') + ' ' + moodFace(v.mood) + '</div>' + (v.title ? '<div class="sub">' + D.TITLES[v.title].ic + ' <b>' + D.TITLES[v.title].nm + '</b> — ' + D.TITLES[v.title].desc + '</div>' : '') + '<div class="sub">' + j.ic + ' ' + j.nm + ' · ' + (STATE_NM[v.state] || v.state) + ' · ❤️' + Math.round(v.hp) + '/' + unitStat(v).hp + ' · 기분 ' + Math.round(v.mood) + (v.bless ? ' · ✨ 축복 ' + Math.max(0, Math.ceil(v.bless - S.simT)) + 's' : '') + (v.doubt ? ' · 🌧️ 신을 의심함' : '') + (v.known ? ' · 💛' : '') + '</div><div class="sub">' + esc(settleOf(v).nm) + ' · ' + (v.gen || 1) + '세대 · ' + (v.child ? '아이 (어른까지 ' + Math.max(0, Math.ceil((FM.adultAfter - v.age) / 60)) + '분)' : Math.floor(v.age / 60) + '분을 살았다') + (mate ? ' · 💕 ' + esc(mate.name) : v.child ? '' : ' · 혼자') + (parents.length ? ' · 부모 ' + parents.map(function (o) { return esc(o.name); }).join('·') : '') + (kids.length ? ' · 자녀 ' + kids.map(function (o) { return esc(o.name); }).join('·') : v.kids ? ' · 아이 ' + v.kids : '') + (hb ? ' · 🏠 ' + D.BUILDINGS[hb.type].nm : '') + '</div></div></div>' +
       (vo || w ? '<div class="np-txt">' + (vo ? KIND_IC[vo.kind] + ' ' + KIND_NM[vo.kind] : '🙏 소원') + ': “' + esc(vo ? vo.txt : D.WISHES.find(function (x) { return x.id === w.type; }).txt) + '”</div><div class="np-opts">' + optsHtml(v, true) + '</div>' : '') +
       '<div class="row"><button class="btn" data-act="bless">✨ 축복 (✨' + C.blessCost + ')</button><button class="btn" data-act="comfort">🕊️ 위로 (✨' + C.comfortCost + ')</button><button class="btn" data-act="watch">' + (S.watch === v.id ? '☆ 그만 지켜보기' : '★ 지켜보기') + '</button></div>' +
       '<p class="hint">직업은 마을 형편에 따라 스스로 바꿉니다. 지도에서 <b>집어서</b> 나무·바위·토템 옆에 내려놓으면 90초 동안 그 일을 하고, 안 가 본 땅에 내려놓으면 탐험가가 됩니다. 축복하면 ' + C.blessTime + '초 동안 일을 1.4배로 하고, ★ 지켜보기를 켜면 이 시민의 소식이 위에 뜹니다.</p>' +
+      (window.RPG ? RPG.villagerSheet(v) : '') +
       '<div class="row"><input id="renameIn" type="text" value="' + esc(v.name) + '" maxlength="8"><button class="btn" data-act="rename">이름 바꾸기</button><button class="btn" data-act="close">닫기</button></div>';
     $('#sheet').hidden = false; drawPortrait($('#portrait'), v); ui.sheetV = v;
   }
@@ -1086,6 +1097,7 @@
       var p = canvasPos(e), down = ui.downAt; ui.downAt = null;
       if (ui.held) { var v = ui.held; ui.held = null; var moved = down && (Math.abs(p.x - down.x) > 3 || Math.abs(p.y - down.y) > 3); if (moved) dropVillager(v, p.x, p.y); else { v.held = false; v.state = 'idle'; if (hasVoice(v)) openNeed(v); else openVillager(v); } return; }
       if (ui.panning) { ui.panning = false; return; }
+      if (window.RPG && RPG.tap(p)) return;
       if (ui.power) { usePower(ui.power, p.x, p.y); if (ui.power !== 'smite' && ui.power !== 'fire') ui.power = null; renderHead(); return; }
       var b = null; S.blds.forEach(function (o) { if (Math.abs(o.x - p.x) < bw(o.type) / 2 + 2 && p.y > o.y - 20 && p.y < o.y + 4) b = o; });
       if (b) { var d = D.BUILDINGS[b.type]; toast(d.ic + ' ' + d.nm + (b.done ? (d.housing ? ' · 수용 ' + d.housing + '명' : d.msg ? ' · ' + d.msg : '') : ' · 짓는 중 ' + Math.round(b.progress / d.work * 100) + '%')); return; }
@@ -1106,7 +1118,7 @@
     document.querySelectorAll('.navbtn').forEach(function (b) { b.addEventListener('click', function () { openPanel(b.dataset.panel); }); });
     document.querySelectorAll('[data-close]').forEach(function (b) { b.addEventListener('click', function () { b.closest('.sheet').hidden = true; if (b.closest('#panel')) document.querySelectorAll('.navbtn').forEach(function (x) { x.classList.remove('on'); }); }); });
     $('#popList').addEventListener('click', function (e) { var el = e.target.closest('[data-id]'); if (!el) return; var v = S.pop.find(function (x) { return x.id === el.dataset.id; }); if (v) { openVillager(v); panTo(v); } });
-    $('#sheetContent').addEventListener('click', function (e) { var vb = e.target.closest('[data-vact]'), v = ui.sheetV; if (vb && v) { if (vb.dataset.vact === 'rename') { $('#renameIn').focus(); return; } if (doAct(vb.dataset.vact, v)) openVillager(v); return; } var b = e.target.closest('[data-act]'); if (!b) return; if (b.dataset.act === 'close') $('#sheet').hidden = true; if (b.dataset.act === 'rename' && v) { var nm = $('#renameIn').value.trim().slice(0, 8); if (nm) { v.name = nm; toast('이름을 ' + nm + '(으)로 바꿨어요'); renderPop(); save(); } $('#sheet').hidden = true; } if (b.dataset.act === 'bless' && v) { if (blessV(v)) { openVillager(v); renderHead(); save(); } } if (b.dataset.act === 'comfort' && v) { if (doAct('comfort', v)) openVillager(v); } if (b.dataset.act === 'watch' && v) { S.watch = S.watch === v.id ? null : v.id; toast(S.watch ? '★ ' + v.name + '을(를) 지켜봅니다. 소식이 위에 뜹니다' : '지켜보기를 껐어요'); openVillager(v); renderHead(); renderPop(); save(); } });
+    $('#sheetContent').addEventListener('click', function (e) { var vb = e.target.closest('[data-vact]'), v = ui.sheetV; var gv = e.target.closest('[data-give]'); if (gv && v && window.RPG) { RPG.give(v, gv.dataset.give); openVillager(v); return; } var ug = e.target.closest('[data-unequip]'); if (ug && v && window.RPG) { RPG.unequipV(v, ug.dataset.unequip); openVillager(v); return; } if (vb && v) { if (vb.dataset.vact === 'rename') { $('#renameIn').focus(); return; } if (doAct(vb.dataset.vact, v)) openVillager(v); return; } var b = e.target.closest('[data-act]'); if (!b) return; if (b.dataset.act === 'close') $('#sheet').hidden = true; if (b.dataset.act === 'rename' && v) { var nm = $('#renameIn').value.trim().slice(0, 8); if (nm) { v.name = nm; toast('이름을 ' + nm + '(으)로 바꿨어요'); renderPop(); save(); } $('#sheet').hidden = true; } if (b.dataset.act === 'bless' && v) { if (blessV(v)) { openVillager(v); renderHead(); save(); } } if (b.dataset.act === 'comfort' && v) { if (doAct('comfort', v)) openVillager(v); } if (b.dataset.act === 'watch' && v) { S.watch = S.watch === v.id ? null : v.id; toast(S.watch ? '★ ' + v.name + '을(를) 지켜봅니다. 소식이 위에 뜹니다' : '지켜보기를 껐어요'); openVillager(v); renderHead(); renderPop(); save(); } });
     $('#sleepBtn').addEventListener('click', function () { closeNeed(); setSleep(true); save(); }); $('#sleep').addEventListener('click', function () { setSleep(false); });
     document.addEventListener('pointerdown', function () { SFX.unlock(); }, { passive: true });
     $('#soundBtn').addEventListener('click', function () { S.cfg.sound = !S.cfg.sound; renderMore(); save(); });
@@ -1153,5 +1165,7 @@
   bind(); $('#godOff').value = S.cfg.offPct; offlineCatchUp(); renderAll();
   requestAnimationFrame(loop);
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function () {});
-  window.__gv = { get S() { return S; }, F: F, cam: cam, ui: ui, D: D, save: save, home: home, usePower: usePower, useOracle: useOracle, dropVillager: dropVillager, slowTick: slowTick, nextBuilding: nextBuilding, reveal: reveal, panTo: panTo, cellCenter: cellCenter, family: family, voice: forceVoice, doAct: doAct, openNeed: openNeed, bless: blessV, marry: marry, daylight: daylight, SFX: SFX, factions: factions, allBases: allBases, spawnFaction: spawnFaction, expandFaction: expandFaction, checkSchism: checkSchism, orderWork: orderWork, orderArmy: orderArmy, orderFest: orderFest, giveTitle: giveTitle, checkTitles: checkTitles, lairsTick: lairsTick, factionTick: factionTick };
+  window.__gv = { get S() { return S; }, F: F, cam: cam, ui: ui, D: D, save: save, home: home, usePower: usePower, useOracle: useOracle, dropVillager: dropVillager, slowTick: slowTick, nextBuilding: nextBuilding, reveal: reveal, panTo: panTo, cellCenter: cellCenter, family: family, voice: forceVoice, doAct: doAct, openNeed: openNeed, bless: blessV, marry: marry, daylight: daylight, SFX: SFX, factions: factions, allBases: allBases, spawnFaction: spawnFaction, expandFaction: expandFaction, checkSchism: checkSchism, orderWork: orderWork, orderArmy: orderArmy, orderFest: orderFest, giveTitle: giveTitle, checkTitles: checkTitles, lairsTick: lairsTick, factionTick: factionTick,
+    // rpg.js 가 쓰는 내부 함수들
+    dist: dist, moveToward: moveToward, clamp: clamp, rnd: rnd, pick: pick, uid: uid, burst: burst, ring: ring, beam: beam, bolt: bolt, sysChat: sysChat, addLog: addLog, toast: toast, addFaith: addFaith, addRes: addRes, nearestHostile: nearestHostile, hit: hit, hasTech: hasTech, isExplored: isExplored, cellOf: cellOf, inView: inView, unitStat: unitStat, renderHead: renderHead, renderPop: renderPop, today: today, fmt: fmt, esc: esc, era: era, P: P, mix: mix, startFest: startFest, checkAch: checkAch, cellDist: cellDist, cellFree: cellFree, fighter: fighter, say: say, openPanel: openPanel, settleOf: settleOf, seeded: seeded, adults: adults, EN: EN, clampCam: clampCam, raidActive: raidActive };
 })();
