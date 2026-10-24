@@ -160,3 +160,6 @@ h2 { font-size: 17px; margin: 0; } h3 { font-size: 13px; margin: 14px 0 6px; col
 .skbtn.atk { width: 64px; height: 56px; font-size: 22px; border-color: #ff9a3c; background: #3a2a1add; } .skbtn.atk:active { background: #8a5a2a; }
 #rpgHud button, #rpgHud .joy { touch-action: none; user-select: none; -webkit-user-select: none; }
 .field.ctrl #field { cursor: default; }
+
+.tag.event { color: #ffe9a8; font-size: 11px; font-weight: 700; }
+.item .btn.primary.small { white-space: nowrap; }
