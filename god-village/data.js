@@ -7,18 +7,18 @@ window.GV = {
     startPop: 3,          // 처음 시민 수
     startFaith: 12,       // 처음 믿음
     foodPerPop: 0.025,    // 시민 1명이 초당 먹는 식량
-    growthFood: 15,       // 아이 한 명이 태어날 때 드는 식량
-    growthEvery: 45,      // 인구가 늘어나는 간격(초). 시대가 오를수록 10%씩 짧아짐
+    growthFood: 20,       // 아이 한 명이 태어날 때 드는 식량
+    knowPerWork: 1,       // 학자가 한 번 생각할 때 쌓이는 지식(건물 배율 전)
     storageBase: 120,     // 창고 없을 때 자원 보관 한도
     storagePer: 150,      // 창고 하나당 늘어나는 한도
     gatherTime: 2.6,      // 한 번 채집에 걸리는 초
     gatherAmount: 3,      // 한 번에 가져오는 양
     prayTime: 3,          // 기도 한 번(초)
     prayFaith: 1,         // 기도 한 번에 쌓이는 믿음
-    wishEvery: 70,        // 소원이 올라오는 간격(초)
+    wishEvery: 90,        // 소원이 올라오는 간격(초)
     wishTime: 90,         // 소원 제한 시간(초)
     wishFaith: 8,         // 소원 들어주면 받는 믿음
-    wolfEvery: 200,       // 늑대가 오는 간격(초), 중세 이후엔 안 옴
+    wolfEvery: 300,       // 늑대가 오는 간격(초), 중세 이후엔 안 옴
     wolfHp: 40,
     oracleTime: 120,      // 신탁 지속(초)
     offPct: 50,           // 오프라인 보상 비율(%)
@@ -39,56 +39,56 @@ window.GV = {
     { id: 'ruins',    nm: '옛 유적',    ic: '🏛️', weight: 2, reward: { know: 80 }, desc: '탐험가가 찾아오면 지식 +80' }
   ],
   // 적 부족
-  ENEMY: { nm: '회색 부족', units: 4, growEvery: 150, growMax: 14, raidEvery: 240, firstRaid: 420, raidSize: 3, raidTime: 45, lootPct: 0.15, unitHp: 30, unitAtk: 5, conquerFaith: 120 },
+  ENEMY: { nm: '회색 부족', units: 4, growEvery: 240, growMax: 14, raidEvery: 360, firstRaid: 900, raidSize: 3, raidTime: 45, lootPct: 0.15, unitHp: 30, unitAtk: 5, conquerFaith: 120 },
   // 전투 수치 (hp, atk). 우리 쪽은 시대마다 +20%, 무기 기술 효과 추가
   UNITS: { warrior: { hp: 44, atk: 7 }, hunter: { hp: 30, atk: 4 }, citizen: { hp: 16, atk: 1 }, child: { hp: 8, atk: 0 }, bandit: { hp: 30, atk: 5 }, enemy: { hp: 30, atk: 5 } },
   // 가족·세대·군락
-  FAMILY: { adultAfter: 240, marryEvery: 50, birthEvery: 80, maxChildren: 3, lifeSec: 3000, settleAt: 12, settleGroup: 4, maxSettlements: 4, settleCost: { wood: 40, food: 30 } },
+  FAMILY: { adultAfter: 480, marryEvery: 90, birthEvery: 150, maxChildren: 3, lifeSec: 5400, settleAt: 16, settleGroup: 4, maxSettlements: 4, settleCost: { wood: 60, food: 40 } },
   SETTLE_NAMES: ['새벽골', '물가 마을', '바람 언덕', '돌밭 마을', '해 뜨는 터', '달빛 고을', '푸른 들'],
 
   // ---------- 시대 ----------
   // house: 그 시대 집 모양(app.js drawBuilding 의 style), cloth: 시민 옷 색 [몸, 어두운 부분], hat: 머리 장식 종류
-  // key: 시대를 넘기려면 지어야 하는 건물. 그 시대 기술을 다 발견하고 key 건물이 있으면 다음 시대로.
+  // key: 시대를 넘기려면 지어야 하는 건물. minPop: 다음 시대로 가려면 필요한 인구. 그 시대 기술을 다 발견하고 key 건물이 있고 인구가 차면 다음 시대로.
   ERAS: [
-    { id: 'stone',  nm: '석기 시대',   ic: '🪨', cloth: ['#8a6a4a', '#5a4030'], hat: 'none',   house: 'hut',     key: 'totem',    ground: '#2f4a2a', msg: '돌을 깎고 열매를 따며 살아간다.' },
-    { id: 'bronze', nm: '청동기 시대', ic: '🥉', cloth: ['#c9a66b', '#8a6a3a'], hat: 'none',   house: 'thatch',  key: 'forge',    ground: '#2f4d2c', msg: '청동으로 도구를 만들고 밭을 간다.' },
-    { id: 'iron',   nm: '철기 시대',   ic: '⚔️', cloth: ['#7a7f8a', '#4a4f5a'], hat: 'helmet', house: 'wood',    key: 'school',   ground: '#2d4a30', msg: '철로 무기와 쟁기를 만든다. 늑대가 두렵지 않다.' },
-    { id: 'medieval', nm: '중세',      ic: '🏰', cloth: ['#4a5a9a', '#2a3a6a'], hat: 'helmet', house: 'stone',   key: 'market',   ground: '#2a4a2a', msg: '돌로 집과 성을 쌓고 시장이 선다.' },
-    { id: 'renaissance', nm: '르네상스', ic: '🎨', cloth: ['#9a4a6a', '#6a2a4a'], hat: 'cap',  house: 'brick',   key: 'university', ground: '#2d4a2d', msg: '배움과 예술이 꽃핀다.' },
-    { id: 'industrial', nm: '산업 시대', ic: '🏭', cloth: ['#3a3a3a', '#1a1a1a'], hat: 'cap',  house: 'rowhouse', key: 'factory',  ground: '#3a4a3a', msg: '증기와 기계가 세상을 바꾼다.' },
-    { id: 'modern', nm: '현대',        ic: '🏙️', cloth: ['#2a6aaa', '#1a3a6a'], hat: 'none',   house: 'tower',   key: 'lab',      ground: '#3a4a40', msg: '전기와 정보의 시대.' },
-    { id: 'space',  nm: '우주 시대',   ic: '🚀', cloth: ['#e0e8f0', '#8a9ab0'], hat: 'visor',  house: 'dome',    key: 'rocket',   ground: '#34484a', msg: '별을 향해 떠날 준비를 한다. 새 세계를 열 수 있다.' }
+    { id: 'stone',  nm: '석기 시대',   ic: '🪨', cloth: ['#8a6a4a', '#5a4030'], hat: 'none',   house: 'hut',     key: 'totem', minPop: 8,    ground: '#2f4a2a', msg: '돌을 깎고 열매를 따며 살아간다.' },
+    { id: 'bronze', nm: '청동기 시대', ic: '🥉', cloth: ['#c9a66b', '#8a6a3a'], hat: 'none',   house: 'thatch',  key: 'forge', minPop: 15,    ground: '#2f4d2c', msg: '청동으로 도구를 만들고 밭을 간다.' },
+    { id: 'iron',   nm: '철기 시대',   ic: '⚔️', cloth: ['#7a7f8a', '#4a4f5a'], hat: 'helmet', house: 'wood',    key: 'school', minPop: 25,   ground: '#2d4a30', msg: '철로 무기와 쟁기를 만든다. 늑대가 두렵지 않다.' },
+    { id: 'medieval', nm: '중세',      ic: '🏰', cloth: ['#4a5a9a', '#2a3a6a'], hat: 'helmet', house: 'stone',   key: 'market', minPop: 40,   ground: '#2a4a2a', msg: '돌로 집과 성을 쌓고 시장이 선다.' },
+    { id: 'renaissance', nm: '르네상스', ic: '🎨', cloth: ['#9a4a6a', '#6a2a4a'], hat: 'cap',  house: 'brick',   key: 'university', minPop: 60, ground: '#2d4a2d', msg: '배움과 예술이 꽃핀다.' },
+    { id: 'industrial', nm: '산업 시대', ic: '🏭', cloth: ['#3a3a3a', '#1a1a1a'], hat: 'cap',  house: 'rowhouse', key: 'factory', minPop: 90,  ground: '#3a4a3a', msg: '증기와 기계가 세상을 바꾼다.' },
+    { id: 'modern', nm: '현대',        ic: '🏙️', cloth: ['#2a6aaa', '#1a3a6a'], hat: 'none',   house: 'tower',   key: 'lab', minPop: 130,      ground: '#3a4a40', msg: '전기와 정보의 시대.' },
+    { id: 'space',  nm: '우주 시대',   ic: '🚀', cloth: ['#e0e8f0', '#8a9ab0'], hat: 'visor',  house: 'dome',    key: 'rocket', minPop: 200,   ground: '#34484a', msg: '별을 향해 떠날 준비를 한다. 새 세계를 열 수 있다.' }
   ],
 
   // ---------- 기술(발견) ----------
   // cost: 필요한 지식(📜). 같은 시대 기술은 위에서부터 차례로 발견됩니다.
   // effect: 배율 (food/wood/stone/metal/know/faith/build/growth). unlock: 지을 수 있게 되는 건물.
   TECHS: [
-    { id: 'fire',      era: 0, nm: '불',       ic: '🔥', cost: 20,  effect: { know: 1.3, food: 1.1 }, unlock: 'campfire', msg: '불을 발견했다! 밤이 따뜻해지고 모닥불 곁에서 생각이 깊어진다.' },
-    { id: 'tools',     era: 0, nm: '돌도끼',   ic: '🪓', cost: 35,  effect: { wood: 1.4, stone: 1.3 }, msg: '돌도끼를 만들었다. 나무와 돌을 더 빨리 모은다.' },
-    { id: 'hunting',   era: 0, nm: '사냥',     ic: '🏹', cost: 50,  effect: { food: 1.3 }, job: 'hunter', msg: '창으로 사슴을 사냥한다. 늑대와도 맞선다.' },
-    { id: 'weapons',   era: 0, nm: '창과 방패', ic: '🛡️', cost: 70,  effect: { atk: 1.2 }, job: 'warrior', msg: '전사가 생겼다. 산적과 적 부족에 맞선다.' },
-    { id: 'farming',   era: 1, nm: '농사',     ic: '🌾', cost: 60,  effect: { food: 1.3 }, unlock: 'farm', job: 'farmer', msg: '씨앗을 심었다. 밭에서 식량이 자란다.' },
-    { id: 'bronze',    era: 1, nm: '청동',     ic: '🥉', cost: 90,  effect: { metal: 1.5, build: 1.2 }, unlock: 'forge', job: 'smith', msg: '구리와 주석을 녹여 청동을 만들었다.' },
-    { id: 'writing',   era: 1, nm: '문자',     ic: '✍️', cost: 120, effect: { know: 1.5 }, msg: '문자를 만들었다. 지식이 쌓여 전해진다.' },
-    { id: 'iron',      era: 2, nm: '철',       ic: '⚔️', cost: 180, effect: { metal: 1.5, wood: 1.2, stone: 1.3 }, msg: '철을 다룬다. 도구가 단단해졌다.' },
-    { id: 'tactics',   era: 2, nm: '진법',     ic: '🏹', cost: 200, effect: { atk: 1.3, hp: 1.2 }, msg: '전사들이 대열을 이뤄 싸운다.' },
-    { id: 'wheel',     era: 2, nm: '수레',     ic: '🛞', cost: 220, effect: { food: 1.2, wood: 1.2, stone: 1.2, build: 1.3 }, msg: '수레를 만들었다. 짐을 한 번에 많이 나른다.' },
-    { id: 'school',    era: 2, nm: '학문',     ic: '📚', cost: 280, effect: { know: 1.5 }, unlock: 'school', msg: '학당을 세워 아이들을 가르친다.' },
-    { id: 'masonry',   era: 3, nm: '석공술',   ic: '🧱', cost: 400, effect: { build: 1.4, stone: 1.3 }, unlock: 'castle', msg: '돌을 다듬어 튼튼한 집과 성을 쌓는다.' },
-    { id: 'trade',     era: 3, nm: '교역',     ic: '⚖️', cost: 480, effect: { food: 1.2, faith: 1.2 }, unlock: 'market', msg: '시장이 열리고 물건이 오간다.' },
-    { id: 'mill',      era: 3, nm: '물레방아', ic: '🌀', cost: 560, effect: { food: 1.4 }, msg: '물레방아가 곡식을 빻는다.' },
-    { id: 'printing',  era: 4, nm: '인쇄술',   ic: '📖', cost: 800, effect: { know: 1.8 }, unlock: 'university', msg: '책을 찍어낸다. 지식이 널리 퍼진다.' },
-    { id: 'art',       era: 4, nm: '예술',     ic: '🎭', cost: 900, effect: { faith: 1.3 }, unlock: 'theater', msg: '극장과 그림이 마음을 풍요롭게 한다.' },
-    { id: 'science',   era: 4, nm: '과학',     ic: '🔭', cost: 1100, effect: { know: 1.5, build: 1.2 }, msg: '별을 관측하고 실험을 한다.' },
-    { id: 'steam',     era: 5, nm: '증기기관', ic: '♨️', cost: 1600, effect: { metal: 1.8, build: 1.5 }, unlock: 'factory', msg: '증기기관이 돌아간다. 공장이 들어선다.' },
-    { id: 'railway',   era: 5, nm: '철도',     ic: '🚂', cost: 2000, effect: { food: 1.4, wood: 1.4, stone: 1.4 }, msg: '철도가 놓였다. 자원이 쏟아져 들어온다.' },
-    { id: 'electric',  era: 5, nm: '전기',     ic: '💡', cost: 2600, effect: { know: 1.6, faith: 1.2 }, unlock: 'powerplant', msg: '밤에도 불이 꺼지지 않는다.' },
-    { id: 'computer',  era: 6, nm: '컴퓨터',   ic: '💻', cost: 4000, effect: { know: 2 }, unlock: 'lab', msg: '계산기가 사람보다 빠르게 생각한다.' },
-    { id: 'medicine',  era: 6, nm: '의학',     ic: '💉', cost: 5000, effect: { growth: 1.5, faith: 1.2 }, unlock: 'park', msg: '병을 고친다. 아이들이 건강하게 자란다.' },
-    { id: 'rocketry',  era: 6, nm: '로켓',     ic: '🚀', cost: 7000, effect: { build: 1.5 }, unlock: 'rocket', msg: '하늘 너머를 꿈꾼다.' },
-    { id: 'fusion',    era: 7, nm: '핵융합',   ic: '☀️', cost: 12000, effect: { metal: 2, know: 1.5 }, msg: '작은 태양을 손에 넣었다.' },
-    { id: 'warp',      era: 7, nm: '항성 항해', ic: '🌌', cost: 20000, effect: { faith: 2 }, msg: '별 사이를 건너는 법을 알아냈다. 새 세계가 기다린다.' }
+    { id: 'fire',      era: 0, nm: '불',       ic: '🔥', cost: 60,  effect: { know: 1.3, food: 1.1 }, unlock: 'campfire', msg: '불을 발견했다! 밤이 따뜻해지고 모닥불 곁에서 생각이 깊어진다.' },
+    { id: 'tools',     era: 0, nm: '돌도끼',   ic: '🪓', cost: 110,  effect: { wood: 1.4, stone: 1.3 }, msg: '돌도끼를 만들었다. 나무와 돌을 더 빨리 모은다.' },
+    { id: 'hunting',   era: 0, nm: '사냥',     ic: '🏹', cost: 170,  effect: { food: 1.3 }, job: 'hunter', msg: '창으로 사슴을 사냥한다. 늑대와도 맞선다.' },
+    { id: 'weapons',   era: 0, nm: '창과 방패', ic: '🛡️', cost: 240,  effect: { atk: 1.2 }, job: 'warrior', msg: '전사가 생겼다. 산적과 적 부족에 맞선다.' },
+    { id: 'farming',   era: 1, nm: '농사',     ic: '🌾', cost: 420,  effect: { food: 1.3 }, unlock: 'farm', job: 'farmer', msg: '씨앗을 심었다. 밭에서 식량이 자란다.' },
+    { id: 'bronze',    era: 1, nm: '청동',     ic: '🥉', cost: 600,  effect: { metal: 1.5, build: 1.2 }, unlock: 'forge', job: 'smith', msg: '구리와 주석을 녹여 청동을 만들었다.' },
+    { id: 'writing',   era: 1, nm: '문자',     ic: '✍️', cost: 850, effect: { know: 1.5 }, msg: '문자를 만들었다. 지식이 쌓여 전해진다.' },
+    { id: 'iron',      era: 2, nm: '철',       ic: '⚔️', cost: 1300, effect: { metal: 1.5, wood: 1.2, stone: 1.3 }, msg: '철을 다룬다. 도구가 단단해졌다.' },
+    { id: 'tactics',   era: 2, nm: '진법',     ic: '🏹', cost: 1600, effect: { atk: 1.3, hp: 1.2 }, msg: '전사들이 대열을 이뤄 싸운다.' },
+    { id: 'wheel',     era: 2, nm: '수레',     ic: '🛞', cost: 1900, effect: { food: 1.2, wood: 1.2, stone: 1.2, build: 1.3 }, msg: '수레를 만들었다. 짐을 한 번에 많이 나른다.' },
+    { id: 'school',    era: 2, nm: '학문',     ic: '📚', cost: 2300, effect: { know: 1.5 }, unlock: 'school', msg: '학당을 세워 아이들을 가르친다.' },
+    { id: 'masonry',   era: 3, nm: '석공술',   ic: '🧱', cost: 3200, effect: { build: 1.4, stone: 1.3 }, unlock: 'castle', msg: '돌을 다듬어 튼튼한 집과 성을 쌓는다.' },
+    { id: 'trade',     era: 3, nm: '교역',     ic: '⚖️', cost: 3800, effect: { food: 1.2, faith: 1.2 }, unlock: 'market', msg: '시장이 열리고 물건이 오간다.' },
+    { id: 'mill',      era: 3, nm: '물레방아', ic: '🌀', cost: 4500, effect: { food: 1.4 }, msg: '물레방아가 곡식을 빻는다.' },
+    { id: 'printing',  era: 4, nm: '인쇄술',   ic: '📖', cost: 6500, effect: { know: 1.8 }, unlock: 'university', msg: '책을 찍어낸다. 지식이 널리 퍼진다.' },
+    { id: 'art',       era: 4, nm: '예술',     ic: '🎭', cost: 7500, effect: { faith: 1.3 }, unlock: 'theater', msg: '극장과 그림이 마음을 풍요롭게 한다.' },
+    { id: 'science',   era: 4, nm: '과학',     ic: '🔭', cost: 9000, effect: { know: 1.5, build: 1.2 }, msg: '별을 관측하고 실험을 한다.' },
+    { id: 'steam',     era: 5, nm: '증기기관', ic: '♨️', cost: 13000, effect: { metal: 1.8, build: 1.5 }, unlock: 'factory', msg: '증기기관이 돌아간다. 공장이 들어선다.' },
+    { id: 'railway',   era: 5, nm: '철도',     ic: '🚂', cost: 16000, effect: { food: 1.4, wood: 1.4, stone: 1.4 }, msg: '철도가 놓였다. 자원이 쏟아져 들어온다.' },
+    { id: 'electric',  era: 5, nm: '전기',     ic: '💡', cost: 20000, effect: { know: 1.6, faith: 1.2 }, unlock: 'powerplant', msg: '밤에도 불이 꺼지지 않는다.' },
+    { id: 'computer',  era: 6, nm: '컴퓨터',   ic: '💻', cost: 30000, effect: { know: 2 }, unlock: 'lab', msg: '계산기가 사람보다 빠르게 생각한다.' },
+    { id: 'medicine',  era: 6, nm: '의학',     ic: '💉', cost: 38000, effect: { growth: 1.5, faith: 1.2 }, unlock: 'park', msg: '병을 고친다. 아이들이 건강하게 자란다.' },
+    { id: 'rocketry',  era: 6, nm: '로켓',     ic: '🚀', cost: 48000, effect: { build: 1.5 }, unlock: 'rocket', msg: '하늘 너머를 꿈꾼다.' },
+    { id: 'fusion',    era: 7, nm: '핵융합',   ic: '☀️', cost: 75000, effect: { metal: 2, know: 1.5 }, msg: '작은 태양을 손에 넣었다.' },
+    { id: 'warp',      era: 7, nm: '항성 항해', ic: '🌌', cost: 110000, effect: { faith: 2 }, msg: '별 사이를 건너는 법을 알아냈다. 새 세계가 기다린다.' }
   ],
 
   // ---------- 건물 ----------
@@ -96,29 +96,29 @@ window.GV = {
   // role: research(지식) / faith(믿음) / storage(보관) / food(밭) / metal / happy(행복) / launch(새 세계)
   // auto: 시민이 알아서 짓는 조건 — 'house'(집 부족), 'one'(시대에 하나), 'storage'(창고 부족), 'farm'(인구 6명당 1), 'need'(지식 건물 없을 때)
   BUILDINGS: {
-    hut:        { nm: '움막',     ic: '⛺', era: 0, cost: { wood: 12 }, work: 8, housing: 3, style: 'hut', auto: 'house' },
-    totem:      { nm: '토템',     ic: '🗿', era: 0, cost: { wood: 8, stone: 6 }, work: 8, role: 'faith', research: true, style: 'totem', auto: 'one', msg: '토템을 세웠다. 시민들이 신에게 기도한다.' },
-    storage:    { nm: '창고',     ic: '📦', era: 0, cost: { wood: 20, stone: 8 }, work: 12, role: 'storage', style: 'storage', auto: 'storage' },
-    campfire:   { nm: '모닥불',   ic: '🔥', era: 0, cost: { wood: 10, stone: 4 }, work: 6, role: 'research', research: 1.5, style: 'campfire', auto: 'one', msg: '모닥불 곁에 모여 이야기를 나눈다.' },
-    thatch:     { nm: '초가집',   ic: '🏠', era: 1, cost: { wood: 25, stone: 10 }, work: 14, housing: 5, style: 'thatch', auto: 'house' },
-    farm:       { nm: '밭',       ic: '🌾', era: 1, cost: { wood: 15 }, work: 10, role: 'food', style: 'farm', auto: 'farm' },
-    forge:      { nm: '대장간',   ic: '🔥', era: 1, cost: { wood: 30, stone: 25 }, work: 20, role: 'metal', style: 'forge', auto: 'one', msg: '대장간이 생겼다. 금속을 다룬다.' },
-    wood:       { nm: '목조집',   ic: '🏡', era: 2, cost: { wood: 50, stone: 15, metal: 5 }, work: 20, housing: 8, style: 'wood', auto: 'house' },
-    school:     { nm: '학당',     ic: '📚', era: 2, cost: { wood: 50, stone: 30, metal: 10 }, work: 28, role: 'research', research: 2.5, style: 'school', auto: 'one', msg: '학당에서 글을 배운다.' },
-    stone:      { nm: '석조집',   ic: '🏘️', era: 3, cost: { stone: 70, wood: 30, metal: 10 }, work: 26, housing: 12, style: 'stone', auto: 'house' },
-    market:     { nm: '시장',     ic: '🛒', era: 3, cost: { wood: 80, stone: 50, metal: 20 }, work: 30, role: 'happy', happy: 8, style: 'market', auto: 'one', msg: '시장이 열렸다. 마을이 활기차다.' },
-    castle:     { nm: '성',       ic: '🏰', era: 3, cost: { stone: 200, metal: 40 }, work: 60, role: 'faith', faith: 2, style: 'castle', auto: 'one', msg: '성이 완성됐다. 늑대가 더는 오지 않는다.' },
-    brick:      { nm: '벽돌집',   ic: '🏚️', era: 4, cost: { stone: 90, wood: 40, metal: 20 }, work: 30, housing: 16, style: 'brick', auto: 'house' },
-    university: { nm: '대학',     ic: '🎓', era: 4, cost: { stone: 150, wood: 80, metal: 40 }, work: 50, role: 'research', research: 4, style: 'university', auto: 'one', msg: '대학이 문을 열었다.' },
-    theater:    { nm: '극장',     ic: '🎭', era: 4, cost: { wood: 120, stone: 80 }, work: 40, role: 'happy', happy: 10, style: 'theater', auto: 'one', msg: '극장에서 연극을 본다.' },
-    rowhouse:   { nm: '연립주택', ic: '🏢', era: 5, cost: { stone: 150, metal: 60, wood: 60 }, work: 36, housing: 24, style: 'rowhouse', auto: 'house' },
-    factory:    { nm: '공장',     ic: '🏭', era: 5, cost: { metal: 150, stone: 150 }, work: 70, role: 'metal', metal: 3, style: 'factory', auto: 'one', msg: '공장 굴뚝에서 연기가 오른다.' },
-    powerplant: { nm: '발전소',   ic: '⚡', era: 5, cost: { metal: 200, stone: 120 }, work: 70, role: 'research', research: 5, style: 'powerplant', auto: 'one', msg: '발전소가 돌아간다. 밤이 사라졌다.' },
-    tower:      { nm: '고층빌딩', ic: '🏙️', era: 6, cost: { metal: 250, stone: 200 }, work: 60, housing: 48, style: 'tower', auto: 'house' },
-    lab:        { nm: '연구소',   ic: '🔬', era: 6, cost: { metal: 300, stone: 150 }, work: 80, role: 'research', research: 8, style: 'lab', auto: 'one', msg: '연구소가 세워졌다.' },
-    park:       { nm: '공원',     ic: '🌳', era: 6, cost: { wood: 150, stone: 80 }, work: 40, role: 'happy', happy: 12, style: 'park', auto: 'one', msg: '공원에서 쉰다.' },
-    dome:       { nm: '돔 주거지', ic: '🛖', era: 7, cost: { metal: 500, stone: 300 }, work: 80, housing: 80, style: 'dome', auto: 'house' },
-    rocket:     { nm: '우주선',   ic: '🚀', era: 7, cost: { metal: 1200, stone: 400 }, work: 200, role: 'launch', style: 'rocket', auto: 'one', msg: '우주선이 완성됐다! 새 세계를 열 수 있다.' }
+    hut:        { nm: '움막',     ic: '⛺', era: 0, cost: { wood: 16 }, work: 16, housing: 3, style: 'hut', auto: 'house' },
+    totem:      { nm: '토템',     ic: '🗿', era: 0, cost: { wood: 8, stone: 6 }, work: 10, role: 'faith', research: true, style: 'totem', auto: 'one', msg: '토템을 세웠다. 시민들이 신에게 기도한다.' },
+    storage:    { nm: '창고',     ic: '📦', era: 0, cost: { wood: 20, stone: 8 }, work: 24, role: 'storage', style: 'storage', auto: 'storage' },
+    campfire:   { nm: '모닥불',   ic: '🔥', era: 0, cost: { wood: 10, stone: 4 }, work: 12, role: 'research', research: 1.5, style: 'campfire', auto: 'one', msg: '모닥불 곁에 모여 이야기를 나눈다.' },
+    thatch:     { nm: '초가집',   ic: '🏠', era: 1, cost: { wood: 25, stone: 10 }, work: 28, housing: 5, style: 'thatch', auto: 'house' },
+    farm:       { nm: '밭',       ic: '🌾', era: 1, cost: { wood: 15 }, work: 20, role: 'food', style: 'farm', auto: 'farm' },
+    forge:      { nm: '대장간',   ic: '🔥', era: 1, cost: { wood: 30, stone: 25 }, work: 40, role: 'metal', style: 'forge', auto: 'one', msg: '대장간이 생겼다. 금속을 다룬다.' },
+    wood:       { nm: '목조집',   ic: '🏡', era: 2, cost: { wood: 50, stone: 15, metal: 5 }, work: 40, housing: 8, style: 'wood', auto: 'house' },
+    school:     { nm: '학당',     ic: '📚', era: 2, cost: { wood: 50, stone: 30, metal: 10 }, work: 56, role: 'research', research: 2.5, style: 'school', auto: 'one', msg: '학당에서 글을 배운다.' },
+    stone:      { nm: '석조집',   ic: '🏘️', era: 3, cost: { stone: 70, wood: 30, metal: 10 }, work: 52, housing: 12, style: 'stone', auto: 'house' },
+    market:     { nm: '시장',     ic: '🛒', era: 3, cost: { wood: 80, stone: 50, metal: 20 }, work: 60, role: 'happy', happy: 8, style: 'market', auto: 'one', msg: '시장이 열렸다. 마을이 활기차다.' },
+    castle:     { nm: '성',       ic: '🏰', era: 3, cost: { stone: 200, metal: 40 }, work: 120, role: 'faith', faith: 2, style: 'castle', auto: 'one', msg: '성이 완성됐다. 늑대가 더는 오지 않는다.' },
+    brick:      { nm: '벽돌집',   ic: '🏚️', era: 4, cost: { stone: 90, wood: 40, metal: 20 }, work: 60, housing: 16, style: 'brick', auto: 'house' },
+    university: { nm: '대학',     ic: '🎓', era: 4, cost: { stone: 150, wood: 80, metal: 40 }, work: 100, role: 'research', research: 4, style: 'university', auto: 'one', msg: '대학이 문을 열었다.' },
+    theater:    { nm: '극장',     ic: '🎭', era: 4, cost: { wood: 120, stone: 80 }, work: 80, role: 'happy', happy: 10, style: 'theater', auto: 'one', msg: '극장에서 연극을 본다.' },
+    rowhouse:   { nm: '연립주택', ic: '🏢', era: 5, cost: { stone: 150, metal: 60, wood: 60 }, work: 72, housing: 24, style: 'rowhouse', auto: 'house' },
+    factory:    { nm: '공장',     ic: '🏭', era: 5, cost: { metal: 150, stone: 150 }, work: 140, role: 'metal', metal: 3, style: 'factory', auto: 'one', msg: '공장 굴뚝에서 연기가 오른다.' },
+    powerplant: { nm: '발전소',   ic: '⚡', era: 5, cost: { metal: 200, stone: 120 }, work: 140, role: 'research', research: 5, style: 'powerplant', auto: 'one', msg: '발전소가 돌아간다. 밤이 사라졌다.' },
+    tower:      { nm: '고층빌딩', ic: '🏙️', era: 6, cost: { metal: 250, stone: 200 }, work: 120, housing: 48, style: 'tower', auto: 'house' },
+    lab:        { nm: '연구소',   ic: '🔬', era: 6, cost: { metal: 300, stone: 150 }, work: 160, role: 'research', research: 8, style: 'lab', auto: 'one', msg: '연구소가 세워졌다.' },
+    park:       { nm: '공원',     ic: '🌳', era: 6, cost: { wood: 150, stone: 80 }, work: 80, role: 'happy', happy: 12, style: 'park', auto: 'one', msg: '공원에서 쉰다.' },
+    dome:       { nm: '돔 주거지', ic: '🛖', era: 7, cost: { metal: 500, stone: 300 }, work: 160, housing: 80, style: 'dome', auto: 'house' },
+    rocket:     { nm: '우주선',   ic: '🚀', era: 7, cost: { metal: 1200, stone: 400 }, work: 400, role: 'launch', style: 'rocket', auto: 'one', msg: '우주선이 완성됐다! 새 세계를 열 수 있다.' }
   },
 
   // ---------- 직업 ----------
@@ -144,7 +144,7 @@ window.GV = {
     { id: 'food',  nm: '식량',  ic: '🍖', cost: 5,  amount: 30, hint: '시민들이 달려와 주워 갑니다' },
     { id: 'wood',  nm: '나무',  ic: '🪵', cost: 5,  amount: 30, hint: '집 지을 나무' },
     { id: 'stone', nm: '돌',    ic: '🪨', cost: 5,  amount: 25, hint: '토템·창고에 필요' },
-    { id: 'idea',  nm: '영감',  ic: '💡', cost: 8,  amount: 25, hint: '지식 +25, 발견이 빨라집니다' },
+    { id: 'idea',  nm: '영감',  ic: '💡', cost: 8,  amount: 15, hint: '지식 +15(시대 보정), 발견이 빨라집니다' },
     { id: 'rain',  nm: '비',    ic: '🌧️', cost: 10, amount: 60, hint: '밭이 자라고 모두 기뻐합니다 (행복 +5)' },
     { id: 'smite', nm: '번개',  ic: '⚡', cost: 6,  hint: '늑대·산적·적에게 30 피해. 시민에게 치면 혼냅니다' },
     { id: 'rally', nm: '집결',  ic: '🚩', cost: 3,  hint: '깃발을 꽂으면 전사·사냥꾼이 모여 근처의 적과 싸웁니다 (60초)' },

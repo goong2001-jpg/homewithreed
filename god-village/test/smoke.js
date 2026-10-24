@@ -28,7 +28,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('카메라가 우리 마을을 비춤', await ev(() => { const g = window.__gv, h = g.home(); return h.x > g.cam.x && h.x < g.cam.x + g.F.vw && h.y > g.cam.y && h.y < g.cam.y + g.F.vh; }));
 
   // ---- 스스로 발전 ----
-  await p.waitForFunction(() => window.__gv.S.blds.some(b => b.type === 'totem' && b.done), null, { timeout: 70000 });
+  await p.waitForFunction(() => window.__gv.S.blds.some(b => b.type === 'totem' && b.done), null, { timeout: 100000 });
   check('시민들이 스스로 토템을 세움', true);
 
   // ---- 지도 끌기(패닝) ----
@@ -52,8 +52,9 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   // ---- 영감 → 발견 ----
   await ev(() => { window.__gv.S.faith = 100; });
   await p.click('.pw[data-power="idea"]'); s = await scr(h.x, h.y); await p.mouse.click(s.x, s.y);
-  await ev(() => window.__gv.slowTick(Date.now()));
-  check('불 발견', await ev(() => window.__gv.S.techs.includes('fire')));
+  check('영감으로 지식 +15', await ev(() => window.__gv.S.res.know >= 15));
+  await ev(() => { window.__gv.S.res.know = 60; window.__gv.slowTick(Date.now()); });
+  check('불 발견(지식 60)', await ev(() => window.__gv.S.techs.includes('fire')));
   check('업적 "첫 불꽃"', await ev(() => window.__gv.S.ach.includes('first_fire')));
 
   // ---- 신탁 ----
@@ -99,8 +100,17 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   await ev(() => { const g = window.__gv, S = g.S; const h = g.home(); for (let i = 0; i < 12; i++) S.pop.push({ ...S.pop[0], id: 'x' + i, name: '시민' + i, partner: null, child: false, age: 999, kids: 0, job: 'gather', state: 'idle', held: false, x: h.x, y: h.y, settle: h.id }); S.res.wood = 100; S.res.food = 100; g.family(); });
   check('인구가 늘면 새 군락을 세움', await ev(() => window.__gv.S.settles.length >= 2 && window.__gv.S.pop.some(v => v.state === 'migrate')));
 
+  // ---- 회귀: 시민은 적에게 죽지 않고 쓰러진다, 침략은 45초 뒤 끝난다, 다 쓰러지면 피난민 ----
+  const before = await ev(() => { const g = window.__gv, S = g.S; S.hostiles = []; const h = g.home(); const civ = S.pop.filter(v => !v.child && v.job !== 'warrior' && v.job !== 'hunter'); civ.forEach(v => { v.hp = 1; v.x = h.x; v.y = h.y; }); S.hostiles.push({ id: 'r1', kind: 'enemy', raid: true, x: h.x, y: h.y, hp: 30, atk: 50, target: { x: h.x, y: h.y }, until: S.simT + 45, timer: 0, walk: 0, face: 1, pillage: 0 }); return { pop: S.pop.length, until: S.hostiles[0].until - S.simT }; });
+  check('침략 지속은 45초', before.until <= 45.01);
+  await p.waitForTimeout(3500);
+  check('일반 시민은 죽지 않고 쓰러짐', await ev(n => window.__gv.S.pop.length === n && window.__gv.S.pop.some(v => v.down > 0), before.pop), String(await ev(() => window.__gv.S.pop.length)));
+  await ev(() => { window.__gv.S.hostiles = []; });
+  await ev(() => { const g = window.__gv, S = g.S; S.pop = S.pop.slice(0, 1); S.pop[0].child = false; S.refugeeT = 18; g.family(); });
+  check('어른이 1명 이하면 피난민 도착', await ev(() => window.__gv.S.pop.length === 3));
+
   // ---- 적 침략 → 격퇴 / 출정 → 정복 ----
-  await ev(() => { const g = window.__gv, S = g.S; if (!S.techs.includes('hunting')) S.techs.push('hunting'); if (!S.techs.includes('weapons')) S.techs.push('weapons'); S.enemy.lastRaid = -9999; S.enemy.metAt = -9999; S.simT = 9999; g.slowTick(Date.now()); });
+  await ev(() => { const g = window.__gv, S = g.S; if (!S.techs.includes('hunting')) S.techs.push('hunting'); if (!S.techs.includes('weapons')) S.techs.push('weapons'); const h = g.home(); while (S.pop.length < 8) { const v = { ...S.pop[0], id: 'p' + S.pop.length, name: '주민' + S.pop.length, partner: null, child: false, age: 999, kids: 0, job: 'gather', state: 'idle', held: false, down: 0, x: h.x, y: h.y, settle: h.id, hp: 16 }; S.pop.push(v); } S.enemy.lastRaid = -9999; S.enemy.metAt = -9999; S.simT = 9999; g.slowTick(Date.now()); });
   check('적 침략 시작', await ev(() => window.__gv.S.hostiles.some(h => h.kind === 'enemy' && h.raid)));
   check('침략 소원 조건·HUD', (await t('#oracleLine')).includes('침략 중'));
   await ev(() => { window.__gv.S.hostiles.forEach(h => { if (h.raid) h.hp = 0; }); });
@@ -128,7 +138,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('오프라인 정산 창(2시간, 50%)', (await t('#welcomeText')).includes('2시간'));
   check('믿음 정산 +180', await ev(f => window.__gv.S.faith >= f + 180, faithPre));
   await p.click('#welcomeOk');
-  check('새로고침 뒤 세계 유지', await ev(() => window.__gv.S.settles.length >= 2 && window.__gv.S.explored.flat().filter(Boolean).length === 12 && window.__gv.S.pop.some(v => v.partner)));
+  check('새로고침 뒤 세계 유지', await ev(() => window.__gv.S.settles.length >= 2 && window.__gv.S.explored.flat().filter(Boolean).length === 12 && window.__gv.S.stats.marry >= 1));
 
   if (process.env.SHOT) await p.screenshot({ path: process.env.SHOT, fullPage: true });
   check('페이지 오류 없음', errors.length === 0, errors.join(' | '));
