@@ -10,7 +10,7 @@
 <link rel="icon" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>신의 마을</title>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 <!-- 지도: 픽셀 캔버스 + HUD -->
@@ -47,10 +47,11 @@
     <div class="avbar"><b id="avLv">Lv.1</b><i><s id="avHpFill"></s></i><span id="avHp"></span></div>
     <div id="joy" class="joy"><div id="joyKnob" class="joyknob"></div></div>
     <div class="rpgbtns">
+      <button id="atkBtn" type="button" class="skbtn atk">⚔️<small>베기</small></button>
       <button id="sk0" type="button" class="skbtn">⚡<small>번개 베기</small></button>
       <button id="sk1" type="button" class="skbtn">💗<small>치유 파동</small></button>
       <button id="dgBtn" type="button" class="skbtn dg" hidden>🕳️<small>입장</small></button>
-      <button id="ascendBtn" type="button" class="skbtn up">🕊️<small>승천</small></button>
+      <button id="ctrlOff" type="button" class="skbtn up">✋<small>조종 끄기</small></button>
     </div>
   </div>
   <!-- 시민을 탭하면 뜨는 작은 팝업: 지금 하는 말 + 바로 할 수 있는 일 -->
@@ -136,8 +137,8 @@
   <div class="modal-body"><h2>🌅 돌아온 사이에</h2><p id="welcomeText"></p><button class="btn primary" id="welcomeOk" type="button">확인</button></div>
 </div>
 
-<script src="data.js?v=6"></script>
-<script src="app.js?v=6"></script>
-<script src="rpg.js?v=6"></script>
+<script src="data.js?v=7"></script>
+<script src="app.js?v=7"></script>
+<script src="rpg.js?v=7"></script>
 </body>
 </html>

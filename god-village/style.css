@@ -143,8 +143,8 @@ h2 { font-size: 17px; margin: 0; } h3 { font-size: 13px; margin: 14px 0 6px; col
 #rpgHud { position: absolute; inset: 0; pointer-events: none; }
 .avbar { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); background: #000b; border: 1px solid #ffd34f66; border-radius: 8px; padding: 3px 8px; display: flex; align-items: center; gap: 6px; font-size: 11px; color: #ffe9a8; pointer-events: auto; }
 .avbar i { width: 90px; height: 6px; background: #333; border-radius: 3px; overflow: hidden; display: block; } .avbar s { display: block; height: 100%; background: #7fd36b; text-decoration: none; width: 100%; }
-.joy { position: absolute; left: 14px; bottom: 38px; width: 96px; height: 96px; border-radius: 50%; background: #0007; border: 2px solid #ffffff44; pointer-events: auto; touch-action: none; }
-.joyknob { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; background: #ffe9a8cc; border: 2px solid #ffd34f; }
+.joy { position: absolute; left: 12px; bottom: 36px; width: 112px; height: 112px; border-radius: 50%; background: #0007; border: 2px solid #ffffff44; pointer-events: auto; touch-action: none; }
+.joyknob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: #ffe9a8cc; border: 2px solid #ffd34f; }
 .rpgbtns { position: absolute; right: 10px; bottom: 40px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; pointer-events: auto; }
 .skbtn { width: 58px; height: 46px; border-radius: 10px; background: #1a2026dd; border: 2px solid #ffd34f88; color: #fff; font-size: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; padding: 0; }
 .skbtn small { font-size: 9px; color: #ffe9a8; margin-top: 2px; } .skbtn.cd { opacity: .45; } .skbtn.up { border-color: #9ad0ff88; } .skbtn.dg { border-color: #c58cff; } .skbtn:disabled { opacity: .4; } .skbtn:active { background: #4a3a20; }
@@ -156,3 +156,7 @@ h2 { font-size: 17px; margin: 0; } h3 { font-size: 13px; margin: 14px 0 6px; col
 .attgrid div.done { opacity: .5; border-color: var(--ok); } .attgrid div.now { border-color: var(--accent); background: #4a3a20; }
 .tag.dg { color: #c58cff; font-size: 9px; font-weight: 700; } .tag.meteor { color: #ff9a3c; font-size: 9px; font-weight: 700; }
 #tab-rpg .np-txt { margin-top: 4px; }
+
+.skbtn.atk { width: 64px; height: 56px; font-size: 22px; border-color: #ff9a3c; background: #3a2a1add; } .skbtn.atk:active { background: #8a5a2a; }
+#rpgHud button, #rpgHud .joy { touch-action: none; user-select: none; -webkit-user-select: none; }
+.field.ctrl #field { cursor: default; }

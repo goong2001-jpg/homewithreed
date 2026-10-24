@@ -359,17 +359,19 @@ window.GV = {
   },
   // ---------- RPG: 강림·장비·던전·이벤트·출석 (rpg.js 가 씁니다) ----------
   RPG: {
-    descendCost: 15,      // 강림 비용(믿음)
-    drain: 0.15,          // 강림 중 초당 믿음 소모 (분당 9)
-    charges: 3,           // 강림 횟수. chargeEvery(ms)마다 1회 충전
-    chargeEvery: 8 * 3600 * 1000,
-    deathFaith: 30,       // 화신이 쓰러지면 잃는 믿음
-    deathCd: 600,         // 쓰러진 뒤 강림 쿨타임(초)
-    base: { hp: 80, hpLv: 15, atk: 8, atkLv: 2, spd: 40, range: 16, atkCd: 0.6 },
-    xpBase: 50, xpPow: 1.4,   // 다음 레벨까지 = xpBase × lv^xpPow
-    xp:    { enemy: 10, bandit: 10, wolf: 5, monster: 60, dmob: 8, boss: 40 },
+    descendCost: 15,      // 강림 비용(믿음). 한 번 내려오면 승천할 때까지 지도에 남는다(저장됨)
+    deathFaith: 20,       // 화신이 쓰러지면 잃는 믿음
+    deathCd: 180,         // 쓰러진 뒤 토템에서 부활하기까지(초)
+    base: { hp: 80, hpLv: 15, atk: 8, atkLv: 2, spd: 44, range: 16, atkCd: 0.5 },
+    chase: 60,            // 조종 중 가만히 있으면 이 거리 안의 적에게 알아서 다가감
+    guard: 90,            // 조종을 끄면 서 있던 자리 주변 이 거리의 적과 싸우고 돌아옴
+    dash: { cd: 1.2, range: 60, radius: 20, mult: 1.6, knock: 10 },   // ⚔️ 베기: 돌진 + 광역 + 넉백
+    xpBase: 40, xpPow: 1.4,   // 다음 레벨까지 = xpBase × lv^xpPow
+    xp:    { enemy: 20, bandit: 20, wolf: 10, monster: 120, dmob: 15, boss: 80 },
     faith: { enemy: 2, bandit: 2, wolf: 1, monster: 20, dmob: 1, boss: 10 },
     morale: 1.2,          // 화신 곁(40px) 전사의 공격 배율
+    champCost: 20,        // 시민을 용사로 삼는 비용(믿음). 용사는 화신을 따라다니며 싸우고 제 경험치로 레벨업
+    champXpBase: 30, champHpLv: 10, champAtkLv: 2,
     skills: [
       { id: 'bolt', nm: '번개 베기', ic: '⚡', cd: 8, mult: 2.5, radius: 26, desc: '주위 적 모두에게 공격력 2.5배' },
       { id: 'heal', nm: '치유 파동', ic: '💗', cd: 15, heal: 0.4, radius: 40, desc: '화신 체력 40% 회복, 근처 시민 전부 회복' }
@@ -408,7 +410,7 @@ window.GV = {
     // 출석 7일 보상. item: 등급 번호(RARITY 순서)
     attend: [
       { ic: '✨', nm: '믿음 20', faith: 20 }, { ic: '⛏️', nm: '금속 30', metal: 30 }, { ic: '📦', nm: '일반 장비', item: 0 },
-      { ic: '✨', nm: '믿음 40', faith: 40 }, { ic: '📦', nm: '희귀 장비', item: 1 }, { ic: '⚡', nm: '강림 완충 + 믿음 50', charges: true, faith: 50 },
+      { ic: '✨', nm: '믿음 40', faith: 40 }, { ic: '📦', nm: '희귀 장비', item: 1 }, { ic: '⚡', nm: '믿음 50 + 희귀 장비', item: 1, faith: 50 },
       { ic: '🎁', nm: '영웅 장비', item: 2 }
     ],
     offline: { dangerAfterH: 24, returnFaithPerH: 10, returnMax: 100 }
