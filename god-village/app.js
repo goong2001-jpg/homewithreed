@@ -373,12 +373,13 @@
   }
   function canAfford(cost) { return Object.keys(cost).every(function (k) { return S.res[k] >= cost[k]; }); }
   function bw(type) { return { totem: 6, campfire: 8, hut: 12, storage: 12, farm: 16, thatch: 14, forge: 14, wood: 16, school: 16, stone: 18, market: 20, castle: 24, brick: 18, university: 22, theater: 18, rowhouse: 24, factory: 22, powerplant: 20, tower: 14, lab: 20, park: 22, dome: 22, rocket: 12, shrine: 18, monument: 10, wall: 26, granary: 20, library: 22, arena: 24, garden: 24, beacon: 10 }[type] || 14; }
-  function freeSlotFor(s, st, w) {
-    var cand = [], r = seeded(s.blds.length * 31 + 5 + st.x);
-    for (var i = 0; i < 500; i++) { var ang = r() * Math.PI * 2, rad = 20 + r() * 52; var p = { x: Math.round(st.x + Math.cos(ang) * rad), y: Math.round(st.y + Math.sin(ang) * rad * 0.8) };
+  // maxRad: 마을 중심에서 얼마나 멀리까지 자리를 찾을지(기본 72). ignoreNodes: 나무·바위가 겹쳐도 됨(대역사는 베어내고 짓는다)
+  function freeSlotFor(s, st, w, maxRad, ignoreNodes) {
+    var cand = [], r = seeded(s.blds.length * 31 + 5 + st.x), span = (maxRad || 72) - 20;
+    for (var i = 0; i < 700; i++) { var ang = r() * Math.PI * 2, rad = 20 + r() * span; var p = { x: Math.round(st.x + Math.cos(ang) * rad), y: Math.round(st.y + Math.sin(ang) * rad * 0.8) };
       if (p.x < 10 || p.x > WW - 10 || p.y < 14 || p.y > WH - 4) continue;
       if (s.blds.some(function (b) { return Math.abs(b.x - p.x) < (w + bw(b.type)) / 2 + 4 && Math.abs(b.y - p.y) < 18; })) continue;
-      if (s.nodes.some(function (n) { return dist(n, p) < 8 + w / 2; })) continue;
+      if (!ignoreNodes && s.nodes.some(function (n) { return dist(n, p) < 8 + w / 2; })) continue;
       if (s.settles.some(function (o) { return o !== st && dist(o, p) < 40; })) continue;
       cand.push({ p: p, d: dist(p, st) }); }
     if (!cand.length) return null; cand.sort(function (a, b) { return a.d - b.d; }); return cand[0].p;
@@ -1134,10 +1135,13 @@
     var d = D.BUILDINGS[id]; if (!d || !d.wonder) return false; if (S.era < d.era) { toast(D.ERAS[d.era].nm + '부터 지을 수 있어요'); return false; }
     if (S.blds.some(function (b) { return b.type === id; })) { toast('이미 있어요'); return false; }
     var lack = Object.keys(d.cost).filter(function (r) { return (r === 'faith' ? S.faith : S.res[r]) < d.cost[r]; }); if (lack.length) { toast('모자라요: ' + lack.map(function (r) { return RES_IC[r] + d.cost[r]; }).join(' ')); return false; }
-    var pos = freeSlotFor(S, home(), bw(id)); if (!pos) { toast('첫 마을에 자리가 없어요'); return false; }
+    // 자리: 첫 마을 가까이 → 더 멀리 → 다른 군락 → 그래도 없으면 나무·바위를 베어내고 짓는다
+    var w = bw(id), order = [home()].concat(S.settles.filter(function (st) { return st !== home(); })), pos = null, at = null, cleared = 0;
+    [[72, false], [120, false], [120, true]].some(function (opt) { return order.some(function (st) { var p = freeSlotFor(S, st, w, opt[0], opt[1]); if (p) { pos = p; at = st; if (opt[1]) { var before = S.nodes.length; S.nodes = S.nodes.filter(function (n) { return dist(n, p) >= 8 + w / 2; }); cleared = before - S.nodes.length; } return true; } return false; }); });
+    if (!pos) { toast('어느 마을에도 자리가 없어요. 낡은 집이 헐리거나 군락이 늘면 다시 시도하세요'); return false; }
     Object.keys(d.cost).forEach(function (r) { if (r === 'faith') S.faith -= d.cost[r]; else S.res[r] -= d.cost[r]; });
-    S.blds.push({ id: uid(), type: id, x: pos.x, y: pos.y, progress: 0, done: false, settle: home().id });
-    sysChat('🏛️ 신의 뜻으로 ' + d.ic + ' ' + d.nm + ' 공사가 시작됐다'); addLog('🏛️ <b>' + d.nm + '</b> 착공'); toast(d.ic + ' ' + d.nm + ' 착공! 건축가들이 모입니다'); beam(pos, '#ffd34f', 80, 8, 0.9); SFX.play('fanfare'); rebalanceJobs(); ui.dirty.bld = true; renderHead(); save(); return true;
+    S.blds.push({ id: uid(), type: id, x: pos.x, y: pos.y, progress: 0, done: false, settle: at.id });
+    sysChat('🏛️ 신의 뜻으로 ' + at.nm + '에 ' + d.ic + ' ' + d.nm + ' 공사가 시작됐다' + (cleared ? ' (나무·바위 ' + cleared + '개를 베어냈다)' : '')); addLog('🏛️ <b>' + d.nm + '</b> 착공 (' + at.nm + ')'); toast(d.ic + ' ' + d.nm + ' 착공 — ' + at.nm + '! 건축가들이 모입니다'); panTo(pos); beam(pos, '#ffd34f', 80, 8, 0.9); SFX.play('fanfare'); rebalanceJobs(); ui.dirty.bld = true; renderHead(); save(); return true;
   }
   function orderArmy() { var a = D.ORDERS.arm, lv = S.armyLv || 0; if (lv >= a.max) { toast('군대는 이미 최고 단계예요'); return false; } var cm = a.cost.metal * (lv + 1), cf = a.cost.faith * (lv + 1); if (S.res.metal < cm || S.faith < cf) { toast('모자라요: ' + RES_IC.metal + cm + ' ✨' + cf); return false; } S.res.metal -= cm; S.faith -= cf; S.armyLv = lv + 1; S.pop.forEach(function (v) { if (fighter(v)) v.hp = unitStat(v).hp; }); sysChat('🛡️ 군대 무장 ' + S.armyLv + '단계 — 전사·사냥꾼 전투력·체력 +' + S.armyLv * 10 + '%'); addLog('🛡️ <b>군대 무장</b> ' + S.armyLv + '단계'); toast('🛡️ 군대 무장 ' + S.armyLv + '단계!'); S.settles.forEach(function (st) { if (st.army) { ring(st.army, '#ffd34f', 2, 16, 0.8); } }); SFX.play('horn'); renderHead(); save(); return true; }
   function orderFest() { var f = D.ORDERS.fest; if (S.fest) { toast('이미 축제 중이에요'); return false; } if (S.res.food < f.cost.food || S.faith < f.cost.faith) { toast('모자라요: ' + RES_IC.food + f.cost.food + ' ✨' + f.cost.faith); return false; } S.res.food -= f.cost.food; S.faith -= f.cost.faith; startFest(home(), 30); S.happy = Math.min(100, S.happy + 10); S.pop.forEach(function (v) { v.mood = clamp((v.mood || 60) + 10, 0, 100); if (Math.random() < 0.5) say(v, 'fest', true); }); S.birthT += 60; sysChat('🎉 신이 축제를 열었다! 30초 동안 모두 광장에 모인다 (행복 +10)'); addLog('🎉 <b>축제</b>'); SFX.play('marry'); panTo(home()); renderHead(); save(); return true; }
