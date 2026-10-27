@@ -136,6 +136,24 @@
 #locApp .sk{margin:4px 0 12px}
 #locApp .sk h3{margin:0 0 6px;font-size:14px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 #locApp .sk h3 small{font-size:11.5px;font-weight:400;color:var(--sub)}
+/* 재고앱 화면 안에 들어갈 때 바깥(Index) 스타일이 섞이지 않게 */
+#locApp .search{width:auto;background:none;border:0;border-radius:0;padding:0;box-shadow:none;font-size:inherit}
+#locApp .srow{background:none;border:0;border-radius:0;margin:0;cursor:default}
+#locApp .srow:active{background:none}
+#locApp .pick{margin:0;border-radius:0}
+#locApp p,#locApp h1,#locApp h2,#locApp h3{font-family:inherit}
+/* 자재별 위치·수량 카드 (검색 결과, 품목 패널) */
+#locApp .icard{padding:8px 12px 6px;border-bottom:1.5px solid var(--line)}
+#locApp .icard .ih{display:flex;gap:6px;align-items:baseline;margin-bottom:2px}
+#locApp .icard .ih b{font-size:15.5px}
+#locApp .icard .ih small{color:var(--sub);font-size:12px}
+#locApp .icard .tot{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+#locApp .results .icard button,#locApp .icard .lr{display:flex;flex-direction:row;justify-content:space-between;align-items:baseline;gap:8px;width:100%;
+  padding:6px 0 6px 10px;border:0;border-top:1px dashed var(--line);background:none;text-align:left;font-size:14px}
+#locApp .icard .lr b{font-variant-numeric:tabular-nums;white-space:nowrap}
+#locApp .icard .lr.z{color:var(--sub)}
+#locApp .rsec{margin:0;padding:6px 12px 2px;font-size:12px;color:var(--sub)}
+#locApp .srow .nm[data-item]{text-decoration:underline;text-decoration-color:var(--line);cursor:pointer}
 #locApp .srow{display:flex;align-items:center;gap:6px;padding:7px 0;border-top:1px dashed var(--line)}
 #locApp .srow:first-of-type{border-top:0}
 #locApp .srow .nm{flex:1;min-width:0;word-break:keep-all}
@@ -198,6 +216,9 @@ const root=document.getElementById('locApp');
 const E=n=>root.querySelector('[data-el="'+n+'"]');
 const KEY='subtek-map-v1';
 const GAS=(typeof google!=='undefined'&&google.script&&google.script.run)?google.script.run:null;
+/* 재고앱(Index) 안에 들어가 있으면 true — 데이터는 재고앱이 한 번에 불러와 넘겨줌(locApi), 화면 이동도 재고앱이 처리(locHost) */
+const HOSTED=!!window.LOC_HOSTED;
+const host=()=>HOSTED&&window.locHost?window.locHost:null;
 const K=(r,c)=>r+','+c;
 /* 줄 코드: A~Z 다음은 AA, AB … (엑셀식). A~Z 칸은 예전과 같아서 기존 재고 위치 이름이 그대로 유지됨 */
 const MAXR=50,MAXC=50;
@@ -269,15 +290,16 @@ function loadStock(){if(!GAS)return;GAS.withSuccessHandler(res=>{STK=(res&&res.s
   .withFailureHandler(()=>toast('재고를 불러오지 못했어요. 새로고침해 주세요')).locStock()}
 /** 재고앱 열기 (item/loc/mode). 저장 중이면 먼저 저장 */
 function openApp(p){
+  if(host()){closePanel();host().open(p||{});return}
   if(dirty||saving){flush();toast('위치도를 저장 중이에요. 잠시 후 다시 눌러주세요');return}
   if(!APP){toast('재고앱 주소를 불러오는 중이에요. 잠시 후 다시 눌러주세요');return}
   const qs=Object.keys(p||{}).filter(k=>p[k]).map(k=>k+'='+encodeURIComponent(p[k])).join('&');
   window.open(APP+(qs?(APP.indexOf('?')<0?'?':'&')+qs:''),'_top');
 }
-function stockRows(list,loc){return list.length?list.map(a=>`<div class="srow"><span class="nm">${esc(a.name)}${a.cat?`<small>${esc(a.cat)}</small>`:''}</span><b>${fmtN(a.qty)}</b>`+
+function stockRows(list,loc){return list.length?list.map(a=>`<div class="srow"><span class="nm" data-item="${esc(a.id)}">${esc(a.name)}${a.cat?`<small>${esc(a.cat)}</small>`:''}</span><b>${fmtN(a.qty)}</b>`+
   `<button data-go="출고" data-id="${esc(a.id)}" data-loc="${esc(loc)}">출고</button><button data-mvid="${esc(a.id)}" data-loc="${esc(loc)}">이동</button></div>`).join('')
   :'<p class="none">재고 없음</p>'}
-function bindGo(P){P.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>openApp({item:b.dataset.id,loc:b.dataset.loc,mode:b.dataset.go}));
+function bindGo(P){P.querySelectorAll('[data-item]').forEach(b=>b.onclick=()=>openItem(b.dataset.item));P.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>openApp({item:b.dataset.id,loc:b.dataset.loc,mode:b.dataset.go}));
   P.querySelectorAll('[data-mvid]').forEach(b=>b.onclick=()=>{const a=stockAt(b.dataset.loc).find(x=>x.id===b.dataset.mvid);if(!a)return;
     startMove({label:a.name+' '+fmtN(a.qty)+'개',parts:[{from:b.dataset.loc,layer:null,items:[a]}],src:P.dataset.kind==='cell'&&cur?{si:S.cur,r:cur.r,c:cur.c}:null})});
   P.querySelectorAll('[data-mvloc]').forEach(b=>b.onclick=()=>{const l=b.dataset.mvloc;
@@ -314,7 +336,7 @@ function flush(){
   saving=true;dirty=false;setStatus('저장 중');
   GAS.withSuccessHandler(res=>{
     saving=false;
-    if(res&&res.ok){version=res.version;setStatus(dirty?'저장 대기':'저장됨');if(dirty)flush();return}
+    if(res&&res.ok){version=res.version;setStatus(dirty?'저장 대기':'저장됨');mapToHost();if(dirty)flush();return}
     if(res&&res.conflict){
       const o=parse(res.data);if(o){const c=S.cur;S=o;S.cur=c;fixCur()}
       version=res.version;dirty=false;closePanel();render();setStatus('저장됨');
@@ -334,7 +356,7 @@ function loadServer(quiet){
     applyPendingQ();
   }).withFailureHandler(()=>{setStatus('불러오기 실패');if(!S){S=seed();render()}toast('시트를 불러오지 못했어요. 새로고침해 주세요')}).locGet();
 }
-document.addEventListener('visibilitychange',()=>{
+document.addEventListener('visibilitychange',()=>{if(HOSTED)return; // 재고앱 안에서는 재고앱이 새로고침
   if(GAS&&S&&document.visibilityState==='visible'&&!dirty&&!saving&&E('panel').hidden){loadServer(true);loadStock()}
 });
 
@@ -431,7 +453,7 @@ function commit(newS,mv,done,fail){
   if(dirty||saving){flush();toast('위치도를 저장 중이에요. 잠시 후 다시 눌러주세요');fail&&fail();return}
   clearTimeout(saveTimer);saving=true;setStatus('저장 중');
   GAS.withSuccessHandler(res=>{saving=false;
-    if(res&&res.ok){const c=S.cur;S=newS;S.cur=c;version=res.version;if(res.stock)STK=res.stock;setStatus('저장됨');done();if(dirty)flush();return}
+    if(res&&res.ok){const c=S.cur;S=newS;S.cur=c;version=res.version;if(res.stock){STK=res.stock;stockToHost()}setStatus('저장됨');mapToHost();done();if(dirty)flush();return}
     if(res&&res.conflict){const o=parse(res.data);if(o){const c=S.cur;S=o;S.cur=c;fixCur()}version=res.version;MV=null;closePanel();render();setStatus('저장됨');
       toast('다른 사람이 먼저 위치도를 고쳐서 아무것도 바꾸지 않았어요. 다시 해주세요');fail&&fail()}
   }).withFailureHandler(e=>{saving=false;setStatus('저장됨');toast((e&&e.message)||'저장하지 못했어요');loadStock();fail&&fail()})
@@ -741,26 +763,65 @@ function openBackup(){
 /* ---------- 검색 ---------- */
 function renderResults(){
   const q=query(),box=E('results');renderGrid();if(!q){box.hidden=true;return}
-  const out=[];
+  const out=[],norm=v=>String(v||'').replace(/\s+/g,'').toLowerCase(),nq=norm(q);
+  // 1) 품목: 총수량 + 위치별 수량 (재고 또는 📌지정이 있는 품목)
+  const ix=keyIndex(),cards=ITEMS.filter(it=>norm(it.name).includes(nq)).map(it=>itemInfo(it.id,ix)).filter(c=>c.rows.length).slice(0,8);
+  // 2) 칸 이름·메모·📌지정(재고 0)
   S.sheets.forEach((s,si)=>{for(const k in s.cells){const x=s.cells[k];const[r,c]=k.split(',').map(Number);
     if(String(x.label||'').toLowerCase().includes(q))out.push({si,r,c,w:'',t:x.label});
     if(x.type==='slot')x.layers.forEach((L,i)=>lines(L.t).forEach(t=>{if(t.toLowerCase().includes(q))out.push({si,r,c,w:x.layers.length>1?(i+1)+'층':'',t})}))
     if(x.type==='slot')x.layers.forEach((L,i)=>(L.p||[]).forEach(pr=>{const nm=prodName(pr);
-      if(nm.toLowerCase().includes(q)&&!stockAt(slotKey(s,r,c,i)).some(a=>a.id===pr.id))out.push({si,r,c,w:(x.layers.length>1?(i+1)+'층 ':'')+(x.label||''),t:'📌'+nm+' · 지정 (재고 0)'})}))}
-    // 실제 재고 (빈 칸·합친 칸 포함 전체 격자)
-    const ks=sheetKeys(s);Object.keys(ks).forEach(k=>stockAt(k).forEach(a=>{if(String(a.name).toLowerCase().includes(q)){const[r,c,i]=ks[k],x=get(s,r,c);
-      out.unshift({si,r,c,w:(x.layers.length>1?(i+1)+'층 ':'')+(x.label?x.label:''),t:a.name+' · '+fmtN(a.qty)+'개'})}}));
-    stockAt(String(s.name||'').trim()).forEach(a=>{if(String(a.name).toLowerCase().includes(q))out.push({si,loose:1,t:a.name+' · '+fmtN(a.qty)+'개'})})});
-  if(stockLoaded)orphanLocs().forEach(k=>STK[k].forEach(a=>{if(String(a.name).toLowerCase().includes(q))out.push({orph:k,t:a.name+' · '+fmtN(a.qty)+'개'})}));
+      if(nm.toLowerCase().includes(q)&&!stockAt(slotKey(s,r,c,i)).some(a=>a.id===pr.id))out.push({si,r,c,pid:pr.id,w:(x.layers.length>1?(i+1)+'층 ':'')+(x.label||''),t:'📌'+nm+' · 지정 (재고 0)'})}))}
+  });
+  // 재고가 있는 품목은 위 카드에 나오므로, 아래 칸 목록에서는 📌지정(재고 0)·이름·메모만
+  const shown={};cards.forEach(c=>shown[c.id]=1);
+  const rest=out.filter(o=>!(o.pid&&shown[o.pid]));
   box.hidden=false;
-  box.innerHTML=out.length?out.slice(0,40).map((o,n)=>`<button data-n="${n}"><span class="rw">${o.orph?esc(o.orph)+' (연결 안 됨)':esc(S.sheets[o.si].name)+' '+(o.loose?'칸 미지정':code(o.r,o.c)+' '+esc(o.w))}</span><span>${esc(o.t)}</span></button>`).join('')
-    :`<p class="none">"${esc(E('q').value.trim())}"이(가) 적힌 칸이 없어요</p>`;
-  box.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{const o=out[+b.dataset.n];box.hidden=true;
-    if(o.orph){openOrphans();return}
-    if(o.loose){S.cur=o.si;render();openLoose();return}
-    S.cur=o.si;flashKey=K(o.r,o.c);render();
-    const el=root.querySelector(`.cell[data-k="${flashKey}"]`);if(el)el.scrollIntoView({block:'center',inline:'center',behavior:'smooth'});
-    setTimeout(()=>{flashKey=null},1500)});
+  box.innerHTML=(cards.length?'<p class="rsec">품목별 위치·수량</p>'+cards.map(itemCardHTML).join(''):'')+
+    (rest.length?(cards.length?'<p class="rsec">이름·메모로 찾은 칸</p>':'')+rest.slice(0,40).map(o=>`<button data-n="${out.indexOf(o)}"><span class="rw">${esc(S.sheets[o.si].name)+' '+code(o.r,o.c)+' '+esc(o.w)}</span><span>${esc(o.t)}</span></button>`).join(''):'')||
+    `<p class="none">"${esc(E('q').value.trim())}"이(가) 있는 칸이 없어요</p>`;
+  box.querySelectorAll('[data-goloc]').forEach(b=>b.onclick=()=>{box.hidden=true;goLoc(b.dataset.goloc)});
+  box.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{const o=out[+b.dataset.n];box.hidden=true;flashCell(o.si,o.r,o.c)});
+}
+function flashCell(si,r,c){
+  S.cur=si;flashKey=K(r,c);render();
+  const el=root.querySelector(`.cell[data-k="${flashKey}"]`);if(el)el.scrollIntoView({block:'center',inline:'center',behavior:'smooth'});
+  setTimeout(()=>{flashKey=null},1500);
+}
+
+/* ---------- 자재별: 총수량 + 위치별 수량 ---------- */
+/** 위치 이름 → 어디인지 {kind:'slot',si,r,c,i} / {kind:'loose',si} (시트 이름) / 없으면 연결 안 됨 */
+function keyIndex(){const o={};S.sheets.forEach((s,si)=>{const ks=sheetKeys(s);Object.keys(ks).forEach(k=>{const[r,c,i]=ks[k];o[k]={kind:'slot',si,r,c,i}});
+  const nm=String(s.name||'').trim();if(!o[nm])o[nm]={kind:'loose',si}});return o}
+function locLabel(k,ix){const w=ix[k];if(!w)return k+' (연결 안 됨)';if(w.kind==='loose')return k+' (칸 미지정)';
+  const s=S.sheets[w.si],x=get(s,w.r,w.c);return String(s.name).trim()+' '+code(w.r,w.c)+(x.label?' '+x.label:'')+(x.layers.length>1?' · '+(w.i+1)+'층':'')}
+/** {id,name,cat,total,rows:[{k,label,qty,pin}]} — 재고 있는 곳(많은 순) + 📌지정했지만 재고 0인 칸 */
+function itemInfo(id,ix){
+  ix=ix||keyIndex();const it=ITEMMAP[id]||{id,name:id,cat:''},rows=[];let total=0;
+  Object.keys(STK).forEach(k=>STK[k].forEach(a=>{if(a.id===id){total+=a.qty;rows.push({k,label:locLabel(k,ix),qty:a.qty})}}));
+  rows.sort((a,b)=>b.qty-a.qty);
+  S.sheets.forEach(s=>Object.keys(s.cells).forEach(ck=>{const x=s.cells[ck];if(x.type!=='slot')return;const[r,c]=ck.split(',').map(Number);
+    x.layers.forEach((L,i)=>{if((L.p||[]).some(pr=>pr.id===id)){const k=slotKey(s,r,c,i),row=rows.find(z=>z.k===k);
+      if(row)row.pin=1;else rows.push({k,label:locLabel(k,ix),qty:0,pin:1})}})}));
+  return{id,name:it.name,cat:it.cat||'',total,rows};
+}
+function itemCardHTML(c){return `<div class="icard"><div class="ih"><b>${esc(c.name)}</b>${c.cat?`<small>${esc(c.cat)}</small>`:''}<span class="tot">총 ${fmtN(c.total)}개</span></div>`+
+  c.rows.map(w=>`<button class="lr${w.qty?'':' z'}" data-goloc="${esc(w.k)}"><span>${w.pin?'📌 ':''}${esc(w.label)}</span><b>${fmtN(w.qty)}</b></button>`).join('')+'</div>'}
+/** 위치 이름으로 이동: 칸이면 반짝, 칸 미지정이면 그 목록, 연결 안 되면 그 목록 */
+function goLoc(k){const w=keyIndex()[k];closePanel();
+  if(!w){openOrphans();return}
+  if(w.kind==='loose'){S.cur=w.si;render();openLoose();return}
+  flashCell(w.si,w.r,w.c)}
+function openItem(id){
+  const c=itemInfo(id),P=E('panelBody');P.dataset.kind='item';P.dataset.id=id;
+  P.innerHTML=`<div class="ph"><h2>${esc(c.name)}<small>${esc(c.cat)}</small></h2><button class="x" data-a="close">닫기</button></div>
+  <div class="icard" style="padding:0;border:0"><div class="ih"><span>위치 ${c.rows.filter(w=>w.qty).length}곳</span><span class="tot" style="font-size:18px">총 ${fmtN(c.total)}개</span></div>
+  ${c.rows.map(w=>`<button class="lr${w.qty?'':' z'}" data-goloc="${esc(w.k)}"><span>${w.pin?'📌 ':''}${esc(w.label)}</span><b>${fmtN(w.qty)}</b></button>`).join('')||'<p class="none">재고 없음</p>'}</div>
+  <div class="acts" style="margin-top:12px"><button data-a="io">재고앱에서 입출고</button></div>`;
+  P.querySelector('[data-a="close"]').onclick=closePanel;
+  P.querySelector('[data-a="io"]').onclick=()=>openApp({item:id});
+  P.querySelectorAll('[data-goloc]').forEach(b=>b.onclick=()=>goLoc(b.dataset.goloc));
+  openPanel();
 }
 E('q').oninput=renderResults;
 E('q').onfocus=()=>{if(query())renderResults()};
@@ -789,7 +850,33 @@ if(GAS&&root.classList.contains('solo')){
 /* ---------- 시작 ---------- */
 /* 재고앱에서 "위치도에서 보기"로 왔으면 ?q=품명 으로 바로 검색 */
 function applyPendingQ(){if(!pendingQ||!S)return;E('q').value=pendingQ;pendingQ='';renderResults()}
-if(GAS){loadServer(false);loadStock();
+/* ---------- 재고앱과 주고받기 ---------- */
+/** 위치도 → 보관칸 목록 (Location.gs 의 locSlotsForApp_ 와 같은 결과) */
+function appSlots(){const sheets=[],slots=[];S.sheets.forEach(s=>{const sheet=String(s.name||'').trim();if(!sheet)return;sheets.push(sheet);
+  Object.keys(s.cells||{}).map(k=>k.split(',').map(Number)).sort((a,b)=>a[0]-b[0]||a[1]-b[1]).forEach(([r,c])=>{const x=s.cells[K(r,c)];if(!x||x.type!=='slot')return;
+    const n=Math.max(1,(x.layers||[]).length);for(let i=0;i<n;i++){const L=(x.layers||[])[i]||{};
+      slots.push({key:slotKey(s,r,c,i),sheet,code:code(r,c),label:String(x.label||'').trim(),layer:i,n,p:(L.p||[]).map(pr=>pr.id),
+        note:((L.p||[])[0]||{}).name||lines(L.t)[0]||''})}})});return{sheets,slots}}
+function mapToHost(){if(host()&&S)host().mapChanged(appSlots())}
+function stockToHost(){if(host())host().stockChanged(STK)}
+if(HOSTED){
+  setStatus('불러오는 중');
+  window.locApi={
+    /** 위치도 데이터 {version, data} */
+    init(loc){const o=loc&&loc.data?parse(loc.data):null;version=(loc&&loc.version)||0;const c=S?S.cur:0;
+      if(o){S=o;S.cur=c;fixCur();setStatus('저장됨')}else if(!S){S=seed();save()}render();applyPendingQ()},
+    /** 재고앱의 품목 목록(items[].locs)으로 위치별 재고를 만듦 — 서버에 다시 묻지 않음 */
+    setStock(items,staff){STK={};ITEMS=[];ITEMMAP={};(items||[]).forEach(it=>{const x={id:it.id,name:String(it.name),cat:String(it.cat||'')};ITEMS.push(x);ITEMMAP[x.id]=x;
+        Object.keys(it.locs||{}).forEach(k=>{const q=Number(it.locs[k])||0;if(q)(STK[k]=STK[k]||[]).push({id:x.id,name:x.name,cat:x.cat,qty:q})})});
+      Object.keys(STK).forEach(k=>STK[k].sort((a,b)=>b.qty-a.qty));if(staff&&staff.length)STAFF=staff;stockLoaded=true;
+      if(S){renderGrid();renderStockBar();if(query())renderResults()}},
+    search(q){pendingQ=q||'';applyPendingQ()},
+    /** 저장 안 된 변경이나 열린 창이 있으면 true (그동안은 새로 덮어쓰지 않음) */
+    busy(){return dirty||saving||!!MV||!E('panel').hidden},
+    slots:()=>S?appSlots():null
+  };
+}
+else if(GAS){loadServer(false);loadStock();
   try{google.script.url.getLocation(l=>{const q=l&&l.parameter&&l.parameter.q;if(q){pendingQ=q;applyPendingQ()}})}catch(e){}}
 else{try{const v=localStorage.getItem(KEY);S=v?parse(v):null}catch(e){}if(!S)S=seed();fixCur();render()}
 })();

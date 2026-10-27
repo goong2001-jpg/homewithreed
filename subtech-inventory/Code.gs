@@ -6,7 +6,7 @@
  * - 메모(업체 사양), 조립 가능 수량(BOM), 월별 입출고 리포트 포함.
  */
 
-var APP_VERSION = 'v14'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
+var APP_VERSION = 'v15'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
 
 var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
@@ -94,9 +94,9 @@ function onOpen() {
     .addToUi();
 }
 function doGet(e) {
-  // ?page=location → 자재 위치도 화면 (Location.gs / Location.html)
-  if (e && e.parameter && e.parameter.page === 'location') return locPage();
-  return HtmlService.createHtmlOutputFromFile('Index').setTitle('써브텍 재고')
+  // 한 화면: Index 안에 위치도(Location.html)를 끼워 넣음 (<?!= locInclude() ?>). 첫 화면 = 위치도.
+  // 예전 주소(?page=location&q=…)도 그대로 열림 — 화면에서 q 를 읽어 위치도 검색
+  return HtmlService.createTemplateFromFile('Index').evaluate().setTitle('써브텍 재고')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1');
 }
 function showUrl() {
@@ -252,6 +252,12 @@ function buildMonthlyView_(sh) {
 // ---------------------------------------------------------------------------
 // 재고
 // ---------------------------------------------------------------------------
+/** 첫 화면용: bootstrap + 위치도 데이터를 서버 한 번 호출로 */
+function appBoot() {
+  var b = bootstrap();
+  b.loc = (typeof locGet === 'function') ? locGet() : { version: 0, data: null };
+  return b;
+}
 function bootstrap() {
   var ss = SpreadsheetApp.getActive();
   var m = ss.getSheetByName(TAB_MASTER), cf = ss.getSheetByName(TAB_CONFIG);

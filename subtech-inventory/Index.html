@@ -60,16 +60,20 @@
   .pthumb { position:relative; width:78px; height:78px; } .pthumb img { width:78px; height:78px; object-fit:cover; border-radius:8px; border:1px solid #eef1f5; } .pthumb .px { position:absolute; top:-7px; right:-7px; width:22px; height:22px; background:#dc2626; color:#fff; border-radius:50%; font-size:13px; display:flex; align-items:center; justify-content:center; cursor:pointer; } .picadd { width:78px; height:78px; border:1.5px dashed #b9ccf5; border-radius:8px; color:#2563eb; font-size:26px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
   .nav { position:fixed; bottom:0; left:0; right:0; height:60px; border-top:1px solid #eef1f5; background:#fff; display:flex; z-index:30; } .nav div { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:10px; color:#b9c2cf; font-weight:600; cursor:pointer; } .nav div.on { color:#2563eb; } .nav .ic { font-size:18px; }
   .pendbar { background:#eff6ff; border:1.5px solid #bfdbfe; color:#1d4ed8; border-radius:10px; padding:9px 12px; font-size:13px; font-weight:700; display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; } .pendbar .x { color:#64748b; cursor:pointer; text-decoration:underline; white-space:nowrap; }
+  #viewLoc #locApp .toast { bottom:76px; } #viewLoc #locApp { min-height:calc(100vh - 60px); }
   .loading { text-align:center; color:#8a97a8; padding:40px; font-size:14px; line-height:1.6; }
 </style>
 </head>
 <body>
 
-<div class="appbar"><div class="title"><span id="barIcon">📦</span> <span id="barTitle">써브텍 재고</span></div><div class="sub" id="barSub">입고 · 출고를 빠르게 기록하세요</div></div>
+<div class="appbar hidden" id="appbar"><div class="title"><span id="barIcon">📦</span> <span id="barTitle">써브텍 재고</span></div><div class="sub" id="barSub">입고 · 출고를 빠르게 기록하세요</div></div>
 <datalist id="allNames"></datalist><datalist id="allCats"></datalist>
 
+<!-- 자재 위치도 (Location.html 을 그대로 끼워 넣음 — 첫 화면) -->
+<div id="viewLoc"><script>window.LOC_HOSTED=true;</script><?!= locInclude() ?></div>
+
 <!-- 검색 -->
-<div class="body" id="viewSearch">
+<div class="body hidden" id="viewSearch">
   <input class="search" id="searchInput" placeholder="🔍 품명 검색 (예: STT1.3)" oninput="renderSearch()">
   <div id="pendBar"></div>
   <div class="label">품목</div><div id="searchList"><div class="loading">불러오는 중…</div></div>
@@ -184,15 +188,15 @@
 </div>
 
 <div class="nav">
-  <div id="navInput" class="on" onclick="go('search')"><span class="ic">➕</span>입출고</div>
+  <div id="navLoc" class="on" onclick="go('loc')"><span class="ic">📍</span>위치도</div>
+  <div id="navInput" onclick="go('search')"><span class="ic">➕</span>입출고</div>
   <div id="navStock" onclick="go('stock')"><span class="ic">📊</span>현재고</div>
   <div id="navBuild" onclick="go('build')"><span class="ic">🧩</span>조립</div>
   <div id="navMemo" onclick="go('memo')"><span class="ic">📝</span>메모</div>
-  <div id="navLoc" onclick="openLocation()"><span class="ic">📍</span>위치도</div>
 </div>
 
 <script>
-var HTML_VERSION = 'v14'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v15'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var cur = null, type = '입고', lines = [{ boxes:'', per:'' }], txImgs = [];
@@ -201,11 +205,13 @@ var CAT_PALETTE = ['#2563eb','#d97706','#16a34a','#9333ea','#dc2626','#0891b2','
 var catColorMap = null;
 var OXF = [['plate','명판'],['bizSticker','상호스티커'],['dateSticker','날짜스티커'],['caseO','전용케이스'],['program','프로그램']];
 
-google.script.run.withSuccessHandler(onBoot).withFailureHandler(onErr).bootstrap();
+// 처음 한 번에: 품목·재고·위치 + 위치도 데이터 (appBoot). 이후 화면 전환은 서버를 다시 부르지 않음
+google.script.run.withSuccessHandler(onBoot).withFailureHandler(onErr).appBoot();
 function onBoot(d){ DATA=d; if(!DATA.layout) DATA.layout=[]; if(!DATA.locMap) DATA.locMap={sheets:[],slots:[]}; indexSlots(); fill('staffSel', d.staff&&d.staff.length?d.staff:['담당자']); fillLoc('locSel'); catColorMap=null; fillDatalists(); resetBar(); renderSearch();
+  if(window.locApi){ locApi.setStock(DATA.items, DATA.staff); if(d.loc!==undefined) locApi.init(d.loc); }
   applyDeepLink();
   if(d.version && d.version!==HTML_VERSION) alert('⚠️ 버전 불일치!\n화면(Index.html): '+HTML_VERSION+' / 서버(Code.gs): '+d.version+'\n두 파일을 모두 최신으로 교체한 뒤 [배포 관리 > 수정 > 새 버전 > 배포] 하세요.'); }
-function onErr(e){ document.getElementById('searchList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>'; }
+function onErr(e){ go('search'); document.getElementById('searchList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>'; }
 function fill(id,arr){ document.getElementById(id).innerHTML=arr.map(function(s){return '<option>'+esc(s)+'</option>';}).join(''); }
 // ---- 위치: 위치 탭 + 자재 위치도(Location.gs) 칸 ----
 // 위치도 칸의 위치 이름 = "시트이름 칸코드"(+ " N층"). 칸 이름(선반1 등)은 화면 표시용.
@@ -478,24 +484,50 @@ function runBuildForm(){ var q=Number(val('brQty'))||0; if(q<=0)return;
 
 // ---- 자재 위치도 (Location.html, 별도 화면) ----
 /** 위치도 화면으로 이동. 주소는 bootstrap에서 받아 둠 (누르는 즉시 열어야 폰에서 막히지 않음) */
-function locPageUrl(u, q){ return u ? (u+(u.indexOf('?')<0?'?':'&')+'page=location'+(q?'&q='+encodeURIComponent(q):'')) : ''; }
-function openLocation(q){
-  if(DATA.appUrl){ window.open(locPageUrl(DATA.appUrl, q),'_top'); return; }
-  google.script.run.withSuccessHandler(function(u){ if(u) window.open(locPageUrl(u, q),'_top'); else alert('웹앱 주소를 찾지 못했습니다. 배포 후 다시 시도하세요.'); })
-    .withFailureHandler(function(e){ alert(e.message); }).locUrl();
+/** 위치도 탭으로 (q 가 있으면 그 품목 검색 — 총수량·위치별 수량) */
+function openLocation(q){ go('loc'); if(q && window.locApi) locApi.search(q); }
+/** 위치도 → 재고앱: 위치도가 부르는 함수들 */
+window.locHost = {
+  open: function(p){ handleLink(p); },
+  /** 위치도에서 이동한 뒤의 위치별 재고 {위치:[{id,qty}]} → 품목별 위치·총수량 다시 계산 */
+  stockChanged: function(stk){
+    var by={}; DATA.items.forEach(function(it){ it.locs={}; it.total=0; by[it.id]=it; });
+    Object.keys(stk||{}).forEach(function(k){ (stk[k]||[]).forEach(function(a){ var it=by[a.id]; if(!it) return; it.locs[k]=(it.locs[k]||0)+a.qty; it.total+=a.qty; }); });
+    if(CURV==='stock') renderStock();
+  },
+  /** 위치도 칸 구성이 바뀌면 보관 위치 목록·📌지정 다시 */
+  mapChanged: function(lm){ DATA.locMap=lm||{sheets:[],slots:[]}; indexSlots(); var v=val('locSel'); fillLoc('locSel', v); ensureLocOption('locSel', v); document.getElementById('locSel').value=v; }
+};
+/** 오래 다른 앱에 있다가 돌아오면(2분+) 조용히 최신으로 — 입력 중인 화면에서는 하지 않음 */
+var HIDDEN_AT=0;
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState==='hidden'){ HIDDEN_AT=Date.now(); return; }
+  if(HIDDEN_AT && Date.now()-HIDDEN_AT>120000 && ['loc','stock','search'].indexOf(CURV)>=0 && !(window.locApi && locApi.busy())) quietRefresh();
+});
+function quietRefresh(){
+  google.script.run.withSuccessHandler(function(d){
+    DATA.items=d.items; DATA.staff=d.staff; DATA.locations=d.locations; DATA.layout=d.layout||[]; DATA.locMap=d.locMap||{sheets:[],slots:[]};
+    indexSlots(); catColorMap=null; fillDatalists(); fillLoc('locSel');
+    if(window.locApi && !locApi.busy()){ locApi.setStock(DATA.items, DATA.staff); locApi.init(d.loc); }
+    if(CURV==='stock') renderStock(); if(CURV==='search') renderSearch();
+  }).appBoot();
 }
 /** 위치도에서 넘어온 경우: ?item=품목ID&loc=위치&mode=입고|출고|이동 (item 없으면 품목을 고르면 적용) */
 var PEND = null, DEEP_DONE = false;
 function applyDeepLink(){
   if(DEEP_DONE) return; DEEP_DONE=true;
   if(!(window.google && google.script && google.script.url)) return;
-  google.script.url.getLocation(function(l){
-    var p=(l&&l.parameter)||{}; if(!p.loc && !p.item) return;
-    var mode=['입고','출고','이동'].indexOf(p.mode)>=0 ? p.mode : '입고';
-    var idx=-1; DATA.items.forEach(function(it,i){ if(it.id===p.item) idx=i; });
-    if(idx>=0){ select(idx); if(p.loc) applyLoc(p.loc, mode); return; }
-    if(p.loc){ PEND={loc:p.loc, mode:mode}; go('search'); renderPend(); }
-  });
+  google.script.url.getLocation(function(l){ var p=(l&&l.parameter)||{}; if(p.q||p.loc||p.item) handleLink(p); });
+}
+/** {item, loc, mode} → 입출고 화면 / {q} → 위치도 검색 */
+function handleLink(p){
+  p=p||{};
+  if(p.q){ openLocation(p.q); return; }
+  var mode=['입고','출고','이동'].indexOf(p.mode)>=0 ? p.mode : '입고';
+  var idx=-1; DATA.items.forEach(function(it,i){ if(it.id===p.item) idx=i; });
+  if(idx>=0){ select(idx); if(p.loc) applyLoc(p.loc, mode); return; }
+  if(p.loc){ PEND={loc:p.loc, mode:mode}; go('search'); renderPend(); return; }
+  go('search');
 }
 function renderPend(){ var el=document.getElementById('pendBar'); if(!el) return;
   el.innerHTML=PEND?'<div class="pendbar"><span>📍 '+esc(locDisp(PEND.loc))+' 에 '+esc(PEND.mode)+'할 품목을 고르세요</span><span class="x" onclick="PEND=null;renderPend()">취소</span></div>':''; }
@@ -582,9 +614,12 @@ function delMemo(row){ if(!confirm('이 메모를 삭제할까요? (사진도 �
   google.script.run.withSuccessHandler(function(){MEMOS=null;loadMemos();}).withFailureHandler(function(e){alert(e.message);}).deleteMemo(row); }
 
 // 전환
+var CURV='loc';
 function go(v){
-  ['Search','Input','NewItem','Done','Stock','Report','Build','BomForm','BuildRun','Log','Memo','MemoForm'].forEach(function(n){document.getElementById('view'+n).classList.add('hidden');});
+  CURV=v; document.getElementById('appbar').classList.toggle('hidden', v==='loc');
+  ['Loc','Search','Input','NewItem','Done','Stock','Report','Build','BomForm','BuildRun','Log','Memo','MemoForm'].forEach(function(n){document.getElementById('view'+n).classList.add('hidden');});
   document.getElementById('saveBtn').classList.add('hidden'); setNav(v);
+  if(v==='loc'){ show('Loc'); if(window.locApi) locApi.setStock(DATA.items, DATA.staff); } // 재고는 이미 받은 품목 목록으로 — 서버 안 부름
   if(v==='search'){ show('Search'); resetBar(); renderSearch(); }
   if(v==='input'){ show('Input'); document.getElementById('saveBtn').classList.remove('hidden'); }
   if(v==='newItem'){ show('NewItem'); resetBar('📦','새 품목 추가','품목을 새로 등록합니다'); }
@@ -599,7 +634,7 @@ function go(v){
   if(v==='memoForm'){ show('MemoForm'); resetBar('📝', MF.row?'메모 수정':'새 메모', '업체 사양 기록'); }
 }
 function show(n){ document.getElementById('view'+n).classList.remove('hidden'); }
-function setNav(v){ var g=(v==='search'||v==='input'||v==='newItem'||v==='done');
+function setNav(v){ var g=(v==='search'||v==='input'||v==='newItem'||v==='done'); document.getElementById('navLoc').className=v==='loc'?'on':'';
   document.getElementById('navInput').className=g?'on':''; document.getElementById('navStock').className=(v==='stock'||v==='report'||v==='log')?'on':''; document.getElementById('navBuild').className=(v==='build'||v==='bomForm'||v==='buildRun')?'on':''; document.getElementById('navMemo').className=(v==='memo'||v==='memoForm')?'on':''; }
 function resetBar(ic,t,s){ document.getElementById('barIcon').textContent=ic||'📦'; document.getElementById('barTitle').textContent=t||'써브텍 재고'; document.getElementById('barSub').textContent=s||('입고 · 출고를 빠르게 기록하세요 · '+HTML_VERSION); }
 </script>
