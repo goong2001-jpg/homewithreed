@@ -56,7 +56,7 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         working-directory: subtech-inventory
         run: |
-          cat Code.gs Location.gs SeedMemos.gs > /tmp/all.js && node --check /tmp/all.js
+          cat Code.gs Location.gs SeedMemos.gs SpecMemos.gs > /tmp/all.js && node --check /tmp/all.js
           APP=$(grep -oP "var APP_VERSION = '\K[^']+" Code.gs)
           HTML=$(grep -oP "var HTML_VERSION = '\K[^']+" Index.html)
           echo "Code.gs=$APP Index.html=$HTML"
@@ -67,7 +67,7 @@ jobs:
         run: |
           mkdir -p dist
           cp subtech-inventory/Code.gs subtech-inventory/Index.html subtech-inventory/Location.html \
-             subtech-inventory/SeedMemos.gs subtech-inventory/appsscript.json dist/
+             subtech-inventory/SeedMemos.gs subtech-inventory/SpecMemos.gs subtech-inventory/appsscript.json dist/
           # 서버 파일은 HTML 'Location' 과 이름이 겹치지 않게 LocationServer 로 올림
           cp subtech-inventory/Location.gs dist/LocationServer.gs
           printf '{"scriptId":"%s","rootDir":"."}' "$CLASP_SCRIPT_ID" > dist/.clasp.json
