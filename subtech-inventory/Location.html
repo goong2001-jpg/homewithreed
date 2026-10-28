@@ -185,6 +185,7 @@
 #locApp .qin .picked button{border:0;background:none;color:var(--sub);text-decoration:underline;padding:0}
 #locApp .qin .plist{max-height:34vh;overflow:auto;margin:-4px 0 10px}
 #locApp .qin .warn2{color:#B3412E;font-size:13px;margin:-4px 0 10px}
+#locApp .qin .warn2[hidden]{display:none}
 #locApp .results .newin{display:block;width:100%;padding:10px 12px;border:0;border-bottom:1.5px solid var(--line);background:var(--hitbg);font-weight:700;text-align:left}
 #locApp .sk .none{color:var(--sub);font-size:13px;margin:2px 0}
 #locApp .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
@@ -516,7 +517,7 @@ function openIn(key,opts){
   if(!GAS){toast('입고는 재고앱의 위치도에서만 돼요');return}
   if(!stockLoaded){toast('재고 정보를 불러오는 중이에요');return}
   const w=keyIndex()[key],P=E('panelBody');P.dataset.kind='in';
-  const F={mode:opts.newName?'new':'old',id:'',q:'',name:opts.newName||'',cat:'',unit:'',boxes:'1',per:'',pin:!!opts.newName};
+  const F={mode:opts.newName?'new':'old',id:'',q:'',name:opts.newName||'',cat:'',catNew:false,unit:'',boxes:'1',per:'',pin:!!opts.newName};
   const here=stockAt(key).map(a=>a.id),pinned=w&&w.kind==='slot'?((get(S.sheets[w.si],w.r,w.c).layers[w.i]||{}).p||[]).map(p=>p.id):[];
   const cats=[...new Set(ITEMS.map(it=>it.cat).filter(Boolean))].sort();
   const norm=v=>String(v||'').replace(/\s+/g,'').toLowerCase();
@@ -532,8 +533,9 @@ function openIn(key,opts){
     ${F.mode==='old'?(it?`<div class="picked"><span><b>${esc(it.name)}</b> <small>${esc(it.cat)}</small> · 이 칸 ${fmtN((stockAt(key).find(a=>a.id===it.id)||{}).qty||0)}개</span><button data-a="repick">바꾸기</button></div>`
         :`<label class="f">품목 찾기<input data-f="q" type="search" value="${esc(F.q)}" placeholder="품명 일부 (예: sv7)" autocomplete="off"></label>${list}`)
       :`<label class="f">품명<input data-f="name" value="${esc(F.name)}" placeholder="예: SV7" autocomplete="off"></label>
-        <label class="f">분류 (선택)<input data-f="cat" value="${esc(F.cat)}" list="locCats" placeholder="예: 기판" autocomplete="off"></label><datalist id="locCats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
-        ${dup?`<p class="warn2">이미 있는 품목이에요 (${esc(dup.name)} ${esc(dup.cat)}) — 저장하면 그 품목에 입고돼요</p>`:''}
+        <label class="f">분류<select data-f="catsel"><option value="">(분류 없음)</option>${cats.map(c=>`<option value="${esc(c)}"${!F.catNew&&c===F.cat?' selected':''}>${esc(c)}</option>`).join('')}<option value="__new__"${F.catNew?' selected':''}>＋ 새 분류 직접 입력</option></select></label>
+        ${F.catNew?`<label class="f">새 분류 이름<input data-f="cat" value="${esc(F.cat)}" placeholder="예: 기판" autocomplete="off"></label>`:''}
+        <p class="warn2" data-f="dup"${dup?'':' hidden'}>${dup?`이미 있는 품목이에요 (${esc(dup.name)} ${esc(dup.cat)}) — 저장하면 그 품목에 입고돼요`:''}</p>
         <label class="f">기본 박스당 수량 (선택)<input data-f="unit" type="number" inputmode="numeric" value="${esc(F.unit)}" placeholder="예: 100"></label>`}
     ${F.mode==='new'||it?`<div class="row3"><label class="f">박스 수<input data-f="boxes" type="number" inputmode="numeric" value="${esc(F.boxes)}"></label><span class="x2">×</span>
       <label class="f">박스당 수량<input data-f="per" type="number" inputmode="numeric" value="${esc(F.per)}" placeholder="개수"></label></div>
@@ -545,9 +547,14 @@ function openIn(key,opts){
     P.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{F.mode=b.dataset.m;if(F.mode==='new'&&!F.name)F.name=F.q;F.pin=F.mode==='new'||pinned.includes(F.id);draw()});
     const on=(f,fn)=>{const el=P.querySelector(`[data-f="${f}"]`);if(el)el.oninput=fn};
     on('q',e=>{F.q=e.target.value;const pos=e.target.selectionStart;draw();const q=P.querySelector('[data-f="q"]');q.focus();try{q.setSelectionRange(pos,pos)}catch(er){}});
-    on('name',e=>{F.name=e.target.value;const d=P.querySelector('.warn2'),isDup=F.name.trim()&&ITEMS.some(x=>norm(x.name)===norm(F.name)&&norm(x.cat)===norm(F.cat));if(!!d!==!!isDup){const pos=e.target.selectionStart;draw();const n=P.querySelector('[data-f="name"]');n.focus();try{n.setSelectionRange(pos,pos)}catch(er){}}});
-    on('cat',e=>{F.cat=e.target.value});
-    const catEl=P.querySelector('[data-f="cat"]');if(catEl)catEl.onchange=()=>setTimeout(draw,0); // change 는 blur 중에 오므로 다 끝난 뒤 다시 그림
+    // 같은 품명+분류 경고는 그 자리에서만 고침 (창 전체를 다시 그리면 다음 칸을 누른 게 사라짐)
+    const dupUp=()=>{const d=P.querySelector('[data-f="dup"]');if(!d)return;const x=F.name.trim()&&ITEMS.find(y=>norm(y.name)===norm(F.name)&&norm(y.cat)===norm(F.cat));
+      d.hidden=!x;d.textContent=x?`이미 있는 품목이에요 (${x.name} ${x.cat}) — 저장하면 그 품목에 입고돼요`:''};
+    on('name',e=>{F.name=e.target.value;dupUp()});
+    on('cat',e=>{F.cat=e.target.value;dupUp()});
+    // 분류: 폰 브라우저에서 datalist 가 안 열려서 일반 선택 목록 + '새 분류 직접 입력'
+    const cs=P.querySelector('[data-f="catsel"]');if(cs)cs.onchange=()=>{const v=cs.value,wasNew=F.catNew;F.catNew=v==='__new__';F.cat=F.catNew?'':v;
+      if(F.catNew!==wasNew)setTimeout(()=>{draw();if(F.catNew){const c=P.querySelector('[data-f="cat"]');if(c)c.focus()}},0);else dupUp()};
     on('unit',e=>{F.unit=e.target.value;if(!F.per){F.per=F.unit;const pe=P.querySelector('[data-f="per"]');if(pe)pe.value=F.per;sumUp()}});
     const sumUp=()=>{const t=P.querySelector('[data-f="sum"]');if(t)t.textContent=fmtN((+F.boxes||0)*(+F.per||0))};
     on('boxes',e=>{F.boxes=e.target.value;sumUp()});on('per',e=>{F.per=e.target.value;sumUp()});
