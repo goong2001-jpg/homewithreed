@@ -18,6 +18,26 @@ function specMemos_1_미리보기() { return importSpecMemos({ dryRun: true }); 
 function specMemos_2_샘플5건() { return importSpecMemos({ dryRun: false, limit: 5 }); }
 function specMemos_3_전체반영() { return importSpecMemos({ dryRun: false }); }
 function specMemos_9_백업으로되돌리기() { return restoreLatestMemoBackup_(); }
+function specMemosRestoreMenu() { return restoreLatestMemoBackup_(); } // 시트 메뉴용 (영문 이름)
+
+/** 시트 메뉴 "📦 재고관리 > 📝 업체사양 메모 가져오기": 미리보기 숫자를 보여주고, 확인하면 전체 반영 */
+function specMemosMenu() {
+  var ui = SpreadsheetApp.getUi();
+  var p = importSpecMemos({ dryRun: true });
+  if (!p.added && !p.updated) {
+    ui.alert('업체사양 메모', '더 넣을 것이 없습니다.\n(이미 같음 ' + p.same + '곳, 손으로 쓴 메모가 있어 건너뜀 ' + p.skippedManual + '곳)', ui.ButtonSet.OK);
+    return;
+  }
+  var msg = '업체 사양 페이지(' + SPEC_MEMOS.length + '곳)를 메모 탭에 반영합니다.\n\n' +
+    '• 새로 추가: ' + p.added + '곳\n' +
+    '• 예전 자동등록 행을 최신으로 고침: ' + p.updated + '곳\n' +
+    '• 손으로 쓴 메모가 있어 건드리지 않음: ' + p.skippedManual + '곳' +
+    (p.skippedNames && p.skippedNames.length ? ' (' + p.skippedNames.slice(0, 15).join(', ') + (p.skippedNames.length > 15 ? ' 외' : '') + ')' : '') + '\n\n' +
+    '지금 있는 메모는 지워지지 않고, 실행 전에 메모 탭을 "메모_백업_날짜" 탭으로 복사해 둡니다.\n계속할까요?';
+  if (ui.alert('업체사양 메모 가져오기', msg, ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  var r = importSpecMemos({ dryRun: false });
+  ui.alert('업체사양 메모', '완료: 추가 ' + r.added + '곳, 고침 ' + r.updated + '곳.\n앱의 메모 탭을 다시 열면 보입니다.\n(되돌리기: 📦 재고관리 > ↩ 메모 탭 최근 백업으로 되돌리기)', ui.ButtonSet.OK);
+}
 
 /** opts = {dryRun, limit} */
 function importSpecMemos(opts) {
@@ -81,7 +101,7 @@ function importSpecMemos(opts) {
     }
     console.log("반영 완료: 추가 " + toAdd.length + ", 고침 " + toUpdate.length + ". 백업 탭: " + backup);
   }
-  return { added: toAdd.length, updated: toUpdate.length, same: same, skippedManual: skipManual.length, overLimit: over, dryRun: dryRun };
+  return { added: toAdd.length, updated: toUpdate.length, same: same, skippedManual: skipManual.length, skippedNames: skipManual, overLimit: over, dryRun: dryRun };
 }
 
 /** 가장 최근 "메모_백업_…" 탭 내용으로 메모 탭을 되돌림 (지금 메모 탭도 먼저 백업) */

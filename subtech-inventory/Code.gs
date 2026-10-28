@@ -89,6 +89,9 @@ function onOpen() {
     .addItem('① 초기 설정 (탭/구조 생성)', 'setup')
     .addItem('🧹 전체 재고 0으로 초기화', 'resetStock')
     .addSeparator()
+    .addItem('📝 업체사양 메모 가져오기 (미리보기 후 반영)', 'specMemosMenu')
+    .addItem('↩ 메모 탭 최근 백업으로 되돌리기', 'specMemosRestoreMenu')
+    .addSeparator()
     .addItem('(선택) 기존 써브텍에서 한 번 가져오기', 'importFromOld')
     .addItem('웹앱(폰 화면) 주소 보기', 'showUrl')
     .addToUi();
