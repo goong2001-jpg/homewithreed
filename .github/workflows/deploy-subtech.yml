@@ -1,0 +1,105 @@
+# 써브텍 재고앱(Google Apps Script) 자동 배포
+# subtech-inventory/ 가 바뀌어 푸시되면 Apps Script 프로젝트에 코드를 올리고(clasp push)
+# 기존 웹앱 배포를 새 버전으로 갱신합니다(clasp deploy -i) — 웹앱 주소는 그대로.
+#
+# 저장소 Secrets 3개가 있어야 동작합니다 (없으면 아무것도 안 하고 건너뜀):
+#   CLASPRC_JSON        : PC에서 `npx @google/clasp@2.4.2 login` 후 생기는 ~/.clasprc.json 내용 전체
+#   CLASP_SCRIPT_ID     : Apps Script 편집기 > 프로젝트 설정 > 스크립트 ID
+#   CLASP_DEPLOYMENT_ID : 배포 > 배포 관리 > 지금 쓰는 웹앱의 배포 ID (AKfycb…)
+# 설정 방법: subtech-inventory/DEPLOY.md
+name: 써브텍 재고앱 배포
+
+on:
+  push:
+    branches:
+      - claude/spreadsheet-accessibility-opmsi3
+      - main
+    paths:
+      - 'subtech-inventory/**'
+      - '.github/workflows/deploy-subtech.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: subtech-apps-script
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+      CLASP_SCRIPT_ID: ${{ secrets.CLASP_SCRIPT_ID }}
+      CLASP_DEPLOYMENT_ID: ${{ secrets.CLASP_DEPLOYMENT_ID }}
+    steps:
+      - name: 설정 확인
+        id: check
+        run: |
+          if [ -z "$CLASPRC_JSON" ] || [ -z "$CLASP_SCRIPT_ID" ] || [ -z "$CLASP_DEPLOYMENT_ID" ]; then
+            echo "::notice::배포 Secrets(CLASPRC_JSON, CLASP_SCRIPT_ID, CLASP_DEPLOYMENT_ID)가 아직 없어 배포를 건너뜁니다. subtech-inventory/DEPLOY.md 참고."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 20
+
+      - name: 코드 점검 (문법, 버전 짝)
+        if: steps.check.outputs.ready == 'true'
+        working-directory: subtech-inventory
+        run: |
+          cat Code.gs Location.gs SeedMemos.gs SpecMemos.gs > /tmp/all.js && node --check /tmp/all.js
+          APP=$(grep -oP "var APP_VERSION = '\K[^']+" Code.gs)
+          HTML=$(grep -oP "var HTML_VERSION = '\K[^']+" Index.html)
+          echo "Code.gs=$APP Index.html=$HTML"
+          if [ "$APP" != "$HTML" ]; then echo "::error::버전 불일치 Code.gs=$APP Index.html=$HTML"; exit 1; fi
+
+      - name: 올릴 파일 준비
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          mkdir -p dist
+          cp subtech-inventory/Code.gs subtech-inventory/Index.html subtech-inventory/Location.html \
+             subtech-inventory/SeedMemos.gs subtech-inventory/SpecMemos.gs subtech-inventory/appsscript.json dist/
+          # 서버 파일은 HTML 'Location' 과 이름이 겹치지 않게 LocationServer 로 올림
+          cp subtech-inventory/Location.gs dist/LocationServer.gs
+          printf '{"scriptId":"%s","rootDir":"."}' "$CLASP_SCRIPT_ID" > dist/.clasp.json
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          ls -la dist
+
+      - name: Apps Script 에 올리기 (clasp push)
+        if: steps.check.outputs.ready == 'true'
+        working-directory: dist
+        run: npx --yes @google/clasp@2.4.2 push --force
+
+      - name: 웹앱 새 버전으로 배포 (주소 그대로)
+        if: steps.check.outputs.ready == 'true'
+        working-directory: dist
+        run: |
+          VER=$(grep -oP "var APP_VERSION = '\K[^']+" Code.gs)
+          # 배포 ID 정리: 공백·줄바꿈 제거, 웹앱 주소 전체(…/macros/s/<ID>/exec)를 넣었어도 ID만 꺼냄
+          ID=$(printf '%s' "$CLASP_DEPLOYMENT_ID" | tr -d '[:space:]')
+          case "$ID" in *"/s/"*) ID=$(printf '%s' "$ID" | sed -E 's#.*/s/([^/?]+).*#\1#') ;; esac
+          echo "::add-mask::$ID"
+          # 이 프로젝트의 배포 목록에 그 ID가 있는지 먼저 확인 (없으면 가려진 목록을 보여주고 멈춤)
+          LIST=$(npx --yes @google/clasp@2.4.2 deployments)
+          if ! printf '%s\n' "$LIST" | grep -qF -- "$ID"; then
+            echo "::error::CLASP_DEPLOYMENT_ID 가 이 Apps Script 프로젝트의 배포 목록에 없습니다. 아래 목록(앞 6자…뒤 4자) 중 @HEAD 가 아닌, 폰 웹앱 주소와 같은 ID를 비밀값에 다시 넣으세요."
+            printf '%s\n' "$LIST" | grep -oE 'AKfyc[A-Za-z0-9_-]+.*' | while read -r d rest; do
+              echo "  - ${d:0:6}…${d: -4} $rest"
+            done
+            exit 1
+          fi
+          npx --yes @google/clasp@2.4.2 deploy --deploymentId "$ID" --description "$VER github ${GITHUB_SHA::7}"
+          echo "::notice::배포 완료: $VER (${GITHUB_SHA::7})"
+
+      - name: 로그인 정보 지우기
+        if: always()
+        run: rm -f "$HOME/.clasprc.json"
