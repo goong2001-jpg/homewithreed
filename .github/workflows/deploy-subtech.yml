@@ -84,7 +84,20 @@ jobs:
         working-directory: dist
         run: |
           VER=$(grep -oP "var APP_VERSION = '\K[^']+" Code.gs)
-          npx --yes @google/clasp@2.4.2 deploy --deploymentId "$CLASP_DEPLOYMENT_ID" --description "$VER github ${GITHUB_SHA::7}"
+          # 배포 ID 정리: 공백·줄바꿈 제거, 웹앱 주소 전체(…/macros/s/<ID>/exec)를 넣었어도 ID만 꺼냄
+          ID=$(printf '%s' "$CLASP_DEPLOYMENT_ID" | tr -d '[:space:]')
+          case "$ID" in *"/s/"*) ID=$(printf '%s' "$ID" | sed -E 's#.*/s/([^/?]+).*#\1#') ;; esac
+          echo "::add-mask::$ID"
+          # 이 프로젝트의 배포 목록에 그 ID가 있는지 먼저 확인 (없으면 가려진 목록을 보여주고 멈춤)
+          LIST=$(npx --yes @google/clasp@2.4.2 deployments)
+          if ! printf '%s\n' "$LIST" | grep -qF -- "$ID"; then
+            echo "::error::CLASP_DEPLOYMENT_ID 가 이 Apps Script 프로젝트의 배포 목록에 없습니다. 아래 목록(앞 6자…뒤 4자) 중 @HEAD 가 아닌, 폰 웹앱 주소와 같은 ID를 비밀값에 다시 넣으세요."
+            printf '%s\n' "$LIST" | grep -oE 'AKfyc[A-Za-z0-9_-]+.*' | while read -r d rest; do
+              echo "  - ${d:0:6}…${d: -4} $rest"
+            done
+            exit 1
+          fi
+          npx --yes @google/clasp@2.4.2 deploy --deploymentId "$ID" --description "$VER github ${GITHUB_SHA::7}"
           echo "::notice::배포 완료: $VER (${GITHUB_SHA::7})"
 
       - name: 로그인 정보 지우기
