@@ -169,7 +169,7 @@
 
 <!-- 메모 -->
 <div class="body hidden" id="viewMemo">
-  <input class="search" id="memoSearch" placeholder="🔍 업체/내용/태그 검색" oninput="renderMemos()">
+  <input class="search" id="memoSearch" placeholder="🔍 업체/내용/태그 검색" oninput="onMemoSearch()">
   <div class="label">업체 사양 <span style="color:#2563eb;cursor:pointer" onclick="openNewMemo()">＋ 새 메모</span></div>
   <div id="memoList"><div class="loading">불러오는 중…</div></div>
 </div>
@@ -196,9 +196,10 @@
 </div>
 
 <script>
-var HTML_VERSION = 'v17'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v18'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
+var BOMROWS = null, MEMO_SHOWN = 50, PREFETCHED = false;
 var cur = null, type = '입고', lines = [{ boxes:'', per:'' }], txImgs = [];
 var stockFilter = '전체', sortMode = 'qty';
 var CAT_PALETTE = ['#2563eb','#d97706','#16a34a','#9333ea','#dc2626','#0891b2','#db2777','#65a30d','#ea580c','#4f46e5','#0d9488','#c026d3'];
@@ -209,6 +210,7 @@ var OXF = [['plate','명판'],['bizSticker','상호스티커'],['dateSticker','�
 google.script.run.withSuccessHandler(onBoot).withFailureHandler(onErr).appBoot();
 function onBoot(d){ DATA=d; if(!DATA.layout) DATA.layout=[]; if(!DATA.locMap) DATA.locMap={sheets:[],slots:[]}; indexSlots(); fill('staffSel', d.staff&&d.staff.length?d.staff:['담당자']); fillLoc('locSel'); catColorMap=null; fillDatalists(); resetBar(); renderSearch();
   if(window.locApi){ locApi.setStock(DATA.items, DATA.staff); if(d.loc!==undefined) locApi.init(d.loc); }
+  if(!PREFETCHED){ PREFETCHED=true; setTimeout(prefetchTabs, 400); }
   applyDeepLink();
   if(d.version && d.version!==HTML_VERSION) alert('⚠️ 버전 불일치!\n화면(Index.html): '+HTML_VERSION+' / 서버(Code.gs): '+d.version+'\n두 파일을 모두 최신으로 교체한 뒤 [배포 관리 > 수정 > 새 버전 > 배포] 하세요.'); }
 function onErr(e){ go('search'); document.getElementById('searchList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>'; }
@@ -422,8 +424,31 @@ function renderReport(arr){ document.getElementById('reportList').innerHTML=arr.
   }).join(''):'<div class="loading">입출고 기록이 쌓이면 월별 집계가 표시됩니다.</div>'; }
 
 // 조립 가능 + BOM 관리
-function loadBuild(){ document.getElementById('buildList').innerHTML='<div class="loading">불러오는 중…</div>';
-  google.script.run.withSuccessHandler(renderBuild).withFailureHandler(function(e){document.getElementById('buildList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>';}).getBuildable(); }
+/** 앱을 연 뒤 조용히 미리 받아 두기 — 조립·메모 탭을 누르면 바로 보이게 */
+function prefetchTabs(){
+  if(BOMROWS===null) google.script.run.withSuccessHandler(function(r){ BOMROWS=r||[]; if(CURV==='build') renderBuild(computeBuild()); }).getBomRows();
+  if(MEMOS===null) google.script.run.withSuccessHandler(function(m){ if(MEMOS===null){ MEMOS=m; if(CURV==='memo') renderMemos(); } }).getMemos();
+}
+/** 조립 가능 수량: 레시피(BOMROWS) × 지금 품목 재고(DATA.items) — 서버 getBuildable 과 같은 계산 */
+function computeBuild(){
+  var have={}; DATA.items.forEach(function(it){ have[it.id]=Number(it.total)||0; });
+  var fin={}, order=[];
+  (BOMROWS||[]).forEach(function(r){ var fid=r[0]+'||'+r[1]; if(!fin[fid]){ fin[fid]={name:r[0],cat:r[1],parts:[]}; order.push(fid); }
+    fin[fid].parts.push({id:r[2]+'||'+r[3],name:r[2],cat:r[3],per:r[4]}); });
+  var out=order.map(function(fid){ var f=fin[fid], buildable=Infinity;
+    var parts=f.parts.map(function(p){ var h=have[p.id]||0, can=Math.floor(h/p.per); if(can<buildable) buildable=can; return {name:p.name,cat:p.cat,per:p.per,have:h,can:can}; });
+    if(buildable===Infinity) buildable=0;
+    var neck=parts.filter(function(p){ return Math.floor(p.have/p.per)===buildable; }).map(function(p){ return p.name+(p.cat?('('+p.cat+')'):''); });
+    return {name:f.name,cat:f.cat,buildable:buildable,parts:parts,bottleneck:neck}; });
+  out.sort(function(a,b){ return a.buildable-b.buildable; });
+  return out;
+}
+/** 받아 둔 레시피가 있으면 바로 그리고, 뒤에서 레시피만 새로 받아 바뀌었으면 다시 그림 */
+function loadBuild(){
+  if(BOMROWS!==null) renderBuild(computeBuild());
+  else document.getElementById('buildList').innerHTML='<div class="loading">불러오는 중…</div>';
+  google.script.run.withSuccessHandler(function(r){ var changed=JSON.stringify(r||[])!==JSON.stringify(BOMROWS); BOMROWS=r||[]; if(changed && CURV==='build') renderBuild(computeBuild()); })
+    .withFailureHandler(function(e){ if(BOMROWS===null) document.getElementById('buildList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>'; }).getBomRows(); }
 function renderBuild(arr){ BUILDS=arr||[];
   if(!BUILDS.length){ document.getElementById('buildList').innerHTML='<div class="loading">조립 레시피가 없습니다.<br>위 <b>＋ 새 조립 레시피</b>로 완제품과 필요 부품을 등록하면<br>여기에 "조립 가능 수량"이 계산됩니다.</div>'; return; }
   document.getElementById('buildList').innerHTML=BUILDS.map(function(b,bi){
@@ -576,21 +601,28 @@ function undoLogTx(row){ if(!confirm('이 거래를 취소(삭제)할까요? 재
     .withFailureHandler(function(e){alert(e.message);}).undoTransaction(row); }
 
 // 메모
-function loadMemos(){ if(MEMOS!==null){renderMemos();return;} document.getElementById('memoList').innerHTML='<div class="loading">불러오는 중…</div>';
-  google.script.run.withSuccessHandler(function(m){MEMOS=m;renderMemos();}).withFailureHandler(function(e){document.getElementById('memoList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>';}).getMemos(); }
+/** 받아 둔 메모가 있으면 바로 보여주고, 뒤에서 새로 받아 바뀌었으면 다시 그림 (다른 사람이 쓴 메모 반영) */
+function loadMemos(){
+  var had=MEMOS!==null;
+  if(had) renderMemos(); else document.getElementById('memoList').innerHTML='<div class="loading">불러오는 중…</div>';
+  google.script.run.withSuccessHandler(function(m){ var changed=!had||JSON.stringify(m)!==JSON.stringify(MEMOS); MEMOS=m; if(changed && CURV==='memo') renderMemos(); })
+    .withFailureHandler(function(e){ if(!had) document.getElementById('memoList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>'; }).getMemos(); }
+function onMemoSearch(){ MEMO_SHOWN=50; renderMemos(); }
+function moreMemos(){ MEMO_SHOWN+=50; renderMemos(); }
 function memoPics(m){ var h='';
   function one(p,label){ if(!p||!p.thumb)return ''; return '<div class="mphoto"><div class="mplabel">'+label+'</div><a href="'+esc(p.url)+'" target="_blank"><img src="'+esc(p.thumb)+'" loading="lazy"></a></div>'; }
   (m.stickerImgs||[]).forEach(function(p){h+=one(p,'상호스티커');}); (m.nameplateImgs||[]).forEach(function(p){h+=one(p,'명판');}); (m.dateStickerImgs||[]).forEach(function(p){h+=one(p,'날짜스티커');}); (m.extras||[]).forEach(function(p){h+=one(p,'추가');});
   return h?'<div class="mphotos">'+h+'</div>':''; }
 function renderMemos(){ var q=val('memoSearch').toLowerCase();
   var list=(MEMOS||[]).filter(function(m){ return !q||[m.company,m.programName,m.note].join(' ').toLowerCase().indexOf(q)>=0; });
+  var total=list.length; list=list.slice(0,MEMO_SHOWN); // 한 번에 50개씩 (검색은 전체에서)
   document.getElementById('memoList').innerHTML=list.length?list.map(function(m){
     var chips=OXF.map(function(f){var v=m[f[0]]; if(!v)return ''; return '<span class="oxchip '+(v==='O'?'on':'off')+'">'+f[1]+' '+v+'</span>';}).filter(Boolean).join('');
     return '<div class="memocard"><div class="mc-top"><div class="comp">'+esc(m.company||'(업체미상)')+'</div><span class="act" onclick="editMemo('+m.row+')">수정</span></div>'+
       (chips?'<div class="oxchips">'+chips+'</div>':'')+(m.program==='O'&&m.programName?'<div class="kv"><b>프로그램</b> '+esc(m.programName)+'</div>':'')+
       (m.note?'<div class="bd">'+esc(m.note)+'</div>':'')+memoPics(m)+
       '<div class="foot"><span>'+esc(m.date)+(m.author?(' · '+esc(m.author)):'')+'</span><span class="act red" onclick="delMemo('+m.row+')">삭제</span></div></div>';
-  }).join(''):'<div class="loading">메모가 없습니다. ＋ 새 메모로 추가하세요.</div>'; }
+  }).join('')+(total>list.length?'<button class="addnew" onclick="moreMemos()">더 보기 ('+(total-list.length)+'개 남음)</button>':''):'<div class="loading">'+(q?'검색 결과가 없습니다.':'메모가 없습니다. ＋ 새 메모로 추가하세요.')+'</div>'; }
 function keepImg(p){ return {id:p.id,thumb:p.thumb}; }
 function openNewMemo(){ MF={stickers:[],nameplates:[],dateStickers:[],extras:[]}; ['mCompany','mProgram','mNote'].forEach(function(id){document.getElementById(id).value='';}); renderOX(); renderPics(); go('memoForm'); }
 function editMemo(row){ var m=(MEMOS||[]).filter(function(x){return x.row===row;})[0]; if(!m)return;

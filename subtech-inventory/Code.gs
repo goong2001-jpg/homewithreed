@@ -6,7 +6,7 @@
  * - 메모(업체 사양), 조립 가능 수량(BOM), 월별 입출고 리포트 포함.
  */
 
-var APP_VERSION = 'v17'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
+var APP_VERSION = 'v18'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
 
 var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
@@ -430,6 +430,14 @@ function adjustStock(p) {
 // ---------------------------------------------------------------------------
 // 조립 가능 수량 (BOM)
 // ---------------------------------------------------------------------------
+/** 조립 레시피 원본 행만 [[완제품,분류,부품,분류,1개당]] — 수량 계산은 화면에서 (거래로그 전체를 다시 읽지 않아 빠름) */
+function getBomRows() {
+  var bom = SpreadsheetApp.getActive().getSheetByName(TAB_BOM);
+  if (!bom || bom.getLastRow() < 2) return [];
+  return bom.getRange(2, 1, bom.getLastRow() - 1, 5).getValues()
+    .map(function (r) { return [('' + r[0]).trim(), ('' + r[1]).trim(), ('' + r[2]).trim(), ('' + r[3]).trim(), Number(r[4]) || 0]; })
+    .filter(function (r) { return r[0] && r[2] && r[4] > 0; });
+}
 function getBuildable() {
   var ss = SpreadsheetApp.getActive(), bom = ss.getSheetByName(TAB_BOM);
   if (!bom || bom.getLastRow() < 2) return [];
