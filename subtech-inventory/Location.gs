@@ -259,3 +259,42 @@ function locMoveRows_(p) {
   });
   return rows;
 }
+
+/**
+ * 위치도에서 바로 입고 (재고앱으로 넘어가지 않음). 없는 품목이면 품목마스터에 새로 만들고 입고까지 한 번에.
+ * p = {id} 또는 {newItem:{name, cat, unit}}, loc, lines:[{boxes, per}], staff, memo
+ * → {item:{id,name,cat,unit,safe,total,boxes,locs}, created}
+ */
+function locQuickIn(p) {
+  p = p || {};
+  const loc = String(p.loc || '').trim();
+  if (!loc) throw new Error('입고할 칸을 고르세요.');
+  const lines = (p.lines || []).map(l => ({ boxes: Number(l.boxes) || 0, per: Number(l.per) || 0 })).filter(l => l.boxes * l.per > 0);
+  if (!lines.length) throw new Error('수량을 입력하세요.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const m = SpreadsheetApp.getActive().getSheetByName(TAB_MASTER), info = {};
+    if (m && m.getLastRow() >= 2)
+      m.getRange(2, 1, m.getLastRow() - 1, 5).getValues().forEach(r => {
+        if (r[0]) info[r[0]] = { id: String(r[0]), name: String(r[1]), cat: String(r[2] || ''), unit: Number(r[3]) || '', safe: Number(r[4]) || 0 };
+      });
+    let it, created = false;
+    if (p.newItem) {
+      const name = String(p.newItem.name || '').trim(), cat = String(p.newItem.cat || '').trim();
+      if (!name) throw new Error('품명을 입력하세요.');
+      it = info[name + '||' + cat];               // 같은 품명+분류가 이미 있으면 그 품목에 입고
+      if (!it) { it = addItem({ name: name, cat: cat, unit: p.newItem.unit }); created = true; }
+    } else {
+      it = info[p.id];
+      if (!it) throw new Error('품목을 찾을 수 없어요. 새로고침 후 다시 해주세요.');
+    }
+    save({ id: it.id, name: it.name, cat: it.cat, type: '입고', loc: loc, lines: lines,
+           staff: p.staff || '', memo: p.memo || '위치도에서 입고', images: [] });
+    const s = computeStock_()[it.id] || { total: 0, boxes: 0, locs: {} };
+    return { item: { id: it.id, name: it.name, cat: it.cat, unit: it.unit, safe: it.safe || 0,
+                     total: s.total, boxes: s.boxes || 0, locs: s.locs }, created: created };
+  } finally {
+    lock.releaseLock();
+  }
+}

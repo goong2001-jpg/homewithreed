@@ -196,7 +196,7 @@
 </div>
 
 <script>
-var HTML_VERSION = 'v15'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v16'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var cur = null, type = '입고', lines = [{ boxes:'', per:'' }], txImgs = [];
@@ -489,6 +489,13 @@ function openLocation(q){ go('loc'); if(q && window.locApi) locApi.search(q); }
 /** 위치도 → 재고앱: 위치도가 부르는 함수들 */
 window.locHost = {
   open: function(p){ handleLink(p); },
+  /** 위치도에서 바로 입고(새 품목 포함)한 결과 품목 → 목록에 추가·갱신 */
+  itemUpserted: function(it){
+    var ex=DATA.items.filter(function(x){ return x.id===it.id; })[0];
+    if(ex){ ex.total=it.total; ex.boxes=it.boxes; ex.locs=it.locs; }
+    else { DATA.items.push(it); catColorMap=null; fillDatalists(); }
+    if(CURV==='stock') renderStock(); if(CURV==='search') renderSearch();
+  },
   /** 위치도에서 이동한 뒤의 위치별 재고 {위치:[{id,qty}]} → 품목별 위치·총수량 다시 계산 */
   stockChanged: function(stk){
     var by={}; DATA.items.forEach(function(it){ it.locs={}; it.total=0; by[it.id]=it; });
