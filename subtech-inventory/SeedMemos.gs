@@ -129,6 +129,8 @@ function seedMemoKey_(name) { return ('' + (name || '')).replace(/\s+/g, '').toL
  * 부를 수 있으므로 막습니다. (익명 호출이면 getActiveUser()가 빈 문자열)
  */
 function assertEditorRun_() {
+  // 시트 메뉴에서 누른 경우(화면이 있는 실행)는 허용 — 웹앱(google.script.run)에서는 getUi()가 실패하므로 아래 검사로 감
+  try { SpreadsheetApp.getUi(); return; } catch (e) {}
   var active = '', owner = '';
   try { active = Session.getActiveUser().getEmail(); owner = Session.getEffectiveUser().getEmail(); } catch (e) {}
   if (!active || active !== owner)
