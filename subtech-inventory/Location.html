@@ -517,21 +517,17 @@ function openIn(key,opts){
   if(!GAS){toast('입고는 재고앱의 위치도에서만 돼요');return}
   if(!stockLoaded){toast('재고 정보를 불러오는 중이에요');return}
   const w=keyIndex()[key],P=E('panelBody');P.dataset.kind='in';
-  const F={mode:opts.newName?'new':'old',id:'',q:'',name:opts.newName||'',cat:'',catNew:false,unit:'',boxes:'1',per:'',pin:!!opts.newName};
+  const F={mode:opts.newName?'new':'old',id:'',q:'',name:opts.newName||'',cat:'',catNew:false,unit:'',boxes:'1',per:'',perAuto:true,pin:!!opts.newName};
   const here=stockAt(key).map(a=>a.id),pinned=w&&w.kind==='slot'?((get(S.sheets[w.si],w.r,w.c).layers[w.i]||{}).p||[]).map(p=>p.id):[];
   const cats=[...new Set(ITEMS.map(it=>it.cat).filter(Boolean))].sort();
   const norm=v=>String(v||'').replace(/\s+/g,'').toLowerCase();
   const draw=()=>{
     const it=ITEMMAP[F.id],total=(+F.boxes||0)*(+F.per||0),dup=F.mode==='new'&&F.name.trim()&&ITEMS.find(x=>norm(x.name)===norm(F.name)&&norm(x.cat)===norm(F.cat));
     const st=lastStaff(),staff=STAFF.length?STAFF:[''];
-    let list='';
-    if(F.mode==='old'&&!it){const q=norm(F.q);
-      const L=ITEMS.filter(x=>!q||norm(x.name).includes(q)).sort((a,b)=>((pinned.includes(b.id)||here.includes(b.id))-(pinned.includes(a.id)||here.includes(a.id)))||String(a.name).localeCompare(String(b.name))).slice(0,40);
-      list=`<div class="plist">${L.map(x=>`<button class="pick" data-id="${esc(x.id)}"><span>${esc(x.name)}${pinned.includes(x.id)?' <small>· 📌지정</small>':here.includes(x.id)?' <small>· 이 칸에 있음</small>':''}</span><small>${esc(x.cat)}</small></button>`).join('')||'<p class="none">맞는 품목이 없어요 — 위에서 "＋ 새 품목"을 누르세요</p>'}</div>`}
     P.innerHTML=`<div class="qin"><div class="ph"><h2>입고<small>${esc(locLabel(key,keyIndex()))}</small></h2><button class="x" data-a="close">닫기</button></div>
     <div class="seg"><button data-m="old" class="${F.mode==='old'?'on':''}">기존 품목</button><button data-m="new" class="${F.mode==='new'?'on':''}">＋ 새 품목</button></div>
     ${F.mode==='old'?(it?`<div class="picked"><span><b>${esc(it.name)}</b> <small>${esc(it.cat)}</small> · 이 칸 ${fmtN((stockAt(key).find(a=>a.id===it.id)||{}).qty||0)}개</span><button data-a="repick">바꾸기</button></div>`
-        :`<label class="f">품목 찾기<input data-f="q" type="search" value="${esc(F.q)}" placeholder="품명 일부 (예: sv7)" autocomplete="off"></label>${list}`)
+        :`<label class="f">품목 찾기<input data-f="q" type="search" value="${esc(F.q)}" placeholder="품명 일부 (예: sv7)" autocomplete="off"></label><div class="plist" data-f="plist"></div>`)
       :`<label class="f">품명<input data-f="name" value="${esc(F.name)}" placeholder="예: SV7" autocomplete="off"></label>
         <label class="f">분류<select data-f="catsel"><option value="">(분류 없음)</option>${cats.map(c=>`<option value="${esc(c)}"${!F.catNew&&c===F.cat?' selected':''}>${esc(c)}</option>`).join('')}<option value="__new__"${F.catNew?' selected':''}>＋ 새 분류 직접 입력</option></select></label>
         ${F.catNew?`<label class="f">새 분류 이름<input data-f="cat" value="${esc(F.cat)}" placeholder="예: 기판" autocomplete="off"></label>`:''}
@@ -546,7 +542,12 @@ function openIn(key,opts){
     P.querySelector('[data-a="close"]').onclick=closePanel;
     P.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{F.mode=b.dataset.m;if(F.mode==='new'&&!F.name)F.name=F.q;F.pin=F.mode==='new'||pinned.includes(F.id);draw()});
     const on=(f,fn)=>{const el=P.querySelector(`[data-f="${f}"]`);if(el)el.oninput=fn};
-    on('q',e=>{F.q=e.target.value;const pos=e.target.selectionStart;draw();const q=P.querySelector('[data-f="q"]');q.focus();try{q.setSelectionRange(pos,pos)}catch(er){}});
+    // 품목 찾기: 목록만 다시 그림 — 입력칸을 다시 그리면 한글 조합(ㅇ+ㅣ+ㄴ→인)이 끊겨 자모로 흩어짐
+    const drawList=()=>{const box=P.querySelector('[data-f="plist"]');if(!box)return;const q=norm(F.q);
+      const L=ITEMS.filter(x=>!q||norm(x.name).includes(q)).sort((a,b)=>((pinned.includes(b.id)||here.includes(b.id))-(pinned.includes(a.id)||here.includes(a.id)))||String(a.name).localeCompare(String(b.name))).slice(0,40);
+      box.innerHTML=L.map(x=>`<button class="pick" data-id="${esc(x.id)}"><span>${esc(x.name)}${pinned.includes(x.id)?' <small>· 📌지정</small>':here.includes(x.id)?' <small>· 이 칸에 있음</small>':''}</span><small>${esc(x.cat)}</small></button>`).join('')||'<p class="none">맞는 품목이 없어요 — 위에서 "＋ 새 품목"을 누르세요</p>';
+      box.querySelectorAll('.pick[data-id]').forEach(b=>b.onclick=()=>{F.id=b.dataset.id;const x=ITEMMAP[F.id]||{};F.per=String(x.unit||F.per||'');F.pin=pinned.includes(F.id);draw()})};
+    on('q',e=>{F.q=e.target.value;drawList()});
     // 같은 품명+분류 경고는 그 자리에서만 고침 (창 전체를 다시 그리면 다음 칸을 누른 게 사라짐)
     const dupUp=()=>{const d=P.querySelector('[data-f="dup"]');if(!d)return;const x=F.name.trim()&&ITEMS.find(y=>norm(y.name)===norm(F.name)&&norm(y.cat)===norm(F.cat));
       d.hidden=!x;d.textContent=x?`이미 있는 품목이에요 (${x.name} ${x.cat}) — 저장하면 그 품목에 입고돼요`:''};
@@ -555,11 +556,12 @@ function openIn(key,opts){
     // 분류: 폰 브라우저에서 datalist 가 안 열려서 일반 선택 목록 + '새 분류 직접 입력'
     const cs=P.querySelector('[data-f="catsel"]');if(cs)cs.onchange=()=>{const v=cs.value,wasNew=F.catNew;F.catNew=v==='__new__';F.cat=F.catNew?'':v;
       if(F.catNew!==wasNew)setTimeout(()=>{draw();if(F.catNew){const c=P.querySelector('[data-f="cat"]');if(c)c.focus()}},0);else dupUp()};
-    on('unit',e=>{F.unit=e.target.value;if(!F.per){F.per=F.unit;const pe=P.querySelector('[data-f="per"]');if(pe)pe.value=F.per;sumUp()}});
+    // 박스당 수량은 직접 고치기 전까지 '기본 박스당 수량'을 그대로 따라감 (340 → 340, 첫 글자만 들어가던 문제)
+    on('unit',e=>{F.unit=e.target.value;if(F.perAuto){F.per=F.unit;const pe=P.querySelector('[data-f="per"]');if(pe)pe.value=F.per;sumUp()}});
     const sumUp=()=>{const t=P.querySelector('[data-f="sum"]');if(t)t.textContent=fmtN((+F.boxes||0)*(+F.per||0))};
-    on('boxes',e=>{F.boxes=e.target.value;sumUp()});on('per',e=>{F.per=e.target.value;sumUp()});
+    on('boxes',e=>{F.boxes=e.target.value;sumUp()});on('per',e=>{F.per=e.target.value;F.perAuto=F.per==='';sumUp()});
     const pin=P.querySelector('[data-f="pin"]');if(pin)pin.onchange=()=>F.pin=pin.checked;
-    P.querySelectorAll('.pick[data-id]').forEach(b=>b.onclick=()=>{F.id=b.dataset.id;const x=ITEMMAP[F.id]||{};F.per=String(x.unit||F.per||'');F.pin=pinned.includes(F.id);draw()});
+    drawList();
     const rp=P.querySelector('[data-a="repick"]');if(rp)rp.onclick=()=>{F.id='';draw()};
     const sv=P.querySelector('[data-a="save"]');if(sv)sv.onclick=()=>saveIn(sv);
   };
