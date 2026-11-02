@@ -58,7 +58,7 @@
 #locApp .mergeBar button{padding:7px 12px;border-radius:4px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);font-weight:700}
 #locApp .mergeBar button.ghost{background:transparent;color:var(--ink);border-color:var(--line);font-weight:400}
 
-#locApp .wrap{overflow-x:auto;padding:10px 12px 28px}
+#locApp .wrap{overflow-x:auto;padding:10px 12px 28px;overscroll-behavior-x:contain} /* 지도를 옆으로 밀다 끝에 닿아도 브라우저 '뒤로 가기'가 되지 않게 */
 #locApp{--cw:96px;--ch:78px;--fz:13.5px}
 #locApp .grid{display:grid;gap:4px;grid-auto-rows:minmax(var(--ch),auto);min-width:min-content}
 #locApp .cell{position:relative;min-height:var(--ch);font-size:var(--fz);border:1.5px solid var(--line);background:var(--slot);border-radius:3px;
@@ -99,6 +99,12 @@
 #locApp .cell.hit{background:var(--hitbg);border-color:var(--hitline)}
 #locApp .cell.sel{box-shadow:inset 0 0 0 3px var(--sel);border-color:#1F2326}
 #locApp .cell.flash{animation:locFlash 1.4s ease-out}
+/* 칸 끌어서 옮기기 */
+#locApp .cell{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+#locApp .cell.dragsrc{opacity:.4;outline:2px dashed var(--hitline);outline-offset:-2px}
+#locApp .cell.droptgt{box-shadow:inset 0 0 0 4px var(--sel);border-color:#1F2326}
+#locApp .dragghost{position:fixed;z-index:50;pointer-events:none;padding:7px 11px;border-radius:4px;background:var(--ink);color:var(--paper);
+  font-size:13px;font-weight:700;transform:translate(-50%,-140%);white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.3)}
 @keyframes locFlash{0%,40%{box-shadow:inset 0 0 0 4px var(--hitline)}100%{box-shadow:inset 0 0 0 0 transparent}}
 @media (prefers-reduced-motion:reduce){#locApp .cell.flash{animation:none;box-shadow:inset 0 0 0 3px var(--hitline)}}
 
@@ -209,7 +215,7 @@
       <button data-el="bBackup">가져오기·내보내기</button>
       <span class="zoom"><button data-el="zOut" aria-label="칸 작게">가−</button><button data-el="zIn" aria-label="칸 크게">가＋</button></span>
     </div>
-    <p class="hint" data-el="hint">칸을 누르면 이름과 자재를 적을 수 있어요.</p>
+    <p class="hint" data-el="hint">칸을 누르면 이름과 자재를 적을 수 있어요. 칸을 <b>길게 누른 채 끌면</b> 다른 칸으로 옮겨져요.</p>
     <div class="stkbar" data-el="stkBar"></div>
     <div class="mergeBar" data-el="moveBar" hidden><span data-el="moveInfo"></span><button class="ghost" data-el="bMvCancel">취소</button></div>
     <div class="mergeBar" data-el="mergeBar" hidden><span data-el="mergeInfo"></span><button class="ghost" data-el="bCancel">취소</button><button data-el="bDoMerge">합치기</button></div>
@@ -433,7 +439,7 @@ function renderMerge(){
 }
 
 /* ---------- 칸 ---------- */
-function tap(r,c){const k=K(r,c);if(PIN){pickIn(r,c);return}if(MV){pickDest(r,c);return}if(mergeMode){sel.has(k)?sel.delete(k):sel.add(k);render();return}cur={r,c};openCell()}
+function tap(r,c){if(Date.now()-dragIgnoreClick<450)return;const k=K(r,c);if(PIN){pickIn(r,c);return}if(MV){pickDest(r,c);return}if(mergeMode){sel.has(k)?sel.delete(k):sel.add(k);render();return}cur={r,c};openCell()}
 function doMerge(){
   if(sel.size<2){toast('두 칸 이상 골라주세요');return}
   const s=sh();let r0=99,c0=99,r1=-1,c1=-1;
@@ -743,6 +749,83 @@ function drawLine(){
     btn.disabled=true;btn.textContent='저장 중…';
     commit(pl.N,pl.groups.length?{groups:pl.groups,staff:staffV,memo:A+(pl.swap?'↔':'→')+B}:null,()=>{closePanel();render();
       toast(pl.swap?`${A}와 ${B} 자리를 바꿨어요`:`${A}를 ${B}로 옮겼어요`)},()=>{btn.disabled=false;btn.textContent='⇄ 옮기기'})};
+}
+
+/* ---------- 칸 끌어서 옮기기 ----------
+   폰: 칸을 0.4초 길게 누르면 끌기 시작 (그 전에 손가락이 움직이면 평소처럼 화면 스크롤)
+   PC: 마우스로 누른 채 움직이면 끌기. 빈 칸에 놓으면 옮기고, 내용 있는 칸에 놓으면 서로 자리 바꿈.
+   이름·메모·층·📌지정·재고가 같이 감 (재고는 '이동' 기록, 그때만 한 번 확인) */
+let DG=null,dragIgnoreClick=0;
+const dragAllowed=()=>!mergeMode&&!MV&&!PIN&&E('panel').hidden;
+function cellAt(x,y){const el=document.elementFromPoint(x,y),c=el&&el.closest?el.closest('.cell'):null;return c&&root.contains(c)&&c.dataset.k?c:null}
+function dragStart(cellEl,x,y){
+  const[r,c]=cellEl.dataset.k.split(',').map(Number),s=sh(),x0=get(s,r,c);
+  if(x0.rs*x0.cs>1){toast('합친 칸은 끌어서 옮길 수 없어요 — 줄·칸 옮기기를 쓰거나 먼저 풀어주세요');return false}
+  if(!s.cells[K(r,c)]&&!cellHasStock(s,r,c)){toast('빈 칸이에요. 내용이 있는 칸을 끌어주세요');return false}
+  DG={r,c,el:cellEl,tgt:null,ghost:document.createElement('div')};
+  DG.ghost.className='dragghost';DG.ghost.textContent=code(r,c)+(x0.label?' '+x0.label:'')+' 옮기는 중 — 놓을 칸에서 손을 떼세요';
+  root.appendChild(DG.ghost);cellEl.classList.add('dragsrc');
+  try{navigator.vibrate&&navigator.vibrate(15)}catch(e){}
+  dragMove(x,y);return true;
+}
+function dragMove(x,y){
+  if(!DG)return;DG.ghost.style.left=Math.min(Math.max(x,90),innerWidth-90)+'px';DG.ghost.style.top=y+'px';
+  const t=cellAt(x,y),tg=t&&t!==DG.el?t:null;
+  if(DG.tgt&&DG.tgt!==tg)DG.tgt.classList.remove('droptgt');DG.tgt=tg;if(tg)tg.classList.add('droptgt');
+  // 화면 가장자리에서는 저절로 스크롤
+  DG.ax=x<40?-1:x>innerWidth-40?1:0;DG.ay=y<90?-1:y>innerHeight-90?1:0;
+  if((DG.ax||DG.ay)&&!DG.timer)DG.timer=setInterval(()=>{if(!DG)return;const w=root.querySelector('.wrap');if(DG.ax)w.scrollLeft+=DG.ax*14;if(DG.ay)window.scrollBy(0,DG.ay*14)},30);
+  if(!DG.ax&&!DG.ay&&DG.timer){clearInterval(DG.timer);DG.timer=null}
+}
+function dragEnd(cancel){
+  if(!DG)return;const d=DG;DG=null;clearInterval(d.timer);d.ghost.remove();d.el.classList.remove('dragsrc');
+  if(d.tgt)d.tgt.classList.remove('droptgt');dragIgnoreClick=Date.now();
+  if(!cancel&&d.tgt){const[r2,c2]=d.tgt.dataset.k.split(',').map(Number);moveCell(d.r,d.c,r2,c2)}
+}
+(function(){
+  const g=E('grid');let lp=null,md=null;
+  g.addEventListener('touchstart',e=>{if(!dragAllowed()||e.touches.length!==1)return;const t=e.touches[0],cell=e.target.closest('.cell');if(!cell)return;
+    lp={x:t.clientX,y:t.clientY,cell,timer:setTimeout(()=>{if(lp&&dragStart(lp.cell,lp.x,lp.y))lp.active=true;else lp=null},400)}},{passive:true});
+  g.addEventListener('touchmove',e=>{if(!lp)return;const t=e.touches[0];
+    if(lp.active){if(e.cancelable)e.preventDefault();dragMove(t.clientX,t.clientY);return}
+    if(Math.abs(t.clientX-lp.x)>8||Math.abs(t.clientY-lp.y)>8){clearTimeout(lp.timer);lp=null}},{passive:false});
+  const end=e=>{if(!lp)return;clearTimeout(lp.timer);if(lp.active)dragEnd(e.type==='touchcancel');lp=null};
+  g.addEventListener('touchend',end);g.addEventListener('touchcancel',end);
+  g.addEventListener('mousedown',e=>{if(e.button!==0||!dragAllowed())return;const cell=e.target.closest('.cell');if(cell)md={x:e.clientX,y:e.clientY,cell}});
+  window.addEventListener('mousemove',e=>{if(!md)return;
+    if(!md.active){if(Math.abs(e.clientX-md.x)+Math.abs(e.clientY-md.y)<6)return;md.active=dragStart(md.cell,e.clientX,e.clientY);if(!md.active){md=null;dragIgnoreClick=Date.now();return}}
+    dragMove(e.clientX,e.clientY)});
+  window.addEventListener('mouseup',()=>{if(md&&md.active)dragEnd(false);md=null});
+  g.addEventListener('contextmenu',e=>{if(e.target.closest('.cell'))e.preventDefault()});
+})();
+/** (r1,c1) 칸을 (r2,c2)로: 빈 자리면 옮기고, 내용이 있으면 서로 자리 바꿈 */
+function moveCell(r1,c1,r2,c2){
+  const s=sh(),a=get(s,r1,c1),b=get(s,r2,c2),cov=covered(s);
+  if(cov[K(r2,c2)]||b.rs*b.cs>1){toast('합친 칸 자리에는 놓을 수 없어요');return}
+  if(GAS&&!stockLoaded){toast('재고 정보를 불러오는 중이에요');return}
+  const groups=[];let neg=false;
+  const add=(fr,fc,tr,tc)=>keysAt(s,fr,fc).forEach((k,i)=>{const list=stockAt(k);if(!list.length)return;if(list.some(z=>z.qty<0))neg=true;
+    groups.push({fromLoc:k,toLoc:slotKey(s,tr,tc,i),moves:list.filter(z=>z.qty>0).map(z=>({id:z.id,qty:z.qty}))})});
+  add(r1,c1,r2,c2);add(r2,c2,r1,c1);
+  if(neg){toast('재고가 마이너스인 칸이 있어요. 재고앱에서 조정한 뒤 옮겨주세요');return}
+  const xb0=s.cells[K(r2,c2)],swap=!!(xb0&&(hasContent(xb0)||xb0.type!=='slot'))||cellHasStock(s,r2,c2);
+  const A=code(r1,c1)+(a.label?' '+a.label:''),B=code(r2,c2)+(b.label?' '+b.label:'');
+  const swapCells=ns=>{const ka=K(r1,c1),kb=K(r2,c2),xa=ns.cells[ka],xb=ns.cells[kb];if(xb)ns.cells[ka]=xb;else delete ns.cells[ka];if(xa)ns.cells[kb]=xa;else delete ns.cells[kb]};
+  const done=()=>{closePanel();flashKey=K(r2,c2);render();setTimeout(()=>{flashKey=null},1500);
+    toast(swap?`${A} ↔ ${B} 자리를 바꿨어요`:`${A} → ${code(r2,c2)} 옮겼어요`)};
+  if(!groups.length){swapCells(sh());save();done();return} // 재고가 없으면 바로 (평소 저장)
+  const P=E('panelBody');P.dataset.kind='dragok';const st=lastStaff(),staff=STAFF.length?STAFF:[''];
+  P.innerHTML=`<div class="ph"><h2>${swap?'자리 바꾸기':'칸 옮기기'}</h2><button class="x" data-a="close">닫기</button></div>
+  <p class="note" style="font-size:14px;color:var(--ink)"><b>${esc(A)}</b> ${swap?'↔':'→'} <b>${esc(swap?B:code(r2,c2))}</b></p>
+  <p class="note">칸 이름·메모·층·📌지정 제품과 <b>재고 ${groups.length}곳</b>이 같이 옮겨지고, 재고앱 이력에 '이동'으로 남아요.</p>
+  ${GAS?`<label class="f">담당자<select data-f="staff">${staff.map(v=>`<option${v===st?' selected':''}>${esc(v)}</option>`).join('')}</select></label>`:''}
+  <div class="acts"><button data-a="cancel">취소</button><button data-a="go" style="background:var(--ink);color:var(--paper);font-weight:700">${swap?'⇄ 자리 바꾸기':'⇄ 옮기기'}</button></div>`;
+  P.querySelector('[data-a="close"]').onclick=closePanel;P.querySelector('[data-a="cancel"]').onclick=closePanel;
+  P.querySelector('[data-a="go"]').onclick=e=>{const btn=e.target,ss=P.querySelector('[data-f="staff"]'),staffV=ss?ss.value:'';
+    try{if(staffV)localStorage.setItem('subtek-staff',staffV)}catch(er){}
+    btn.disabled=true;btn.textContent='저장 중…';const N=clone(S);swapCells(N.sheets[S.cur]);
+    commit(N,{groups,staff:staffV,memo:code(r1,c1)+(swap?'↔':'→')+code(r2,c2)},done,()=>{btn.disabled=false;btn.textContent=swap?'⇄ 자리 바꾸기':'⇄ 옮기기'})};
+  openPanel();
 }
 
 /* ---------- 패널 ---------- */
