@@ -186,6 +186,12 @@
 #locApp .qin .row3{display:flex;align-items:flex-end;gap:8px}
 #locApp .qin .row3 .f{flex:1;margin-bottom:0}
 #locApp .qin .row3 .x2{padding-bottom:10px;color:var(--sub)}
+#locApp .qin .bl{font-size:13px;color:var(--sub);margin:4px 0 6px}
+#locApp .qin .bline{align-items:center;margin-bottom:8px}
+#locApp .qin .bline input{display:block;width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:4px;background:var(--slot);color:var(--ink);font-size:15px}
+#locApp .qin .bline .ls{min-width:58px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;font-size:14px}
+#locApp .qin .bline .del{border:0;background:none;color:var(--sub);font-size:16px;padding:4px 6px}
+#locApp .qin .addl{display:block;width:100%;padding:9px;border:1.5px dashed var(--line);border-radius:4px;background:transparent;color:var(--ink);margin:2px 0 4px}
 #locApp .qin .sum{font-size:20px;font-weight:700;margin:10px 0 12px;font-variant-numeric:tabular-nums}
 #locApp .qin .picked{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid var(--hitline);background:var(--hitbg);border-radius:4px;margin-bottom:10px}
 #locApp .qin .picked button{border:0;background:none;color:var(--sub);text-decoration:underline;padding:0}
@@ -523,12 +529,14 @@ function openIn(key,opts){
   if(!GAS){toast('입고는 재고앱의 위치도에서만 돼요');return}
   if(!stockLoaded){toast('재고 정보를 불러오는 중이에요');return}
   const w=keyIndex()[key],P=E('panelBody');P.dataset.kind='in';
-  const F={mode:opts.newName?'new':'old',id:'',q:'',name:opts.newName||'',cat:'',catNew:false,unit:'',boxes:'1',per:'',perAuto:true,pin:!!opts.newName};
+  const F={mode:opts.newName?'new':'old',id:'',q:'',name:opts.newName||'',cat:'',catNew:false,unit:'',lines:[{boxes:'1',per:''}],perAuto:true,pin:!!opts.newName};
   const here=stockAt(key).map(a=>a.id),pinned=w&&w.kind==='slot'?((get(S.sheets[w.si],w.r,w.c).layers[w.i]||{}).p||[]).map(p=>p.id):[];
   const cats=[...new Set(ITEMS.map(it=>it.cat).filter(Boolean))].sort();
   const norm=v=>String(v||'').replace(/\s+/g,'').toLowerCase();
+  const linesTotal=()=>F.lines.reduce((t,l)=>t+(+l.boxes||0)*(+l.per||0),0);
+  const linesBoxes=()=>F.lines.reduce((t,l)=>t+((+l.boxes||0)*(+l.per||0)>0?(+l.boxes||0):0),0);
   const draw=()=>{
-    const it=ITEMMAP[F.id],total=(+F.boxes||0)*(+F.per||0),dup=F.mode==='new'&&F.name.trim()&&ITEMS.find(x=>norm(x.name)===norm(F.name)&&norm(x.cat)===norm(F.cat));
+    const it=ITEMMAP[F.id],total=linesTotal(),dup=F.mode==='new'&&F.name.trim()&&ITEMS.find(x=>norm(x.name)===norm(F.name)&&norm(x.cat)===norm(F.cat));
     const st=lastStaff(),staff=STAFF.length?STAFF:[''];
     P.innerHTML=`<div class="qin"><div class="ph"><h2>입고<small>${esc(locLabel(key,keyIndex()))}</small></h2><button class="x" data-a="close">닫기</button></div>
     <div class="seg"><button data-m="old" class="${F.mode==='old'?'on':''}">기존 품목</button><button data-m="new" class="${F.mode==='new'?'on':''}">＋ 새 품목</button></div>
@@ -539,9 +547,12 @@ function openIn(key,opts){
         ${F.catNew?`<label class="f">새 분류 이름<input data-f="cat" value="${esc(F.cat)}" placeholder="예: 기판" autocomplete="off"></label>`:''}
         <p class="warn2" data-f="dup"${dup?'':' hidden'}>${dup?`이미 있는 품목이에요 (${esc(dup.name)} ${esc(dup.cat)}) — 저장하면 그 품목에 입고돼요`:''}</p>
         <label class="f">기본 박스당 수량 (선택)<input data-f="unit" type="number" inputmode="numeric" value="${esc(F.unit)}" placeholder="예: 100"></label>`}
-    ${F.mode==='new'||it?`<div class="row3"><label class="f">박스 수<input data-f="boxes" type="number" inputmode="numeric" value="${esc(F.boxes)}"></label><span class="x2">×</span>
-      <label class="f">박스당 수량<input data-f="per" type="number" inputmode="numeric" value="${esc(F.per)}" placeholder="개수"></label></div>
-      <div class="sum">합계 <span data-f="sum">${fmtN(total)}</span>개</div>
+    ${F.mode==='new'||it?`<p class="bl">박스 구성 — 박스당 개수가 다른 박스가 섞여 있으면 <b>줄 추가</b></p>
+      ${F.lines.map((l,i)=>`<div class="row3 bline"><input data-lb="${i}" type="number" inputmode="numeric" value="${esc(l.boxes)}" placeholder="박스" aria-label="${i+1}번째 줄 박스 수"><span class="x2" style="padding:0">×</span>
+        <input data-lp="${i}" type="number" inputmode="numeric" value="${esc(l.per)}" placeholder="개수" aria-label="${i+1}번째 줄 박스당 수량"><span class="ls" data-ls="${i}">${fmtN((+l.boxes||0)*(+l.per||0))}</span>
+        ${F.lines.length>1?`<button class="del" data-dl="${i}" aria-label="${i+1}번째 줄 지우기">✕</button>`:''}</div>`).join('')}
+      <button class="addl" data-a="addline">＋ 줄 추가 (박스당 개수가 다른 박스)</button>
+      <div class="sum">합계 <span data-f="sum">${fmtN(total)}</span>개 <small style="font-size:13px;font-weight:400;color:var(--sub)" data-f="boxsum">${linesBoxes()?'(박스 '+fmtN(linesBoxes())+'개)':''}</small></div>
       <label class="f">담당자<select data-f="staff">${staff.map(v=>`<option${v===st?' selected':''}>${esc(v)}</option>`).join('')}</select></label>
       ${w&&w.kind==='slot'?`<label class="chk"><input type="checkbox" data-f="pin"${F.pin?' checked':''}> 📌 이 칸에 지정 (재고가 0이 돼도 칸에 이름이 보임)</label>`:''}
       <div class="acts"><button data-a="save" style="background:var(--ink);color:var(--paper);font-weight:700">＋ 입고 저장</button></div>`:''}</div>`;
@@ -552,7 +563,7 @@ function openIn(key,opts){
     const drawList=()=>{const box=P.querySelector('[data-f="plist"]');if(!box)return;const q=norm(F.q);
       const L=ITEMS.filter(x=>!q||norm(x.name).includes(q)).sort((a,b)=>((pinned.includes(b.id)||here.includes(b.id))-(pinned.includes(a.id)||here.includes(a.id)))||String(a.name).localeCompare(String(b.name))).slice(0,40);
       box.innerHTML=L.map(x=>`<button class="pick" data-id="${esc(x.id)}"><span>${esc(x.name)}${pinned.includes(x.id)?' <small>· 📌지정</small>':here.includes(x.id)?' <small>· 이 칸에 있음</small>':''}</span><small>${esc(x.cat)}</small></button>`).join('')||'<p class="none">맞는 품목이 없어요 — 위에서 "＋ 새 품목"을 누르세요</p>';
-      box.querySelectorAll('.pick[data-id]').forEach(b=>b.onclick=()=>{F.id=b.dataset.id;const x=ITEMMAP[F.id]||{};F.per=String(x.unit||F.per||'');F.pin=pinned.includes(F.id);draw()})};
+      box.querySelectorAll('.pick[data-id]').forEach(b=>b.onclick=()=>{F.id=b.dataset.id;const x=ITEMMAP[F.id]||{};F.lines[0].per=String(x.unit||F.lines[0].per||'');F.pin=pinned.includes(F.id);draw()})};
     on('q',e=>{F.q=e.target.value;drawList()});
     // 같은 품명+분류 경고는 그 자리에서만 고침 (창 전체를 다시 그리면 다음 칸을 누른 게 사라짐)
     const dupUp=()=>{const d=P.querySelector('[data-f="dup"]');if(!d)return;const x=F.name.trim()&&ITEMS.find(y=>norm(y.name)===norm(F.name)&&norm(y.cat)===norm(F.cat));
@@ -563,22 +574,29 @@ function openIn(key,opts){
     const cs=P.querySelector('[data-f="catsel"]');if(cs)cs.onchange=()=>{const v=cs.value,wasNew=F.catNew;F.catNew=v==='__new__';F.cat=F.catNew?'':v;
       if(F.catNew!==wasNew)setTimeout(()=>{draw();if(F.catNew){const c=P.querySelector('[data-f="cat"]');if(c)c.focus()}},0);else dupUp()};
     // 박스당 수량은 직접 고치기 전까지 '기본 박스당 수량'을 그대로 따라감 (340 → 340, 첫 글자만 들어가던 문제)
-    on('unit',e=>{F.unit=e.target.value;if(F.perAuto){F.per=F.unit;const pe=P.querySelector('[data-f="per"]');if(pe)pe.value=F.per;sumUp()}});
-    const sumUp=()=>{const t=P.querySelector('[data-f="sum"]');if(t)t.textContent=fmtN((+F.boxes||0)*(+F.per||0))};
-    on('boxes',e=>{F.boxes=e.target.value;sumUp()});on('per',e=>{F.per=e.target.value;F.perAuto=F.per==='';sumUp()});
+    on('unit',e=>{F.unit=e.target.value;if(F.perAuto){F.lines[0].per=F.unit;const pe=P.querySelector('[data-lp="0"]');if(pe)pe.value=F.unit;sumUp()}});
+    // 줄 입력은 그 자리에서 합계만 고침 (다시 그리지 않아 입력이 끊기지 않음)
+    const sumUp=()=>{F.lines.forEach((l,i)=>{const e=P.querySelector(`[data-ls="${i}"]`);if(e)e.textContent=fmtN((+l.boxes||0)*(+l.per||0))});
+      const t=P.querySelector('[data-f="sum"]');if(t)t.textContent=fmtN(linesTotal());const bs=P.querySelector('[data-f="boxsum"]');if(bs)bs.textContent=linesBoxes()?'(박스 '+fmtN(linesBoxes())+'개)':''};
+    P.querySelectorAll('[data-lb]').forEach(el=>el.oninput=()=>{F.lines[+el.dataset.lb].boxes=el.value;sumUp()});
+    P.querySelectorAll('[data-lp]').forEach(el=>el.oninput=()=>{const i=+el.dataset.lp;F.lines[i].per=el.value;if(i===0)F.perAuto=el.value==='';sumUp()});
+    P.querySelectorAll('[data-dl]').forEach(b=>b.onclick=()=>{F.lines.splice(+b.dataset.dl,1);if(!F.lines.length)F.lines=[{boxes:'1',per:''}];draw()});
+    const al=P.querySelector('[data-a="addline"]');if(al)al.onclick=()=>{const it2=ITEMMAP[F.id]||{};F.lines.push({boxes:'',per:''});draw();
+      const n=P.querySelector(`[data-lb="${F.lines.length-1}"]`);if(n)setTimeout(()=>n.focus(),30)};
     const pin=P.querySelector('[data-f="pin"]');if(pin)pin.onchange=()=>F.pin=pin.checked;
     drawList();
     const rp=P.querySelector('[data-a="repick"]');if(rp)rp.onclick=()=>{F.id='';draw()};
     const sv=P.querySelector('[data-a="save"]');if(sv)sv.onclick=()=>saveIn(sv);
   };
   const saveIn=btn=>{
-    const total=(+F.boxes||0)*(+F.per||0);
+    const total=linesTotal();
     if(F.mode==='new'&&!F.name.trim()){toast('품명을 입력하세요');return}
     if(F.mode==='old'&&!F.id){toast('품목을 고르세요');return}
     if(!(total>0)){toast('박스 수와 박스당 수량을 입력하세요');return}
+    if(F.lines.some(l=>(l.boxes!==''||l.per!=='')&&!((+l.boxes||0)*(+l.per||0)>0))){toast('줄마다 박스 수와 박스당 수량을 둘 다 넣거나, 빈 줄은 ✕로 지워주세요');return}
     const ss=P.querySelector('[data-f="staff"]'),staff=ss?ss.value:'';try{if(staff)localStorage.setItem('subtek-staff',staff)}catch(e){}
     btn.disabled=true;btn.textContent='저장 중…';
-    const req={loc:key,lines:[{boxes:+F.boxes,per:+F.per}],staff:staff,memo:'위치도에서 입고'};
+    const req={loc:key,lines:F.lines.map(l=>({boxes:+l.boxes||0,per:+l.per||0})).filter(l=>l.boxes*l.per>0),staff:staff,memo:'위치도에서 입고'};
     if(F.mode==='new')req.newItem={name:F.name.trim(),cat:F.cat.trim(),unit:+F.unit||''};else req.id=F.id;
     GAS.withSuccessHandler(res=>{
       const it=res.item;upsertItem(it);
@@ -589,7 +607,7 @@ function openIn(key,opts){
     }).withFailureHandler(e=>{btn.disabled=false;btn.textContent='＋ 입고 저장';toast((e&&e.message)||'입고하지 못했어요')}).locQuickIn(req);
   };
   draw();openPanel();
-  const first=P.querySelector(F.mode==='new'?'[data-f="per"]':'[data-f="q"]');if(first)setTimeout(()=>first.focus(),50);
+  const first=P.querySelector(F.mode==='new'?'[data-lp="0"]':'[data-f="q"]');if(first)setTimeout(()=>first.focus(),50);
 }
 /** 서버가 돌려준 품목(위치별 수량 포함)으로 위치도 재고·품목 목록 갱신 */
 function upsertItem(it){
