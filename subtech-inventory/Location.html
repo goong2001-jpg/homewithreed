@@ -99,6 +99,15 @@
 #locApp .cell.hit{background:var(--hitbg);border-color:var(--hitline)}
 #locApp .cell.sel{box-shadow:inset 0 0 0 3px var(--sel);border-color:#1F2326}
 #locApp .cell.flash{animation:locFlash 1.4s ease-out}
+/* 적재 방식 표시 (칸 오른쪽 위) */
+#locApp .kb{position:absolute;top:3px;right:4px;font-size:.72em;font-weight:700;padding:1px 5px;border-radius:3px;line-height:1.35;color:#fff;letter-spacing:0;text-indent:0;writing-mode:horizontal-tb}
+#locApp .kb.kg{background:#2E7D32}#locApp .kb.kl{background:#1F4FD8}#locApp .kb.kp{background:#8D6E63}
+#locApp .kindsel{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-2px 0 12px}
+#locApp .kindsel .pk{font-size:13px;color:var(--sub);width:100%}
+#locApp .kindsel button{padding:7px 10px;border:1.5px solid var(--line);border-radius:4px;background:transparent;font-size:14px}
+#locApp .kindsel button small{color:var(--sub);margin-left:3px;font-size:11.5px}
+#locApp .kindsel button.on{border-color:var(--ink);background:var(--ink);color:var(--paper);font-weight:700}
+#locApp .kindsel button.on small{color:inherit;opacity:.8}
 /* 칸 끌어서 옮기기 */
 #locApp .cell{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 #locApp .cell.dragsrc{opacity:.4;outline:2px dashed var(--hitline);outline-offset:-2px}
@@ -288,6 +297,9 @@ const hasContent=x=>String(x.label||'').trim()||(x.layers||[]).some(L=>String(L.
 const prodName=pr=>(ITEMMAP[pr.id]&&ITEMMAP[pr.id].name)||pr.name||pr.id;
 const uniqP=a=>a.filter((x,i)=>a.findIndex(y=>y.id===x.id)===i);
 const clone=o=>JSON.parse(JSON.stringify(o));
+/* 적재 방식: 칸마다 하나 (x.kind). 종류를 늘리려면 여기에 한 줄 추가 */
+const LMARK=/[(（]\s*[Ll]\s*[)）]/,LMARK_ALL=/[(（]\s*[Ll]\s*[)）]/g; // 예전에 이름에 적던 "(L)"
+const KINDS={'초록차':{cls:'kg',mov:'이동'},'L카':{cls:'kl',mov:'이동'},'파렛트':{cls:'kp',mov:'고정'}};
 
 /* ---------- 재고 연동 ----------
    위치 이름 = "시트이름 칸코드" (+ 2층 이상은 " N층"). Location.gs 의 locSlots_ 와 같은 규칙. */
@@ -395,13 +407,13 @@ function renderTabs(){
   t.appendChild(a);
 }
 const query=()=>E('q').value.trim().toLowerCase();
-const matches=(x,q)=>String(x.label||'').toLowerCase().includes(q)||(x.type==='slot'&&x.layers.some(L=>String(L.t||'').toLowerCase().includes(q)||(L.p||[]).some(pr=>prodName(pr).toLowerCase().includes(q))));
+const matches=(x,q)=>String(x.label||'').toLowerCase().includes(q)||String(x.kind||'').toLowerCase().includes(q)||(x.type==='slot'&&x.layers.some(L=>String(L.t||'').toLowerCase().includes(q)||(L.p||[]).some(pr=>prodName(pr).toLowerCase().includes(q))));
 const stockMatch=(s,r,c,q)=>keysAt(s,r,c).some(k=>stockAt(k).some(a=>String(a.name).toLowerCase().includes(q)));
 function cellHTML(x,r,c,s){
   const cd=`<span class="code">${code(r,c)}</span>`;
   if(x.type==='label')return `${x.rs*x.cs>1?cd:''}<span class="lbl">${x.label?esc(x.label):'<i>이름표</i>'}</span>`;
   if(x.type==='void')return cd+(x.label?`<span class="name">${esc(x.label)}</span>`:'');
-  let h=cd+(x.label?`<span class="name">${esc(x.label)}</span>`:'');
+  let h=cd+(x.kind&&KINDS[x.kind]?`<span class="kb ${KINDS[x.kind].cls}" title="${esc(x.kind)} (${KINDS[x.kind].mov})">${esc(x.kind)}</span>`:'')+(x.label?`<span class="name">${esc(x.label)}</span>`:'');
   const split=x.layers.length>1;
   const st=x.layers.map((L,i)=>s?stockAt(slotKey(s,r,c,i)):[]);
   const anyItem=x.layers.some(L=>lines(L.t).length||(L.p||[]).length)||st.some(a=>a.length);
@@ -892,6 +904,7 @@ function drawCell(){
   P.innerHTML=`<div class="ph"><h2>${code(r,c)}${big?`<small>${x.rs}×${x.cs} 합친 칸</small>`:''}</h2><button class="x" data-a="close">닫기</button></div>
   <div class="seg">${[['slot','보관칸'],['label','이름표'],['void','빈 공간']].map(([v,t])=>`<button data-type="${v}" class="${x.type===v?'on':''}">${t}</button>`).join('')}</div>
   <label class="f">이름${big?' (합친 칸은 가운데에 크게 보여요)':''}<input data-f="label" value="${esc(x.label)}" placeholder="${ph}"></label>
+  ${x.type==='slot'?`<div class="kindsel"><span class="pk">적재 방식</span><button data-kind="" class="${x.kind?'':'on'}">없음</button>${Object.keys(KINDS).map(k=>`<button data-kind="${esc(k)}" class="${x.kind===k?'on':''}">${esc(k)}<small>${KINDS[k].mov}</small></button>`).join('')}</div>`:''}
   ${x.type==='slot'&&x.layers.length>1&&x.layers.some((L,i)=>layerMovable(s,r,c,i))?`<button class="mvall" data-mvcell="1">⇄ 칸째로 이동 (${x.layers.map((L,i)=>(i+1)+'층').join('·')} 모두)</button>`:''}
   ${x.type==='slot'?x.layers.map((L,i)=>{const k=slotKey(s,r,c,i),list=stockAt(k);return `<div class="sk"><h3>현재 재고${x.layers.length>1?' · '+(i+1)+'층':''}<small>${esc(k)}</small></h3>
     ${stockLoaded||!GAS?stockRows(list,k):'<p class="none">불러오는 중…</p>'}<button class="in" data-in="${esc(k)}">＋ 이 칸에 입고</button>${layerMovable(s,r,c,i)?`<button class="mv" data-mvl="${i}">⇄ ${x.layers.length>1?(i+1)+'층':'칸'} 전체 이동</button>`:''}
@@ -903,6 +916,7 @@ function drawCell(){
     ${s.cells[K(r,c)]||cellHasStock(s,r,c)?'<button class="danger" data-a="clearcell">🗑 이 칸 삭제</button>':''}
   </div>`;
   bindGo(P);
+  P.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{const y=ensure(s,r,c);if(b.dataset.kind)y.kind=b.dataset.kind;else delete y.kind;save();renderGrid();drawCell()});
   P.querySelectorAll('[data-mvl]').forEach(b=>b.onclick=()=>startCellMove(s,r,c,[+b.dataset.mvl]));
   P.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>openPick(+b.dataset.pick));
   P.querySelectorAll('[data-unp]').forEach(b=>b.onclick=()=>{const[i,pi]=b.dataset.unp.split(',').map(Number),L=ensure(s,r,c).layers[i];
@@ -932,6 +946,10 @@ function drawSheet(){
   <div class="acts"><button data-a="rename">이름 바꾸기</button></div>
   <p class="note">시트 이름은 칸 위치 이름의 앞부분이에요 (예: ${esc(nm)} B3). 이름을 바꾸면 칸에 있는 재고도 새 이름으로 같이 옮겨져요(재고앱 이력에 '이동').
   기존 위치 이름(예: A동1층)과 똑같이 하면 그 이름의 재고가 이 시트의 "칸 미지정"으로 붙어요.</p>
+  ${(()=>{const cnt={};let lL=0;S.sheets.forEach(sx=>Object.values(sx.cells).forEach(x=>{if(x.kind)cnt[x.kind]=(cnt[x.kind]||0)+1;if(LMARK.test(String(x.label||''))&&!x.kind)lL++}));
+    const tally=Object.keys(KINDS).map(k=>k+' '+(cnt[k]||0)).join(' · ');
+    return `<h2 style="font-size:16px;margin:16px 0 8px">적재 방식</h2><p class="note">전체 시트: ${tally} (칸을 눌러 '적재 방식'에서 고르세요)</p>`+
+      (lL?`<div class="acts" style="margin-bottom:6px"><button data-lconv="1">이름에 (L)이 있는 칸 ${lL}개 → 'L카'로 바꾸기</button></div><p class="note">이름에서 "(L)"은 지워지고 칸 오른쪽 위에 L카 표시가 붙어요. 재고·위치 이름에는 영향 없어요.</p>`:'')})()}
   <h2 style="font-size:16px;margin:16px 0 8px">크기</h2>
   ${canTrim?`<div class="acts" style="margin-bottom:10px"><button data-a="trim" style="background:var(--ink);color:var(--paper);font-weight:700">✂ 남는 빈 줄·칸 한 번에 지우기 (줄 ${s.rows}→${ext.rows} · 칸 ${s.cols}→${ext.cols})</button></div>`:''}
   <div class="step"><span>줄 (A부터)</span><button data-d="r-5" aria-label="줄 5개 줄이기">−5</button><button data-d="r-1" aria-label="줄 줄이기">−</button><b>${s.rows}</b><button data-d="r1" aria-label="줄 늘리기">+</button><button data-d="r5" aria-label="줄 5개 늘리기">+5</button></div>
@@ -940,6 +958,9 @@ function drawSheet(){
   ${S.sheets.length>1?`<h2 style="font-size:16px;margin:16px 0 8px">삭제</h2>
   ${delArm?`<p class="note">${cellStock.length?`칸에 있는 재고 ${cellStock.length}곳은 "${esc(nm)}"(칸 미지정)으로 옮긴 뒤 삭제해요. `:''}${stockAt(nm).length?`"${esc(nm)}" 이름의 재고(칸 미지정)는 그대로 남아요 — 같은 이름의 시트가 없으면 "연결 안 된 재고"로 보여요. `:''}</p>`:''}
   <div class="acts"><button class="danger${delArm?' arm':''}" data-a="del">${delArm?'한 번 더 누르면 삭제':'이 시트 삭제'}</button></div>`:''}`;
+  const lc=P.querySelector('[data-lconv]');if(lc)lc.onclick=e=>{e.stopPropagation();let n=0;
+    S.sheets.forEach(sx=>Object.values(sx.cells).forEach(x=>{if(!x.kind&&LMARK.test(String(x.label||''))){x.kind='L카';x.label=String(x.label).replace(LMARK_ALL,' ').replace(/\s+/g,' ').trim();n++}}));
+    save();render();drawSheet();toast(n+'개 칸을 L카로 바꿨어요')};
   P.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const d=b.dataset.d;resize(d[0]==='r'?+d.slice(1):0,d[0]==='c'?+d.slice(1):0)});
   P.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;
     if(a==='close'){closePanel();return}
@@ -1014,6 +1035,7 @@ function renderResults(){
   // 2) 칸 이름·메모·📌지정(재고 0)
   S.sheets.forEach((s,si)=>{for(const k in s.cells){const x=s.cells[k];const[r,c]=k.split(',').map(Number);
     if(String(x.label||'').toLowerCase().includes(q))out.push({si,r,c,w:'',t:x.label});
+    if(x.kind&&String(x.kind).toLowerCase().includes(q))out.push({si,r,c,w:x.label||'',t:'적재: '+x.kind});
     if(x.type==='slot')x.layers.forEach((L,i)=>lines(L.t).forEach(t=>{if(t.toLowerCase().includes(q))out.push({si,r,c,w:x.layers.length>1?(i+1)+'층':'',t})}))
     if(x.type==='slot')x.layers.forEach((L,i)=>(L.p||[]).forEach(pr=>{const nm=prodName(pr);
       if(nm.toLowerCase().includes(q)&&!stockAt(slotKey(s,r,c,i)).some(a=>a.id===pr.id))out.push({si,r,c,pid:pr.id,w:(x.layers.length>1?(i+1)+'층 ':'')+(x.label||''),t:'📌'+nm+' · 지정 (재고 0)'})}))}
@@ -1104,7 +1126,7 @@ function applyPendingQ(){if(!pendingQ||!S)return;E('q').value=pendingQ;pendingQ=
 function appSlots(){const sheets=[],slots=[];S.sheets.forEach(s=>{const sheet=String(s.name||'').trim();if(!sheet)return;sheets.push(sheet);
   Object.keys(s.cells||{}).map(k=>k.split(',').map(Number)).sort((a,b)=>a[0]-b[0]||a[1]-b[1]).forEach(([r,c])=>{const x=s.cells[K(r,c)];if(!x||x.type!=='slot')return;
     const n=Math.max(1,(x.layers||[]).length);for(let i=0;i<n;i++){const L=(x.layers||[])[i]||{};
-      slots.push({key:slotKey(s,r,c,i),sheet,code:code(r,c),label:String(x.label||'').trim(),layer:i,n,p:(L.p||[]).map(pr=>pr.id),
+      slots.push({key:slotKey(s,r,c,i),sheet,code:code(r,c),label:String(x.label||'').trim(),kind:x.kind||'',layer:i,n,p:(L.p||[]).map(pr=>pr.id),
         note:((L.p||[])[0]||{}).name||lines(L.t)[0]||''})}})});return{sheets,slots}}
 function mapToHost(){if(host()&&S)host().mapChanged(appSlots())}
 function stockToHost(){if(host())host().stockChanged(STK)}

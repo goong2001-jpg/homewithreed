@@ -100,7 +100,7 @@ function locApply(json, baseVersion, mv) {
 function locWriteList_(obj) {
   const ss = locBook_();
   const sh = ss.getSheetByName(LOC_LIST) || ss.insertSheet(LOC_LIST);
-  const rows = [['시트', '칸', '이름', '층', '자재']];
+  const rows = [['시트', '칸', '이름', '층', '자재', '적재방식']];
   (obj.sheets || []).forEach(s => {
     Object.keys(s.cells || {}).forEach(k => {
       const x = s.cells[k];
@@ -109,14 +109,14 @@ function locWriteList_(obj) {
       const code = locCode_(rc[0], rc[1]);
       const split = (x.layers || []).length > 1;
       (x.layers || []).forEach((L, i) => {
-        (L.p || []).forEach(pr => rows.push([s.name, code, x.label || '', split ? (i + 1) + '층' : '', '[제품] ' + (pr.name || pr.id)]));
+        (L.p || []).forEach(pr => rows.push([s.name, code, x.label || '', split ? (i + 1) + '층' : '', '[제품] ' + (pr.name || pr.id), x.kind || '']));
         String(L.t || '').split('\n').map(t => t.trim()).filter(Boolean)
-          .forEach(t => rows.push([s.name, code, x.label || '', split ? (i + 1) + '층' : '', t]));
+          .forEach(t => rows.push([s.name, code, x.label || '', split ? (i + 1) + '층' : '', t, x.kind || '']));
       });
     });
   });
   sh.clearContents();
-  sh.getRange(1, 1, rows.length, 5).setNumberFormat('@').setValues(rows);
+  sh.getRange(1, 1, rows.length, 6).setNumberFormat('@').setValues(rows);
   sh.setFrozenRows(1);
 }
 
@@ -166,7 +166,7 @@ function locSlots_(obj) {
         const code = locCode_(rc[0], rc[1]), n = Math.max(1, (x.layers || []).length);
         for (let i = 0; i < n; i++)
           out.push({ key: sheet + ' ' + code + (i ? ' ' + (i + 1) + '층' : ''), sheet: sheet, code: code,
-                     label: String(x.label || '').trim(), layer: i, n: n,
+                     label: String(x.label || '').trim(), kind: x.kind || '', layer: i, n: n,
                      p: (((x.layers || [])[i] || {}).p || []).map(pr => pr.id),
                      note: ((((x.layers || [])[i] || {}).p || [])[0] || {}).name ||
                            String(((x.layers || [])[i] || {}).t || '').split('\n').map(t => t.trim()).filter(Boolean)[0] || '' });

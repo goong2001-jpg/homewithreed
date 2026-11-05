@@ -196,7 +196,7 @@
 </div>
 
 <script>
-var HTML_VERSION = 'v22'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v23'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var BOMROWS = null, MEMO_SHOWN = 50, PREFETCHED = false;
@@ -220,7 +220,7 @@ function fill(id,arr){ document.getElementById(id).innerHTML=arr.map(function(s)
 var SLOT = {}, ASSIGN = {};   // ASSIGN[품목ID] = [위치도에서 📌지정한 칸 위치들]
 function indexSlots(){ SLOT={}; ASSIGN={}; (DATA.locMap.slots||[]).forEach(function(sl){ SLOT[sl.key]=sl;
   (sl.p||[]).forEach(function(id){ (ASSIGN[id]=ASSIGN[id]||[]).push(sl.key); }); }); }
-function slotText(sl){ return sl.code+(sl.n>1?' '+(sl.layer+1)+'층':'')+(sl.label?' · '+sl.label:(sl.note?' · ('+sl.note+')':'')); }
+function slotText(sl){ return sl.code+(sl.n>1?' '+(sl.layer+1)+'층':'')+(sl.label?' · '+sl.label:(sl.note?' · ('+sl.note+')':''))+(sl.kind?' ['+sl.kind+']':''); }
 /** 화면에 보일 위치 이름 (위치도 칸이면 칸 이름까지) */
 function locDisp(name){ var sl=SLOT[name]; return sl ? (sl.sheet+' '+slotText(sl)) : (''+(name||'')); }
 function stockLocSet(){ var o={}; DATA.items.forEach(function(it){ Object.keys(it.locs||{}).forEach(function(k){ if(Number(it.locs[k])) o[k]=true; }); }); return o; }
