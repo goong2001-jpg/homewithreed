@@ -84,7 +84,7 @@ function locApply(json, baseVersion, mv) {
     }
     JSON.parse(json);
     const hasMoves = mv && (mv.groups || []).some(g => (g.moves || []).some(m => Number(m.qty) > 0));
-    const rows = hasMoves ? locMoveRows_(mv) : [];   // 검사 먼저 (틀리면 여기서 오류)
+    const rows = (hasMoves ? locMoveRows_(mv) : []).concat(mv && mv.clears ? locClearRows_(mv) : []);   // 검사 먼저 (틀리면 여기서 오류)
     if (rows.length) {
       const log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
       log.getRange(log.getLastRow() + 1, 1, rows.length, 13).setValues(rows);
@@ -229,6 +229,29 @@ function locMove(p) {
     lock.releaseLock();
   }
   return locStock();
+}
+
+/**
+ * 칸 삭제 때 그 칸 위치들의 재고를 0으로: mv.clears = {mode:'조정'|'출고', locs:[위치 이름…]}
+ * 지금 거래로그 기준 수량을 다시 읽어 그만큼 빼므로(마이너스면 더함) 그 사이 바뀐 재고도 정확히 0이 됨.
+ * '출고'를 골라도 마이너스 재고는 출고로 쓸 수 없어 '조정'으로 기록.
+ */
+function locClearRows_(mv) {
+  const c = mv.clears || {}, mode = c.mode === '출고' ? '출고' : '조정';
+  const locs = (c.locs || []).map(l => String(l || '').trim()).filter(String);
+  if (!locs.length) return [];
+  const m = SpreadsheetApp.getActive().getSheetByName(TAB_MASTER), info = {};
+  if (m && m.getLastRow() >= 2)
+    m.getRange(2, 1, m.getLastRow() - 1, 3).getValues().forEach(r => { if (r[0]) info[r[0]] = { name: r[1], cat: r[2] }; });
+  const st = computeStock_(), now = new Date(), rows = [];
+  Object.keys(st).forEach(id => locs.forEach(loc => {
+    const cur = Number((st[id].locs || {})[loc]) || 0;
+    if (!cur) return;
+    const it = info[id] || { name: String(id).split('||')[0], cat: '' }, type = cur > 0 ? mode : '조정';
+    rows.push([now, id, it.name, it.cat, loc, type, '', '', Math.abs(cur), -cur, mv.staff || '',
+               '위치도 칸 삭제' + (mv.memo ? ' ' + mv.memo : '') + ' (' + cur + '→0)', '']);
+  }));
+  return rows;
 }
 
 /** 이동 요청 검사 → 거래로그 행들 (하나라도 틀리면 오류, 아무것도 안 씀). 잠금은 호출하는 쪽에서 */

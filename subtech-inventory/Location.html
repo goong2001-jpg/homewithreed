@@ -846,6 +846,40 @@ function moveCell(r1,c1,r2,c2){
   openPanel();
 }
 
+/* ---------- 칸 삭제: 내용(이름·메모·층·📌지정·합친 칸)과 재고까지 ----------
+   재고가 있으면 거래로그에 '조정'(기본, 0으로 맞춤) 또는 '출고'로 차감 기록 — 위치도 저장과 한 번에(locApply) */
+function openClearCell(s,r,c){
+  if(GAS&&!stockLoaded){toast('재고 정보를 불러오는 중이에요. 잠시 후 다시 해주세요');return}
+  const x=get(s,r,c),keys=keysAt(s,r,c),P=E('panelBody');P.dataset.kind='clear';
+  const stockKeys=keys.filter(k=>stockAt(k).length),n=stockKeys.reduce((t,k)=>t+stockAt(k).length,0);
+  const what=[x.label?'이름 "'+x.label+'"':'',x.layers&&x.layers.some(L=>String(L.t||'').trim())?'메모':'',x.layers&&x.layers.some(L=>(L.p||[]).length)?'📌지정 제품':'',
+    x.layers&&x.layers.length>1?x.layers.length+'개 층':'',x.rs*x.cs>1?x.rs+'×'+x.cs+' 합친 칸':'',x.type!=='slot'?(x.type==='label'?'이름표':'빈 공간')+' 표시':''].filter(Boolean);
+  let mode='조정';const st=lastStaff(),staff=STAFF.length?STAFF:[''];
+  const draw=()=>{
+    P.innerHTML=`<div class="ph"><h2>${code(r,c)}${x.label?' '+esc(x.label):''}<small>칸 삭제</small></h2><button class="x" data-a="close">닫기</button></div>
+    <p class="note" style="color:var(--ink)">이 칸을 <b>빈 칸</b>으로 되돌립니다.${what.length?' 지워지는 것: '+esc(what.join(', '))+'.':''}</p>
+    ${n?`<div class="sk"><h3>차감할 재고<small>${n}건</small></h3>
+      ${stockKeys.map(k=>stockAt(k).map(a=>`<div class="srow"><span class="nm">${esc(a.name)}${a.cat?`<small>${esc(a.cat)}</small>`:''}${keys.length>1?`<small>${esc(k.slice(String(s.name).trim().length+1))}</small>`:''}</span><b${a.qty<0?' style="color:#B3412E"':''}>${fmtN(a.qty)} → 0</b></div>`).join('')).join('')}</div>
+      <p class="note" style="margin-bottom:6px">재고는 어떻게 기록할까요?</p>
+      <div class="seg"><button data-md="조정" class="${mode==='조정'?'on':''}">조정 (0으로 맞춤)</button><button data-md="출고" class="${mode==='출고'?'on':''}">출고</button></div>
+      <p class="note">${mode==='조정'?'잘못 들어간 재고·실사 정리용. 월별 출고에는 잡히지 않아요.':'실제로 나간 물건이면 출고. 월별 리포트 출고에 더해져요.'} 재고앱 이력에 남고, 거기서 <b>취소</b>할 수 있어요.</p>
+      ${GAS?`<label class="f">담당자<select data-f="staff">${staff.map(v=>`<option${v===st?' selected':''}>${esc(v)}</option>`).join('')}</select></label>`:''}`:''}
+    <div class="acts"><button data-a="cancel">취소</button><button class="danger arm" data-a="go">🗑 ${n?'재고 차감하고 ':''}칸 삭제</button></div>`;
+    P.querySelector('[data-a="close"]').onclick=closePanel;P.querySelector('[data-a="cancel"]').onclick=()=>drawCell();
+    P.querySelectorAll('[data-md]').forEach(b=>b.onclick=()=>{mode=b.dataset.md;draw()});
+    P.querySelector('[data-a="go"]').onclick=e=>{
+      const btn=e.target,ss=P.querySelector('[data-f="staff"]'),staffV=ss?ss.value:'';try{if(staffV)localStorage.setItem('subtek-staff',staffV)}catch(er){}
+      if(n&&!GAS){toast('재고 차감은 재고앱의 위치도에서만 돼요');return}
+      const N=clone(S);delete N.sheets[S.cur].cells[K(r,c)];
+      const fin=()=>{closePanel();render();toast(`${code(r,c)} 칸을 삭제했어요`+(n?` (재고 ${n}건 ${mode})`:''))};
+      if(!n){const c0=S.cur;S=N;S.cur=c0;save();fin();return} // 재고가 없으면 평소 저장
+      btn.disabled=true;btn.textContent='저장 중…';
+      commit(N,{clears:{mode,locs:stockKeys},staff:staffV,memo:code(r,c)},fin,()=>{btn.disabled=false;btn.textContent='🗑 재고 차감하고 칸 삭제'});
+    };
+  };
+  draw();openPanel();
+}
+
 /* ---------- 패널 ---------- */
 function openPanel(){E('shade').hidden=false;E('panel').hidden=false}
 function closePanel(){E('shade').hidden=true;E('panel').hidden=true;delArm=false}
@@ -866,6 +900,7 @@ function drawCell(){
   <div class="acts">
     ${x.type==='slot'?(x.layers.length===1?'<button data-a="split">1층·2층으로 나누기</button>':`${x.layers.length<4?'<button data-a="addL">층 추가</button>':''}<button data-a="joinL">층 없애기</button>`):''}
     ${big?'<button data-a="unmerge">합친 칸 풀기</button>':''}
+    ${s.cells[K(r,c)]||cellHasStock(s,r,c)?'<button class="danger" data-a="clearcell">🗑 이 칸 삭제</button>':''}
   </div>`;
   bindGo(P);
   P.querySelectorAll('[data-mvl]').forEach(b=>b.onclick=()=>startCellMove(s,r,c,[+b.dataset.mvl]));
@@ -877,6 +912,7 @@ function drawCell(){
   const fl=P.querySelector('[data-f="label"]');fl.oninput=()=>{ensure(s,r,c).label=fl.value;save();renderGrid()};
   P.querySelectorAll('textarea').forEach(t=>t.oninput=()=>{ensure(s,r,c).layers[+t.dataset.i].t=t.value;save();renderGrid()});
   P.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='close'){closePanel();return}
+    if(a==='clearcell'){openClearCell(s,r,c);return}
     if(a==='joinL'&&guard(cellHasStock(s,r,c,1),'2층 이상에 재고가 있어 층을 없앨 수 없어요. 재고를 옮긴 뒤 해주세요'))return;
     const y=ensure(s,r,c);
     if(a==='split')y.layers=[{t:y.layers[0].t},{t:''}];
