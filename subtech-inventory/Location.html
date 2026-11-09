@@ -41,11 +41,19 @@
 
 #locApp .tabs{display:flex;gap:4px;overflow-x:auto;padding:0 12px;scrollbar-width:none}
 #locApp .tabs::-webkit-scrollbar{display:none}
-#locApp .tab{flex:0 0 auto;padding:8px 12px;border:1.5px solid var(--line);border-bottom:0;border-radius:4px 4px 0 0;background:transparent;white-space:nowrap}
-#locApp .tab.on{background:var(--paper);font-weight:700;border-color:var(--ink)}
+#locApp .tab{flex:0 0 auto;padding:8px 12px;border:1.5px solid var(--line);border-top:5px solid var(--tc,var(--line));border-bottom:0;border-radius:4px 4px 0 0;background:transparent;white-space:nowrap}
+#locApp .tab.on{background:var(--tc);border-color:var(--tc);color:#fff;font-weight:700;padding:9px 16px}
+/* 지금 보는 시트: 시트마다 색 (--sc) */
+#locApp .shn{display:inline-block;background:var(--sc);color:#fff;padding:1px 8px;border-radius:4px;font-size:13px;font-weight:700;margin-right:6px;vertical-align:middle}
+#locApp .where{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--sc);color:#fff}
+#locApp .where b{font-size:18px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#locApp .where small{font-size:12px;opacity:.85;white-space:nowrap}
+#locApp .where button{width:38px;height:34px;border:1.5px solid rgba(255,255,255,.7);border-radius:4px;background:rgba(255,255,255,.15);color:#fff;font-size:15px}
+#locApp .where button:disabled{opacity:.35}
 #locApp .tab.add{border-style:dashed;color:var(--sub)}
 
-#locApp .floor{background:var(--paper);border-top:1.5px solid var(--ink)}
+#locApp .floor{background:var(--paper);border-top:4px solid var(--sc,var(--ink))}
+#locApp .floor .wrap{background:color-mix(in srgb,var(--sc,transparent) 10%,var(--paper))}
 #locApp .floor.merging{border-top:6px solid transparent;
   border-image:repeating-linear-gradient(-45deg,var(--sel) 0 10px,#1F2326 10px 20px) 6}
 #locApp .tools{display:flex;gap:6px;padding:10px 12px 4px;flex-wrap:wrap}
@@ -255,6 +263,7 @@
   </div>
   <nav class="tabs" data-el="tabs"></nav>
   <main class="floor" data-el="floor">
+    <div class="where" data-el="where"></div>
     <div class="tools">
       <button data-el="bQty" class="qbtn">✏️ 수량 입력</button>
       <button data-el="bMerge">칸 합치기</button>
@@ -437,9 +446,17 @@ document.addEventListener('visibilitychange',()=>{if(HOSTED)return; // 재고앱
 
 /* ---------- 그리기 ---------- */
 function render(){if(!S)return;renderTabs();renderGrid();renderMerge();renderStockBar();renderMoveBar()}
+/* 시트 색: 시트 순서대로 (구분이 잘 되는 색) */
+const SHEETC=['#2563EB','#16A34A','#D97706','#9333EA','#DC2626','#0891B2','#DB2777','#4D7C0F','#4F46E5','#EA580C'];
+const sheetColor=i=>SHEETC[i%SHEETC.length];
+const shTag=()=>`<span class="shn">${esc(sh().name)}</span>`;
+function renderWhere(){const w=E('where'),n=S.sheets.length,s=sh();root.style.setProperty('--sc',sheetColor(S.cur));
+  w.innerHTML=`<button data-w="-1" aria-label="이전 시트"${S.cur===0?' disabled':''}>◀</button><b>📍 ${esc(s.name)}</b><small>시트 ${S.cur+1}/${n}</small><button data-w="1" aria-label="다음 시트"${S.cur>=n-1?' disabled':''}>▶</button>`;
+  w.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{const j=S.cur+Number(b.dataset.w);if(j<0||j>=n)return;S.cur=j;sel.clear();render();
+    const tb=E('tabs').children[j];if(tb)tb.scrollIntoView({inline:'center',block:'nearest'})})}
 function renderTabs(){
-  const t=E('tabs');t.innerHTML='';
-  S.sheets.forEach((s,i)=>{const b=document.createElement('button');b.className='tab'+(i===S.cur?' on':'');b.textContent=s.name;
+  const t=E('tabs');t.innerHTML='';renderWhere();
+  S.sheets.forEach((s,i)=>{const b=document.createElement('button');b.className='tab'+(i===S.cur?' on':'');b.textContent=s.name;b.style.setProperty('--tc',sheetColor(i));
     b.onclick=()=>{if(i===S.cur){if(!MV)openSheet();return}S.cur=i;sel.clear();render()};t.appendChild(b)});
   const a=document.createElement('button');a.className='tab add';a.textContent='+ 시트';
   a.onclick=()=>{let n=S.sheets.length+1;while(S.sheets.some(s=>String(s.name).trim()==='시트 '+n))n++;S.sheets.push(blank('시트 '+n,5,6));S.cur=S.sheets.length-1;save();render();setTimeout(()=>t.scrollLeft=9999,0)};
@@ -556,7 +573,7 @@ function pickDest(r,c){
     MV.parts.forEach(p=>p.to=slotKey(s,r,c,Math.min(p.layer,n-1)));MV.dest={si:S.cur,r,c};return confirmMove()}
   if(n===1){MV.parts[0].to=slotKey(s,r,c,0);MV.dest={si:S.cur,r,c};return confirmMove()}
   const P=E('panelBody');P.dataset.kind='mvlayer';
-  P.innerHTML=`<div class="ph"><h2>${code(r,c)}${x.label?' '+esc(x.label):''}<small>몇 층으로?</small></h2><button class="x" data-a="close">닫기</button></div>
+  P.innerHTML=`<div class="ph"><h2>${shTag()}${code(r,c)}${x.label?' '+esc(x.label):''}<small>몇 층으로?</small></h2><button class="x" data-a="close">닫기</button></div>
   <div class="acts">${x.layers.map((L,i)=>`<button data-l="${i}">${i+1}층</button>`).join('')}</div>`;
   P.querySelector('[data-a="close"]').onclick=closePanel;
   P.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{MV.parts[0].to=slotKey(s,r,c,+b.dataset.l);MV.dest={si:S.cur,r,c};confirmMove()});
@@ -569,7 +586,7 @@ function pickIn(r,c){
   const name=PIN.name;
   if(x.layers.length===1){PIN=null;render();openIn(slotKey(s,r,c,0),{newName:name});return}
   const P=E('panelBody');P.dataset.kind='inlayer';
-  P.innerHTML=`<div class="ph"><h2>${code(r,c)}${x.label?' '+esc(x.label):''}<small>몇 층에?</small></h2><button class="x" data-a="close">닫기</button></div>
+  P.innerHTML=`<div class="ph"><h2>${shTag()}${code(r,c)}${x.label?' '+esc(x.label):''}<small>몇 층에?</small></h2><button class="x" data-a="close">닫기</button></div>
   <div class="acts">${x.layers.map((L,i)=>`<button data-l="${i}">${i+1}층</button>`).join('')}</div>`;
   P.querySelector('[data-a="close"]').onclick=closePanel;
   P.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{PIN=null;render();openIn(slotKey(s,r,c,+b.dataset.l),{newName:name})});
@@ -714,7 +731,7 @@ function doMove(btn){
 /* ---------- 제품 지정 ---------- */
 function openPick(i){
   const s=sh(),{r,c}=cur,x=get(s,r,c),P=E('panelBody');P.dataset.kind='pick';
-  P.innerHTML=`<div class="ph"><h2>${code(r,c)}${x.label?' '+esc(x.label):''}${x.layers.length>1?' · '+(i+1)+'층':''}<small>제품 지정</small></h2><button class="x" data-a="back">← 돌아가기</button></div>
+  P.innerHTML=`<div class="ph"><h2>${shTag()}${code(r,c)}${x.label?' '+esc(x.label):''}${x.layers.length>1?' · '+(i+1)+'층':''}<small>제품 지정</small></h2><button class="x" data-a="back">← 돌아가기</button></div>
   <label class="f">품목 검색<input data-f="pq" type="search" placeholder="품명 일부 입력 (예: sv7)" autocomplete="off"></label><div data-f="plist"></div>`;
   const inp=P.querySelector('[data-f="pq"]'),box=P.querySelector('[data-f="plist"]');
   const norm=v=>String(v||'').replace(/\s+/g,'').toLowerCase();
@@ -908,7 +925,7 @@ function openClearCell(s,r,c){
     x.layers&&x.layers.length>1?x.layers.length+'개 층':'',x.rs*x.cs>1?x.rs+'×'+x.cs+' 합친 칸':'',x.type!=='slot'?(x.type==='label'?'이름표':'빈 공간')+' 표시':''].filter(Boolean);
   let mode='조정';const st=lastStaff(),staff=STAFF.length?STAFF:[''];
   const draw=()=>{
-    P.innerHTML=`<div class="ph"><h2>${code(r,c)}${x.label?' '+esc(x.label):''}<small>칸 삭제</small></h2><button class="x" data-a="close">닫기</button></div>
+    P.innerHTML=`<div class="ph"><h2>${shTag()}${code(r,c)}${x.label?' '+esc(x.label):''}<small>칸 삭제</small></h2><button class="x" data-a="close">닫기</button></div>
     <p class="note" style="color:var(--ink)">이 칸을 <b>빈 칸</b>으로 되돌립니다.${what.length?' 지워지는 것: '+esc(what.join(', '))+'.':''}</p>
     ${n?`<div class="sk"><h3>차감할 재고<small>${n}건</small></h3>
       ${stockKeys.map(k=>stockAt(k).map(a=>`<div class="srow"><span class="nm">${esc(a.name)}${a.cat?`<small>${esc(a.cat)}</small>`:''}${keys.length>1?`<small>${esc(k.slice(String(s.name).trim().length+1))}</small>`:''}</span><b${a.qty<0?' style="color:#B3412E"':''}>${fmtN(a.qty)} → 0</b></div>`).join('')).join('')}</div>
@@ -941,7 +958,7 @@ function openCell(){drawCell();openPanel()}
 function drawCell(){
   const s=sh(),{r,c}=cur,x=get(s,r,c),P=E('panelBody'),big=x.rs*x.cs>1;P.dataset.kind='cell';
   const ph={slot:'예: 선반1, 파레트',label:'예: 현관, 벽쪽, 가운데',void:'예: 복도, 통로'}[x.type];
-  P.innerHTML=`<div class="ph"><h2>${code(r,c)}${big?`<small>${x.rs}×${x.cs} 합친 칸</small>`:''}</h2><button class="x" data-a="close">닫기</button></div>
+  P.innerHTML=`<div class="ph"><h2>${shTag()}${code(r,c)}${big?`<small>${x.rs}×${x.cs} 합친 칸</small>`:''}</h2><button class="x" data-a="close">닫기</button></div>
   <div class="seg">${[['slot','보관칸'],['label','이름표'],['void','빈 공간']].map(([v,t])=>`<button data-type="${v}" class="${x.type===v?'on':''}">${t}</button>`).join('')}</div>
   <label class="f">이름${big?' (합친 칸은 가운데에 크게 보여요)':''}<input data-f="label" value="${esc(x.label)}" placeholder="${ph}"></label>
   ${x.type==='slot'?`<div class="kindsel"><span class="pk">적재 방식</span><button data-kind="" class="${x.kind?'':'on'}">없음</button>${Object.keys(KINDS).map(k=>`<button data-kind="${esc(k)}" class="${x.kind===k?'on':''}">${esc(k)}<small>${KINDS[k].mov}</small></button>`).join('')}</div>`:''}
@@ -1048,7 +1065,7 @@ function bindQty(P,s,r,c,compact){
 /** 수량 입력 창만 (수량 입력 모드에서 칸을 눌렀을 때) */
 function openQty(){
   const s=sh(),{r,c}=cur,x=get(s,r,c),P=E('panelBody');P.dataset.kind='cell';
-  P.innerHTML=`<div class="ph"><h2>${code(r,c)}${x.label?` <small>${esc(x.label)}</small>`:''}${x.kind?`<small>${esc(x.kind)}</small>`:''}</h2><button class="x" data-a="close">닫기</button></div>${qtyHTML(s,r,c,true)}`;
+  P.innerHTML=`<div class="ph"><h2>${shTag()}${code(r,c)}${x.label?` <small>${esc(x.label)}</small>`:''}${x.kind?`<small>${esc(x.kind)}</small>`:''}</h2><button class="x" data-a="close">닫기</button></div>${qtyHTML(s,r,c,true)}`;
   P.querySelector('[data-a="close"]').onclick=closePanel;bindQty(P,s,r,c,true);openPanel();
   const first=P.querySelector('.qitem [data-qb]');if(first)setTimeout(()=>{first.focus();try{first.select()}catch(e){}},60);
 }
