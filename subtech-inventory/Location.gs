@@ -393,3 +393,28 @@ function resetAllStock(p) {
     lock.releaseLock();
   }
 }
+
+/** 위치도에서 바로 출고: lines=[{boxes,per}] + loose(낱개) → '출고' 줄 (박스 줄마다 한 줄, 낱개는 한 줄) */
+function locQuickOut(p) {
+  p = p || {};
+  const loc = String(p.loc || '').trim();
+  if (!loc) throw new Error('출고할 칸을 고르세요.');
+  const lines = (p.lines || []).map(l => ({ boxes: Math.floor(Number(l.boxes) || 0), per: Math.floor(Number(l.per) || 0) })).filter(l => l.boxes > 0 && l.per > 0);
+  const loose = Math.max(0, Math.floor(Number(p.loose) || 0));
+  if (!lines.length && !loose) throw new Error('출고할 수량을 넣으세요.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const it = locMasterInfo_()[p.id];
+    if (!it) throw new Error('품목을 찾을 수 없어요. 새로고침 후 다시 해주세요.');
+    const now = new Date(), staff = p.staff || '', memo = ('위치도에서 출고' + (p.memo ? ' · ' + String(p.memo).slice(0, 200) : '')), out = [];
+    lines.forEach(l => out.push([now, it.id, it.name, it.cat, loc, '출고', l.boxes, l.per, l.boxes * l.per, -l.boxes * l.per, staff, memo, '']));
+    if (loose) out.push([now, it.id, it.name, it.cat, loc, '출고', '', '', loose, -loose, staff, memo, '']);
+    const log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
+    log.getRange(log.getLastRow() + 1, 1, out.length, 13).setValues(out);
+    const s = computeStock_()[it.id] || { total: 0, boxes: 0, locs: {} };
+    return { item: { id: it.id, name: it.name, cat: it.cat, unit: it.unit, safe: it.safe, total: s.total, boxes: s.boxes || 0, locs: s.locs } };
+  } finally {
+    lock.releaseLock();
+  }
+}
