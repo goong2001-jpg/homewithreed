@@ -6,7 +6,7 @@
  * - 메모(업체 사양), 조립 가능 수량(BOM), 월별 입출고 리포트 포함.
  */
 
-var APP_VERSION = 'v24'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
+var APP_VERSION = 'v25'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
 
 var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
@@ -255,12 +255,14 @@ function buildMonthlyView_(sh) {
 // 재고
 // ---------------------------------------------------------------------------
 /** 첫 화면용: bootstrap + 위치도 데이터를 서버 한 번 호출로 */
+/** 앱 첫 화면용: 위치도는 한 번만 읽고(locGet), 보관칸 목록(locMap)은 화면이 위치도에서 직접 만듦 → 더 빠름 */
 function appBoot() {
-  var b = bootstrap();
+  var b = bootstrap_(false);
   b.loc = (typeof locGet === 'function') ? locGet() : { version: 0, data: null };
   return b;
 }
-function bootstrap() {
+function bootstrap() { return bootstrap_(true); }
+function bootstrap_(withLocMap) {
   var ss = SpreadsheetApp.getActive();
   var m = ss.getSheetByName(TAB_MASTER), cf = ss.getSheetByName(TAB_CONFIG);
   var stock = computeStock_();
@@ -290,7 +292,7 @@ function bootstrap() {
   }
   var appUrl = '';
   try { appUrl = ScriptApp.getService().getUrl() || ''; } catch (e) {}
-  var locMap = (typeof locSlotsForApp_ === 'function') ? locSlotsForApp_() : { sheets: [], slots: [] }; // Location.gs
+  var locMap = withLocMap && (typeof locSlotsForApp_ === 'function') ? locSlotsForApp_() : null; // Location.gs (appBoot는 화면에서 계산)
   return { items: items, staff: staff, locations: locs, layout: layout, version: APP_VERSION, appUrl: appUrl, locMap: locMap };
 }
 function computeStock_() {

@@ -1,4 +1,5 @@
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 #locApp{
   --bg:#D8DAD5;--paper:#ECEDE9;--ink:#1F2326;--sub:#5B6367;--line:#979D99;
@@ -79,15 +80,25 @@
 #locApp .qbox{border:1.5px solid var(--ink);border-radius:6px;padding:10px 12px;margin:4px 0 14px;background:var(--paper)}
 #locApp .qbox h3{margin:0 0 4px;font-size:14px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 #locApp .qbox h3 small{font-size:11.5px;font-weight:400;color:var(--sub)}
-#locApp .qrow{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px dashed var(--line)}
-#locApp .qrow:first-of-type{border-top:0}
-#locApp .qrow .nm{flex:1;min-width:0;word-break:keep-all;font-size:14.5px}
-#locApp .qrow .nm small{display:block;color:var(--sub);font-size:11.5px}
-#locApp .qrow .nm .qt{color:var(--sub);font-size:12px}
-#locApp .qrow input{width:96px;padding:9px 8px;border:1.5px solid var(--ink);border-radius:4px;background:var(--slot);font-size:17px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
-#locApp .qrow input.bad{border-color:#B3412E;background:#F6DCD6}
-#locApp .qrow input.chg{border-color:var(--hitline);background:var(--hitbg)}
-#locApp .qrow .eqv{min-width:44px;font-size:12px;color:var(--sub);text-align:right;font-variant-numeric:tabular-nums}
+#locApp .qitem{padding:9px 0 8px;border-top:1px dashed var(--line)}
+#locApp .qitem:first-child{border-top:0}
+#locApp .qitem.chg{background:var(--hitbg);margin:0 -12px;padding:9px 12px 8px}
+#locApp .qhead{display:flex;align-items:baseline;gap:8px;margin-bottom:5px}
+#locApp .qhead .nm{flex:1;min-width:0;word-break:keep-all;font-weight:700;font-size:15px}
+#locApp .qhead .nm small{color:var(--sub);font-weight:400;font-size:12px}
+#locApp .qhead .qnow{font-size:12px;color:var(--sub);white-space:nowrap}
+#locApp .qhead .qnow b{color:var(--ink)}
+#locApp .qline{display:flex;align-items:center;gap:5px;margin:5px 0;font-size:13.5px;color:var(--sub)}
+#locApp .qline input{width:70px;padding:8px 6px;border:1.5px solid var(--ink);border-radius:4px;background:var(--slot);color:var(--ink);font-size:17px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+#locApp .qline input::-webkit-outer-spin-button,#locApp .qline input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+#locApp .qline input{-moz-appearance:textfield;appearance:textfield}
+#locApp .qline .qsub{margin-left:auto;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+#locApp .qline .qdel{border:0;background:none;color:var(--sub);font-size:16px;padding:4px 6px}
+#locApp .qline .qadd{padding:7px 9px;border:1.5px dashed var(--line);border-radius:4px;background:transparent;font-size:13px;color:var(--ink);margin-right:auto}
+#locApp .qline .ql{color:var(--ink)}
+#locApp .qres{font-size:13px;color:var(--sub);text-align:right}
+#locApp .qres b{font-size:16px;color:var(--ink)}
+#locApp .qres .bad{color:#B3412E;font-weight:700}
 #locApp .qacts{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
 #locApp .qacts select{padding:9px 6px;border:1.5px solid var(--line);border-radius:4px;background:var(--slot);color:var(--ink);font:inherit;font-size:14px}
 #locApp .qacts button{flex:1;padding:11px 10px;border:1.5px solid var(--ink);border-radius:4px;background:var(--ink);color:var(--bg);font-weight:700;white-space:nowrap}
@@ -652,7 +663,7 @@ function openIn(key,opts){
 }
 /** 서버가 돌려준 품목(위치별 수량 포함)으로 위치도 재고·품목 목록 갱신 */
 function upsertItem(it){
-  const x={id:it.id,name:String(it.name),cat:String(it.cat||'')};
+  const x={id:it.id,name:String(it.name),cat:String(it.cat||''),unit:Number(it.unit)||0};
   if(!ITEMMAP[x.id])ITEMS.push(x);else Object.assign(ITEMMAP[x.id],x);ITEMMAP[x.id]=ITEMMAP[x.id]||x;
   Object.keys(STK).forEach(k=>{STK[k]=STK[k].filter(a=>a.id!==x.id);if(!STK[k].length)delete STK[k]});
   Object.keys(it.locs||{}).forEach(k=>{const q=Number(it.locs[k])||0;if(q){(STK[k]=STK[k]||[]).push({id:x.id,name:x.name,cat:x.cat,qty:q});STK[k].sort((a,b)=>b.qty-a.qty)}});
@@ -967,46 +978,70 @@ function drawCell(){
 }
 
 /* ---------- 칸별 수량 입력 ----------
-   📌지정 제품 + 지금 이 칸에 재고가 있는 품목마다 입력칸. 바뀐 것만 '조정'으로 저장 (locSetQty).
-   200 처럼 그냥 숫자, 또는 20*10+5 처럼 박스×개수로도 입력 가능 */
-function parseQty(v){v=String(v||'').replace(/\s+/g,'').replace(/[xX×]/g,'*').replace(/,/g,'');if(v==='')return null;
-  if(!/^\d+(\*\d+)*(\+\d+(\*\d+)*)*$/.test(v))return NaN;return v.split('+').reduce((t,p)=>t+p.split('*').reduce((m,n)=>m*Number(n),1),0)}
+   📌지정 제품 + 지금 이 칸에 재고가 있는 품목마다: 박스 줄(박스 수 × 박스당 수량) 여러 개 + 낱개.
+   합계가 이 칸의 수량이 됨. 바뀐 것만 '조정'으로 저장 (locSetQty). 아무것도 안 적은 품목은 그대로 */
 function qtyRows(s,r,c){const x=get(s,r,c);return x.layers.map((L,i)=>{const k=slotKey(s,r,c,i),st=stockAt(k),pp=L.p||[];
   const rows=pp.map(pr=>{const a=st.find(z=>z.id===pr.id);return{id:pr.id,name:prodName(pr),cat:(ITEMMAP[pr.id]||{}).cat||'',qty:a?a.qty:0,pin:1}})
     .concat(st.filter(a=>!pp.some(pr=>pr.id===a.id)).map(a=>({id:a.id,name:a.name,cat:a.cat,qty:a.qty,pin:0})));return{k,i,rows}})}
+const nInt=v=>{v=String(v==null?'':v).replace(/[^0-9]/g,'');return v===''?null:Number(v)};
+/** 품목 하나의 입력 상태 → {used, bad, total, note} */
+function qCalc(q){let total=0,used=false,bad=false;const parts=[];
+  q.lines.forEach(l=>{const b=nInt(l.b),p=nInt(l.p);if(b==null||b===0){return}used=true;if(!p){bad=true;return}total+=b*p;parts.push(b+'박스×'+p)});
+  const lo=nInt(q.loose);if(lo!=null){used=true;total+=lo;if(lo||!parts.length)parts.push(lo+'낱개')}
+  return{used,bad,total,note:parts.join('+')}}
+function qItemHTML(q,j,T){const c=qCalc(q),chg=c.used&&!c.bad&&c.total!==q.q0;
+  return `<div class="qitem${chg?' chg':''}" data-qi="${j}"><div class="qhead"><span class="nm">${q.pin?'📌 ':''}${esc(q.name)}${q.cat?` <small>${esc(q.cat)}</small>`:''}</span>
+    <span class="qnow">지금 <b>${fmtN(q.q0)}</b>개 · 총 ${fmtN(T[q.id]||0)}개</span></div>
+  ${q.lines.map((l,li)=>`<div class="qline"><input data-qb="${li}" type="number" inputmode="numeric" min="0" value="${esc(l.b)}" placeholder="0" aria-label="박스 수"><span>박스 ×</span>
+    <input data-qp="${li}" type="number" inputmode="numeric" min="0" value="${esc(l.p)}" placeholder="박스당" aria-label="박스당 수량"><span>개</span>
+    <b class="qsub" data-qs="${li}">${nInt(l.b)&&nInt(l.p)?'= '+fmtN(nInt(l.b)*nInt(l.p)):''}</b>${q.lines.length>1?`<button class="qdel" data-qdel="${li}" aria-label="이 줄 지우기">✕</button>`:''}</div>`).join('')}
+  <div class="qline"><button class="qadd" data-qadd="1">＋ 박스 줄</button><span class="ql">낱개</span><input data-ql="1" type="number" inputmode="numeric" min="0" value="${esc(q.loose)}" placeholder="0" aria-label="낱개 수량"><span>개</span></div>
+  <div class="qres" data-qres>${c.bad?'<span class="bad">박스당 수량을 넣어주세요</span>':c.used?`→ 이 칸 <b>${fmtN(c.total)}</b>개로${c.total===q.q0?' (그대로)':''}`:'<span>안 적으면 그대로</span>'}</div></div>`}
 function qtyHTML(s,r,c,compact){
-  const x=get(s,r,c),T=totals(),ls=qtyRows(s,r,c),any=ls.some(l=>l.rows.length);
+  const x=get(s,r,c),ls=qtyRows(s,r,c),any=ls.some(l=>l.rows.length);
   if(!stockLoaded)return '<div class="qbox"><p class="none">재고 정보를 불러오는 중…</p></div>';
   if(!any&&!compact)return '';
   const st=lastStaff(),staff=STAFF.length?STAFF:[''];
   return `<div class="qbox" data-qbox="1">${ls.map(l=>`<h3>✏️ 수량 입력${x.layers.length>1?' · '+(l.i+1)+'층':''}<small>${esc(l.k)}</small></h3>
-    ${l.rows.length?l.rows.map(w=>`<div class="qrow"><span class="nm">${w.pin?'📌 ':''}${esc(w.name)}${w.cat?` <small style="display:inline">${esc(w.cat)}</small>`:''}<small class="qt" data-qt="${esc(w.id)}">총 ${fmtN(T[w.id]||0)}개</small></span>
-      <span class="eqv" data-eq></span><input data-qk="${esc(l.k)}" data-qid="${esc(w.id)}" data-q0="${w.qty}" type="text" inputmode="tel" autocomplete="off" value="${w.qty||''}" placeholder="0" aria-label="${esc(w.name)} 수량"></div>`).join('')
-      :'<p class="none">📌 지정 제품이 없어요. 칸 설정에서 ＋ 제품 지정을 먼저 해주세요</p>'}`).join('')}
+    ${l.rows.length?`<div data-ql0="${esc(l.k)}"></div>`:'<p class="none">📌 지정 제품이 없어요. 칸 설정에서 ＋ 제품 지정을 먼저 해주세요</p>'}`).join('')}
     ${any||compact?`<div class="qacts">${any&&staff.length>1?`<select data-f="qstaff" aria-label="담당자">${staff.map(n=>`<option${n===st?' selected':''}>${esc(n)}</option>`).join('')}</select>`:''}
-      ${compact?'<button class="ghost" data-a="qfull">칸 설정</button>':''}${any?`<button data-a="qsave">💾 수량 저장${compact?' → 다음 칸':''}</button>`:''}</div>`:''}
-    ${any?'<p class="note" style="margin:6px 0 0">이 칸에 있는 개수를 그대로 적으면 돼요 (빈칸=그대로). 20*10 처럼 박스×개수로도 돼요</p>':''}</div>`;
+      ${compact?'<button class="ghost" data-a="qfull">칸 설정</button>':''}${any?`<button data-a="qsave">💾 저장${compact?' → 다음 칸':''}</button>`:''}</div>`:''}
+    ${any?'<p class="note" style="margin:6px 0 0">이 칸에 실제로 있는 걸 적으면 그 수량으로 맞춰져요. 박스마다 개수가 다르면 ＋ 박스 줄, 남는 건 낱개에.</p>':''}</div>`;
 }
 function bindQty(P,s,r,c,compact){
-  const ins=[...P.querySelectorAll('[data-qk]')];
-  const upd=inp=>{const v=parseQty(inp.value),eq=inp.parentNode.querySelector('[data-eq]'),q0=+inp.dataset.q0;
-    inp.classList.toggle('bad',Number.isNaN(v));inp.classList.toggle('chg',v!=null&&!Number.isNaN(v)&&v!==q0);
-    eq.textContent=v!=null&&!Number.isNaN(v)&&/[^0-9]/.test(inp.value.trim())?'='+fmtN(v):''};
-  ins.forEach((inp,j)=>{inp.oninput=()=>upd(inp);inp.onfocus=()=>{try{inp.select()}catch(e){}};
-    inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const nx=ins[j+1];if(nx)nx.focus();else{const b=P.querySelector('[data-a="qsave"]');if(b)b.click()}}}});
+  const T=totals(),Q=[];
+  qtyRows(s,r,c).forEach(l=>{const box=P.querySelector(`[data-ql0="${CSS.escape(l.k)}"]`);if(!box)return;
+    box.innerHTML=l.rows.map(w=>{const unit=(ITEMMAP[w.id]||{}).unit;Q.push({k:l.k,id:w.id,name:w.name,cat:w.cat,pin:w.pin,q0:w.qty,lines:[{b:'',p:unit>0?String(unit):''}],loose:''});
+      return qItemHTML(Q[Q.length-1],Q.length-1,T)}).join('')});
+  const allIns=()=>[...P.querySelectorAll('.qitem input')];
+  const bindItem=el=>{const j=+el.dataset.qi,q=Q[j];
+    const refresh=()=>{const cc=qCalc(q);el.classList.toggle('chg',cc.used&&!cc.bad&&cc.total!==q.q0);
+      el.querySelector('[data-qres]').innerHTML=cc.bad?'<span class="bad">박스당 수량을 넣어주세요</span>':cc.used?`→ 이 칸 <b>${fmtN(cc.total)}</b>개로${cc.total===q.q0?' (그대로)':''}`:'<span>안 적으면 그대로</span>';
+      q.lines.forEach((l,li)=>{const sb=el.querySelector(`[data-qs="${li}"]`);if(sb)sb.textContent=nInt(l.b)&&nInt(l.p)?'= '+fmtN(nInt(l.b)*nInt(l.p)):''})};
+    const redraw=focusSel=>{const d=document.createElement('div');d.innerHTML=qItemHTML(q,j,T);const ne=d.firstChild;el.replaceWith(ne);bindItem(ne);
+      if(focusSel){const f=ne.querySelector(focusSel);if(f)f.focus()}};
+    el.querySelectorAll('[data-qb]').forEach(i=>i.oninput=()=>{q.lines[+i.dataset.qb].b=i.value;refresh()});
+    el.querySelectorAll('[data-qp]').forEach(i=>i.oninput=()=>{q.lines[+i.dataset.qp].p=i.value;refresh()});
+    el.querySelector('[data-ql]').oninput=e=>{q.loose=e.target.value;refresh()};
+    el.querySelector('[data-qadd]').onclick=()=>{const last=q.lines[q.lines.length-1];q.lines.push({b:'',p:last?last.p:''});redraw(`[data-qb="${q.lines.length-1}"]`)};
+    el.querySelectorAll('[data-qdel]').forEach(b=>b.onclick=()=>{q.lines.splice(+b.dataset.qdel,1);redraw()});
+    el.querySelectorAll('input').forEach(i=>{i.onfocus=()=>{try{i.select()}catch(e){}};
+      i.onkeydown=e=>{if(e.key!=='Enter')return;e.preventDefault();const a=allIns(),k=a.indexOf(i),nx=a[k+1];if(nx)nx.focus();else{const b=P.querySelector('[data-a="qsave"]');if(b)b.click()}}})};
+  P.querySelectorAll('.qitem').forEach(bindItem);
   const fb=P.querySelector('[data-a="qfull"]');if(fb)fb.onclick=()=>{drawCell()};
   const sb=P.querySelector('[data-a="qsave"]');if(!sb)return;
+  const label='💾 저장'+(compact?' → 다음 칸':'');
   sb.onclick=()=>{
     const rows=[];let bad=false;
-    ins.forEach(inp=>{const v=parseQty(inp.value);if(v==null)return;if(Number.isNaN(v)){bad=true;return}if(v!==+inp.dataset.q0)rows.push({id:inp.dataset.qid,loc:inp.dataset.qk,qty:v})});
-    if(bad){toast('숫자만 넣어주세요 (예: 200 또는 20*10)');return}
+    Q.forEach(q=>{const cc=qCalc(q);if(!cc.used)return;if(cc.bad){bad=true;return}if(cc.total!==q.q0)rows.push({id:q.id,loc:q.k,qty:cc.total,note:cc.note})});
+    if(bad){toast('박스 수를 적은 줄에는 박스당 수량도 넣어주세요');return}
     const next=()=>{if(compact){const n=nextQtyCell(s,r,c);if(n){cur=n;flashCell(S.cur,n.r,n.c);openQty()}else{closePanel();toast('이 시트의 마지막 칸이에요')}}else drawCell()};
     if(!rows.length){if(compact){next();return}toast('바뀐 수량이 없어요');return}
     const ss=P.querySelector('[data-f="qstaff"]'),staff=ss?ss.value:lastStaff();try{if(staff)localStorage.setItem('subtek-staff',staff)}catch(e){}
     sb.disabled=true;sb.textContent='저장 중…';
     GAS.withSuccessHandler(res=>{(res.items||[]).forEach(it=>{upsertItem(it);if(host())host().itemUpserted(it)});renderGrid();renderStockBar();
-      toast(`${rows.length}개 수량 저장했어요`);next()})
-    .withFailureHandler(e=>{sb.disabled=false;sb.textContent='💾 수량 저장'+(compact?' → 다음 칸':'');toast((e&&e.message)||'저장하지 못했어요')})
+      toast(rows.map(w=>(ITEMMAP[w.id]||{}).name+' '+fmtN(w.qty)+'개').join(', ')+' 저장했어요');next()})
+    .withFailureHandler(e=>{sb.disabled=false;sb.textContent=label;toast((e&&e.message)||'저장하지 못했어요')})
     .locSetQty({rows,staff});
   };
 }
@@ -1015,7 +1050,7 @@ function openQty(){
   const s=sh(),{r,c}=cur,x=get(s,r,c),P=E('panelBody');P.dataset.kind='cell';
   P.innerHTML=`<div class="ph"><h2>${code(r,c)}${x.label?` <small>${esc(x.label)}</small>`:''}${x.kind?`<small>${esc(x.kind)}</small>`:''}</h2><button class="x" data-a="close">닫기</button></div>${qtyHTML(s,r,c,true)}`;
   P.querySelector('[data-a="close"]').onclick=closePanel;bindQty(P,s,r,c,true);openPanel();
-  const first=P.querySelector('[data-qk]');if(first)setTimeout(()=>{first.focus();try{first.select()}catch(e){}},60);
+  const first=P.querySelector('.qitem [data-qb]');if(first)setTimeout(()=>{first.focus();try{first.select()}catch(e){}},60);
 }
 /** 같은 시트에서 다음(오른쪽→아래) 📌지정·재고 있는 칸 */
 function nextQtyCell(s,r,c){const cov=covered(s);
@@ -1188,7 +1223,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('#locApp .search'))E(
 
 /* ---------- 버튼 ---------- */
 E('bMerge').onclick=()=>{if(MV)endMove();QM=false;mergeMode=!mergeMode;sel.clear();render()};
-E('bQty').onclick=()=>{if(MV)endMove();mergeMode=false;sel.clear();QM=!QM;render();if(QM)toast('칸을 누르면 수량을 바로 넣을 수 있어요')};
+E('bQty').onclick=()=>{if(MV)endMove();mergeMode=false;sel.clear();QM=!QM;render()};
 E('bQtyEnd').onclick=()=>{QM=false;render()};
 E('bMvCancel').onclick=()=>endMove();
 E('bCancel').onclick=()=>{mergeMode=false;sel.clear();render()};
@@ -1224,10 +1259,11 @@ if(HOSTED){
   setStatus('불러오는 중');
   window.locApi={
     /** 위치도 데이터 {version, data} */
-    init(loc){const o=loc&&loc.data?parse(loc.data):null;version=(loc&&loc.version)||0;const c=S?S.cur:0;
+    init(loc){if(S&&loc&&version>0&&(loc.version||0)<=version){render();applyPendingQ();return} // 이미 같은(또는 더 새) 버전이면 다시 그리지 않음
+      const o=loc&&loc.data?parse(loc.data):null;version=(loc&&loc.version)||0;const c=S?S.cur:0;
       if(o){S=o;S.cur=c;fixCur();setStatus('저장됨')}else if(!S){S=seed();save()}render();applyPendingQ()},
     /** 재고앱의 품목 목록(items[].locs)으로 위치별 재고를 만듦 — 서버에 다시 묻지 않음 */
-    setStock(items,staff){STK={};ITEMS=[];ITEMMAP={};(items||[]).forEach(it=>{const x={id:it.id,name:String(it.name),cat:String(it.cat||'')};ITEMS.push(x);ITEMMAP[x.id]=x;
+    setStock(items,staff){STK={};ITEMS=[];ITEMMAP={};(items||[]).forEach(it=>{const x={id:it.id,name:String(it.name),cat:String(it.cat||''),unit:Number(it.unit)||0};ITEMS.push(x);ITEMMAP[x.id]=x;
         Object.keys(it.locs||{}).forEach(k=>{const q=Number(it.locs[k])||0;if(q)(STK[k]=STK[k]||[]).push({id:x.id,name:x.name,cat:x.cat,qty:q})})});
       Object.keys(STK).forEach(k=>STK[k].sort((a,b)=>b.qty-a.qty));if(staff&&staff.length)STAFF=staff;stockLoaded=true;
       if(S){renderGrid();renderStockBar();if(query())renderResults()}},

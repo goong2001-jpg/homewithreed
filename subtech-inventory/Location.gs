@@ -335,7 +335,7 @@ function locMasterInfo_() {
 /** 위치도에서 칸별 수량 입력: rows=[{id, loc, qty}] → 지금 그 칸 수량과의 차이만 '조정'으로 기록 */
 function locSetQty(p) {
   p = p || {};
-  const rows = (p.rows || []).map(r => ({ id: String(r.id || ''), loc: String(r.loc || '').trim(), qty: Number(r.qty) }))
+  const rows = (p.rows || []).map(r => ({ id: String(r.id || ''), loc: String(r.loc || '').trim(), qty: Number(r.qty), note: String(r.note || '').slice(0, 200) }))
     .filter(r => r.id && r.loc);
   if (!rows.length) throw new Error('입력한 수량이 없어요.');
   rows.forEach(r => { if (!(r.qty >= 0) || Math.floor(r.qty) !== r.qty) throw new Error('수량은 0 이상의 정수로 입력하세요.'); });
@@ -350,7 +350,7 @@ function locSetQty(p) {
       const cur = Number(s.locs[r.loc]) || 0, d = r.qty - cur;
       if (ids.indexOf(r.id) < 0) ids.push(r.id);
       if (!d) return;
-      out.push([now, it.id, it.name, it.cat, r.loc, '조정', '', '', Math.abs(d), d, p.staff || '', '위치도 수량 입력 ' + cur + '→' + r.qty, '']);
+      out.push([now, it.id, it.name, it.cat, r.loc, '조정', '', '', Math.abs(d), d, p.staff || '', '위치도 수량 입력 ' + cur + '→' + r.qty + (r.note ? ' (' + r.note + ')' : ''), '']);
       s.locs[r.loc] = r.qty;
     });
     const log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);

@@ -213,7 +213,7 @@
 </div>
 
 <script>
-var HTML_VERSION = 'v24'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v25'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var BOMROWS = null, MEMO_SHOWN = 50, PREFETCHED = false;
@@ -224,13 +224,30 @@ var catColorMap = null;
 var OXF = [['plate','명판'],['bizSticker','상호스티커'],['dateSticker','날짜스티커'],['caseO','전용케이스'],['program','프로그램']];
 
 // 처음 한 번에: 품목·재고·위치 + 위치도 데이터 (appBoot). 이후 화면 전환은 서버를 다시 부르지 않음
-google.script.run.withSuccessHandler(onBoot).withFailureHandler(onErr).appBoot();
-function onBoot(d){ DATA=d; if(!DATA.layout) DATA.layout=[]; if(!DATA.locMap) DATA.locMap={sheets:[],slots:[]}; indexSlots(); fill('staffSel', d.staff&&d.staff.length?d.staff:['담당자']); fillLoc('locSel'); catColorMap=null; fillDatalists(); resetBar(); renderSearch();
-  if(window.locApi){ locApi.setStock(DATA.items, DATA.staff); if(d.loc!==undefined) locApi.init(d.loc); }
+// 빠르게 켜지게: 지난번 받은 데이터를 이 폰에 저장해 두고 켜자마자 먼저 보여준 뒤, 서버 최신 데이터가 오면 바꿈
+var BOOT_KEY='subtek-boot-v1', FROM_CACHE=false;
+function saveBoot(d){ try{ if(!d||!d.loc||!d.loc.data) return; var j=JSON.stringify(d); if(j.length<3500000) localStorage.setItem(BOOT_KEY,j); else localStorage.removeItem(BOOT_KEY); }catch(e){} }
+google.script.run.withSuccessHandler(function(d){ saveBoot(d); onBoot(d,false); }).withFailureHandler(onErr).appBoot();
+/** 위치도에 데이터 넣기 + 보관칸 목록(locMap)은 위치도에서 바로 계산 */
+function feedLoc(d,needLM){
+  if(!window.locApi) return;
+  locApi.setStock(DATA.items, DATA.staff);
+  if(d.loc!==undefined) locApi.init(d.loc);
+  if(needLM){ var lm=locApi.slots(); if(lm) DATA.locMap=lm; }
+}
+function onBoot(d,cached){ var needLM=!d.locMap; DATA=d; if(!DATA.layout) DATA.layout=[]; if(!DATA.locMap) DATA.locMap={sheets:[],slots:[]};
+  var fed=false;
+  if(window.locApi){ if(cached||!locApi.busy()){ feedLoc(d,needLM); fed=true; } }
+  indexSlots(); fill('staffSel', d.staff&&d.staff.length?d.staff:['담당자']); fillLoc('locSel'); catColorMap=null; fillDatalists(); resetBar(); renderSearch();
+  if(CURV==='stock') renderStock(); if(CURV==='total') renderTotal();
+  // 캐시로 먼저 보여준 뒤 사용자가 칸을 열고 있으면, 닫을 때까지 기다렸다가 최신으로
+  if(window.locApi && !fed){ (function wait(){ if(locApi.busy()){ setTimeout(wait,700); return; } feedLoc(d,needLM); indexSlots(); fillLoc('locSel'); if(CURV==='total') renderTotal(); })(); }
+  if(cached) return;
+  FROM_CACHE=false;
   if(!PREFETCHED){ PREFETCHED=true; setTimeout(prefetchTabs, 400); }
   applyDeepLink();
   if(d.version && d.version!==HTML_VERSION) alert('⚠️ 버전 불일치!\n화면(Index.html): '+HTML_VERSION+' / 서버(Code.gs): '+d.version+'\n두 파일을 모두 최신으로 교체한 뒤 [배포 관리 > 수정 > 새 버전 > 배포] 하세요.'); }
-function onErr(e){ go('search'); document.getElementById('searchList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>'; }
+function onErr(e){ if(FROM_CACHE){ alert('서버에서 최신 정보를 못 받아 지난번 저장된 화면을 보여주고 있어요. 새로고침해 주세요.\n('+e.message+')'); return; } go('search'); document.getElementById('searchList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>'; }
 function fill(id,arr){ document.getElementById(id).innerHTML=arr.map(function(s){return '<option>'+esc(s)+'</option>';}).join(''); }
 // ---- 위치: 위치 탭 + 자재 위치도(Location.gs) 칸 ----
 // 위치도 칸의 위치 이름 = "시트이름 칸코드"(+ " N층"). 칸 이름(선반1 등)은 화면 표시용.
@@ -604,9 +621,10 @@ document.addEventListener('visibilitychange', function(){
 });
 function quietRefresh(){
   google.script.run.withSuccessHandler(function(d){
-    DATA.items=d.items; DATA.staff=d.staff; DATA.locations=d.locations; DATA.layout=d.layout||[]; DATA.locMap=d.locMap||{sheets:[],slots:[]};
+    saveBoot(d);
+    DATA.items=d.items; DATA.staff=d.staff; DATA.locations=d.locations; DATA.layout=d.layout||[]; if(d.locMap) DATA.locMap=d.locMap;
+    if(window.locApi && !locApi.busy()) feedLoc(d,!d.locMap);
     indexSlots(); catColorMap=null; fillDatalists(); fillLoc('locSel'); if(CURV==='total') renderTotal();
-    if(window.locApi && !locApi.busy()){ locApi.setStock(DATA.items, DATA.staff); locApi.init(d.loc); }
     if(CURV==='stock') renderStock(); if(CURV==='search') renderSearch();
   }).appBoot();
 }
@@ -743,6 +761,8 @@ function show(n){ document.getElementById('view'+n).classList.remove('hidden'); 
 function setNav(v){ var g=(v==='search'||v==='input'||v==='newItem'||v==='done'); document.getElementById('navLoc').className=v==='loc'?'on':''; document.getElementById('navTotal').className=v==='total'?'on':'';
   document.getElementById('navInput').className=g?'on':''; document.getElementById('navStock').className=(v==='stock'||v==='report'||v==='log')?'on':''; document.getElementById('navBuild').className=(v==='build'||v==='bomForm'||v==='buildRun')?'on':''; document.getElementById('navMemo').className=(v==='memo'||v==='memoForm')?'on':''; }
 function resetBar(ic,t,s){ document.getElementById('barIcon').textContent=ic||'📦'; document.getElementById('barTitle').textContent=t||'써브텍 재고'; document.getElementById('barSub').textContent=s||('입고 · 출고를 빠르게 기록하세요 · '+HTML_VERSION); }
+// (맨 끝에서 실행: 위의 변수들이 다 준비된 뒤) 지난번 데이터로 먼저 그리기
+try{ var cb=JSON.parse(localStorage.getItem(BOOT_KEY)||'null'); if(cb&&cb.version===HTML_VERSION&&cb.loc&&cb.loc.data){ FROM_CACHE=true; onBoot(cb,true); } }catch(e){ FROM_CACHE=false; console.warn(e); }
 </script>
 </body>
 </html>
