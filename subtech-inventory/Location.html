@@ -313,6 +313,9 @@ let MV=null;
 let PIN=null;
 /* 수량 입력 모드: 칸을 누르면 수량 입력 창만 바로 열림 */
 let QM=false;
+/* 폰에 저장해 둔 지난 화면을 먼저 보여주는 중이면 true — 서버 최신이 올 때까지 고치기 막음 (옛 버전으로 저장하면 거절돼 사라지므로) */
+let STALE=false;
+function staleBlock(){if(!STALE)return false;toast('최신 위치도를 불러오는 중이에요. 잠시 후 다시 눌러주세요');return true}
 
 /* 단독 화면이면 전체 높이 사용 */
 if(root.parentElement===document.body&&document.body.querySelectorAll(':scope > div,:scope > main,:scope > section').length===1){
@@ -457,9 +460,9 @@ function renderWhere(){const w=E('where'),n=S.sheets.length,s=sh();root.style.se
 function renderTabs(){
   const t=E('tabs');t.innerHTML='';renderWhere();
   S.sheets.forEach((s,i)=>{const b=document.createElement('button');b.className='tab'+(i===S.cur?' on':'');b.textContent=s.name;b.style.setProperty('--tc',sheetColor(i));
-    b.onclick=()=>{if(i===S.cur){if(!MV)openSheet();return}S.cur=i;sel.clear();render()};t.appendChild(b)});
+    b.onclick=()=>{if(i===S.cur){if(!MV&&!staleBlock())openSheet();return}S.cur=i;sel.clear();render()};t.appendChild(b)});
   const a=document.createElement('button');a.className='tab add';a.textContent='+ 시트';
-  a.onclick=()=>{let n=S.sheets.length+1;while(S.sheets.some(s=>String(s.name).trim()==='시트 '+n))n++;S.sheets.push(blank('시트 '+n,5,6));S.cur=S.sheets.length-1;save();render();setTimeout(()=>t.scrollLeft=9999,0)};
+  a.onclick=()=>{if(staleBlock())return;let n=S.sheets.length+1;while(S.sheets.some(s=>String(s.name).trim()==='시트 '+n))n++;S.sheets.push(blank('시트 '+n,5,6));S.cur=S.sheets.length-1;save();render();setTimeout(()=>t.scrollLeft=9999,0)};
   t.appendChild(a);
 }
 const query=()=>E('q').value.trim().toLowerCase();
@@ -513,7 +516,7 @@ function renderMerge(){
 }
 
 /* ---------- 칸 ---------- */
-function tap(r,c){if(Date.now()-dragIgnoreClick<450)return;const k=K(r,c);if(PIN){pickIn(r,c);return}if(MV){pickDest(r,c);return}if(mergeMode){sel.has(k)?sel.delete(k):sel.add(k);render();return}cur={r,c};if(QM&&get(sh(),r,c).type==='slot'){openQty();return}openCell()}
+function tap(r,c){if(Date.now()-dragIgnoreClick<450)return;if(staleBlock())return;const k=K(r,c);if(PIN){pickIn(r,c);return}if(MV){pickDest(r,c);return}if(mergeMode){sel.has(k)?sel.delete(k):sel.add(k);render();return}cur={r,c};if(QM&&get(sh(),r,c).type==='slot'){openQty();return}openCell()}
 function doMerge(){
   if(sel.size<2){toast('두 칸 이상 골라주세요');return}
   const s=sh();let r0=99,c0=99,r1=-1,c1=-1;
@@ -846,6 +849,7 @@ let DG=null,dragIgnoreClick=0;
 const dragAllowed=()=>!mergeMode&&!MV&&!PIN&&E('panel').hidden;
 function cellAt(x,y){const el=document.elementFromPoint(x,y),c=el&&el.closest?el.closest('.cell'):null;return c&&root.contains(c)&&c.dataset.k?c:null}
 function dragStart(cellEl,x,y){
+  if(STALE)return false;
   const[r,c]=cellEl.dataset.k.split(',').map(Number),s=sh(),x0=get(s,r,c);
   if(x0.rs*x0.cs>1){toast('합친 칸은 끌어서 옮길 수 없어요 — 줄·칸 옮기기를 쓰거나 먼저 풀어주세요');return false}
   if(!s.cells[K(r,c)]&&!cellHasStock(s,r,c)){toast('빈 칸이에요. 내용이 있는 칸을 끌어주세요');return false}
@@ -1074,7 +1078,7 @@ function nextQtyCell(s,r,c){const cov=covered(s);
   for(let rr=r;rr<s.rows;rr++)for(let cc=(rr===r?c+1:0);cc<s.cols;cc++){if(cov[K(rr,cc)])continue;const x=get(s,rr,cc);
     if(x.type==='slot'&&qtyRows(s,rr,cc).some(l=>l.rows.length))return{r:rr,c:cc}}return null}
 /** 위치 이름으로 그 칸의 수량 입력 창 열기 (재고앱 총수량 탭에서) */
-function editLoc(k){const w=keyIndex()[k];if(!w||w.kind!=='slot'){goLoc(k);return}closePanel();flashCell(w.si,w.r,w.c);cur={r:w.r,c:w.c};openQty()}
+function editLoc(k){if(staleBlock())return;const w=keyIndex()[k];if(!w||w.kind!=='slot'){goLoc(k);return}closePanel();flashCell(w.si,w.r,w.c);cur={r:w.r,c:w.c};openQty()}
 
 function openSheet(){delArm=false;drawSheet();openPanel()}
 function drawSheet(){
@@ -1239,15 +1243,15 @@ E('q').onfocus=()=>{if(query())renderResults()};
 document.addEventListener('click',e=>{if(!e.target.closest('#locApp .search'))E('results').hidden=true});
 
 /* ---------- 버튼 ---------- */
-E('bMerge').onclick=()=>{if(MV)endMove();QM=false;mergeMode=!mergeMode;sel.clear();render()};
-E('bQty').onclick=()=>{if(MV)endMove();mergeMode=false;sel.clear();QM=!QM;render()};
+E('bMerge').onclick=()=>{if(staleBlock())return;if(MV)endMove();QM=false;mergeMode=!mergeMode;sel.clear();render()};
+E('bQty').onclick=()=>{if(staleBlock())return;if(MV)endMove();mergeMode=false;sel.clear();QM=!QM;render()};
 E('bQtyEnd').onclick=()=>{QM=false;render()};
 E('bMvCancel').onclick=()=>endMove();
 E('bCancel').onclick=()=>{mergeMode=false;sel.clear();render()};
 E('bDoMerge').onclick=doMerge;
-E('bSheet').onclick=openSheet;
-E('bBackup').onclick=openBackup;
-E('bLine').onclick=openLine;
+E('bSheet').onclick=()=>{if(staleBlock())return;openSheet()};
+E('bBackup').onclick=()=>{if(staleBlock())return;openBackup()};
+E('bLine').onclick=()=>{if(staleBlock())return;openLine()};
 /* 칸 크기(글자 크기) — 이 기기에 기억 */
 const ZOOM=[{cw:64,ch:56,fz:11},{cw:96,ch:78,fz:13.5},{cw:124,ch:96,fz:15.5},{cw:156,ch:118,fz:18}];
 let zoom=1;try{const z=+localStorage.getItem('subtek-loc-zoom');if(z>=0&&z<ZOOM.length&&localStorage.getItem('subtek-loc-zoom')!==null)zoom=z}catch(e){}
@@ -1276,7 +1280,9 @@ if(HOSTED){
   setStatus('불러오는 중');
   window.locApi={
     /** 위치도 데이터 {version, data} */
-    init(loc){if(S&&loc&&version>0&&(loc.version||0)<=version){render();applyPendingQ();return} // 이미 같은(또는 더 새) 버전이면 다시 그리지 않음
+    init(loc,cached){const wasStale=STALE;STALE=!!cached;if(cached)setStatus('최신 확인 중…');
+      if(!cached&&wasStale&&!dirty&&!saving){version=0} // 지난 화면이었으면 서버 것으로 무조건 교체
+      if(S&&loc&&version>0&&(loc.version||0)<=version){if(!cached&&!dirty&&!saving)setStatus('저장됨');render();applyPendingQ();return} // 이미 같은(또는 더 새) 버전이면 다시 그리지 않음
       const o=loc&&loc.data?parse(loc.data):null;version=(loc&&loc.version)||0;const c=S?S.cur:0;
       if(o){S=o;S.cur=c;fixCur();setStatus('저장됨')}else if(!S){S=seed();save()}render();applyPendingQ()},
     /** 재고앱의 품목 목록(items[].locs)으로 위치별 재고를 만듦 — 서버에 다시 묻지 않음 */
@@ -1289,7 +1295,9 @@ if(HOSTED){
     editLoc(k){if(S)editLoc(k)},
     /** 저장 안 된 변경이나 열린 창이 있으면 true (그동안은 새로 덮어쓰지 않음) */
     busy(){return dirty||saving||!!MV||!E('panel').hidden},
-    slots:()=>S?appSlots():null
+    slots:()=>S?appSlots():null,
+    /** 지금 위치도 {version,data} — 재고앱이 폰에 저장해 두고 다음에 켤 때 먼저 보여줌 */
+    snapshot:()=>S&&version?{version:version,data:JSON.stringify(S)}:null
   };
 }
 else if(GAS){loadServer(false);loadStock();
