@@ -1026,7 +1026,7 @@ function qtyHTML(s,r,c,compact){
   return `<div class="qbox" data-qbox="1">${ls.map(l=>`<h3>✏️ 수량 입력${x.layers.length>1?' · '+(l.i+1)+'층':''}<small>${esc(l.k)}</small></h3>
     ${l.rows.length?`<div data-ql0="${esc(l.k)}"></div>`:'<p class="none">📌 지정 제품이 없어요. 칸 설정에서 ＋ 제품 지정을 먼저 해주세요</p>'}`).join('')}
     ${any||compact?`<div class="qacts">${any&&staff.length>1?`<select data-f="qstaff" aria-label="담당자">${staff.map(n=>`<option${n===st?' selected':''}>${esc(n)}</option>`).join('')}</select>`:''}
-      ${compact?'<button class="ghost" data-a="qfull">칸 설정</button>':''}${any?`<button data-a="qsave">💾 저장${compact?' → 다음 칸':''}</button>`:''}</div>`:''}
+      ${compact?'<button class="ghost" data-qfull="1">칸 설정</button>':''}${any?`<button data-qsave="1">💾 저장${compact?' → 다음 칸':''}</button>`:''}</div>`:''}
     ${any?'<p class="note" style="margin:6px 0 0">이 칸에 실제로 있는 걸 적으면 그 수량으로 맞춰져요. 박스마다 개수가 다르면 ＋ 박스 줄, 남는 건 낱개에.</p>':''}</div>`;
 }
 function bindQty(P,s,r,c,compact){
@@ -1047,10 +1047,10 @@ function bindQty(P,s,r,c,compact){
     el.querySelector('[data-qadd]').onclick=()=>{const last=q.lines[q.lines.length-1];q.lines.push({b:'',p:last?last.p:''});redraw(`[data-qb="${q.lines.length-1}"]`)};
     el.querySelectorAll('[data-qdel]').forEach(b=>b.onclick=()=>{q.lines.splice(+b.dataset.qdel,1);redraw()});
     el.querySelectorAll('input').forEach(i=>{i.onfocus=()=>{try{i.select()}catch(e){}};
-      i.onkeydown=e=>{if(e.key!=='Enter')return;e.preventDefault();const a=allIns(),k=a.indexOf(i),nx=a[k+1];if(nx)nx.focus();else{const b=P.querySelector('[data-a="qsave"]');if(b)b.click()}}})};
+      i.onkeydown=e=>{if(e.key!=='Enter')return;e.preventDefault();const a=allIns(),k=a.indexOf(i),nx=a[k+1];if(nx)nx.focus();else{const b=P.querySelector('[data-qsave="1"]');if(b)b.click()}}})};
   P.querySelectorAll('.qitem').forEach(bindItem);
-  const fb=P.querySelector('[data-a="qfull"]');if(fb)fb.onclick=()=>{drawCell()};
-  const sb=P.querySelector('[data-a="qsave"]');if(!sb)return;
+  const fb=P.querySelector('[data-qfull="1"]');if(fb)fb.onclick=()=>{drawCell()};
+  const sb=P.querySelector('[data-qsave="1"]');if(!sb)return;
   const label='💾 저장'+(compact?' → 다음 칸':'');
   sb.onclick=()=>{
     const rows=[];let bad=false;
