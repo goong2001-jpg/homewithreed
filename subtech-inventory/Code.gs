@@ -6,7 +6,7 @@
  * - 메모(업체 사양), 조립 가능 수량(BOM), 월별 입출고 리포트 포함.
  */
 
-var APP_VERSION = 'v23'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
+var APP_VERSION = 'v24'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
 
 var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
@@ -163,14 +163,13 @@ function importFromOld() {
 function resetStock() {
   var ui = SpreadsheetApp.getUi();
   var resp = ui.alert('전체 재고 0으로 초기화',
-    '거래로그를 모두 비워 모든 품목의 재고를 0으로 만듭니다.\n' +
-    '품목 목록·메모·BOM·위치는 그대로 유지됩니다.\n\n계속할까요?', ui.ButtonSet.YES_NO);
+    '모든 품목·위치의 수량을 0으로 만듭니다.\n' +
+    '거래로그는 지우지 않고 "조정" 줄을 덧붙이는 방식이라 이력은 남습니다.\n' +
+    '품목 목록·메모·BOM·위치도(📌지정)는 그대로 유지됩니다.\n\n계속할까요?', ui.ButtonSet.YES_NO);
   if (resp !== ui.Button.YES) return;
-  var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
-  if (log && log.getLastRow() > 1) log.deleteRows(2, log.getLastRow() - 1);
-  ui.alert('완료! 모든 재고가 0이 되었습니다.\n이제 입출고 화면에서 입고로 다시 입력하세요.');
+  var res = resetAllStock({ confirm: '초기화', staff: '시트 메뉴' });
+  ui.alert('완료! 모든 재고가 0이 되었습니다. (조정 ' + res.rows + '줄)\n이제 위치도에서 칸별로 수량을 입력하세요.');
 }
-
 function importInitial_(master, log) {
   var old = SpreadsheetApp.openById(OLD_SHEET_ID).getSheetByName(OLD_TAB_NAME);
   if (!old) throw new Error('기존 써브텍에서 "' + OLD_TAB_NAME + '" 탭을 찾을 수 없습니다.');

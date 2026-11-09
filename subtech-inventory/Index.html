@@ -61,6 +61,12 @@
   .nav { position:fixed; bottom:0; left:0; right:0; height:60px; border-top:1px solid #eef1f5; background:#fff; display:flex; z-index:30; } .nav div { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:10px; color:#b9c2cf; font-weight:600; cursor:pointer; } .nav div.on { color:#2563eb; } .nav .ic { font-size:18px; }
   .pendbar { background:#eff6ff; border:1.5px solid #bfdbfe; color:#1d4ed8; border-radius:10px; padding:9px 12px; font-size:13px; font-weight:700; display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; } .pendbar .x { color:#64748b; cursor:pointer; text-decoration:underline; white-space:nowrap; }
   #viewLoc #locApp .toast { bottom:76px; } #viewLoc #locApp { min-height:calc(100vh - 60px); }
+  .totsum { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; padding:11px 14px; margin-bottom:10px; font-size:13px; color:#37475a; display:flex; flex-wrap:wrap; gap:4px 14px; } .totsum b { font-size:15px; color:#1f2733; }
+  .tcard { background:#fff; border:1.5px solid #eef1f5; border-left-width:6px; border-radius:11px; padding:11px 13px; margin-bottom:8px; }
+  .tcard .th { display:flex; align-items:center; gap:8px; } .tcard .th .nm2 { font-size:15px; font-weight:800; flex:1; min-width:0; } .tcard .th .tt { font-size:20px; font-weight:900; white-space:nowrap; } .tcard .th .tt small { font-size:11px; color:#8a97a8; font-weight:700; }
+  .trow { display:flex; align-items:baseline; gap:8px; padding:8px 0 7px; border-top:1px dashed #e6ebf2; cursor:pointer; font-size:13.5px; } .trow:first-of-type { margin-top:6px; } .trow:active { background:#f0f4ff; }
+  .trow .tl { flex:1; min-width:0; color:#37475a; } .trow .tq { font-weight:900; font-size:15px; white-space:nowrap; } .trow .ts { font-size:11.5px; color:#8a97a8; white-space:nowrap; } .trow.z .tq { color:#d97706; font-size:13px; } .trow.z .tl { color:#8a97a8; }
+  .dangerbox { margin:22px 0 10px; padding:12px 14px; border:1.5px dashed #f3b4b4; border-radius:12px; font-size:12px; color:#8a97a8; } .dangerbox button { margin-top:8px; width:100%; padding:11px; border-radius:10px; border:1.5px solid #dc2626; background:#fff; color:#dc2626; font-weight:800; font-size:14px; cursor:pointer; }
   .loading { text-align:center; color:#8a97a8; padding:40px; font-size:14px; line-height:1.6; }
 </style>
 </head>
@@ -135,6 +141,16 @@
   <div id="stockList"></div>
 </div>
 
+<!-- 총수량: 품목별 총수량 + 위치별 수량 -->
+<div class="body hidden" id="viewTotal">
+  <input class="search" id="totSearch" placeholder="🔍 품명 검색" oninput="TOT_SHOWN=60;renderTotal()" style="margin-bottom:10px">
+  <div class="toolbar"><div class="filterbar" id="totFilter"></div></div>
+  <div id="totSum"></div>
+  <div id="totList"></div>
+  <div class="dangerbox">새로 실사할 때만 쓰세요. 모든 품목·위치 수량을 0으로 만듭니다. (거래로그는 지우지 않고 '조정'으로 남아요 · 품목·📌지정·메모는 그대로)
+    <button onclick="resetAll()">🧹 전체 수량 0으로 초기화</button></div>
+</div>
+
 <!-- 월별 리포트 -->
 <div class="body hidden" id="viewReport"><div id="reportList"><div class="loading">불러오는 중…</div></div></div>
 
@@ -189,6 +205,7 @@
 
 <div class="nav">
   <div id="navLoc" class="on" onclick="go('loc')"><span class="ic">📍</span>위치도</div>
+  <div id="navTotal" onclick="go('total')"><span class="ic">🧮</span>총수량</div>
   <div id="navInput" onclick="go('search')"><span class="ic">➕</span>입출고</div>
   <div id="navStock" onclick="go('stock')"><span class="ic">📊</span>현재고</div>
   <div id="navBuild" onclick="go('build')"><span class="ic">🧩</span>조립</div>
@@ -196,7 +213,7 @@
 </div>
 
 <script>
-var HTML_VERSION = 'v23'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v24'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var BOMROWS = null, MEMO_SHOWN = 50, PREFETCHED = false;
@@ -416,6 +433,55 @@ function renderStock(){
   }).join(''):'<div class="loading">품목이 없습니다.</div>';
 }
 
+// 총수량: 품목마다 "총 N개" + 위치마다 "200개 (총수량 400개)". 📌지정했는데 아직 0인 칸은 '미입력'
+var totFilter = '전체', TOT_SHOWN = 60;
+function setTotFilter(f){ totFilter=f; TOT_SHOWN=60; renderTotal(); }
+function locSortKey(k){ return locDisp(k); }
+function totalCards(){
+  return DATA.items.map(function(it){
+    var locs=it.locs||{}, asg=ASSIGN[it.id]||[], rows=[];
+    Object.keys(locs).forEach(function(k){ var q=Number(locs[k])||0; if(q) rows.push({k:k, q:q, pin:asg.indexOf(k)>=0}); });
+    asg.forEach(function(k){ if(!(Number(locs[k])||0)) rows.push({k:k, q:0, pin:true}); });
+    if(!rows.length) return null;
+    rows.sort(function(a,b){ return locSortKey(a.k).localeCompare(locSortKey(b.k),'ko',{numeric:true}); });
+    return { it:it, rows:rows, todo:rows.filter(function(r){ return r.pin&&!r.q; }).length };
+  }).filter(Boolean);
+}
+function renderTotal(){
+  var all=totalCards(), sq=val('totSearch').toLowerCase();
+  var fs=['전체','미입력 있음','입력 완료'];
+  document.getElementById('totFilter').innerHTML=fs.map(function(f){ return '<div class="f '+(f===totFilter?'on':'')+'" onclick="setTotFilter(\''+f+'\')">'+f+'</div>'; }).join('');
+  var pins=0, done=0, sumQ=0; all.forEach(function(c){ c.rows.forEach(function(r){ if(r.pin){ pins++; if(r.q) done++; } }); sumQ+=c.it.total||0; });
+  document.getElementById('totSum').innerHTML='<div class="totsum"><span>품목 <b>'+fmt(all.length)+'</b>종</span><span>전체 <b>'+fmt(sumQ)+'</b>개</span><span>📌 지정 칸 입력 <b>'+fmt(done)+'</b> / '+fmt(pins)+'곳</span></div>';
+  var list=all.filter(function(c){ return (!sq||(c.it.name+' '+(c.it.cat||'')).toLowerCase().indexOf(sq)>=0) &&
+    (totFilter==='전체'||(totFilter==='미입력 있음'?c.todo>0:c.todo===0)); });
+  list.sort(function(a,b){ return (a.it.name+'').localeCompare(b.it.name+'','ko',{numeric:true}) || (a.it.cat+'').localeCompare(b.it.cat+'','ko'); });
+  var shown=list.slice(0,TOT_SHOWN);
+  document.getElementById('totList').innerHTML=list.length?shown.map(function(c){
+    var it=c.it, tot=it.total||0;
+    return '<div class="tcard" style="border-left-color:'+catColor(it.cat)+'"><div class="th"><span class="nm2">'+esc(it.name)+' '+badge(it.cat)+'</span><span class="tt">총 '+fmt(tot)+'<small> 개</small></span></div>'+
+      c.rows.map(function(r){ return '<div class="trow'+(r.q?'':' z')+'" onclick="totGo(\''+escJs(r.k)+'\')"><span class="tl">'+(r.pin?'📌 ':'📍 ')+esc(locDisp(r.k))+'</span>'+
+        (r.q?'<span class="tq">'+fmt(r.q)+'개</span><span class="ts">(총수량 '+fmt(tot)+'개)</span>':'<span class="tq">미입력 ✏️</span>')+'</div>'; }).join('')+'</div>';
+  }).join('')+(list.length>TOT_SHOWN?'<div style="text-align:center;margin:12px 0"><button class="addline" style="display:inline-block;padding:10px 24px" onclick="TOT_SHOWN+=60;renderTotal()">더 보기 ('+fmt(list.length-TOT_SHOWN)+'개 남음)</button></div>':'')
+    :'<div class="loading">'+(all.length?'조건에 맞는 품목이 없어요.':'위치도에서 📌 제품을 지정하거나 수량을 넣으면 여기에 보여요.')+'</div>';
+}
+function escJs(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+/** 총수량 탭에서 위치를 누르면 → 위치도의 그 칸에서 바로 수량 입력 */
+function totGo(k){ go('loc'); if(window.locApi&&locApi.editLoc) setTimeout(function(){ locApi.editLoc(k); }, 30); }
+function resetAll(){
+  var t=prompt('모든 품목·위치의 수량을 0으로 만듭니다.\n정말 하려면 아래에 초기화 라고 입력하세요.');
+  if(t===null) return;
+  if(t.trim()!=='초기화'){ alert('"초기화"라고 정확히 입력해야 실행돼요. 아무것도 바꾸지 않았어요.'); return; }
+  document.getElementById('totList').innerHTML='<div class="loading">초기화 중…</div>';
+  google.script.run.withSuccessHandler(function(res){
+    google.script.run.withSuccessHandler(function(d){
+      DATA.items=d.items; DATA.locMap=d.locMap||DATA.locMap; indexSlots();
+      if(window.locApi){ locApi.setStock(DATA.items, DATA.staff); }
+      renderTotal(); alert('완료! 모든 수량이 0이 되었어요. (조정 '+res.rows+'줄)\n이제 위치도에서 ✏️ 수량 입력으로 칸마다 넣으면 돼요.');
+    }).withFailureHandler(function(e){ alert(e.message); renderTotal(); }).bootstrap();
+  }).withFailureHandler(function(e){ alert(e.message); renderTotal(); }).resetAllStock({confirm:t.trim(), staff:val('staffSel')});
+}
+
 // 월별 리포트
 function loadReport(){ document.getElementById('reportList').innerHTML='<div class="loading">불러오는 중…</div>';
   google.script.run.withSuccessHandler(renderReport).withFailureHandler(function(e){document.getElementById('reportList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>';}).getMonthlyReport(); }
@@ -519,13 +585,13 @@ window.locHost = {
     var ex=DATA.items.filter(function(x){ return x.id===it.id; })[0];
     if(ex){ ex.total=it.total; ex.boxes=it.boxes; ex.locs=it.locs; }
     else { DATA.items.push(it); catColorMap=null; fillDatalists(); }
-    if(CURV==='stock') renderStock(); if(CURV==='search') renderSearch();
+    if(CURV==='stock') renderStock(); if(CURV==='search') renderSearch(); if(CURV==='total') renderTotal();
   },
   /** 위치도에서 이동한 뒤의 위치별 재고 {위치:[{id,qty}]} → 품목별 위치·총수량 다시 계산 */
   stockChanged: function(stk){
     var by={}; DATA.items.forEach(function(it){ it.locs={}; it.total=0; by[it.id]=it; });
     Object.keys(stk||{}).forEach(function(k){ (stk[k]||[]).forEach(function(a){ var it=by[a.id]; if(!it) return; it.locs[k]=(it.locs[k]||0)+a.qty; it.total+=a.qty; }); });
-    if(CURV==='stock') renderStock();
+    if(CURV==='stock') renderStock(); if(CURV==='total') renderTotal();
   },
   /** 위치도 칸 구성이 바뀌면 보관 위치 목록·📌지정 다시 */
   mapChanged: function(lm){ DATA.locMap=lm||{sheets:[],slots:[]}; indexSlots(); var v=val('locSel'); fillLoc('locSel', v); ensureLocOption('locSel', v); document.getElementById('locSel').value=v; }
@@ -534,12 +600,12 @@ window.locHost = {
 var HIDDEN_AT=0;
 document.addEventListener('visibilitychange', function(){
   if(document.visibilityState==='hidden'){ HIDDEN_AT=Date.now(); return; }
-  if(HIDDEN_AT && Date.now()-HIDDEN_AT>120000 && ['loc','stock','search'].indexOf(CURV)>=0 && !(window.locApi && locApi.busy())) quietRefresh();
+  if(HIDDEN_AT && Date.now()-HIDDEN_AT>120000 && ['loc','stock','search','total'].indexOf(CURV)>=0 && !(window.locApi && locApi.busy())) quietRefresh();
 });
 function quietRefresh(){
   google.script.run.withSuccessHandler(function(d){
     DATA.items=d.items; DATA.staff=d.staff; DATA.locations=d.locations; DATA.layout=d.layout||[]; DATA.locMap=d.locMap||{sheets:[],slots:[]};
-    indexSlots(); catColorMap=null; fillDatalists(); fillLoc('locSel');
+    indexSlots(); catColorMap=null; fillDatalists(); fillLoc('locSel'); if(CURV==='total') renderTotal();
     if(window.locApi && !locApi.busy()){ locApi.setStock(DATA.items, DATA.staff); locApi.init(d.loc); }
     if(CURV==='stock') renderStock(); if(CURV==='search') renderSearch();
   }).appBoot();
@@ -656,13 +722,14 @@ function delMemo(row){ if(!confirm('이 메모를 삭제할까요? (사진도 �
 var CURV='loc';
 function go(v){
   CURV=v; document.getElementById('appbar').classList.toggle('hidden', v==='loc');
-  ['Loc','Search','Input','NewItem','Done','Stock','Report','Build','BomForm','BuildRun','Log','Memo','MemoForm'].forEach(function(n){document.getElementById('view'+n).classList.add('hidden');});
+  ['Loc','Total','Search','Input','NewItem','Done','Stock','Report','Build','BomForm','BuildRun','Log','Memo','MemoForm'].forEach(function(n){document.getElementById('view'+n).classList.add('hidden');});
   document.getElementById('saveBtn').classList.add('hidden'); setNav(v);
   if(v==='loc'){ show('Loc'); if(window.locApi) locApi.setStock(DATA.items, DATA.staff); } // 재고는 이미 받은 품목 목록으로 — 서버 안 부름
   if(v==='search'){ show('Search'); resetBar(); renderSearch(); }
   if(v==='input'){ show('Input'); document.getElementById('saveBtn').classList.remove('hidden'); }
   if(v==='newItem'){ show('NewItem'); resetBar('📦','새 품목 추가','품목을 새로 등록합니다'); }
   if(v==='done'){ show('Done'); resetBar(); }
+  if(v==='total'){ show('Total'); resetBar('🧮','총수량','품목별 총수량 · 위치별 수량'); renderTotal(); }
   if(v==='stock'){ show('Stock'); resetBar('📊','현재고','실시간 자동 집계'); renderStock(); }
   if(v==='report'){ show('Report'); resetBar('📅','월별 리포트','입고·출고 월별 집계'); loadReport(); }
   if(v==='log'){ show('Log'); resetBar('🕒','전체 이력','최근 입출고 60건'); loadLog(); }
@@ -673,7 +740,7 @@ function go(v){
   if(v==='memoForm'){ show('MemoForm'); resetBar('📝', MF.row?'메모 수정':'새 메모', '업체 사양 기록'); }
 }
 function show(n){ document.getElementById('view'+n).classList.remove('hidden'); }
-function setNav(v){ var g=(v==='search'||v==='input'||v==='newItem'||v==='done'); document.getElementById('navLoc').className=v==='loc'?'on':'';
+function setNav(v){ var g=(v==='search'||v==='input'||v==='newItem'||v==='done'); document.getElementById('navLoc').className=v==='loc'?'on':''; document.getElementById('navTotal').className=v==='total'?'on':'';
   document.getElementById('navInput').className=g?'on':''; document.getElementById('navStock').className=(v==='stock'||v==='report'||v==='log')?'on':''; document.getElementById('navBuild').className=(v==='build'||v==='bomForm'||v==='buildRun')?'on':''; document.getElementById('navMemo').className=(v==='memo'||v==='memoForm')?'on':''; }
 function resetBar(ic,t,s){ document.getElementById('barIcon').textContent=ic||'📦'; document.getElementById('barTitle').textContent=t||'써브텍 재고'; document.getElementById('barSub').textContent=s||('입고 · 출고를 빠르게 기록하세요 · '+HTML_VERSION); }
 </script>

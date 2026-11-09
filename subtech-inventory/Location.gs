@@ -321,3 +321,75 @@ function locQuickIn(p) {
     lock.releaseLock();
   }
 }
+
+/* ---------- 칸별 수량 바로 입력 · 전체 수량 초기화 ----------
+   둘 다 거래로그를 지우지 않고 '조정' 줄만 덧붙입니다 (이력이 남고, 필요하면 되돌릴 수 있음). */
+function locMasterInfo_() {
+  const m = SpreadsheetApp.getActive().getSheetByName(TAB_MASTER), info = {};
+  if (m && m.getLastRow() >= 2)
+    m.getRange(2, 1, m.getLastRow() - 1, 5).getValues().forEach(r => {
+      if (r[0]) info[r[0]] = { id: String(r[0]), name: String(r[1]), cat: String(r[2] || ''), unit: Number(r[3]) || '', safe: Number(r[4]) || 0 };
+    });
+  return info;
+}
+/** 위치도에서 칸별 수량 입력: rows=[{id, loc, qty}] → 지금 그 칸 수량과의 차이만 '조정'으로 기록 */
+function locSetQty(p) {
+  p = p || {};
+  const rows = (p.rows || []).map(r => ({ id: String(r.id || ''), loc: String(r.loc || '').trim(), qty: Number(r.qty) }))
+    .filter(r => r.id && r.loc);
+  if (!rows.length) throw new Error('입력한 수량이 없어요.');
+  rows.forEach(r => { if (!(r.qty >= 0) || Math.floor(r.qty) !== r.qty) throw new Error('수량은 0 이상의 정수로 입력하세요.'); });
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const info = locMasterInfo_(), st = computeStock_(), now = new Date(), out = [], ids = [];
+    rows.forEach(r => {
+      const it = info[r.id];
+      if (!it) throw new Error('품목을 찾을 수 없어요 (' + r.id.split('||')[0] + '). 새로고침 후 다시 해주세요.');
+      const s = st[r.id] = st[r.id] || { total: 0, boxes: 0, locs: {} };
+      const cur = Number(s.locs[r.loc]) || 0, d = r.qty - cur;
+      if (ids.indexOf(r.id) < 0) ids.push(r.id);
+      if (!d) return;
+      out.push([now, it.id, it.name, it.cat, r.loc, '조정', '', '', Math.abs(d), d, p.staff || '', '위치도 수량 입력 ' + cur + '→' + r.qty, '']);
+      s.locs[r.loc] = r.qty;
+    });
+    const log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
+    if (out.length) log.getRange(log.getLastRow() + 1, 1, out.length, 13).setValues(out);
+    const s2 = out.length ? computeStock_() : st;
+    return { ok: true, changed: out.length, items: ids.map(id => {
+      const it = info[id], s = s2[id] || { total: 0, boxes: 0, locs: {} };
+      return { id: it.id, name: it.name, cat: it.cat, unit: it.unit, safe: it.safe, total: s.total, boxes: s.boxes || 0, locs: s.locs };
+    }) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+/** 모든 품목·위치의 수량을 0으로 만드는 '조정' 줄들 (박스 수도 0이 되게 한 줄에 실어 뺌) */
+function locResetRows_(staff) {
+  const st = computeStock_(), info = locMasterInfo_(), now = new Date(), out = [];
+  Object.keys(st).forEach(id => {
+    const s = st[id], it = info[id] || { name: String(id).split('||')[0], cat: String(id).split('||')[1] || '' };
+    let boxLeft = Number(s.boxes) || 0;   // 박스 수: 줄 수량이 빠지면(-) 빼지고, 더해지면(+) 더해짐
+    Object.keys(s.locs).forEach(loc => {
+      const cur = Number(s.locs[loc]) || 0;
+      if (!cur) return;
+      let bx = '';
+      if (boxLeft && (boxLeft > 0) === (cur > 0)) { bx = Math.abs(boxLeft); boxLeft = 0; }
+      out.push([now, id, it.name, it.cat, loc, '조정', bx, '', Math.abs(cur), -cur, staff || '', '전체 수량 초기화 ' + cur + '→0', '']);
+    });
+  });
+  return out;
+}
+/** 전체 수량 0으로 (재고앱 총수량 탭에서 "초기화"를 입력해야 실행) */
+function resetAllStock(p) {
+  if (!p || String(p.confirm || '').trim() !== '초기화') throw new Error('확인 문구("초기화")가 맞지 않아 아무것도 바꾸지 않았어요.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const out = locResetRows_(p.staff || ''), log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
+    if (out.length) log.getRange(log.getLastRow() + 1, 1, out.length, 13).setValues(out);
+    return { ok: true, rows: out.length };
+  } finally {
+    lock.releaseLock();
+  }
+}

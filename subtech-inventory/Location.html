@@ -73,6 +73,27 @@
 #locApp .it{display:block;font-weight:600;line-height:1.25;margin-top:2px;overflow-wrap:anywhere}
 #locApp .it b{font-weight:800;font-variant-numeric:tabular-nums}
 #locApp .it b.q0{opacity:.4;font-weight:400}
+#locApp .it .tq{font-size:.82em;color:var(--sub);font-weight:400;white-space:nowrap}
+/* 칸별 수량 입력 */
+#locApp .tools button.qbtn{border-color:var(--ink);font-weight:700}
+#locApp .qbox{border:1.5px solid var(--ink);border-radius:6px;padding:10px 12px;margin:4px 0 14px;background:var(--paper)}
+#locApp .qbox h3{margin:0 0 4px;font-size:14px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+#locApp .qbox h3 small{font-size:11.5px;font-weight:400;color:var(--sub)}
+#locApp .qrow{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px dashed var(--line)}
+#locApp .qrow:first-of-type{border-top:0}
+#locApp .qrow .nm{flex:1;min-width:0;word-break:keep-all;font-size:14.5px}
+#locApp .qrow .nm small{display:block;color:var(--sub);font-size:11.5px}
+#locApp .qrow .nm .qt{color:var(--sub);font-size:12px}
+#locApp .qrow input{width:96px;padding:9px 8px;border:1.5px solid var(--ink);border-radius:4px;background:var(--slot);font-size:17px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+#locApp .qrow input.bad{border-color:#B3412E;background:#F6DCD6}
+#locApp .qrow input.chg{border-color:var(--hitline);background:var(--hitbg)}
+#locApp .qrow .eqv{min-width:44px;font-size:12px;color:var(--sub);text-align:right;font-variant-numeric:tabular-nums}
+#locApp .qacts{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+#locApp .qacts select{padding:9px 6px;border:1.5px solid var(--line);border-radius:4px;background:var(--slot);color:var(--ink);font:inherit;font-size:14px}
+#locApp .qacts button{flex:1;padding:11px 10px;border:1.5px solid var(--ink);border-radius:4px;background:var(--ink);color:var(--bg);font-weight:700;white-space:nowrap}
+#locApp .qacts button.ghost{background:transparent;color:var(--ink);flex:0 0 auto}
+#locApp .qacts button:disabled{opacity:.5}
+#locApp .qbox .none{margin:4px 0}
 #locApp .it.pin{border-left:3px solid var(--hitline);padding-left:4px}
 #locApp .it.memo{font-weight:400;color:var(--sub);font-size:.88em}
 #locApp .more{display:block;font-size:.8em;color:var(--sub)}
@@ -224,6 +245,7 @@
   <nav class="tabs" data-el="tabs"></nav>
   <main class="floor" data-el="floor">
     <div class="tools">
+      <button data-el="bQty" class="qbtn">✏️ 수량 입력</button>
       <button data-el="bMerge">칸 합치기</button>
       <button data-el="bLine">줄·칸 옮기기</button>
       <button data-el="bSheet">시트 설정</button>
@@ -232,6 +254,7 @@
     </div>
     <p class="hint" data-el="hint">칸을 누르면 이름과 자재를 적을 수 있어요. 칸을 <b>길게 누른 채 끌면</b> 다른 칸으로 옮겨져요.</p>
     <div class="stkbar" data-el="stkBar"></div>
+    <div class="mergeBar" data-el="qtyBar" hidden><span>✏️ 수량 입력 중 — 칸을 누르면 바로 수량을 넣어요</span><button class="ghost" data-el="bQtyEnd">끝내기</button></div>
     <div class="mergeBar" data-el="moveBar" hidden><span data-el="moveInfo"></span><button class="ghost" data-el="bMvCancel">취소</button></div>
     <div class="mergeBar" data-el="mergeBar" hidden><span data-el="mergeInfo"></span><button class="ghost" data-el="bCancel">취소</button><button data-el="bDoMerge">합치기</button></div>
     <div class="wrap"><div class="grid" data-el="grid"></div></div>
@@ -268,6 +291,8 @@ let STK={},APP='',stockLoaded=false,pendingQ='',STAFF=[],ITEMS=[],ITEMMAP={};
 let MV=null;
 /* 검색에서 '새 품목으로 입고' → 칸 고르기 상태: PIN = {name} */
 let PIN=null;
+/* 수량 입력 모드: 칸을 누르면 수량 입력 창만 바로 열림 */
+let QM=false;
 
 /* 단독 화면이면 전체 높이 사용 */
 if(root.parentElement===document.body&&document.body.querySelectorAll(':scope > div,:scope > main,:scope > section').length===1){
@@ -317,6 +342,9 @@ const cellHasStock=(s,r,c,from)=>keysAt(s,r,c).slice(from||0).some(k=>stockAt(k)
 function orphanLocs(){const known={};S.sheets.forEach(s=>{known[String(s.name||'').trim()]=1;Object.assign(known,sheetKeys(s))});
   return Object.keys(STK).filter(k=>!known[k]&&STK[k].length).sort((a,b)=>sum(STK[b])-sum(STK[a]))}
 const sum=a=>a.reduce((t,x)=>t+x.qty,0);
+/** 품목별 총수량 {id: 개수} — "200 (총 400)"처럼 칸 수량 옆에 보여줄 때 */
+function totals(){const T={};for(const k in STK)for(const a of STK[k])T[a.id]=(T[a.id]||0)+a.qty;return T}
+const totTag=(T,id,q)=>T&&T[id]&&T[id]!==q?`<small class="tq">(총${fmtN(T[id])})</small>`:'';
 /** 재고 때문에 막아야 하면 안내하고 true */
 function guard(cond,msg){if(GAS&&!stockLoaded){toast('재고 정보를 불러오는 중이에요. 잠시 후 다시 해주세요');return true}
   if(cond){toast(msg);return true}return false}
@@ -332,7 +360,7 @@ function openApp(p){
   const qs=Object.keys(p||{}).filter(k=>p[k]).map(k=>k+'='+encodeURIComponent(p[k])).join('&');
   window.open(APP+(qs?(APP.indexOf('?')<0?'?':'&')+qs:''),'_top');
 }
-function stockRows(list,loc){return list.length?list.map(a=>`<div class="srow"><span class="nm" data-item="${esc(a.id)}">${esc(a.name)}${a.cat?`<small>${esc(a.cat)}</small>`:''}</span><b>${fmtN(a.qty)}</b>`+
+function stockRows(list,loc){const T=totals();return list.length?list.map(a=>`<div class="srow"><span class="nm" data-item="${esc(a.id)}">${esc(a.name)}${a.cat?`<small>${esc(a.cat)}</small>`:''}</span><b>${fmtN(a.qty)}${T[a.id]!==a.qty?`<small style="font-weight:400;color:var(--sub)"> (총 ${fmtN(T[a.id])})</small>`:''}</b>`+
   `<button data-go="출고" data-id="${esc(a.id)}" data-loc="${esc(loc)}">출고</button><button data-mvid="${esc(a.id)}" data-loc="${esc(loc)}">이동</button></div>`).join('')
   :'<p class="none">재고 없음</p>'}
 function bindGo(P){P.querySelectorAll('[data-in]').forEach(b=>b.onclick=()=>openIn(b.dataset.in));P.querySelectorAll('[data-item]').forEach(b=>b.onclick=()=>openItem(b.dataset.item));P.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>openApp({item:b.dataset.id,loc:b.dataset.loc,mode:b.dataset.go}));
@@ -409,7 +437,7 @@ function renderTabs(){
 const query=()=>E('q').value.trim().toLowerCase();
 const matches=(x,q)=>String(x.label||'').toLowerCase().includes(q)||String(x.kind||'').toLowerCase().includes(q)||(x.type==='slot'&&x.layers.some(L=>String(L.t||'').toLowerCase().includes(q)||(L.p||[]).some(pr=>prodName(pr).toLowerCase().includes(q))));
 const stockMatch=(s,r,c,q)=>keysAt(s,r,c).some(k=>stockAt(k).some(a=>String(a.name).toLowerCase().includes(q)));
-function cellHTML(x,r,c,s){
+function cellHTML(x,r,c,s,T){
   const cd=`<span class="code">${code(r,c)}</span>`;
   if(x.type==='label')return `${x.rs*x.cs>1?cd:''}<span class="lbl">${x.label?esc(x.label):'<i>이름표</i>'}</span>`;
   if(x.type==='void')return cd+(x.label?`<span class="name">${esc(x.label)}</span>`:'');
@@ -421,8 +449,8 @@ function cellHTML(x,r,c,s){
   h+='<span class="layers">'+x.layers.map((L,i)=>{
     // 📌지정 제품(수량, 0이면 흐리게) → 그 밖의 재고 → 손으로 적은 메모. 한 줄에 하나
     const pp=L.p||[];
-    const ls=pp.map(pr=>{const a=st[i].find(z=>z.id===pr.id);return `<span class="it pin">${esc(prodName(pr))} <b${a?'':' class="q0"'}>${fmtN(a?a.qty:0)}</b></span>`})
-      .concat(st[i].filter(a=>!pp.some(pr=>pr.id===a.id)).map(a=>`<span class="it">${esc(a.name)} <b>${fmtN(a.qty)}</b></span>`),
+    const ls=pp.map(pr=>{const a=st[i].find(z=>z.id===pr.id);return `<span class="it pin">${esc(prodName(pr))} <b${a?'':' class="q0"'}>${fmtN(a?a.qty:0)}</b>${a?totTag(T,pr.id,a.qty):''}</span>`})
+      .concat(st[i].filter(a=>!pp.some(pr=>pr.id===a.id)).map(a=>`<span class="it">${esc(a.name)} <b>${fmtN(a.qty)}</b>${totTag(T,a.id,a.qty)}</span>`),
               lines(L.t).map(t=>`<span class="it memo">${esc(t)}</span>`));
     const body=ls.length?ls.slice(0,4).join('')+(ls.length>4?`<span class="more">외 ${ls.length-4}개</span>`:''):'<i>–</i>';
     return `<span class="layer">${split?`<b class="ly">${i+1}층</b>`:''}${body}</span>`}).join('')+'</span>';
@@ -439,7 +467,7 @@ function bigStyle(d,x){
   if(x.rs>x.cs&&len&&len<=6)d.classList.add('tall');
 }
 function renderGrid(){
-  const s=sh(),g=E('grid'),q=query(),cov=covered(s);
+  const s=sh(),g=E('grid'),q=query(),cov=covered(s),T=totals();
   g.style.gridTemplateColumns=`repeat(${s.cols},minmax(var(--cw),1fr))`;g.innerHTML='';
   for(let r=0;r<s.rows;r++)for(let c=0;c<s.cols;c++){
     const k=K(r,c);if(cov[k])continue;const x=get(s,r,c);
@@ -447,7 +475,7 @@ function renderGrid(){
     d.className='cell '+x.type+(sel.has(k)||(MV&&MV.src&&MV.src.si===S.cur&&MV.src.r===r&&MV.src.c===c)?' sel src':'')+(q&&(matches(x,q)||stockMatch(s,r,c,q))?' hit':'')+(flashKey===k?' flash':'')+(cellHasStock(s,r,c)?' stocked':'');
     d.style.gridRow=`${r+1} / span ${x.rs}`;d.style.gridColumn=`${c+1} / span ${x.cs}`;d.dataset.k=k;
     d.setAttribute('aria-label',code(r,c)+(x.label?' '+x.label:''));
-    d.innerHTML=cellHTML(x,r,c,s);bigStyle(d,x);d.onclick=()=>tap(r,c);g.appendChild(d);
+    d.innerHTML=cellHTML(x,r,c,s,T);bigStyle(d,x);d.onclick=()=>tap(r,c);g.appendChild(d);
   }
 }
 function renderMerge(){
@@ -457,7 +485,7 @@ function renderMerge(){
 }
 
 /* ---------- 칸 ---------- */
-function tap(r,c){if(Date.now()-dragIgnoreClick<450)return;const k=K(r,c);if(PIN){pickIn(r,c);return}if(MV){pickDest(r,c);return}if(mergeMode){sel.has(k)?sel.delete(k):sel.add(k);render();return}cur={r,c};openCell()}
+function tap(r,c){if(Date.now()-dragIgnoreClick<450)return;const k=K(r,c);if(PIN){pickIn(r,c);return}if(MV){pickDest(r,c);return}if(mergeMode){sel.has(k)?sel.delete(k):sel.add(k);render();return}cur={r,c};if(QM&&get(sh(),r,c).type==='slot'){openQty();return}openCell()}
 function doMerge(){
   if(sel.size<2){toast('두 칸 이상 골라주세요');return}
   const s=sh();let r0=99,c0=99,r1=-1,c1=-1;
@@ -506,6 +534,7 @@ function endMove(){MV=null;PIN=null;render()}
 function renderMoveBar(){E('moveBar').hidden=!MV&&!PIN;
   if(MV){E('hint').hidden=true;E('moveInfo').textContent='⇄ '+MV.label+' → 받을 칸을 누르세요'}
   else if(PIN){E('hint').hidden=true;E('moveInfo').textContent='＋ "'+PIN.name+'" 입고할 칸을 누르세요'}
+  E('qtyBar').hidden=!QM||!!MV||!!PIN||mergeMode;if(QM)E('hint').hidden=true;E('bQty').classList.toggle('on',QM);
   E('floor').classList.toggle('merging',mergeMode||!!MV||!!PIN)}
 function pickDest(r,c){
   const s=sh(),x=get(s,r,c);
@@ -905,6 +934,7 @@ function drawCell(){
   <div class="seg">${[['slot','보관칸'],['label','이름표'],['void','빈 공간']].map(([v,t])=>`<button data-type="${v}" class="${x.type===v?'on':''}">${t}</button>`).join('')}</div>
   <label class="f">이름${big?' (합친 칸은 가운데에 크게 보여요)':''}<input data-f="label" value="${esc(x.label)}" placeholder="${ph}"></label>
   ${x.type==='slot'?`<div class="kindsel"><span class="pk">적재 방식</span><button data-kind="" class="${x.kind?'':'on'}">없음</button>${Object.keys(KINDS).map(k=>`<button data-kind="${esc(k)}" class="${x.kind===k?'on':''}">${esc(k)}<small>${KINDS[k].mov}</small></button>`).join('')}</div>`:''}
+  ${x.type==='slot'&&GAS?qtyHTML(s,r,c,false):''}
   ${x.type==='slot'&&x.layers.length>1&&x.layers.some((L,i)=>layerMovable(s,r,c,i))?`<button class="mvall" data-mvcell="1">⇄ 칸째로 이동 (${x.layers.map((L,i)=>(i+1)+'층').join('·')} 모두)</button>`:''}
   ${x.type==='slot'?x.layers.map((L,i)=>{const k=slotKey(s,r,c,i),list=stockAt(k);return `<div class="sk"><h3>현재 재고${x.layers.length>1?' · '+(i+1)+'층':''}<small>${esc(k)}</small></h3>
     ${stockLoaded||!GAS?stockRows(list,k):'<p class="none">불러오는 중…</p>'}<button class="in" data-in="${esc(k)}">＋ 이 칸에 입고</button>${layerMovable(s,r,c,i)?`<button class="mv" data-mvl="${i}">⇄ ${x.layers.length>1?(i+1)+'층':'칸'} 전체 이동</button>`:''}
@@ -915,7 +945,7 @@ function drawCell(){
     ${big?'<button data-a="unmerge">합친 칸 풀기</button>':''}
     ${s.cells[K(r,c)]||cellHasStock(s,r,c)?'<button class="danger" data-a="clearcell">🗑 이 칸 삭제</button>':''}
   </div>`;
-  bindGo(P);
+  bindGo(P);if(x.type==='slot'&&GAS)bindQty(P,s,r,c,false);
   P.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{const y=ensure(s,r,c);if(b.dataset.kind)y.kind=b.dataset.kind;else delete y.kind;save();renderGrid();drawCell()});
   P.querySelectorAll('[data-mvl]').forEach(b=>b.onclick=()=>startCellMove(s,r,c,[+b.dataset.mvl]));
   P.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>openPick(+b.dataset.pick));
@@ -935,6 +965,64 @@ function drawCell(){
     if(a==='unmerge'){y.rs=1;y.cs=1}
     save();renderGrid();drawCell()});
 }
+
+/* ---------- 칸별 수량 입력 ----------
+   📌지정 제품 + 지금 이 칸에 재고가 있는 품목마다 입력칸. 바뀐 것만 '조정'으로 저장 (locSetQty).
+   200 처럼 그냥 숫자, 또는 20*10+5 처럼 박스×개수로도 입력 가능 */
+function parseQty(v){v=String(v||'').replace(/\s+/g,'').replace(/[xX×]/g,'*').replace(/,/g,'');if(v==='')return null;
+  if(!/^\d+(\*\d+)*(\+\d+(\*\d+)*)*$/.test(v))return NaN;return v.split('+').reduce((t,p)=>t+p.split('*').reduce((m,n)=>m*Number(n),1),0)}
+function qtyRows(s,r,c){const x=get(s,r,c);return x.layers.map((L,i)=>{const k=slotKey(s,r,c,i),st=stockAt(k),pp=L.p||[];
+  const rows=pp.map(pr=>{const a=st.find(z=>z.id===pr.id);return{id:pr.id,name:prodName(pr),cat:(ITEMMAP[pr.id]||{}).cat||'',qty:a?a.qty:0,pin:1}})
+    .concat(st.filter(a=>!pp.some(pr=>pr.id===a.id)).map(a=>({id:a.id,name:a.name,cat:a.cat,qty:a.qty,pin:0})));return{k,i,rows}})}
+function qtyHTML(s,r,c,compact){
+  const x=get(s,r,c),T=totals(),ls=qtyRows(s,r,c),any=ls.some(l=>l.rows.length);
+  if(!stockLoaded)return '<div class="qbox"><p class="none">재고 정보를 불러오는 중…</p></div>';
+  if(!any&&!compact)return '';
+  const st=lastStaff(),staff=STAFF.length?STAFF:[''];
+  return `<div class="qbox" data-qbox="1">${ls.map(l=>`<h3>✏️ 수량 입력${x.layers.length>1?' · '+(l.i+1)+'층':''}<small>${esc(l.k)}</small></h3>
+    ${l.rows.length?l.rows.map(w=>`<div class="qrow"><span class="nm">${w.pin?'📌 ':''}${esc(w.name)}${w.cat?` <small style="display:inline">${esc(w.cat)}</small>`:''}<small class="qt" data-qt="${esc(w.id)}">총 ${fmtN(T[w.id]||0)}개</small></span>
+      <span class="eqv" data-eq></span><input data-qk="${esc(l.k)}" data-qid="${esc(w.id)}" data-q0="${w.qty}" type="text" inputmode="tel" autocomplete="off" value="${w.qty||''}" placeholder="0" aria-label="${esc(w.name)} 수량"></div>`).join('')
+      :'<p class="none">📌 지정 제품이 없어요. 칸 설정에서 ＋ 제품 지정을 먼저 해주세요</p>'}`).join('')}
+    ${any||compact?`<div class="qacts">${any&&staff.length>1?`<select data-f="qstaff" aria-label="담당자">${staff.map(n=>`<option${n===st?' selected':''}>${esc(n)}</option>`).join('')}</select>`:''}
+      ${compact?'<button class="ghost" data-a="qfull">칸 설정</button>':''}${any?`<button data-a="qsave">💾 수량 저장${compact?' → 다음 칸':''}</button>`:''}</div>`:''}
+    ${any?'<p class="note" style="margin:6px 0 0">이 칸에 있는 개수를 그대로 적으면 돼요 (빈칸=그대로). 20*10 처럼 박스×개수로도 돼요</p>':''}</div>`;
+}
+function bindQty(P,s,r,c,compact){
+  const ins=[...P.querySelectorAll('[data-qk]')];
+  const upd=inp=>{const v=parseQty(inp.value),eq=inp.parentNode.querySelector('[data-eq]'),q0=+inp.dataset.q0;
+    inp.classList.toggle('bad',Number.isNaN(v));inp.classList.toggle('chg',v!=null&&!Number.isNaN(v)&&v!==q0);
+    eq.textContent=v!=null&&!Number.isNaN(v)&&/[^0-9]/.test(inp.value.trim())?'='+fmtN(v):''};
+  ins.forEach((inp,j)=>{inp.oninput=()=>upd(inp);inp.onfocus=()=>{try{inp.select()}catch(e){}};
+    inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const nx=ins[j+1];if(nx)nx.focus();else{const b=P.querySelector('[data-a="qsave"]');if(b)b.click()}}}});
+  const fb=P.querySelector('[data-a="qfull"]');if(fb)fb.onclick=()=>{drawCell()};
+  const sb=P.querySelector('[data-a="qsave"]');if(!sb)return;
+  sb.onclick=()=>{
+    const rows=[];let bad=false;
+    ins.forEach(inp=>{const v=parseQty(inp.value);if(v==null)return;if(Number.isNaN(v)){bad=true;return}if(v!==+inp.dataset.q0)rows.push({id:inp.dataset.qid,loc:inp.dataset.qk,qty:v})});
+    if(bad){toast('숫자만 넣어주세요 (예: 200 또는 20*10)');return}
+    const next=()=>{if(compact){const n=nextQtyCell(s,r,c);if(n){cur=n;flashCell(S.cur,n.r,n.c);openQty()}else{closePanel();toast('이 시트의 마지막 칸이에요')}}else drawCell()};
+    if(!rows.length){if(compact){next();return}toast('바뀐 수량이 없어요');return}
+    const ss=P.querySelector('[data-f="qstaff"]'),staff=ss?ss.value:lastStaff();try{if(staff)localStorage.setItem('subtek-staff',staff)}catch(e){}
+    sb.disabled=true;sb.textContent='저장 중…';
+    GAS.withSuccessHandler(res=>{(res.items||[]).forEach(it=>{upsertItem(it);if(host())host().itemUpserted(it)});renderGrid();renderStockBar();
+      toast(`${rows.length}개 수량 저장했어요`);next()})
+    .withFailureHandler(e=>{sb.disabled=false;sb.textContent='💾 수량 저장'+(compact?' → 다음 칸':'');toast((e&&e.message)||'저장하지 못했어요')})
+    .locSetQty({rows,staff});
+  };
+}
+/** 수량 입력 창만 (수량 입력 모드에서 칸을 눌렀을 때) */
+function openQty(){
+  const s=sh(),{r,c}=cur,x=get(s,r,c),P=E('panelBody');P.dataset.kind='cell';
+  P.innerHTML=`<div class="ph"><h2>${code(r,c)}${x.label?` <small>${esc(x.label)}</small>`:''}${x.kind?`<small>${esc(x.kind)}</small>`:''}</h2><button class="x" data-a="close">닫기</button></div>${qtyHTML(s,r,c,true)}`;
+  P.querySelector('[data-a="close"]').onclick=closePanel;bindQty(P,s,r,c,true);openPanel();
+  const first=P.querySelector('[data-qk]');if(first)setTimeout(()=>{first.focus();try{first.select()}catch(e){}},60);
+}
+/** 같은 시트에서 다음(오른쪽→아래) 📌지정·재고 있는 칸 */
+function nextQtyCell(s,r,c){const cov=covered(s);
+  for(let rr=r;rr<s.rows;rr++)for(let cc=(rr===r?c+1:0);cc<s.cols;cc++){if(cov[K(rr,cc)])continue;const x=get(s,rr,cc);
+    if(x.type==='slot'&&qtyRows(s,rr,cc).some(l=>l.rows.length))return{r:rr,c:cc}}return null}
+/** 위치 이름으로 그 칸의 수량 입력 창 열기 (재고앱 총수량 탭에서) */
+function editLoc(k){const w=keyIndex()[k];if(!w||w.kind!=='slot'){goLoc(k);return}closePanel();flashCell(w.si,w.r,w.c);cur={r:w.r,c:w.c};openQty()}
 
 function openSheet(){delArm=false;drawSheet();openPanel()}
 function drawSheet(){
@@ -1099,7 +1187,9 @@ E('q').onfocus=()=>{if(query())renderResults()};
 document.addEventListener('click',e=>{if(!e.target.closest('#locApp .search'))E('results').hidden=true});
 
 /* ---------- 버튼 ---------- */
-E('bMerge').onclick=()=>{if(MV)endMove();mergeMode=!mergeMode;sel.clear();render()};
+E('bMerge').onclick=()=>{if(MV)endMove();QM=false;mergeMode=!mergeMode;sel.clear();render()};
+E('bQty').onclick=()=>{if(MV)endMove();mergeMode=false;sel.clear();QM=!QM;render();if(QM)toast('칸을 누르면 수량을 바로 넣을 수 있어요')};
+E('bQtyEnd').onclick=()=>{QM=false;render()};
 E('bMvCancel').onclick=()=>endMove();
 E('bCancel').onclick=()=>{mergeMode=false;sel.clear();render()};
 E('bDoMerge').onclick=doMerge;
@@ -1142,6 +1232,8 @@ if(HOSTED){
       Object.keys(STK).forEach(k=>STK[k].sort((a,b)=>b.qty-a.qty));if(staff&&staff.length)STAFF=staff;stockLoaded=true;
       if(S){renderGrid();renderStockBar();if(query())renderResults()}},
     search(q){pendingQ=q||'';applyPendingQ()},
+    /** 위치 이름의 칸으로 가서 수량 입력 창 열기 */
+    editLoc(k){if(S)editLoc(k)},
     /** 저장 안 된 변경이나 열린 창이 있으면 true (그동안은 새로 덮어쓰지 않음) */
     busy(){return dirty||saving||!!MV||!E('panel').hidden},
     slots:()=>S?appSlots():null
