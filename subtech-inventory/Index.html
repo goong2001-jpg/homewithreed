@@ -67,6 +67,10 @@
   .trow { display:flex; align-items:baseline; gap:8px; padding:8px 0 7px; border-top:1px dashed #e6ebf2; cursor:pointer; font-size:13.5px; } .trow:first-of-type { margin-top:6px; } .trow:active { background:#f0f4ff; }
   .trow .tl { flex:1; min-width:0; color:#37475a; } .trow .tq { font-weight:900; font-size:15px; white-space:nowrap; } .trow .ts { font-size:11.5px; color:#8a97a8; white-space:nowrap; } .trow.z .tq { color:#d97706; font-size:13px; } .trow.z .tl { color:#8a97a8; }
   .dangerbox { margin:22px 0 10px; padding:12px 14px; border:1.5px dashed #f3b4b4; border-radius:12px; font-size:12px; color:#8a97a8; } .dangerbox button { margin-top:8px; width:100%; padding:11px; border-radius:10px; border:1.5px solid #dc2626; background:#fff; color:#dc2626; font-weight:800; font-size:14px; cursor:pointer; }
+  .schips { display:flex; gap:6px; overflow-x:auto; padding:2px 0 10px; } .schips .f { font-size:12px; font-weight:700; padding:6px 12px; border-radius:18px; background:#fff; border:1.5px solid #e6ebf2; color:#6b7889; white-space:nowrap; cursor:pointer; } .schips .f.on { background:#1f2733; color:#fff; border-color:#1f2733; }
+  .sgrp { background:#fff; border:1.5px solid #e6ebf2; border-radius:12px; margin-bottom:9px; overflow:hidden; } .sgrp .gh { display:flex; justify-content:space-between; align-items:baseline; padding:11px 14px 6px; } .sgrp .gh b { font-size:15.5px; } .sgrp .gh span { font-size:12px; color:#8a97a8; font-weight:700; }
+  .sgrp .gr { display:flex; align-items:center; gap:8px; padding:10px 14px; border-top:1px dashed #e6ebf2; cursor:pointer; font-size:13.5px; } .sgrp .gr:active { background:#f0f4ff; } .sgrp .gr .q { margin-left:auto; font-weight:800; font-size:15px; } .sgrp .gr.z .q { color:#b9c2cf; font-weight:600; font-size:13px; }
+  .tsub { display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13px; font-weight:700; color:#37475a; } .tsub .tt2 { margin-left:auto; font-size:14px; }
   .loading { text-align:center; color:#8a97a8; padding:40px; font-size:14px; line-height:1.6; }
 </style>
 </head>
@@ -80,7 +84,7 @@
 
 <!-- 검색 -->
 <div class="body hidden" id="viewSearch">
-  <input class="search" id="searchInput" placeholder="🔍 품명 검색 (예: STT1.3)" oninput="renderSearch()">
+  <input class="search" id="searchInput" placeholder="🔍 품명 검색 (예: STT1.3)" oninput="SEARCH_SHOWN=40;renderSearch()">
   <div id="pendBar"></div>
   <div class="label">품목</div><div id="searchList"><div class="loading">불러오는 중…</div></div>
   <button class="addnew" onclick="openNewItem()">＋ 새 품목 추가</button>
@@ -213,7 +217,7 @@
 </div>
 
 <script>
-var HTML_VERSION = 'v29'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v30'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var BOMROWS = null, MEMO_SHOWN = 50, PREFETCHED = false;
@@ -300,11 +304,37 @@ function boxText(total,unit){ unit=Number(unit)||0; if(unit<=0) return ''; var f
 function typeColor(t){ return t==='출고'?'#dc2626':(t==='기초'||t==='기록'?'#8a97a8':(t==='조정'?'#2563eb':(t==='이동'?'#9333ea':(t==='조립출'?'#ea580c':'#16a34a')))); }
 
 // 검색
-function renderSearch(){ var q=val('searchInput').toLowerCase();
-  var list=DATA.items.filter(function(it){return !q||(it.name+'').toLowerCase().indexOf(q)>=0;}).slice(0,80);
-  document.getElementById('searchList').innerHTML=list.length?list.map(function(it){var idx=DATA.items.indexOf(it); var bt=(it.boxes>0)?(fmt(it.boxes)+'박스'):'';
-    return '<div class="item" onclick="select('+idx+')"><div><div class="nm">'+esc(it.name)+'</div><div class="meta">현재 '+fmt(it.total)+'개'+(bt?(' · '+bt):'')+'</div></div>'+badge(it.cat)+'</div>';
-  }).join(''):'<div class="loading">검색 결과가 없습니다.</div>'; }
+// ---- 검색 공통: 같은 이름은 묶고, 정확히 맞는 이름 먼저, "이름 분류" 띄어쓰기로 분류까지 (위치도 검색과 같은 규칙) ----
+function nrm(v){ return String(v==null?'':v).replace(/\s+/g,'').toLowerCase(); }
+/** 0 정확히 같은 이름, 1 그걸로 시작, 2 포함, 3 기타 / -1 안 맞음 */
+function srank(it,q){ var nq=nrm(q), nm=nrm(it.name), ct=nrm(it.cat); if(!nq) return -1;
+  if(nm===nq) return 0; if(nm.indexOf(nq)===0) return 1; if(nm.indexOf(nq)>=0) return 2;
+  var tk=String(q).trim().toLowerCase().split(/\s+/).map(nrm).filter(Boolean); if(tk.length<2) return -1;
+  if(!tk.every(function(t){ return nm.indexOf(t)>=0||ct.indexOf(t)>=0; })) return -1;
+  var nt=tk.filter(function(t){ return nm.indexOf(t)>=0; }).join(''); return !nt?3:nm===nt?0:nm.indexOf(nt)===0?1:2; }
+/** 품목 목록을 이름별로 묶음 (순서 유지) → [{name, rank, items}] */
+function groupByName(list, rankOf){ var g={}, order=[];
+  list.forEach(function(it){ var k=nrm(it.name); if(!g[k]){ g[k]={name:it.name, rank:9, items:[]}; order.push(g[k]); } g[k].items.push(it); if(rankOf) g[k].rank=Math.min(g[k].rank, rankOf(it)); });
+  return order; }
+var SCAT='*', SEARCH_SHOWN=40; try{ SCAT=localStorage.getItem('subtek-scat')||'*'; }catch(e){}
+function setScat(c){ SCAT=c; SEARCH_SHOWN=40; try{ localStorage.setItem('subtek-scat',c); }catch(e){} renderSearch(); }
+function renderSearch(){ var q=val('searchInput'), ranks={};
+  var hits=q?DATA.items.filter(function(it){ var r=srank(it,q); if(r<0) return false; ranks[it.id]=r; return true; }):DATA.items.slice();
+  var cats={}; hits.forEach(function(it){ var c=it.cat||''; cats[c]=(cats[c]||0)+1; });
+  var cat=(SCAT!=='*'&&cats[SCAT])?SCAT:'*', ck=Object.keys(cats).sort(function(a,b){ return cats[b]-cats[a]; });
+  var chips=(q&&ck.length>1)?'<div class="schips"><div class="f '+(cat==='*'?'on':'')+'" onclick="setScat(\'*\')">전체 '+hits.length+'</div>'+ck.map(function(c){ return '<div class="f '+(cat===c?'on':'')+'" onclick="setScat(\''+escJs(c)+'\')">'+esc(c||'분류 없음')+' '+cats[c]+'</div>'; }).join('')+'</div>':'';
+  var use=cat==='*'?hits:hits.filter(function(it){ return (it.cat||'')===cat; });
+  var groups=groupByName(use, q?function(it){ return ranks[it.id]; }:null);
+  groups.forEach(function(g){ g.tot=g.items.reduce(function(t,it){ return t+(Number(it.total)||0); },0);
+    g.items.sort(function(a,b){ return (b.total>0)-(a.total>0) || (b.total-a.total) || String(a.cat).localeCompare(String(b.cat),'ko'); }); });
+  if(q) groups.sort(function(a,b){ return a.rank-b.rank || (b.tot>0)-(a.tot>0) || b.tot-a.tot || a.name.length-b.name.length || String(a.name).localeCompare(String(b.name),'ko'); });
+  var shown=groups.slice(0,SEARCH_SHOWN);
+  document.getElementById('searchList').innerHTML=chips+(groups.length?shown.map(function(g){
+    return '<div class="sgrp"><div class="gh"><b>'+esc(g.name)+'</b><span>총 '+fmt(g.tot)+'개'+(g.items.length>1?' · 분류 '+g.items.length:'')+'</span></div>'+
+      g.items.map(function(it){ var idx=DATA.items.indexOf(it), bt=(it.boxes>0)?(' · '+fmt(it.boxes)+'박스'):'';
+        return '<div class="gr'+(it.total?'':' z')+'" onclick="select('+idx+')">'+badge(it.cat)+'<span style="color:#8a97a8;font-size:11.5px">'+bt.replace(' · ','')+'</span><span class="q">'+(it.total?fmt(it.total)+'개':'재고 0')+'</span></div>'; }).join('')+'</div>';
+  }).join('')+(groups.length>SEARCH_SHOWN?'<div style="text-align:center;margin:10px 0"><button class="addline" style="display:inline-block;padding:10px 24px" onclick="SEARCH_SHOWN+=40;renderSearch()">더 보기 ('+fmt(groups.length-SEARCH_SHOWN)+'개 더)</button></div>':'')
+    :'<div class="loading">검색 결과가 없습니다.</div>'); }
 function select(i){ cur=DATA.items[i]; type='입고'; lines=[{boxes:'',per:String(cur.unit||'')}]; txImgs=[]; document.getElementById('renameBox').classList.add('hidden'); document.getElementById('adjTarget').value=''; renderInput(); go('input'); loadHistory();
   var asg=ASSIGN[cur.id]; if(asg&&asg.length){ ensureLocOption('locSel', asg[0]); document.getElementById('locSel').value=asg[0]; updateTotal(); } // 📌지정 칸을 기본 보관 위치로
   if(PEND){ var pd=PEND; PEND=null; renderPend(); applyLoc(pd.loc, pd.mode); } }
@@ -476,15 +506,23 @@ function renderTotal(){
   document.getElementById('totFilter').innerHTML=fs.map(function(f){ return '<div class="f '+(f===totFilter?'on':'')+'" onclick="setTotFilter(\''+f+'\')">'+f+'</div>'; }).join('');
   var pins=0, done=0, sumQ=0; all.forEach(function(c){ c.rows.forEach(function(r){ if(r.pin){ pins++; if(r.q) done++; } }); sumQ+=c.it.total||0; });
   document.getElementById('totSum').innerHTML='<div class="totsum"><span>품목 <b>'+fmt(all.length)+'</b>종</span><span>전체 <b>'+fmt(sumQ)+'</b>개</span><span>📌 지정 칸 입력 <b>'+fmt(done)+'</b> / '+fmt(pins)+'곳</span></div>';
-  var list=all.filter(function(c){ return (!sq||(c.it.name+' '+(c.it.cat||'')).toLowerCase().indexOf(sq)>=0) &&
-    (totFilter==='전체'||(totFilter==='미입력 있음'?c.todo>0:c.todo===0)); });
+  var tq=val('totSearch'), trank={};
+  var list=all.filter(function(c){ if(tq){ var r=srank(c.it,tq); if(r<0) return false; trank[c.it.id]=r; }
+    return totFilter==='전체'||(totFilter==='미입력 있음'?c.todo>0:c.todo===0); });
   list.sort(function(a,b){ return (a.it.name+'').localeCompare(b.it.name+'','ko',{numeric:true}) || (a.it.cat+'').localeCompare(b.it.cat+'','ko'); });
+  // 같은 이름은 한 카드로 (분류마다 소제목)
+  var byName=groupByName(list.map(function(c){ return c.it; }), tq?function(it){ return trank[it.id]; }:null), cmap={};
+  list.forEach(function(c){ cmap[c.it.id]=c; });
+  if(tq) byName.sort(function(a,b){ return a.rank-b.rank || a.name.length-b.name.length; });
+  list=byName.map(function(g){ return { name:g.name, cards:g.items.map(function(it){ return cmap[it.id]; }) }; });
   var shown=list.slice(0,TOT_SHOWN);
-  document.getElementById('totList').innerHTML=list.length?shown.map(function(c){
-    var it=c.it, tot=it.total||0;
-    return '<div class="tcard" style="border-left-color:'+catColor(it.cat)+'"><div class="th"><span class="nm2">'+esc(it.name)+' '+badge(it.cat)+'</span><span class="tt">총 '+fmt(tot)+'<small> 개</small></span></div>'+
-      c.rows.map(function(r){ return '<div class="trow'+(r.q?'':' z')+'" onclick="totGo(\''+escJs(r.k)+'\')"><span class="tl">'+(r.pin?'📌 ':'📍 ')+esc(locDisp(r.k))+'</span>'+
-        (r.q?'<span class="tq">'+fmt(r.q)+'개</span><span class="ts">(총수량 '+fmt(tot)+'개)</span>':'<span class="tq">미입력 ✏️</span>')+'</div>'; }).join('')+'</div>';
+  document.getElementById('totList').innerHTML=list.length?shown.map(function(g){
+    var gt=g.cards.reduce(function(t,c){ return t+(c.it.total||0); },0), many=g.cards.length>1;
+    return '<div class="tcard" style="border-left-color:'+catColor(g.cards[0].it.cat)+'"><div class="th"><span class="nm2">'+esc(g.name)+(many?'':' '+badge(g.cards[0].it.cat))+'</span><span class="tt">총 '+fmt(gt)+'<small> 개</small></span></div>'+
+      g.cards.map(function(c){ var it=c.it, tot=it.total||0;
+        return (many?'<div class="tsub">'+badge(it.cat)+'<span class="tt2">'+fmt(tot)+'개</span></div>':'')+
+        c.rows.map(function(r){ return '<div class="trow'+(r.q?'':' z')+'" onclick="totGo(\''+escJs(r.k)+'\')"><span class="tl">'+(r.pin?'📌 ':'📍 ')+esc(locDisp(r.k))+'</span>'+
+          (r.q?'<span class="tq">'+fmt(r.q)+'개</span><span class="ts">(총수량 '+fmt(tot)+'개)</span>':'<span class="tq">미입력 ✏️</span>')+'</div>'; }).join(''); }).join('')+'</div>';
   }).join('')+(list.length>TOT_SHOWN?'<div style="text-align:center;margin:12px 0"><button class="addline" style="display:inline-block;padding:10px 24px" onclick="TOT_SHOWN+=60;renderTotal()">더 보기 ('+fmt(list.length-TOT_SHOWN)+'개 남음)</button></div>':'')
     :'<div class="loading">'+(all.length?'조건에 맞는 품목이 없어요.':'위치도에서 📌 제품을 지정하거나 수량을 넣으면 여기에 보여요.')+'</div>';
 }

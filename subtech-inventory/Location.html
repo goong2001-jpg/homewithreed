@@ -210,6 +210,15 @@
 #locApp .icard .lr b{font-variant-numeric:tabular-nums;white-space:nowrap}
 #locApp .icard .lr.z{color:var(--sub)}
 #locApp .rsec{margin:0;padding:6px 12px 2px;font-size:12px;color:var(--sub)}
+/* 검색: 분류 칩 · 이름별 묶음 카드 */
+#locApp .results .schips{display:flex;gap:6px;overflow-x:auto;padding:8px 12px;border-bottom:1.5px solid var(--line);scrollbar-width:none}
+#locApp .results .schips button{flex:0 0 auto;width:auto;display:inline-block;padding:5px 11px;border:1.5px solid var(--line);border-radius:16px;font-size:13px;background:var(--slot);white-space:nowrap}
+#locApp .results .schips button.on{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:700}
+#locApp .icard .gcat{display:flex;align-items:baseline;gap:8px;margin:6px 0 0;font-size:13.5px}
+#locApp .icard .gcat .cb{padding:1px 8px;border-radius:4px;background:var(--bg);border:1px solid var(--line);font-size:12px;font-weight:700}
+#locApp .icard .gcat b{margin-left:auto;font-variant-numeric:tabular-nums}
+#locApp .results .icard button.gz,#locApp .icard .gz{color:var(--sub);font-size:12.5px;justify-content:flex-start}
+#locApp .results button.more{align-items:center;font-weight:700}
 #locApp .srow .nm[data-item]{text-decoration:underline;text-decoration-color:var(--line);cursor:pointer}
 #locApp .srow{display:flex;align-items:center;gap:6px;padding:7px 0;border-top:1px dashed var(--line)}
 #locApp .srow:first-of-type{border-top:0}
@@ -1224,11 +1233,46 @@ function openBackup(){
 }
 
 /* ---------- 검색 ---------- */
+/* ---------- 검색: 같은 이름은 한 카드로 묶고, 정확히 맞는 이름 먼저, "이름 분류" 띄어쓰기로 분류까지 ---------- */
+const nrm=v=>String(v||'').replace(/\s+/g,'').toLowerCase();
+/** 검색어에 맞으면 순위 (0 정확히 같은 이름, 1 이름이 그걸로 시작, 2 이름에 포함, 3 기타), 안 맞으면 -1 */
+function srank(it,q){const nq=nrm(q),nm=nrm(it.name),ct=nrm(it.cat);if(!nq)return -1;
+  if(nm===nq)return 0;if(nm.startsWith(nq))return 1;if(nm.includes(nq))return 2;
+  const tk=String(q).trim().toLowerCase().split(/\s+/).map(nrm).filter(Boolean);if(tk.length<2)return -1;
+  if(!tk.every(t=>nm.includes(t)||ct.includes(t)))return -1;
+  const nt=tk.filter(t=>nm.includes(t)).join('');return !nt?3:nm===nt?0:nm.startsWith(nt)?1:2}
+let SCAT='*',SG_SHOWN=8;try{SCAT=localStorage.getItem('subtek-scat')||'*'}catch(e){}
+/** 검색 결과를 이름별로 묶음 → {groups:[{name,rank,items}], cats:{분류:개수}, total, cat(실제로 적용된 분류)} */
+function searchGroups(q){
+  const hits=ITEMS.map(it=>({it,r:srank(it,q)})).filter(h=>h.r>=0),cats={};
+  hits.forEach(h=>{const c=h.it.cat||'';cats[c]=(cats[c]||0)+1});
+  const cat=SCAT!=='*'&&cats[SCAT]?SCAT:'*'; // 기억한 분류가 이번 결과에 없으면 전체
+  const g={};hits.filter(h=>cat==='*'||(h.it.cat||'')===cat).forEach(h=>{const k=nrm(h.it.name);
+    const x=g[k]=g[k]||{name:h.it.name,rank:9,items:[]};x.rank=Math.min(x.rank,h.r);x.items.push(h.it)});
+  return{groups:Object.values(g),cats,total:hits.length,cat};
+}
+/** 묶음 카드: 분류마다 총수량 + 위치별 수량, 재고 0인 분류는 한 줄로 접어둠 */
+function groupCardHTML(gr,ix){
+  const infos=gr.items.map(it=>itemInfo(it.id,ix)),on=infos.filter(c=>c.rows.length).sort((a,b)=>b.total-a.total),zero=infos.filter(c=>!c.rows.length);
+  const tot=infos.reduce((t,c)=>t+c.total,0);
+  return `<div class="icard"><div class="ih"><b>${esc(gr.name)}</b><span class="tot">총 ${fmtN(tot)}개</span></div>`+
+    on.map(c=>`<div class="gcat"><span class="cb">${esc(c.cat||'분류 없음')}</span><b>${fmtN(c.total)}개</b></div>`+
+      c.rows.map(w=>`<button class="lr${w.qty?'':' z'}" data-goloc="${esc(w.k)}"><span>${w.pin?'📌 ':''}${esc(w.label)}</span><b>${fmtN(w.qty)}</b></button>`).join('')).join('')+
+    (zero.length?`<button class="lr gz" data-gz="1">재고 0: ${zero.map(c=>esc(c.cat||'분류 없음')).join(' · ')} ▾</button><div hidden>${zero.map(c=>`<button class="lr z" data-item="${esc(c.id)}"><span>${esc(c.cat||'분류 없음')}</span><b>0</b></button>`).join('')}</div>`:'')+'</div>'}
 function renderResults(){
   const q=query(),box=E('results');renderGrid();if(!q){box.hidden=true;return}
-  const out=[],norm=v=>String(v||'').replace(/\s+/g,'').toLowerCase(),nq=norm(q);
-  // 1) 품목: 총수량 + 위치별 수량 (재고 또는 📌지정이 있는 품목)
-  const ix=keyIndex(),cards=ITEMS.filter(it=>norm(it.name).includes(nq)).map(it=>itemInfo(it.id,ix)).filter(c=>c.rows.length).slice(0,8);
+  const out=[],norm=nrm,nq=norm(q);
+  // 1) 품목: 이름별로 묶어서, 정확히 맞는 이름 → 재고 있는 것 → 짧은 이름 순
+  const ix=keyIndex(),SR=searchGroups(q);
+  const hasRows=gr=>gr.items.some(it=>itemInfo(it.id,ix).rows.length);
+  SR.groups.forEach(gr=>{gr.on=hasRows(gr);gr.tot=gr.items.reduce((t,it)=>t+itemInfo(it.id,ix).total,0)});
+  SR.groups.sort((a,b)=>a.rank-b.rank||(b.on-a.on)||(b.tot-a.tot)||[...a.name].length-[...b.name].length||String(a.name).localeCompare(String(b.name),'ko'));
+  const live=SR.groups.filter(g=>g.on),dead=SR.groups.filter(g=>!g.on);
+  const catKeys=Object.keys(SR.cats).sort((a,b)=>SR.cats[b]-SR.cats[a]);
+  const chips=catKeys.length>1?`<div class="schips"><button data-scat="*" class="${SR.cat==='*'?'on':''}">전체 ${SR.total}</button>${catKeys.map(c=>`<button data-scat="${esc(c)}" class="${SR.cat===c?'on':''}">${esc(c||'분류 없음')} ${SR.cats[c]}</button>`).join('')}</div>`:'';
+  const cardsHTML=live.slice(0,SG_SHOWN).map(g=>groupCardHTML(g,ix)).join('')+(live.length>SG_SHOWN?`<button class="more" data-more="1">더 보기 (${live.length-SG_SHOWN}개 더)</button>`:'')+
+    (dead.length?'<p class="rsec">재고·📌지정 없는 품목</p>'+dead.slice(0,10).map(g=>g.items.map(it=>`<button data-item="${esc(it.id)}"><span>${esc(it.name)} <small>${esc(it.cat||'')}</small></span><span class="rw">재고 없음</span></button>`).join('')).join(''):'');
+  const cards=[].concat(...live.map(g=>g.items));
   // 2) 칸 이름·메모·📌지정(재고 0)
   S.sheets.forEach((s,si)=>{for(const k in s.cells){const x=s.cells[k];const[r,c]=k.split(',').map(Number);
     if(String(x.label||'').toLowerCase().includes(q))out.push({si,r,c,w:'',t:x.label});
@@ -1241,13 +1285,17 @@ function renderResults(){
   const shown={};cards.forEach(c=>shown[c.id]=1);
   const rest=out.filter(o=>!(o.pid&&shown[o.pid]));
   // 같은 이름의 품목이 없으면: 새 품목으로 만들어 바로 입고
-  const raw=E('q').value.trim(),exact=ITEMS.some(it=>norm(it.name)===nq);
+  const raw=E('q').value.trim(),exact=ITEMS.some(it=>norm(it.name)===nq)||SR.groups.some(g=>g.rank===0);
   const newBtn=(GAS&&stockLoaded&&raw&&!exact)?`<button class="newin" data-newin="1">＋ "${esc(raw)}" 새 품목으로 만들어 입고</button>`:'';
   box.hidden=false;
-  box.innerHTML=newBtn+(cards.length?'<p class="rsec">품목별 위치·수량</p>'+cards.map(itemCardHTML).join(''):'')+
+  box.innerHTML=newBtn+chips+(SR.groups.length?(live.length?'<p class="rsec">품목별 위치·수량</p>':'')+cardsHTML:'')+
     (rest.length?(cards.length?'<p class="rsec">이름·메모로 찾은 칸</p>':'')+rest.slice(0,40).map(o=>`<button data-n="${out.indexOf(o)}"><span class="rw">${esc(S.sheets[o.si].name)+' '+code(o.r,o.c)+' '+esc(o.w)}</span><span>${esc(o.t)}</span></button>`).join(''):'')||
     (newBtn?'':`<p class="none">"${esc(E('q').value.trim())}"이(가) 있는 칸이 없어요</p>`);
   box.querySelectorAll('[data-goloc]').forEach(b=>b.onclick=()=>{box.hidden=true;goLoc(b.dataset.goloc)});
+  box.querySelectorAll('[data-scat]').forEach(b=>b.onclick=()=>{SCAT=b.dataset.scat;SG_SHOWN=8;try{localStorage.setItem('subtek-scat',SCAT)}catch(e){}renderResults()});
+  box.querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{SG_SHOWN+=8;renderResults()});
+  box.querySelectorAll('[data-gz]').forEach(b=>b.onclick=()=>{const d=b.nextElementSibling;d.hidden=!d.hidden});
+  box.querySelectorAll('[data-item]').forEach(b=>b.onclick=()=>{box.hidden=true;openItem(b.dataset.item)});
   const nb=box.querySelector('[data-newin]');if(nb)nb.onclick=()=>{box.hidden=true;if(MV)MV=null;mergeMode=false;sel.clear();PIN={name:raw};render();toast('입고할 칸을 누르세요. 다른 시트 탭으로 가서 골라도 돼요')};
   box.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{const o=out[+b.dataset.n];box.hidden=true;flashCell(o.si,o.r,o.c)});
 }
@@ -1291,9 +1339,9 @@ function openItem(id){
   P.querySelectorAll('[data-goloc]').forEach(b=>b.onclick=()=>goLoc(b.dataset.goloc));
   openPanel();
 }
-E('q').oninput=renderResults;
+E('q').oninput=()=>{SG_SHOWN=8;renderResults()};
 E('q').onfocus=()=>{if(query())renderResults()};
-document.addEventListener('click',e=>{if(!e.target.closest('#locApp .search'))E('results').hidden=true});
+document.addEventListener('click',e=>{if(!e.target.isConnected)return; /* 칩 등 누르는 순간 다시 그려진 버튼 */ if(!e.target.closest('#locApp .search'))E('results').hidden=true});
 
 /* ---------- 버튼 ---------- */
 E('bMerge').onclick=()=>{if(staleBlock())return;if(MV)endMove();QM=false;mergeMode=!mergeMode;sel.clear();render()};
