@@ -217,7 +217,7 @@
 </div>
 
 <script>
-var HTML_VERSION = 'v31'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v32'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var BOMROWS = null, MEMO_SHOWN = 50, PREFETCHED = false;
@@ -503,13 +503,15 @@ function totalCards(){
 }
 function renderTotal(){
   var all=totalCards(), sq=val('totSearch').toLowerCase();
-  var ORDS=(window.locApi&&locApi.orders)?locApi.orders():[], fs=['전체','미입력 있음','입력 완료','🚫 재고X'];
-  document.getElementById('totFilter').innerHTML=fs.map(function(f){ return '<div class="f '+(f===totFilter?'on':'')+'" onclick="setTotFilter(\''+f+'\')"'+(f==='🚫 재고X'?' style="border-color:#dc2626;color:'+(f===totFilter?'#fff;background:#dc2626':'#dc2626')+'"':'')+'>'+f+(f==='🚫 재고X'&&ORDS.length?' '+ORDS.length:'')+'</div>'; }).join('');
+  var OM=(window.locApi&&locApi.orderMap)?locApi.orderMap():{}, ORDS=Object.keys(OM), nX=ORDS.filter(function(id){ return OM[id]==='x'; }).length, fs=['전체','미입력 있음','입력 완료','🚫 재고X','📦 발주완료'];
+  document.getElementById('totFilter').innerHTML=fs.map(function(f){ var col=f==='🚫 재고X'?'#dc2626':f==='📦 발주완료'?'#1d4ed8':'', n=f==='🚫 재고X'?nX:f==='📦 발주완료'?ORDS.length-nX:0;
+    return '<div class="f '+(f===totFilter?'on':'')+'" onclick="setTotFilter(\''+f+'\')"'+(col?' style="border-color:'+col+';'+(f===totFilter?'background:'+col+';color:#fff':'color:'+col)+'"':'')+'>'+f+(n?' '+n:'')+'</div>'; }).join('');
   var pins=0, done=0, sumQ=0; all.forEach(function(c){ c.rows.forEach(function(r){ if(r.pin){ pins++; if(r.q) done++; } }); sumQ+=c.it.total||0; });
   document.getElementById('totSum').innerHTML='<div class="totsum"><span>품목 <b>'+fmt(all.length)+'</b>종</span><span>전체 <b>'+fmt(sumQ)+'</b>개</span><span>📌 지정 칸 입력 <b>'+fmt(done)+'</b> / '+fmt(pins)+'곳</span></div>';
   var tq=val('totSearch'), trank={};
   var list=all.filter(function(c){ if(tq){ var r=srank(c.it,tq); if(r<0) return false; trank[c.it.id]=r; }
-    if(totFilter==='🚫 재고X') return ORDS.indexOf(c.it.id)>=0;
+    if(totFilter==='🚫 재고X') return OM[c.it.id]==='x';
+    if(totFilter==='📦 발주완료') return OM[c.it.id]==='o';
     return totFilter==='전체'||(totFilter==='미입력 있음'?c.todo>0:c.todo===0); });
   list.sort(function(a,b){ return (a.it.name+'').localeCompare(b.it.name+'','ko',{numeric:true}) || (a.it.cat+'').localeCompare(b.it.cat+'','ko'); });
   // 같은 이름은 한 카드로 (분류마다 소제목)
@@ -522,7 +524,7 @@ function renderTotal(){
     var gt=g.cards.reduce(function(t,c){ return t+(c.it.total||0); },0), many=g.cards.length>1;
     return '<div class="tcard" style="border-left-color:'+catColor(g.cards[0].it.cat)+'"><div class="th"><span class="nm2">'+esc(g.name)+(many?'':' '+badge(g.cards[0].it.cat))+'</span><span class="tt">총 '+fmt(gt)+'<small> 개</small></span></div>'+
       g.cards.map(function(c){ var it=c.it, tot=it.total||0;
-        var xo=ORDS.indexOf(it.id)>=0?'<span style="color:#dc2626;font-weight:800;font-size:12px">🚫재고X</span>':'';
+        var xo=OM[it.id]==='x'?'<span style="color:#dc2626;font-weight:800;font-size:12px">🚫재고X</span>':OM[it.id]==='o'?'<span style="color:#1d4ed8;font-weight:800;font-size:12px">📦발주완료</span>':'';
         return (many?'<div class="tsub">'+badge(it.cat)+xo+'<span class="tt2">'+fmt(tot)+'개</span></div>':(xo?'<div class="tsub">'+xo+'</div>':''))+
         c.rows.map(function(r){ return '<div class="trow'+(r.q?'':' z')+'" onclick="totGo(\''+escJs(r.k)+'\')"><span class="tl">'+(r.pin?'📌 ':'📍 ')+esc(locDisp(r.k))+'</span>'+
           (r.q?'<span class="tq">'+fmt(r.q)+'개</span><span class="ts">(총수량 '+fmt(tot)+'개)</span>':'<span class="tq">미입력 ✏️</span>')+'</div>'; }).join(''); }).join('')+'</div>';
