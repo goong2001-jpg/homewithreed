@@ -308,6 +308,18 @@
 #locApp .status,#locApp .where small,#locApp .results .rw,#locApp .qhead .qnow,#locApp .qhead .nm small,#locApp .olist .orow .nm small,#locApp .icard .ih small,#locApp .rsec{font-size:13px}
 #locApp .qbox h3 small,#locApp .sk h3 small,#locApp .kindsel button small{font-size:12.5px}
 #locApp .hint,#locApp .note,#locApp .ph small,#locApp .pp .pk{font-size:13px}
+/* v35: 편집 버튼 줄 · 칸 설정 접기 */
+#locApp .tools2{padding-top:0}
+#locApp .tools2 button{border-style:dashed}
+#locApp .tools2[hidden]{display:none}
+#locApp details.cfg{border:1.5px solid var(--line);border-radius:6px;margin:4px 0 12px;padding:0 12px}
+#locApp details.cfg summary{min-height:44px;display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer;list-style:none}
+#locApp details.cfg summary::-webkit-details-marker{display:none}
+#locApp details.cfg summary::after{content:'▾';margin-left:auto;color:var(--sub)}
+#locApp details.cfg[open] summary::after{content:'▴'}
+#locApp details.cfg summary small{font-weight:400;color:var(--sub);font-size:13px}
+#locApp details.cfg[open]{padding-bottom:4px}
+#locApp details.cfg .kindsel{margin-bottom:8px}
 </style>
 
 <div id="locApp">
@@ -324,11 +336,14 @@
     <div class="tools">
       <button data-el="bOut" class="xbtn">🚫 재고X</button>
       <button data-el="bQty" class="qbtn">✏️ 수량 입력</button>
+      <button data-el="bMore" aria-expanded="false">⚙️ 편집 ▾</button>
+      <span class="zoom"><button data-el="zOut" aria-label="칸 작게">가−</button><button data-el="zIn" aria-label="칸 크게">가＋</button></span>
+    </div>
+    <div class="tools tools2" data-el="tools2" hidden>
       <button data-el="bMerge">칸 합치기</button>
       <button data-el="bLine">줄·칸 옮기기</button>
       <button data-el="bSheet">시트 설정</button>
       <button data-el="bBackup">가져오기·내보내기</button>
-      <span class="zoom"><button data-el="zOut" aria-label="칸 작게">가−</button><button data-el="zIn" aria-label="칸 크게">가＋</button></span>
     </div>
     <p class="hint" data-el="hint">칸을 누르면 이름과 자재를 적을 수 있어요. 칸을 <b>길게 누른 채 끌면</b> 다른 칸으로 옮겨져요.</p>
     <div class="stkbar" data-el="stkBar"></div>
@@ -598,7 +613,7 @@ function renderGrid(){
   }
 }
 function renderMerge(){
-  E('floor').classList.toggle('merging',mergeMode);E('bMerge').classList.toggle('on',mergeMode);
+  E('floor').classList.toggle('merging',mergeMode);E('bMerge').classList.toggle('on',mergeMode);drawMore();
   E('mergeBar').hidden=!mergeMode;E('hint').hidden=mergeMode;
   E('mergeInfo').textContent=sel.size?`${sel.size}칸 선택됨 (선택한 칸을 감싸는 네모로 합쳐요)`:'합칠 칸을 차례로 누르세요';
 }
@@ -1096,22 +1111,30 @@ function openClearCell(s,r,c){
 
 /* ---------- 패널 ---------- */
 function openPanel(){E('shade').hidden=false;E('panel').hidden=false}
+/* 가끔 쓰는 편집 버튼(칸 합치기·줄·칸 옮기기·시트 설정·가져오기)은 '⚙️ 편집' 안에 접어 둠. 칸 합치는 중엔 펼친 채로 */
+let moreOpen=false;
+function drawMore(){const open=moreOpen||mergeMode,b=E('bMore');E('tools2').hidden=!open;b.classList.toggle('on',open);b.setAttribute('aria-expanded',open?'true':'false');b.textContent=open?'⚙️ 편집 ▴':'⚙️ 편집 ▾'}
 function closePanel(){E('shade').hidden=true;E('panel').hidden=true;delArm=false}
 E('shade').onclick=closePanel;
 
 function openCell(){drawCell();openPanel()}
 function drawCell(){
   const s=sh(),{r,c}=cur,x=get(s,r,c),P=E('panelBody'),big=x.rs*x.cs>1;P.dataset.kind='cell';
+  /* 순서: 현재 재고(입고·출고·이동) → 수량 입력 → 칸 설정(접힘) → 메모. 새 칸·이름표·빈 공간은 설정을 펼쳐서 */
+  const ck=s.id+':'+K(r,c),od=P.querySelector('details.cfg'),blank0=x.type!=='slot'||(!x.label&&!cellHasStock(s,r,c)&&!x.layers.some(L=>(L.p&&L.p.length)||String(L.t||'').trim()));
+  const cfgOpen=(od&&P.dataset.ck===ck)?od.open:blank0;P.dataset.ck=ck;
   const ph={slot:'예: 선반1, 파레트',label:'예: 현관, 벽쪽, 가운데',void:'예: 복도, 통로'}[x.type];
   P.innerHTML=`<div class="ph"><h2>${shTag()}${code(r,c)}${big?`<small>${x.rs}×${x.cs} 합친 칸</small>`:''}</h2><button class="x" data-a="close">닫기</button></div>
-  <div class="seg">${[['slot','보관칸'],['label','이름표'],['void','빈 공간']].map(([v,t])=>`<button data-type="${v}" class="${x.type===v?'on':''}">${t}</button>`).join('')}</div>
-  <label class="f">이름${big?' (합친 칸은 가운데에 크게 보여요)':''}<input data-f="label" value="${esc(x.label)}" placeholder="${ph}"></label>
-  ${x.type==='slot'?`<div class="kindsel"><span class="pk">적재 방식</span><button data-kind="" class="${x.kind?'':'on'}">없음</button>${Object.keys(KINDS).map(k=>`<button data-kind="${esc(k)}" class="${x.kind===k?'on':''}">${esc(k)}<small>${KINDS[k].mov}</small></button>`).join('')}</div>`:''}
-  ${x.type==='slot'&&GAS?qtyHTML(s,r,c,false):''}
-  ${x.type==='slot'&&x.layers.length>1&&x.layers.some((L,i)=>layerMovable(s,r,c,i))?`<button class="mvall" data-mvcell="1">⇄ 칸째로 이동 (${x.layers.map((L,i)=>(i+1)+'층').join('·')} 모두)</button>`:''}
   ${x.type==='slot'?x.layers.map((L,i)=>{const k=slotKey(s,r,c,i),list=stockAt(k);return `<div class="sk"><h3>현재 재고${x.layers.length>1?' · '+(i+1)+'층':''}<small>${esc(k)}</small></h3>
     ${stockLoaded||!GAS?stockRows(list,k):'<p class="none">불러오는 중…</p>'}<button class="in" data-in="${esc(k)}">＋ 이 칸에 입고</button>${layerMovable(s,r,c,i)?`<button class="mv" data-mvl="${i}">⇄ ${x.layers.length>1?(i+1)+'층':'칸'} 전체 이동</button>`:''}
     ${GAS?`<div class="pp"><span class="pk">📌 지정 제품</span>${(L.p||[]).map((pr,pi)=>`<span class="chip">${nameCat(prodName(pr),prodCat(pr))}<button data-unp="${i},${pi}" aria-label="${esc(prodName(pr))} 지정 해제">✕</button></span>`).join('')}<button class="mv" data-pick="${i}">＋ 제품 지정</button></div>`:''}</div>`}).join(''):''}
+  ${x.type==='slot'&&x.layers.length>1&&x.layers.some((L,i)=>layerMovable(s,r,c,i))?`<button class="mvall" data-mvcell="1">⇄ 칸째로 이동 (${x.layers.map((L,i)=>(i+1)+'층').join('·')} 모두)</button>`:''}
+  ${x.type==='slot'&&GAS?qtyHTML(s,r,c,false):''}
+  <details class="cfg"${cfgOpen?' open':''}><summary>⚙️ 칸 설정 <small>종류 · 이름 · 적재 방식</small></summary>
+  <div class="seg">${[['slot','보관칸'],['label','이름표'],['void','빈 공간']].map(([v,t])=>`<button data-type="${v}" class="${x.type===v?'on':''}">${t}</button>`).join('')}</div>
+  <label class="f">이름${big?' (합친 칸은 가운데에 크게 보여요)':''}<input data-f="label" value="${esc(x.label)}" placeholder="${ph}"></label>
+  ${x.type==='slot'?`<div class="kindsel"><span class="pk">적재 방식</span><button data-kind="" class="${x.kind?'':'on'}">없음</button>${Object.keys(KINDS).map(k=>`<button data-kind="${esc(k)}" class="${x.kind===k?'on':''}">${esc(k)}<small>${KINDS[k].mov}</small></button>`).join('')}</div>`:''}
+  </details>
   ${x.type==='slot'?x.layers.map((L,i)=>`<label class="f">${x.layers.length>1?(i+1)+'층 메모':'메모 (직접 적는 자재)'}<textarea data-i="${i}" rows="3" placeholder="자재명을 한 줄에 하나씩">${esc(L.t)}</textarea></label>`).join(''):''}
   <div class="acts">
     ${x.type==='slot'?(x.layers.length===1?'<button data-a="split">1층·2층으로 나누기</button>':`${x.layers.length<4?'<button data-a="addL">층 추가</button>':''}<button data-a="joinL">층 없애기</button>`):''}
@@ -1463,6 +1486,7 @@ E('q').onfocus=()=>{if(query())renderResults()};
 document.addEventListener('click',e=>{if(!e.target.isConnected)return; /* 칩 등 누르는 순간 다시 그려진 버튼 */ if(!e.target.closest('#locApp .search'))E('results').hidden=true});
 
 /* ---------- 버튼 ---------- */
+E('bMore').onclick=()=>{moreOpen=!moreOpen;drawMore()};
 E('bMerge').onclick=()=>{if(staleBlock())return;if(MV)endMove();QM=false;mergeMode=!mergeMode;sel.clear();render()};
 E('bQty').onclick=()=>{if(staleBlock())return;if(MV)endMove();mergeMode=false;sel.clear();QM=!QM;render()};
 E('bQtyEnd').onclick=()=>{QM=false;render()};

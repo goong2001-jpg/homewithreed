@@ -73,6 +73,23 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
   ok(await pg.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(25, 28, 30)', '현재고 탭도 어두운 배경');
   await pg.emulateMedia({ colorScheme: 'light' });
 
+  console.log('편집 버튼 줄 · 칸 창 순서 · 알림 (v35)');
+  await pg.click('#navLoc'); await pg.waitForTimeout(100);
+  ok(!(await L('tools2').isVisible()), '편집 버튼(칸 합치기 등)은 접혀 있음');
+  await L('bMore').tap(); ok(await L('bMerge').isVisible(), '⚙️ 편집 누르면 펼쳐짐'); await L('bMore').tap();
+  await pg.locator('#locApp .cell[data-k="1,1"]').tap(); await pg.waitForTimeout(200);
+  ok(await pg.evaluate(() => { const P = document.querySelector('#locApp [data-el="panelBody"]'), a = P.querySelector('.sk'), d = P.querySelector('details.cfg'); return !!(a && d && !d.open && (a.compareDocumentPosition(d) & 4)); }), '칸 창: 현재 재고가 위, 칸 설정은 아래에 접힘');
+  await pg.locator('#locApp .panel [data-a="close"]').first().tap();
+  await pg.locator('#locApp .cell[data-k="2,2"]').tap(); await pg.waitForTimeout(200);
+  ok(await pg.evaluate(() => document.querySelector('#locApp details.cfg').open), '빈 칸은 칸 설정이 펼쳐져 있음');
+  await pg.locator('#locApp .panel [data-a="close"]').first().tap();
+  await pg.evaluate(() => notice({ message: '테스트 오류' }, 1, '저장 실패: '));
+  ok((await pg.locator('#notice').innerText()) === '저장 실패: 테스트 오류' && await pg.locator('#notice.err').isVisible(), '오류는 팝업 대신 화면 아래 알림');
+  await pg.context().setOffline(true); await pg.waitForTimeout(200);
+  ok(await pg.locator('#netBar').isVisible(), '인터넷 끊기면 위쪽에 안내');
+  await pg.context().setOffline(false); await pg.waitForTimeout(200);
+  ok(!(await pg.locator('#netBar').isVisible()), '다시 연결되면 안내 사라짐');
+
   ok(errs.length === 0, '페이지 오류 없음 ' + (errs.length ? JSON.stringify(errs) : ''));
   await b.close();
   console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과');

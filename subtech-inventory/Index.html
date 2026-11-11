@@ -83,6 +83,11 @@
   .bcard .bneck { font-size:12.5px; } .bpart { font-size:13px; } .bact span { font-size:13px; padding:6px 0; } .oxchip { font-size:12px; } .mphoto .mplabel { font-size:11.5px; } .memocard .foot { font-size:12px; }
   .field2 .k2 { font-size:12px; } .nav div { font-size:11.5px; } .nav .ic { font-size:20px; }
   .tcard .th .tt small { font-size:12px; } .trow { font-size:14px; } .trow .ts { font-size:12.5px; } .dangerbox { font-size:12.5px; } .sgrp .gh span { font-size:12.5px; } .sgrp .gr { font-size:14px; }
+  /* v35: 화면 아래 알림 · 인터넷 끊김 표시 */
+  .notice { position:fixed; left:50%; bottom:76px; transform:translateX(-50%); z-index:60; max-width:92vw; width:max-content; background:#1f2733; color:#fff; padding:12px 16px; border-radius:10px; font-size:14.5px; font-weight:700; line-height:1.5; white-space:pre-line; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+  .notice.err { background:#7f1d1d; border:1.5px solid #f87171; }
+  .netbar { position:fixed; top:0; left:0; right:0; z-index:70; background:#b45309; color:#fff; text-align:center; font-size:13.5px; font-weight:800; height:36px; line-height:36px; white-space:nowrap; overflow:hidden; }
+  body.offline { padding-top:36px; } body.offline .appbar { top:36px; } body.offline #locApp .where { top:36px; }
   /* v34: 다크 모드 (폰이 다크 모드면 위치도와 같은 어두운 화면) */
   @media (prefers-color-scheme:dark){
     :root { color-scheme:dark; }
@@ -111,6 +116,7 @@
     .srow .q2.low, .bcard .bnum.zero, .bcard .bneck, .bpart.lim .pn, .warnline, .delItem, .hrow .undo { color:#F87171; }
     .dangerbox { border-color:#7F3030; } .dangerbox button { color:#F87171; border-color:#F87171; }
     .mphoto img, .pthumb img { border-color:#3A4044; } .res { box-shadow:none; }
+    .notice { background:#E3E5E0; color:#191C1E; } .notice.err { background:#7f1d1d; color:#fff; }
     .dk-ink { color:#E3E5E0 !important; } .locchip.none { background:#2C3134; color:#9AA09C; } .locchip.pin { background:#3D2A14; color:#FDBA74; }
   }
 </style>
@@ -248,6 +254,9 @@
   <button class="savebtn blue" id="mBtn" onclick="saveMemoForm()">＋ 메모 저장</button>
 </div>
 
+<div class="netbar hidden" id="netBar">📡 인터넷 끊김 — 연결될 때까지 저장이 안 됩니다</div>
+<div class="notice hidden" id="notice" onclick="this.className='notice hidden'"></div>
+
 <div class="nav">
   <div id="navLoc" class="on" onclick="go('loc')"><span class="ic">📍</span>위치도</div>
   <div id="navTotal" onclick="go('total')"><span class="ic">🧮</span>총수량</div>
@@ -258,7 +267,22 @@
 </div>
 
 <script>
-var HTML_VERSION = 'v34'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+// 알림: 시스템 팝업(alert) 대신 화면 아래에 뜨는 알림 (위치도와 같은 방식). 오류는 빨간 테두리, 누르면 닫힘
+var NT=null;
+function notice(m,isErr,prefix){
+  if(m&&typeof m==='object') m=m.message||String(m);
+  m=String(m==null?'':m);
+  if(isErr){ if(!navigator.onLine||/NetworkError|Failed to fetch|network|연결/i.test(m)) m='인터넷 연결이 끊겨 저장하지 못했어요.\n연결을 확인하고 다시 눌러주세요.'; else m=(prefix||'')+m; }
+  var el=document.getElementById('notice'); el.textContent=m; el.className='notice'+(isErr?' err':''); 
+  clearTimeout(NT); NT=setTimeout(function(){ el.className='notice hidden'; }, isErr?7000:Math.min(9000,2500+m.length*60));
+}
+// 인터넷 연결 끊김 표시 (창고 안쪽 등) — 끊긴 동안엔 저장이 안 됨을 미리 알려줌
+function netBar(){ var b=document.getElementById('netBar'); var off=navigator.onLine===false; if(b) b.classList.toggle('hidden', !off); document.body.classList.toggle('offline', off); }
+window.addEventListener('online',function(){ netBar(); notice('인터넷이 다시 연결됐어요'); }); window.addEventListener('offline',netBar);
+document.addEventListener('DOMContentLoaded',netBar);
+</script>
+<script>
+var HTML_VERSION = 'v35'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var BOMROWS = null, MEMO_SHOWN = 50, PREFETCHED = false;
@@ -297,8 +321,8 @@ function onBoot(d,cached){ var needLM=!d.locMap; DATA=d; if(!DATA.layout) DATA.l
   FROM_CACHE=false;
   if(!PREFETCHED){ PREFETCHED=true; setTimeout(prefetchTabs, 400); }
   applyDeepLink();
-  if(d.version && d.version!==HTML_VERSION) alert('⚠️ 버전 불일치!\n화면(Index.html): '+HTML_VERSION+' / 서버(Code.gs): '+d.version+'\n두 파일을 모두 최신으로 교체한 뒤 [배포 관리 > 수정 > 새 버전 > 배포] 하세요.'); }
-function onErr(e){ if(FROM_CACHE){ alert('서버에서 최신 정보를 못 받아 지난번 저장된 화면을 보여주고 있어요. 새로고침해 주세요.\n('+e.message+')'); return; } go('search'); document.getElementById('searchList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>'; }
+  if(d.version && d.version!==HTML_VERSION) notice('⚠️ 버전 불일치!\n화면(Index.html): '+HTML_VERSION+' / 서버(Code.gs): '+d.version+'\n두 파일을 모두 최신으로 교체한 뒤 [배포 관리 > 수정 > 새 버전 > 배포] 하세요.'); }
+function onErr(e){ if(FROM_CACHE){ notice('서버에서 최신 정보를 못 받아 지난번 저장된 화면을 보여주고 있어요. 새로고침해 주세요.\n('+e.message+')'); return; } go('search'); document.getElementById('searchList').innerHTML='<div class="loading">오류: '+esc(e.message)+'</div>'; }
 // 담당자 기억: 마지막에 고른 사람을 다음에도 (위치도와 같은 저장 키)
 function pickStaff(id){ var el=document.getElementById(id); if(!el) return; try{ var st=localStorage.getItem('subtek-staff')||''; if(st) for(var i=0;i<el.options.length;i++) if(el.options[i].value===st){ el.value=st; break; } }catch(e){}
   el.onchange=function(){ try{ localStorage.setItem('subtek-staff',el.value); }catch(e){} }; }
@@ -391,18 +415,18 @@ function openNewItem(){ ['niName','niCat','niUnit','niSafe'].forEach(function(id
   document.getElementById('niCatSel').innerHTML='<option value="">(분류 없음)</option>'+cats.map(function(c){return '<option>'+esc(c)+'</option>';}).join('')+'<option value="__new__">＋ 새 분류 직접 입력</option>';
   document.getElementById('niCat').style.display='none'; go('newItem'); }
 function onNiCat(){ document.getElementById('niCat').style.display = document.getElementById('niCatSel').value==='__new__' ? 'block' : 'none'; }
-function saveNewItem(){ var name=val('niName'); if(!name){alert('품명을 입력하세요.');return;}
+function saveNewItem(){ var name=val('niName'); if(!name){notice('품명을 입력하세요.');return;}
   var catSel=val('niCatSel'); var cat = catSel==='__new__' ? val('niCat') : catSel;
   var b=document.getElementById('niBtn'); b.disabled=true; b.textContent='추가 중…';
   google.script.run.withSuccessHandler(function(it){ DATA.items.push(it); catColorMap=null; fillDatalists(); cur=it; type='입고'; lines=[{boxes:'',per:String(it.unit||'')}]; txImgs=[]; b.disabled=false; b.textContent='＋ 품목 추가'; renderInput(); renderHistory([]); go('input'); })
-    .withFailureHandler(function(e){alert(e.message); b.disabled=false; b.textContent='＋ 품목 추가';}).addItem({name:name,cat:cat,unit:val('niUnit'),safe:val('niSafe')}); }
+    .withFailureHandler(function(e){notice(e,1); b.disabled=false; b.textContent='＋ 품목 추가';}).addItem({name:name,cat:cat,unit:val('niUnit'),safe:val('niSafe')}); }
 
 // 품명 수정
 function toggleRename(){ var box=document.getElementById('renameBox'); if(box.classList.contains('hidden')){ document.getElementById('reName').value=cur.name; document.getElementById('reCat').value=cur.cat; document.getElementById('reUnit').value=cur.unit||''; document.getElementById('reSafe').value=cur.safe||''; } box.classList.toggle('hidden'); }
-function doRename(){ var name=val('reName'); if(!name){alert('품명을 입력하세요.');return;}
+function doRename(){ var name=val('reName'); if(!name){notice('품명을 입력하세요.');return;}
   google.script.run.withSuccessHandler(function(r){ var old=cur.id; cur.id=r.id; cur.name=r.name; cur.cat=r.cat; cur.unit=r.unit; cur.safe=r.safe;
     DATA.items.forEach(function(it){ if(it.id===old){it.id=r.id;it.name=r.name;it.cat=r.cat;it.unit=r.unit;it.safe=r.safe;} }); catColorMap=null; fillDatalists(); document.getElementById('renameBox').classList.add('hidden'); renderInput();
-  }).withFailureHandler(function(e){alert(e.message);}).renameItem(cur.id,name,val('reCat'),val('reUnit'),val('reSafe')); }
+  }).withFailureHandler(function(e){notice(e,1);}).renameItem(cur.id,name,val('reCat'),val('reUnit'),val('reSafe')); }
 
 // 입출고/조정
 function setType(t){ type=t; renderInput(); }
@@ -492,19 +516,19 @@ function undoCell(h,fn){ if(h.cancel) return '<span class="tag">취소 기록</s
   return '<span class="undo" onclick="'+fn+'('+h.row+','+JSON.stringify(h.k==null?null:h.k).replace(/"/g,'&quot;')+')">취소</span>'; }
 function undoTx(row,k){ if(!confirm(UNDO_Q))return;
   google.script.run.withSuccessHandler(function(res){ cur.total=res.total; cur.locs=res.locs; var it=DATA.items.filter(function(x){return x.id===res.id;})[0]; if(it){it.total=res.total;it.locs=res.locs;} renderInput(); loadHistory(); })
-    .withFailureHandler(function(e){alert(e.message);}).undoTransaction(row,k); }
+    .withFailureHandler(function(e){notice(e,1);}).undoTransaction(row,k); }
 function doSave(){ var btn=document.getElementById('saveBtn'); btn.disabled=true; btn.textContent='저장 중…';
   if(type==='이동'){ var mq=Number(val('movQty'))||0;
-    google.script.run.withSuccessHandler(function(res){ syncCur(res); document.getElementById('movQty').value=''; showDone('이동',mq,res.total); }).withFailureHandler(function(e){alert(e.message); updateTotal();})
+    google.script.run.withSuccessHandler(function(res){ syncCur(res); document.getElementById('movQty').value=''; showDone('이동',mq,res.total); }).withFailureHandler(function(e){notice(e,1); updateTotal();})
       .moveStock({id:cur.id,name:cur.name,cat:cur.cat,fromLoc:val('movFrom'),toLoc:val('movTo'),qty:mq,staff:val('staffSel'),memo:val('memoInput'),images:txImgs.map(clean)}); return; }
   if(type==='조정'){ var loc=val('locSel'); var curLoc=(cur.locs&&cur.locs[loc])||0; var target=Number(val('adjTarget'))||0; var delta=target-curLoc;
-    google.script.run.withSuccessHandler(function(res){ syncCur(res); showDone('조정',delta,res.total); }).withFailureHandler(function(e){alert(e.message); updateTotal();})
+    google.script.run.withSuccessHandler(function(res){ syncCur(res); showDone('조정',delta,res.total); }).withFailureHandler(function(e){notice(e,1); updateTotal();})
       .adjustStock({id:cur.id,name:cur.name,cat:cur.cat,loc:loc,target:target,staff:val('staffSel'),memo:val('memoInput'),images:txImgs.map(clean)}); return; }
   var d=grandTotal();
   if(d<=0){ // 수량 변동 없는 기록(사진/메모)만 저장
-    google.script.run.withSuccessHandler(function(res){ syncCur(res); showDone('기록',0,res.total); }).withFailureHandler(function(e){alert('저장 실패: '+e.message); updateTotal();})
+    google.script.run.withSuccessHandler(function(res){ syncCur(res); showDone('기록',0,res.total); }).withFailureHandler(function(e){notice(e,1,'저장 실패: '); updateTotal();})
       .saveNote({id:cur.id,name:cur.name,cat:cur.cat,loc:val('locSel'),staff:val('staffSel'),memo:val('memoInput'),images:txImgs.map(clean)}); return; }
-  google.script.run.withSuccessHandler(function(res){ syncCur(res); showDone(type,d,res.total); if(type==='입고'&&window.locApi&&locApi.clearOut) locApi.clearOut(cur.id); }).withFailureHandler(function(e){alert('저장 실패: '+e.message); updateTotal();})
+  google.script.run.withSuccessHandler(function(res){ syncCur(res); showDone(type,d,res.total); if(type==='입고'&&window.locApi&&locApi.clearOut) locApi.clearOut(cur.id); }).withFailureHandler(function(e){notice(e,1,'저장 실패: '); updateTotal();})
     .save({id:cur.id,name:cur.name,cat:cur.cat,type:type,loc:val('locSel'),staff:val('staffSel'),memo:val('memoInput'),lines:lines,images:txImgs.map(clean)}); }
 function syncCur(res){ cur.total=res.total; cur.locs=res.locs; var it=DATA.items.filter(function(x){return x.id===cur.id;})[0]; if(it){it.total=res.total;it.locs=res.locs;} }
 function showDone(kind,delta,total){ document.getElementById('doneTitle').textContent=kind+' 저장 완료!'; document.getElementById('doneItem').textContent=cur.name+' · '+cur.cat; document.getElementById('doneTotal').textContent=fmt(total)+'개';
@@ -514,7 +538,7 @@ function showDone(kind,delta,total){ document.getElementById('doneTitle').textCo
     : ((pos?'＋':'−')+fmt(Math.abs(delta))+' '+kind+' ('+val('staffSel')+')');
   document.getElementById('memoInput').value=''; document.getElementById('adjTarget').value=''; txImgs=[]; go('done'); }
 function delCurItem(){ if(!confirm('"'+cur.name+' ('+cur.cat+')" 품목과 모든 기록을 삭제할까요?\n되돌릴 수 없습니다.'))return;
-  google.script.run.withSuccessHandler(function(){ DATA.items=DATA.items.filter(function(it){return it.id!==cur.id;}); catColorMap=null; fillDatalists(); alert('삭제되었습니다.'); go('search'); }).withFailureHandler(function(e){alert(e.message);}).deleteItem(cur.id); }
+  google.script.run.withSuccessHandler(function(){ DATA.items=DATA.items.filter(function(it){return it.id!==cur.id;}); catColorMap=null; fillDatalists(); notice('삭제되었습니다.'); go('search'); }).withFailureHandler(function(e){notice(e,1);}).deleteItem(cur.id); }
 
 // 현재고
 function toggleSort(){ sortMode=sortMode==='qty'?'name':'qty'; renderStock(); }
@@ -585,15 +609,15 @@ function totGo(k){ go('loc'); if(window.locApi&&locApi.editLoc) setTimeout(funct
 function resetAll(){
   var t=prompt('모든 품목·위치의 수량을 0으로 만듭니다.\n정말 하려면 아래에 초기화 라고 입력하세요.');
   if(t===null) return;
-  if(t.trim()!=='초기화'){ alert('"초기화"라고 정확히 입력해야 실행돼요. 아무것도 바꾸지 않았어요.'); return; }
+  if(t.trim()!=='초기화'){ notice('"초기화"라고 정확히 입력해야 실행돼요. 아무것도 바꾸지 않았어요.'); return; }
   document.getElementById('totList').innerHTML='<div class="loading">초기화 중…</div>';
   google.script.run.withSuccessHandler(function(res){
     google.script.run.withSuccessHandler(function(d){
       DATA.items=d.items; DATA.locMap=d.locMap||DATA.locMap; indexSlots();
       if(window.locApi){ locApi.setStock(DATA.items, DATA.staff); }
-      renderTotal(); alert('완료! 모든 수량이 0이 되었어요. (조정 '+res.rows+'줄)\n이제 위치도에서 ✏️ 수량 입력으로 칸마다 넣으면 돼요.');
-    }).withFailureHandler(function(e){ alert(e.message); renderTotal(); }).bootstrap();
-  }).withFailureHandler(function(e){ alert(e.message); renderTotal(); }).resetAllStock({confirm:t.trim(), staff:val('staffSel')});
+      renderTotal(); notice('완료! 모든 수량이 0이 되었어요. (조정 '+res.rows+'줄)\n이제 위치도에서 ✏️ 수량 입력으로 칸마다 넣으면 돼요.');
+    }).withFailureHandler(function(e){ notice(e,1); renderTotal(); }).bootstrap();
+  }).withFailureHandler(function(e){ notice(e,1); renderTotal(); }).resetAllStock({confirm:t.trim(), staff:val('staffSel')});
 }
 
 // 월별 리포트
@@ -646,19 +670,19 @@ function openNewBom(){ BF={parts:[{id:'',per:1}]}; document.getElementById('bomF
 function editBom(bi){ var b=BUILDS[bi]; if(!b)return; BF={origName:b.name,origCat:b.cat,parts:b.parts.map(function(p){return {id:p.name+'||'+p.cat,per:p.per};})};
   document.getElementById('bomFinished').innerHTML=itemOptions(b.name+'||'+b.cat); renderBomParts(); go('bomForm'); }
 function deleteBom(bi){ var b=BUILDS[bi]; if(!b)return; if(!confirm('"'+b.name+'" 조립 레시피를 삭제할까요?'))return;
-  google.script.run.withSuccessHandler(loadBuild).withFailureHandler(function(e){alert(e.message);}).deleteBOM(b.name,b.cat); }
+  google.script.run.withSuccessHandler(loadBuild).withFailureHandler(function(e){notice(e,1);}).deleteBOM(b.name,b.cat); }
 function addBomPart(){ BF.parts.push({id:'',per:1}); renderBomParts(); }
 function delBomPart(i){ BF.parts.splice(i,1); if(!BF.parts.length) BF.parts=[{id:'',per:1}]; renderBomParts(); }
 function onBomPart(i,f,v){ BF.parts[i][f]=v; }
 function renderBomParts(){ document.getElementById('bomParts').innerHTML=BF.parts.map(function(p,i){
     return '<div class="boxrow"><div class="field"><div class="k">부품</div><select class="selfull" style="font-size:14px" onchange="onBomPart('+i+',\'id\',this.value)">'+itemOptions(p.id)+'</select></div><div class="field" style="max-width:64px"><div class="k">1개당</div><input type="number" inputmode="numeric" value="'+esc(p.per)+'" oninput="onBomPart('+i+',\'per\',this.value)"></div><span class="del" onclick="delBomPart('+i+')">✕</span></div>';
   }).join(''); }
-function saveBomForm(){ var fin=itemById(val('bomFinished')); if(!fin){alert('완제품을 선택하세요.');return;}
+function saveBomForm(){ var fin=itemById(val('bomFinished')); if(!fin){notice('완제품을 선택하세요.');return;}
   var parts=BF.parts.filter(function(p){return p.id&&(Number(p.per)||0)>0;}).map(function(p){var it=itemById(p.id);return {name:it.name,cat:it.cat,per:Number(p.per)||1};});
-  if(!parts.length){alert('부품을 1개 이상 선택하세요.');return;}
+  if(!parts.length){notice('부품을 1개 이상 선택하세요.');return;}
   var b=document.getElementById('bomBtn'); b.disabled=true; b.textContent='저장 중…';
   google.script.run.withSuccessHandler(function(){ b.disabled=false; b.textContent='＋ 레시피 저장'; loadBuild(); go('build'); })
-    .withFailureHandler(function(e){alert(e.message); b.disabled=false; b.textContent='＋ 레시피 저장';})
+    .withFailureHandler(function(e){notice(e,1); b.disabled=false; b.textContent='＋ 레시피 저장';})
     .saveBOM({origName:BF.origName||'', origCat:BF.origCat||'', name:fin.name, cat:fin.cat, parts:parts}); }
 
 // 조립 실행
@@ -684,7 +708,7 @@ function runBuildForm(){ var q=Number(val('brQty'))||0; if(q<=0)return;
   var b=document.getElementById('brBtn'); b.disabled=true; b.textContent='실행 중…';
   google.script.run.withSuccessHandler(function(){
     google.script.run.withSuccessHandler(function(d){ onBoot(d); go('build'); }).withFailureHandler(function(){ go('build'); }).bootstrap();
-  }).withFailureHandler(function(e){ alert(e.message); updateBrBtn(); })
+  }).withFailureHandler(function(e){ notice(e,1); updateBrBtn(); })
   .runBuild({name:BR.name,cat:BR.cat,qty:q,toLoc:val('brLoc'),staff:val('brStaff'),memo:''}); }
 
 // ---- 자재 위치도 (Location.html, 별도 화면) ----
@@ -781,7 +805,7 @@ function renderLog(rows){
 }
 function undoLogTx(row,k){ if(!confirm(UNDO_Q))return;
   google.script.run.withSuccessHandler(function(res){ var it=DATA.items.filter(function(x){return x.id===res.id;})[0]; if(it){it.total=res.total;it.locs=res.locs;} loadLog(); })
-    .withFailureHandler(function(e){alert(e.message);}).undoTransaction(row,k); }
+    .withFailureHandler(function(e){notice(e,1);}).undoTransaction(row,k); }
 
 // 메모
 /** 받아 둔 메모가 있으면 바로 보여주고, 뒤에서 새로 받아 바뀌었으면 다시 그림 (다른 사람이 쓴 메모 반영) */
@@ -827,13 +851,13 @@ function removePic(name,i){ MF[mfKey(name)].splice(i,1); renderPics(); }
 function onPic(name,input){ var files=input.files; if(!files.length)return; var key=mfKey(name);
   Array.prototype.forEach.call(files,function(f){ var r=new FileReader(); r.onload=function(){ MF[key]=MF[key]||[]; MF[key].push({data:r.result.split(',')[1],mime:f.type,name:f.name,preview:r.result}); renderPics(); }; r.readAsDataURL(f); }); input.value=''; }
 function clean(p){ if(!p)return null; if(p.id)return {id:p.id}; return {data:p.data,mime:p.mime,name:p.name}; }
-function saveMemoForm(){ var c=val('mCompany'); if(!c){alert('업체명을 입력하세요.');return;}
+function saveMemoForm(){ var c=val('mCompany'); if(!c){notice('업체명을 입력하세요.');return;}
   var b=document.getElementById('mBtn'); b.disabled=true; b.textContent='저장 중…';
-  google.script.run.withSuccessHandler(function(){ MEMOS=null; b.disabled=false; b.textContent='＋ 메모 저장'; go('memo'); }).withFailureHandler(function(e){alert('저장 실패: '+e.message); b.disabled=false; b.textContent='＋ 메모 저장';})
+  google.script.run.withSuccessHandler(function(){ MEMOS=null; b.disabled=false; b.textContent='＋ 메모 저장'; go('memo'); }).withFailureHandler(function(e){notice(e,1,'저장 실패: '); b.disabled=false; b.textContent='＋ 메모 저장';})
     .saveMemo({ row:MF.row||'', company:c, plate:MF.plate||'', bizSticker:MF.bizSticker||'', dateSticker:MF.dateSticker||'', caseO:MF.caseO||'', program:MF.program||'', programName:val('mProgram'), note:val('mNote'), author:val('staffSel'),
       stickers:(MF.stickers||[]).map(clean), nameplates:(MF.nameplates||[]).map(clean), dateStickers:(MF.dateStickers||[]).map(clean), extras:(MF.extras||[]).map(clean) }); }
 function delMemo(row){ if(!confirm('이 메모를 삭제할까요? (사진도 함께 삭제됩니다)'))return;
-  google.script.run.withSuccessHandler(function(){MEMOS=null;loadMemos();}).withFailureHandler(function(e){alert(e.message);}).deleteMemo(row); }
+  google.script.run.withSuccessHandler(function(){MEMOS=null;loadMemos();}).withFailureHandler(function(e){notice(e,1);}).deleteMemo(row); }
 
 // 전환
 var CURV='loc';
