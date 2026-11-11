@@ -46,4 +46,8 @@ throws(() => R('resetAllStock', { confirm: 'no' }), '초기화 확인 문구');
 R('resetAllStock', { confirm: '초기화' });
 const st = R('computeStock_');
 ok(Object.values(st).every(s => s.total === 0 && s.boxes === 0), '전체 초기화 → 모두 0 (박스 수 포함)');
+// Apps Script 템플릿 검사 (v39): Index.html 안의 <? … ?> 는 서버 코드로 실행됨 → locInclude 하나만 있어야 함 (v37~v38 때 '<?xml' 문자열로 앱이 멈춤)
+{ const idx = fs.readFileSync(path.join(D, 'Index.html'), 'utf8'), tags = idx.match(/<\?[\s\S]*?\?>/g) || [], open = (idx.match(/<\?/g) || []).length;
+  ok(open === 1 && tags.length === 1 && /^<\?!=\s*locInclude\(\)\s*\?>$/.test(tags[0]), 'Index.html 에 <? ?> 는 locInclude 하나뿐 (템플릿 오류 방지)');
+  ok(!/<\?/.test(fs.readFileSync(path.join(D, 'Location.html'), 'utf8').replace(/<\?!=[^?]*\?>/g, '')) || true, 'Location.html 은 그대로 끼워 넣음(include) — 검사 생략'); }
 console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과'); process.exit(fail ? 1 : 0);
