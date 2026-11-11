@@ -20,6 +20,7 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
   console.log('위치도');
   ok(await pg.locator('#locApp .cell').count() === 9, '칸 9개 그려짐');
   ok((await pg.locator('#locApp .cell[data-k="0,0"]').innerText()).includes('(기판)'), '칸에 품명(분류) 표시');
+  ok(await pg.locator('#locApp .cell[data-k="0,0"] .kb.kp svg').count() === 1, '파렛트 칸에 받침대 모양 (v38)');
 
   console.log('칸 창 → 수량 입력 저장 (일반 창)');
   await pg.locator('#locApp .cell[data-k="0,0"]').tap(); await pg.waitForTimeout(150);
@@ -70,8 +71,10 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
 
   console.log('다크 모드 (v34)');
   await pg.emulateMedia({ colorScheme: 'dark' }); await pg.click('#navStock'); await pg.waitForTimeout(100);
-  ok(await pg.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(25, 28, 30)', '현재고 탭도 어두운 배경');
-  await pg.emulateMedia({ colorScheme: 'light' });
+  ok(await pg.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(246, 248, 251)', '폰이 다크 모드여도 밝은 화면이 기본 (v38)');
+  await pg.evaluate(() => setTheme('dark'));
+  ok(await pg.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(25, 28, 30)', '"화면 어둡게"를 고르면 모든 탭이 어두운 배경');
+  await pg.evaluate(() => setTheme('light')); await pg.emulateMedia({ colorScheme: 'light' });
 
   console.log('편집 버튼 줄 · 칸 창 순서 · 알림 (v35)');
   await pg.click('#navLoc'); await pg.waitForTimeout(100);

@@ -2,14 +2,14 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 #locApp{
-  --bg:#D8DAD5;--paper:#ECEDE9;--ink:#1F2326;--sub:#5B6367;--line:#979D99;
-  --slot:#FFFFFF;--label:#2F3639;--labelink:#EEEFEA;--sel:#F2C230;--hitbg:#FFEFB8;--hitline:#B98C08;
+  --bg:#EEF1F5;--paper:#F7F9FB;--ink:#0F172A;--sub:#64748B;--line:#C3CCD8;
+  --slot:#FFFFFF;--label:#DCE3EC;--labelink:#334155;--sel:#F2C230;--hitbg:#FFEFB8;--hitline:#B98C08;
   background:var(--bg);color:var(--ink);
   font-family:"IBM Plex Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent;
 }
 @media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]) #locApp{
+  :root:not([data-theme]) #locApp{
     --bg:#191C1E;--paper:#232729;--ink:#E3E5E0;--sub:#9AA09C;--line:#4B5155;
     --slot:#2C3134;--label:#C8CBC5;--labelink:#191C1E;--hitbg:#4A3F17;--hitline:#F2C230;
   }
@@ -320,6 +320,26 @@
 #locApp details.cfg summary small{font-weight:400;color:var(--sub);font-size:13px}
 #locApp details.cfg[open]{padding-bottom:4px}
 #locApp details.cfg .kindsel{margin-bottom:8px}
+/* v38: 밝은 화면 기본 · 칸 종류 모양 */
+#locApp .cell{border-radius:6px}
+#locApp .kb{background:none !important;padding:0;display:inline-flex;align-items:center;gap:2px;font-size:.74em}
+#locApp .kb i{font-style:normal}
+#locApp .kb.kp{color:#8A6A45}#locApp .kb.kl{color:#1D4ED8}#locApp .kb.kg{color:#15803D}
+#locApp .cell:has(.kb.kp){box-shadow:inset 0 3px 0 #8A6A45}
+#locApp .cell:has(.kb.kl){box-shadow:inset 0 3px 0 #1D4ED8}
+#locApp .cell:has(.kb.kg){box-shadow:inset 0 3px 0 #15803D}
+#locApp .cell:has(.kb){padding-top:7px}
+#locApp .cell.stocked{border-width:2px}
+#locApp .kindsel{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+#locApp .kindsel .pk{grid-column:1/-1}
+#locApp .kindsel button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 2px 8px;border-radius:10px;min-height:76px}
+#locApp .kindsel button b{font-size:14px}
+#locApp .kindsel button small{margin:0;font-size:12px}
+#locApp .kindsel button.k-kp{color:#8A6A45}#locApp .kindsel button.k-kl{color:#1D4ED8}#locApp .kindsel button.k-kg{color:#15803D}
+#locApp .kindsel button.on{color:var(--paper)}
+#locApp .kindsel button.k-kp.on{background:#8A6A45;border-color:#8A6A45;color:#fff}#locApp .kindsel button.k-kl.on{background:#1D4ED8;border-color:#1D4ED8;color:#fff}#locApp .kindsel button.k-kg.on{background:#15803D;border-color:#15803D;color:#fff}
+:root[data-theme="dark"] #locApp .kb.kp{color:#D0A878}:root[data-theme="dark"] #locApp .kb.kl{color:#8FB4FF}:root[data-theme="dark"] #locApp .kb.kg{color:#5FD08A}
+:root[data-theme="dark"] #locApp .kindsel button.k-kp:not(.on){color:#D0A878}:root[data-theme="dark"] #locApp .kindsel button.k-kl:not(.on){color:#8FB4FF}:root[data-theme="dark"] #locApp .kindsel button.k-kg:not(.on){color:#5FD08A}
 </style>
 
 <div id="locApp">
@@ -344,6 +364,7 @@
       <button data-el="bLine">줄·칸 옮기기</button>
       <button data-el="bSheet">시트 설정</button>
       <button data-el="bBackup">가져오기·내보내기</button>
+      <button data-el="bTheme" hidden>화면 어둡게</button>
     </div>
     <p class="hint" data-el="hint">칸을 누르면 이름과 자재를 적을 수 있어요. 칸을 <b>길게 누른 채 끌면</b> 다른 칸으로 옮겨져요.</p>
     <div class="stkbar" data-el="stkBar"></div>
@@ -452,6 +473,12 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 /* 적재 방식: 칸마다 하나 (x.kind). 종류를 늘리려면 여기에 한 줄 추가 */
 const LMARK=/[(（]\s*[Ll]\s*[)）]/,LMARK_ALL=/[(（]\s*[Ll]\s*[)）]/g; // 예전에 이름에 적던 "(L)"
 const KINDS={'초록차':{cls:'kg',mov:'이동'},'L카':{cls:'kl',mov:'이동'},'파렛트':{cls:'kp',mov:'고정'}};
+/* 칸 종류 모양 (v38): 파렛트=받침대 / L카=L자 수레 / 초록차=카트. 색은 currentColor */
+function kindIcon(k,sz){const a=`width="${sz||16}" height="${sz||16}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"`;
+  if(k==='파렛트')return `<svg ${a}><g fill="currentColor" stroke="none"><rect x="2.5" y="7" width="19" height="3.2" rx=".6"/><rect x="2.5" y="10.2" width="3.6" height="5"/><rect x="10.2" y="10.2" width="3.6" height="5"/><rect x="17.9" y="10.2" width="3.6" height="5"/><rect x="2.5" y="15.2" width="19" height="2.4" rx=".6"/></g></svg>`;
+  if(k==='L카')return `<svg ${a}><path d="M5 3v13.5h15.5" stroke-width="3"/><circle cx="8" cy="20.3" r="1.7" fill="currentColor"/><circle cx="18" cy="20.3" r="1.7" fill="currentColor"/></svg>`;
+  if(k==='초록차')return `<svg ${a}><rect x="3" y="8" width="14.5" height="8.5" rx="1.8" fill="currentColor"/><path d="M17.5 9.5l2.2-5h2"/><circle cx="6.8" cy="20.2" r="1.7" fill="currentColor"/><circle cx="14" cy="20.2" r="1.7" fill="currentColor"/></svg>`;
+  return `<svg ${a}><rect x="4" y="3.5" width="16" height="17" rx="1.5"/><path d="M4 12h16"/></svg>`}
 
 /* ---------- 재고 연동 ----------
    위치 이름 = "시트이름 칸코드" (+ 2층 이상은 " N층"). Location.gs 의 locSlots_ 와 같은 규칙. */
@@ -576,7 +603,7 @@ function cellHTML(x,r,c,s,T){
   const cd=`<span class="code">${code(r,c)}</span>`;
   if(x.type==='label')return `${x.rs*x.cs>1?cd:''}<span class="lbl">${x.label?esc(x.label):'<i>이름표</i>'}</span>`;
   if(x.type==='void')return cd+(x.label?`<span class="name">${esc(x.label)}</span>`:'');
-  let h=cd+(x.kind&&KINDS[x.kind]?`<span class="kb ${KINDS[x.kind].cls}" title="${esc(x.kind)} (${KINDS[x.kind].mov})">${esc(x.kind)}</span>`:'')+(x.label?`<span class="name">${esc(x.label)}</span>`:'');
+  let h=cd+(x.kind&&KINDS[x.kind]?`<span class="kb ${KINDS[x.kind].cls}" title="${esc(x.kind)} (${KINDS[x.kind].mov})">${kindIcon(x.kind,15)}<i>${esc(x.kind)}</i></span>`:'')+(x.label?`<span class="name">${esc(x.label)}</span>`:'');
   const split=x.layers.length>1;
   const st=x.layers.map((L,i)=>s?stockAt(slotKey(s,r,c,i)):[]);
   const anyItem=x.layers.some(L=>lines(L.t).length||(L.p||[]).length)||st.some(a=>a.length);
@@ -1135,7 +1162,7 @@ function drawCell(){
   <details class="cfg"${cfgOpen?' open':''}><summary>⚙️ 칸 설정 <small>종류 · 이름 · 적재 방식</small></summary>
   <div class="seg">${[['slot','보관칸'],['label','이름표'],['void','빈 공간']].map(([v,t])=>`<button data-type="${v}" class="${x.type===v?'on':''}">${t}</button>`).join('')}</div>
   <label class="f">이름${big?' (합친 칸은 가운데에 크게 보여요)':''}<input data-f="label" value="${esc(x.label)}" placeholder="${ph}"></label>
-  ${x.type==='slot'?`<div class="kindsel"><span class="pk">적재 방식</span><button data-kind="" class="${x.kind?'':'on'}">없음</button>${Object.keys(KINDS).map(k=>`<button data-kind="${esc(k)}" class="${x.kind===k?'on':''}">${esc(k)}<small>${KINDS[k].mov}</small></button>`).join('')}</div>`:''}
+  ${x.type==='slot'?`<div class="kindsel"><span class="pk">적재 방식</span><button data-kind="" class="${x.kind?'':'on'}">${kindIcon('',26)}<b>선반</b><small>고정</small></button>${Object.keys(KINDS).map(k=>`<button data-kind="${esc(k)}" class="k-${KINDS[k].cls}${x.kind===k?' on':''}">${kindIcon(k,26)}<b>${esc(k)}</b><small>${KINDS[k].mov}</small></button>`).join('')}</div>`:''}
   </details>
   ${x.type==='slot'?x.layers.map((L,i)=>`<label class="f">${x.layers.length>1?(i+1)+'층 메모':'메모 (직접 적는 자재)'}<textarea data-i="${i}" rows="3" placeholder="자재명을 한 줄에 하나씩">${esc(L.t)}</textarea></label>`).join(''):''}
   <div class="acts">
@@ -1488,6 +1515,9 @@ E('q').onfocus=()=>{if(query())renderResults()};
 document.addEventListener('click',e=>{if(!e.target.isConnected)return; /* 칩 등 누르는 순간 다시 그려진 버튼 */ if(!e.target.closest('#locApp .search'))E('results').hidden=true});
 
 /* ---------- 버튼 ---------- */
+/* 밝은 화면이 기본, 어둡게는 선택 (재고앱 Index 의 setTheme) */
+function drawTheme(){const b=E('bTheme');if(!b||typeof window.setTheme!=='function')return;b.hidden=false;b.textContent=document.documentElement.dataset.theme==='dark'?'화면 밝게':'화면 어둡게'}
+E('bTheme').onclick=()=>{window.setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');drawTheme()};drawTheme();
 E('bMore').onclick=()=>{moreOpen=!moreOpen;drawMore()};
 E('bMerge').onclick=()=>{if(staleBlock())return;if(MV)endMove();QM=false;mergeMode=!mergeMode;sel.clear();render()};
 E('bQty').onclick=()=>{if(MV)endMove();mergeMode=false;sel.clear();QM=!QM;render()};

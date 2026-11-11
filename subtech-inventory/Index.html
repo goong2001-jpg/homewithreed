@@ -99,7 +99,9 @@
   .netbar { position:fixed; top:0; left:0; right:0; z-index:70; background:#b45309; color:#fff; text-align:center; font-size:13.5px; font-weight:800; height:36px; line-height:36px; white-space:nowrap; overflow:hidden; }
   body.offline { padding-top:36px; } body.offline .appbar { top:36px; } body.offline #locApp .where { top:36px; }
   /* v34: 다크 모드 (폰이 다크 모드면 위치도와 같은 어두운 화면) */
-  @media (prefers-color-scheme:dark){
+</style>
+<!-- 어두운 화면 (선택했을 때만 켜짐: setTheme) -->
+<style id="darkCss" media="not all">
     :root { color-scheme:dark; }
     body { background:#191C1E; color:#E3E5E0; }
     .appbar { background:linear-gradient(135deg,#1e3a8a,#1e40af); }
@@ -131,8 +133,12 @@
     .xsheets button.on { background:#1D2A44; border-color:#7FA8FF; color:#9CBBFF; } .xacts button { color:#E3E5E0; } .xacts button.pri { background:#2563eb; border-color:#2563eb; color:#fff; } .xd { color:#C8CBC5; }
     .xres textarea { background:#191C1E; border-color:#3A4044; color:#E3E5E0; } .xres button { background:#E3E5E0; color:#191C1E; }
     .dk-ink { color:#E3E5E0 !important; } .locchip.none { background:#2C3134; color:#9AA09C; } .locchip.pin { background:#3D2A14; color:#FDBA74; }
-  }
 </style>
+<script>
+/* 화면 색: 밝게가 기본. 어둡게를 고르면 폰에 기억 (v38) */
+function setTheme(t){ t=(t==='dark')?'dark':'light'; document.documentElement.dataset.theme=t; var d=document.getElementById('darkCss'); if(d) d.media=(t==='dark')?'all':'not all'; try{ localStorage.setItem('subtek-theme',t); }catch(e){} }
+(function(){ var t='light'; try{ t=localStorage.getItem('subtek-theme')||'light'; }catch(e){} setTheme(t); })();
+</script>
 </head>
 <body>
 
@@ -306,7 +312,7 @@ window.addEventListener('online',function(){ netBar(); notice('인터넷이 다�
 document.addEventListener('DOMContentLoaded',netBar);
 </script>
 <script>
-var HTML_VERSION = 'v37'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v38'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var BOMROWS = null, MEMO_SHOWN = 50, PREFETCHED = false;
