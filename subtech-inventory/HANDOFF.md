@@ -1,7 +1,7 @@
 # 써브텍 재고앱 — 인수인계 (새 채팅에서 이어가기)
 
 > 이 파일 하나만 읽으면 다음 작업자(사람이든 Claude든)가 **바로 고치고 배포까지** 할 수 있게 정리했습니다.
-> 마지막 갱신: 2026-11-11 · 앱 버전 **v33**
+> 마지막 갱신: 2026-11-11 · 앱 버전 **v33** · 이후 변경은 [`CHANGELOG.md`](CHANGELOG.md) (자동 기록)
 
 ---
 
@@ -43,6 +43,7 @@ goong2001-jpg/homewithreed 저장소의 subtech-inventory(써브텍 재고앱) �
 5. **비밀값을 채팅·코드에 넣지 않기.** `CLASPRC_JSON` 등은 GitHub Secrets에만 있습니다. 사용자가 열쇠 파일을 붙여넣으려 하면 말리기.
 6. **PR은 요청할 때만.** 커밋 메시지 끝에는 세션의 attribution 줄을 붙입니다. 저장소 산출물에 모델 이름 넣지 않기.
 7. **푸시 후 배포 성공 확인까지가 작업 끝.** 아래 4-3 참고. 사용자에게는 "새로고침 후 vNN 확인"을 안내.
+7-1. **변경 이력은 자동 기록** (`CHANGELOG.md`). 커밋 메시지 첫 줄이 곧 이력 제목이니 `vNN: 무엇을 바꿨는지` + 본문 `- ` 목록으로 쓴다. `CHANGELOG.md`는 손대지 않는다. 배포 뒤 봇이 커밋을 하나 더 올리므로 **작업 시작·푸시 전에 `git pull --rebase origin claude/spreadsheet-accessibility-opmsi3`**.
 8. 사용자 응답은 **한국어, 짧게, 폰에서 읽기 쉽게**. 결정이 필요하면 추천안을 먼저.
 
 ---
@@ -60,7 +61,8 @@ goong2001-jpg/homewithreed 저장소의 subtech-inventory(써브텍 재고앱) �
 | `SeedMemos.gs` | 옛 375개 카톡 추출 메모 일괄 등록 (예전 것) |
 | `appsscript.json` | 웹앱: `executeAs: USER_DEPLOYING`, `access: ANYONE_ANONYMOUS`(주소만 있으면 로그인 없이), V8 |
 | `DEPLOY.md` | 자동 배포 최초 설정법 (PC에서 한 번, **이미 완료**) |
-| `dev/` | 테스트 도구 (배포되지 않음) — 4-2 참고 |
+| `CHANGELOG.md` | 변경 이력 — v34부터 배포 성공 시 **자동 기록** (손으로 고치지 않음) |
+| `dev/` | 테스트 도구 (배포되지 않음) — 4-2 참고 · `dev/changelog.js` = 이력 자동 기록 스크립트 |
 
 ### 시트 (스프레드시트 탭)
 | 탭 | 내용 |
@@ -111,7 +113,7 @@ node subtech-inventory/dev/mock-page.js && node subtech-inventory/dev/smoke.js  
 - 화면 확인은 Playwright로 스크린샷(`devices['Galaxy S9+']`), 다크 모드는 `colorScheme:'dark'`.
 
 ### 4-3. 배포
-1. 커밋 → `git push -u origin claude/spreadsheet-accessibility-opmsi3`
+1. 커밋 (메시지: `vNN: …` + `- ` 목록 — 그대로 이력이 됨) → `git pull --rebase origin claude/spreadsheet-accessibility-opmsi3` → `git push -u origin claude/spreadsheet-accessibility-opmsi3`
 2. GitHub Actions **써브텍 재고앱 배포**가 자동 실행: 문법 검사 → 버전 짝 검사 → `clasp push --force` → 기존 배포 ID로 `clasp deploy -i` (주소 그대로)
 3. 성공 확인 (1~2분):
    ```bash
@@ -119,7 +121,8 @@ node subtech-inventory/dev/mock-page.js && node subtech-inventory/dev/smoke.js  
    for i in $(seq 1 24); do sleep 15; out=$(gh api "repos/goong2001-jpg/homewithreed/actions/workflows/deploy-subtech.yml/runs?per_page=1" --jq '.workflow_runs[0] | "\(.head_sha[0:7]) \(.status) \(.conclusion)"'); echo "$out" | grep -q "^$H completed" && break; done; echo "$out"
    ```
    `gh`가 없으면 GitHub MCP 도구 `actions_list`(workflow `deploy-subtech.yml`) / `get_job_logs`.
-4. 사용자에게: "폰에서 새로고침 → 입출고 탭 위쪽 **vNN** 확인".
+4. 배포가 성공하면 같은 실행의 **변경 이력 자동 기록** 단계가 `CHANGELOG.md` 맨 위에 그 커밋(들)을 추가하고 봇 커밋(`[skip ci] 변경 이력 자동 기록 (vNN)`)을 푸시함 → 로컬도 `git pull --rebase` 해서 맞춰 두기. (이 단계가 실패해도 배포는 성공 — 경고만 뜸)
+5. 사용자에게: "폰에서 새로고침 → 입출고 탭 위쪽 **vNN** 확인".
 - 실패하면: 빨간 단계 로그 확인. 배포 ID 문제면 워크플로가 가려진 배포 목록을 보여줌. Secrets: `CLASPRC_JSON`, `CLASP_SCRIPT_ID`, `CLASP_DEPLOYMENT_ID` (설정법 `DEPLOY.md`).
 - 푸시가 "could not read Username"로 실패하면 세션의 GitHub 연결이 끊긴 것 → 사용자에게 연결 확인 요청.
 
@@ -132,6 +135,8 @@ node subtech-inventory/dev/mock-page.js && node subtech-inventory/dev/smoke.js  
 ---
 
 ## 6. 변경 이력
+
+> **v34부터는 [`CHANGELOG.md`](CHANGELOG.md)에 자동 기록됩니다** — 배포가 성공할 때마다 GitHub Actions(`deploy-subtech.yml`의 "변경 이력 자동 기록" 단계, 스크립트 `dev/changelog.js`)가 그 푸시의 커밋 메시지(버전 · 한국 시간 · 커밋 해시 · 본문 목록)를 맨 위에 추가합니다. 아래 표는 v33까지의 정리본입니다 (같은 내용이 CHANGELOG.md 아래쪽에도 있음).
 
 | 버전 | 날짜 | 내용 |
 |---|---|---|

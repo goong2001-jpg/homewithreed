@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # 배포 성공 후 subtech-inventory/CHANGELOG.md 자동 기록 커밋용
 
 concurrency:
   group: subtech-apps-script
@@ -46,6 +46,8 @@ jobs:
 
       - uses: actions/checkout@v4
         if: steps.check.outputs.ready == 'true'
+        with:
+          fetch-depth: 0   # 이번 푸시의 커밋들을 이력에 적으려면 기록 전체가 필요
 
       - uses: actions/setup-node@v4
         if: steps.check.outputs.ready == 'true'
@@ -99,6 +101,30 @@ jobs:
           fi
           npx --yes @google/clasp@2.4.2 deploy --deploymentId "$ID" --description "$VER github ${GITHUB_SHA::7}"
           echo "::notice::배포 완료: $VER (${GITHUB_SHA::7})"
+
+      # 배포가 성공했을 때만: 이번 푸시의 커밋 메시지를 CHANGELOG.md 맨 위에 추가하고 같은 브랜치에 커밋
+      # (GITHUB_TOKEN 으로 푸시한 커밋은 워크플로를 다시 실행시키지 않음 → 무한 반복 없음)
+      - name: 변경 이력 자동 기록 (CHANGELOG.md)
+        if: steps.check.outputs.ready == 'true' && github.event_name == 'push'
+        continue-on-error: true   # 기록이 실패해도 배포 성공은 그대로
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          node subtech-inventory/dev/changelog.js "$BEFORE" "$AFTER"
+          if git diff --quiet -- subtech-inventory/CHANGELOG.md; then echo "기록할 것 없음"; exit 0; fi
+          VER=$(grep -oP "var APP_VERSION = '\K[^']+" subtech-inventory/Code.gs)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add subtech-inventory/CHANGELOG.md
+          git commit -m "[skip ci] 변경 이력 자동 기록 ($VER)"
+          for i in 1 2 3; do
+            # 그사이 다른 푸시가 있었으면 그 위에 다시 얹어서 푸시
+            git pull --rebase origin "$BRANCH" && git push origin "HEAD:$BRANCH" && { echo "::notice::이력 기록 완료 ($VER)"; exit 0; }
+            sleep $((i*5))
+          done
+          echo "::warning::이력 기록 푸시 실패 (배포는 성공)"; exit 1
 
       - name: 로그인 정보 지우기
         if: always()
