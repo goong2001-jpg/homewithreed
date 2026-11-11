@@ -282,7 +282,7 @@ window.addEventListener('online',function(){ netBar(); notice('인터넷이 다�
 document.addEventListener('DOMContentLoaded',netBar);
 </script>
 <script>
-var HTML_VERSION = 'v35'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v36'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var BOMROWS = null, MEMO_SHOWN = 50, PREFETCHED = false;
@@ -296,7 +296,11 @@ var OXF = [['plate','명판'],['bizSticker','상호스티커'],['dateSticker','�
 // 빠르게 켜지게: 지난번 받은 데이터를 이 폰에 저장해 두고 켜자마자 먼저 보여준 뒤, 서버 최신 데이터가 오면 바꿈
 var BOOT_KEY='subtek-boot-v1', FROM_CACHE=false;
 function saveBoot(d){ try{ if(!d||!d.loc||!d.loc.data) return; var j=JSON.stringify(d); if(j.length<3500000) localStorage.setItem(BOOT_KEY,j); else localStorage.removeItem(BOOT_KEY); }catch(e){} }
-google.script.run.withSuccessHandler(function(d){ saveBoot(d); onBoot(d,false); }).withFailureHandler(onErr).appBoot();
+/* v36: 서버 최신이 지금 화면(폰 저장본)과 똑같으면 다시 그리지 않음 → 켤 때 버벅임 없음 */
+function bootSig(d){ try{ return JSON.stringify([d.items,d.staff,d.locations,d.layout||[]]); }catch(e){ return ''; } }
+function sameAsShown(d){ return !!(FROM_CACHE && DATA && window.locApi && d.loc && d.version===HTML_VERSION && bootSig(d)===bootSig(DATA) && locApi.confirm(d.loc.version)); }
+function bootDone(d){ FROM_CACHE=false; if(!PREFETCHED){ PREFETCHED=true; setTimeout(prefetchTabs, 400); } applyDeepLink(); }
+google.script.run.withSuccessHandler(function(d){ if(sameAsShown(d)){ bootDone(d); return; } saveBoot(d); onBoot(d,false); }).withFailureHandler(onErr).appBoot();
 /** 지금 상태(품목·재고 + 위치도)를 폰에 저장 — 다음에 켤 때 최신에 가까운 화면이 바로 뜨게 (1초 모아서) */
 var PERSIST_T=null;
 function persistBoot(now){ if(FROM_CACHE) return; clearTimeout(PERSIST_T); PERSIST_T=setTimeout(function(){
@@ -744,6 +748,7 @@ document.addEventListener('visibilitychange', function(){
 });
 function quietRefresh(){
   google.script.run.withSuccessHandler(function(d){
+    if(window.locApi && d.loc && bootSig(d)===bootSig(DATA) && d.loc.version===locApi.ver()) return; // 바뀐 게 없으면 그대로
     saveBoot(d);
     DATA.items=d.items; DATA.staff=d.staff; DATA.locations=d.locations; DATA.layout=d.layout||[]; if(d.locMap) DATA.locMap=d.locMap;
     if(window.locApi && !locApi.busy()) feedLoc(d,!d.locMap);

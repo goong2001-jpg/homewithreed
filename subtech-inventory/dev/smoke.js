@@ -90,6 +90,16 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
   await pg.context().setOffline(false); await pg.waitForTimeout(200);
   ok(!(await pg.locator('#netBar').isVisible()), '다시 연결되면 안내 사라짐');
 
+  console.log('켤 때 속도 (v36)');
+  await pg.evaluate(() => localStorage.setItem('mockDelay', '2500')); await pg.reload(); await pg.waitForTimeout(500);
+  ok((await L('status').innerText()).includes('최신 확인 중'), '저장본으로 바로 뜸 (최신 확인 중)');
+  await pg.locator('#locApp .cell[data-k="1,1"]').tap(); await pg.waitForTimeout(200);
+  ok(await pg.locator('#locApp [data-qsave]').isVisible(), '최신 확인 중에도 칸이 열리고 수량 입력 가능');
+  await pg.locator('#locApp .panel [data-a="close"]').first().tap();
+  await pg.evaluate(() => { window.__g = document.querySelector('#locApp .grid .cell'); }); await pg.waitForTimeout(2600);
+  ok(await pg.evaluate(() => window.__g.isConnected) && (await L('status').innerText()) === '저장됨', '최신이 저장본과 같으면 다시 그리지 않고 "저장됨"');
+  await pg.evaluate(() => localStorage.removeItem('mockDelay'));
+
   ok(errs.length === 0, '페이지 오류 없음 ' + (errs.length ? JSON.stringify(errs) : ''));
   await b.close();
   console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과');

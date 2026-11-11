@@ -394,7 +394,7 @@ const isOut=id=>!!ORD()[id];              // 재고X 또는 발주완료 (표시
 const isOrd=id=>!!(ORD()[id]&&ORD()[id].o); // 발주완료 (o: 발주한 시각, ob: 담당자)
 const isNeed=id=>isOut(id)&&!isOrd(id);      // 재고X (아직 발주 안 함)
 /** 상태 바꾸기: '' 없음 · 'x' 재고X · 'o' 발주완료 */
-function setOrdState(id,st){if(staleBlock())return false;if(!S.order)S.order={};const cur=S.order[id];
+function setOrdState(id,st){if(!S.order)S.order={};const cur=S.order[id];
   if(!st)delete S.order[id];
   else if(st==='x')S.order[id]=cur?{t:cur.t,by:cur.by}:{t:Date.now(),by:lastStaff()};
   else S.order[id]=Object.assign({t:cur?cur.t:Date.now(),by:cur?cur.by:lastStaff()},{o:Date.now(),ob:lastStaff()});
@@ -412,6 +412,8 @@ function bindX(root,after){
   root.querySelectorAll('[data-xo]').forEach(b=>b.onclick=()=>{const id=b.dataset.xo,on=!isOrd(id);if(setOrdState(id,on?'o':'x')){paintX(root);toast(on?'발주완료로 표시했어요. 입고하거나 수량을 넣으면 사라져요':'발주완료를 취소했어요 (재고X로)');after&&after()}})}
 function paintX(root){root.querySelectorAll('[data-xx]').forEach(b=>{const on=isNeed(b.dataset.xx);b.classList.toggle('on',on);b.textContent=on?'🚫 재고X':'재고X'});
   root.querySelectorAll('[data-xo]').forEach(b=>{const on=isOrd(b.dataset.xo);b.classList.toggle('on',on);b.textContent=on?'📦 발주완료':'발주완료'})}
+/* v36: 최신 확인 중에도 칸 열기·수량 입력·입출고·재고X는 바로 됨 (재고는 서버에서 덧붙이는 방식이라 안전).
+   칸 설정을 고쳤는데 그사이 다른 기기에서 위치도가 바뀌었으면 저장 때 conflict 로 알려줌. 구조 편집(합치기·줄 옮기기·시트)만 최신이 올 때까지 막음 */
 function staleBlock(){if(!STALE)return false;toast('최신 위치도를 불러오는 중이에요. 잠시 후 다시 눌러주세요');return true}
 
 /* 단독 화면이면 전체 높이 사용 */
@@ -619,7 +621,7 @@ function renderMerge(){
 }
 
 /* ---------- 칸 ---------- */
-function tap(r,c){if(Date.now()-dragIgnoreClick<450)return;if(staleBlock())return;const k=K(r,c);if(PIN){pickIn(r,c);return}if(MV){pickDest(r,c);return}if(mergeMode){sel.has(k)?sel.delete(k):sel.add(k);render();return}cur={r,c};if(QM&&get(sh(),r,c).type==='slot'){openQty();return}openCell()}
+function tap(r,c){if(Date.now()-dragIgnoreClick<450)return;if(mergeMode&&staleBlock())return;const k=K(r,c);if(PIN){pickIn(r,c);return}if(MV){pickDest(r,c);return}if(mergeMode){sel.has(k)?sel.delete(k):sel.add(k);render();return}cur={r,c};if(QM&&get(sh(),r,c).type==='slot'){openQty();return}openCell()}
 function doMerge(){
   if(sel.size<2){toast('두 칸 이상 골라주세요');return}
   const s=sh();let r0=99,c0=99,r1=-1,c1=-1;
@@ -1244,7 +1246,7 @@ function nextQtyCell(s,r,c){const cov=covered(s);
   for(let rr=r;rr<s.rows;rr++)for(let cc=(rr===r?c+1:0);cc<s.cols;cc++){if(cov[K(rr,cc)])continue;const x=get(s,rr,cc);
     if(x.type==='slot'&&qtyRows(s,rr,cc).some(l=>l.rows.length))return{r:rr,c:cc}}return null}
 /** 위치 이름으로 그 칸의 수량 입력 창 열기 (재고앱 총수량 탭에서) */
-function editLoc(k){if(staleBlock())return;const w=keyIndex()[k];if(!w||w.kind!=='slot'){goLoc(k);return}closePanel();flashCell(w.si,w.r,w.c);cur={r:w.r,c:w.c};openQty()}
+function editLoc(k){const w=keyIndex()[k];if(!w||w.kind!=='slot'){goLoc(k);return}closePanel();flashCell(w.si,w.r,w.c);cur={r:w.r,c:w.c};openQty()}
 
 /* ---------- 🚫 재고X · 발주 목록 ---------- */
 function orderText(){const o=ORD(),T=totals(),d=new Date();
@@ -1488,7 +1490,7 @@ document.addEventListener('click',e=>{if(!e.target.isConnected)return; /* 칩 �
 /* ---------- 버튼 ---------- */
 E('bMore').onclick=()=>{moreOpen=!moreOpen;drawMore()};
 E('bMerge').onclick=()=>{if(staleBlock())return;if(MV)endMove();QM=false;mergeMode=!mergeMode;sel.clear();render()};
-E('bQty').onclick=()=>{if(staleBlock())return;if(MV)endMove();mergeMode=false;sel.clear();QM=!QM;render()};
+E('bQty').onclick=()=>{if(MV)endMove();mergeMode=false;sel.clear();QM=!QM;render()};
 E('bQtyEnd').onclick=()=>{QM=false;render()};
 E('bOut').onclick=()=>{if(MV)endMove();openOrders()};
 E('bMvCancel').onclick=()=>endMove();
@@ -1525,11 +1527,14 @@ if(HOSTED){
   setStatus('불러오는 중');
   window.locApi={
     /** 위치도 데이터 {version, data} */
+    /** 서버 최신이 폰 저장본과 똑같을 때: 다시 그리지 않고 '최신 확인 중'만 풀기 */
+    confirm(v){if(!S||v!==version)return false;STALE=false;if(!dirty&&!saving)setStatus('저장됨');return true},
+    ver(){return version},
     init(loc,cached){const wasStale=STALE;STALE=!!cached;if(cached)setStatus('최신 확인 중…');
       if(!cached&&wasStale&&!dirty&&!saving){version=0} // 지난 화면이었으면 서버 것으로 무조건 교체
       if(S&&loc&&version>0&&(loc.version||0)<=version){if(!cached&&!dirty&&!saving)setStatus('저장됨');render();applyPendingQ();return} // 이미 같은(또는 더 새) 버전이면 다시 그리지 않음
       const o=loc&&loc.data?parse(loc.data):null;version=(loc&&loc.version)||0;const c=S?S.cur:0;
-      if(o){S=o;S.cur=c;fixCur();setStatus('저장됨')}else if(!S){S=seed();save()}render();applyPendingQ()},
+      if(o){S=o;S.cur=c;fixCur();setStatus(cached?'최신 확인 중…':'저장됨')}else if(!S){S=seed();save()}render();applyPendingQ()},
     /** 재고앱의 품목 목록(items[].locs)으로 위치별 재고를 만듦 — 서버에 다시 묻지 않음 */
     setStock(items,staff){STK={};ITEMS=[];ITEMMAP={};(items||[]).forEach(it=>{const x={id:it.id,name:String(it.name),cat:String(it.cat||''),unit:Number(it.unit)||0};ITEMS.push(x);ITEMMAP[x.id]=x;
         Object.keys(it.locs||{}).forEach(k=>{const q=Number(it.locs[k])||0;if(q)(STK[k]=STK[k]||[]).push({id:x.id,name:x.name,cat:x.cat,qty:q})})});
