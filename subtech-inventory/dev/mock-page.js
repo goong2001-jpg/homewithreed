@@ -52,6 +52,7 @@ var F={
    {row:8,k:1700000000000,cancel:false,undone:true,date:'11-11 10:00',type:'출고',loc:'1층 B2',boxes:0,delta:-30,staff:'홍길동',imgs:[]},
    {row:7,k:1690000000000,cancel:false,undone:false,date:'11-10 09:00',type:'입고',loc:'1층 B2',boxes:1,delta:50,staff:'김철수',imgs:[]}]},
  undoTransaction:function(row,k){CALLS.push({undo:[row,k]});var it=item('SV7||기판');return {ok:true,id:it.id,total:it.total,locs:it.locs,rows:1}},
+ exportSave:function(p){CALLS.push({exp:{name:p.name,mime:p.mime,len:p.data.length}});return {ok:true,name:p.name,url:'https://drive.google.com/file/d/TEST/view'}},
  getRecentLog:function(){return []}, getMonthlyReport:function(){return []},
  resetAllStock:function(p){if(p.confirm!=='초기화')throw new Error('확인 문구');ITEMS.forEach(function(it){Object.keys(it.locs).forEach(function(k){it.locs[k]=0});it.total=0});return {ok:true,rows:ITEMS.length}}};
 function runner(s,f){var o={withSuccessHandler:function(h){return runner(h,f)},withFailureHandler:function(h){return runner(s,h)}};

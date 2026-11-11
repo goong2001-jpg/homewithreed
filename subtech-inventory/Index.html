@@ -83,6 +83,16 @@
   .bcard .bneck { font-size:12.5px; } .bpart { font-size:13px; } .bact span { font-size:13px; padding:6px 0; } .oxchip { font-size:12px; } .mphoto .mplabel { font-size:11.5px; } .memocard .foot { font-size:12px; }
   .field2 .k2 { font-size:12px; } .nav div { font-size:11.5px; } .nav .ic { font-size:20px; }
   .tcard .th .tt small { font-size:12px; } .trow { font-size:14px; } .trow .ts { font-size:12.5px; } .dangerbox { font-size:12.5px; } .sgrp .gh span { font-size:12.5px; } .sgrp .gr { font-size:14px; }
+  /* v37: 내보내기 창 */
+  .xshade { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:80; }
+  .xpanel { position:fixed; left:0; right:0; bottom:0; z-index:81; background:#fff; border-radius:18px 18px 0 0; padding:16px 16px 22px; max-height:86vh; overflow:auto; }
+  .xpanel .xh { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; } .xpanel .xh b { font-size:18px; } .xpanel .xh span { color:#6b7889; font-size:14px; padding:8px 4px; cursor:pointer; }
+  .xseg { display:flex; gap:6px; margin-bottom:10px; } .xseg button { flex:1; min-height:46px; border-radius:11px; border:1.5px solid #e6ebf2; background:#fff; font-size:15px; font-weight:800; color:#6b7889; } .xseg button.on { background:#1f2733; color:#fff; border-color:#1f2733; }
+  .xd { font-size:13.5px; color:#37475a; line-height:1.6; margin-bottom:10px; white-space:pre-line; }
+  .xsheets { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; } .xsheets button { min-height:42px; padding:0 14px; border-radius:10px; border:1.5px solid #e6ebf2; background:#fff; font-size:14px; font-weight:700; color:#6b7889; } .xsheets button.on { border-color:#2563eb; color:#2563eb; background:#eef4ff; }
+  .xacts { display:flex; gap:8px; } .xacts button { flex:1; min-height:50px; border-radius:12px; border:1.5px solid #cfd8e3; background:#fff; font-size:15px; font-weight:800; color:#1f2733; } .xacts button.pri { background:#2563eb; border-color:#2563eb; color:#fff; } .xacts button:disabled { opacity:.5; }
+  .xres { margin-top:12px; } .xres .k { font-size:13px; color:#16a34a; font-weight:700; margin-bottom:6px; } .xres textarea { width:100%; border:1.5px solid #e6ebf2; border-radius:10px; padding:10px; font-size:13.5px; color:#1f2733; background:#f6f8fb; resize:none; } .xres button { width:100%; min-height:46px; margin-top:6px; border-radius:11px; border:none; background:#1f2733; color:#fff; font-size:15px; font-weight:800; }
+  .xnote { font-size:12px; color:#8a97a8; margin-top:12px; line-height:1.5; }
   /* v35: 화면 아래 알림 · 인터넷 끊김 표시 */
   .notice { position:fixed; left:50%; bottom:76px; transform:translateX(-50%); z-index:60; max-width:92vw; width:max-content; background:#1f2733; color:#fff; padding:12px 16px; border-radius:10px; font-size:14.5px; font-weight:700; line-height:1.5; white-space:pre-line; box-shadow:0 8px 24px rgba(0,0,0,.3); }
   .notice.err { background:#7f1d1d; border:1.5px solid #f87171; }
@@ -117,6 +127,9 @@
     .dangerbox { border-color:#7F3030; } .dangerbox button { color:#F87171; border-color:#F87171; }
     .mphoto img, .pthumb img { border-color:#3A4044; } .res { box-shadow:none; }
     .notice { background:#E3E5E0; color:#191C1E; } .notice.err { background:#7f1d1d; color:#fff; }
+    .xpanel { background:#232729; } .xseg button, .xsheets button, .xacts button { background:#2C3134; border-color:#3A4044; color:#C8CBC5; } .xseg button.on { background:#E3E5E0; color:#191C1E; border-color:#E3E5E0; }
+    .xsheets button.on { background:#1D2A44; border-color:#7FA8FF; color:#9CBBFF; } .xacts button { color:#E3E5E0; } .xacts button.pri { background:#2563eb; border-color:#2563eb; color:#fff; } .xd { color:#C8CBC5; }
+    .xres textarea { background:#191C1E; border-color:#3A4044; color:#E3E5E0; } .xres button { background:#E3E5E0; color:#191C1E; }
     .dk-ink { color:#E3E5E0 !important; } .locchip.none { background:#2C3134; color:#9AA09C; } .locchip.pin { background:#3D2A14; color:#FDBA74; }
   }
 </style>
@@ -195,7 +208,7 @@
 <!-- 총수량: 품목별 총수량 + 위치별 수량 -->
 <div class="body hidden" id="viewTotal">
   <input class="search" id="totSearch" placeholder="🔍 품명 검색" oninput="TOT_SHOWN=60;renderTotal()" style="margin-bottom:10px">
-  <div class="toolbar"><div class="filterbar" id="totFilter"></div></div>
+  <div class="toolbar"><div class="filterbar" id="totFilter"></div><div class="sortbtn" onclick="openExport()">📤 내보내기</div></div>
   <div id="totSum"></div>
   <div id="totList"></div>
   <div class="dangerbox">새로 실사할 때만 쓰세요. 모든 품목·위치 수량을 0으로 만듭니다. (거래로그는 지우지 않고 '조정'으로 남아요 · 품목·📌지정·메모는 그대로)
@@ -254,6 +267,17 @@
   <button class="savebtn blue" id="mBtn" onclick="saveMemoForm()">＋ 메모 저장</button>
 </div>
 
+<!-- 내보내기 (엑셀 / 위치도 그림) -->
+<div class="xshade hidden" id="xShade" onclick="closeExport()"></div>
+<div class="xpanel hidden" id="xPanel">
+  <div class="xh"><b>📤 내보내기</b><span onclick="closeExport()">닫기</span></div>
+  <div class="xseg"><button id="xfX" class="on" onclick="setXf('xlsx')">엑셀 파일</button><button id="xfP" onclick="setXf('png')">위치도 그림</button></div>
+  <div class="xd" id="xDesc"></div>
+  <div class="xsheets hidden" id="xSheets"></div>
+  <div class="xacts"><button onclick="doExport('save')">폰에 저장</button><button class="pri" onclick="doExport('link')">보낼 링크 만들기</button></div>
+  <div class="xres hidden" id="xRes"><div class="k">받는 사람은 구글 계정 없이 열 수 있어요. 카톡·문자에 붙여넣으세요.</div><textarea id="xLink" rows="2" readonly></textarea><button onclick="copyXLink()">링크 복사</button></div>
+  <div class="xnote">링크를 아는 사람은 누구나 이 파일을 볼 수 있어요. 파일은 구글 드라이브 "써브텍 재고 - 내보내기" 폴더에 저장됩니다.</div>
+</div>
 <div class="netbar hidden" id="netBar">📡 인터넷 끊김 — 연결될 때까지 저장이 안 됩니다</div>
 <div class="notice hidden" id="notice" onclick="this.className='notice hidden'"></div>
 
@@ -282,7 +306,7 @@ window.addEventListener('online',function(){ netBar(); notice('인터넷이 다�
 document.addEventListener('DOMContentLoaded',netBar);
 </script>
 <script>
-var HTML_VERSION = 'v36'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v37'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var BOMROWS = null, MEMO_SHOWN = 50, PREFETCHED = false;
@@ -891,6 +915,155 @@ function setNav(v){ var g=(v==='search'||v==='input'||v==='newItem'||v==='done')
 function resetBar(ic,t,s){ document.getElementById('barIcon').textContent=ic||'📦'; document.getElementById('barTitle').textContent=t||'써브텍 재고'; document.getElementById('barSub').textContent=s||('입고 · 출고를 빠르게 기록하세요 · '+HTML_VERSION); }
 // (맨 끝에서 실행: 위의 변수들이 다 준비된 뒤) 지난번 데이터로 먼저 그리기
 try{ var cb=JSON.parse(localStorage.getItem(BOOT_KEY)||'null'); if(cb&&cb.version===HTML_VERSION&&cb.loc&&cb.loc.data){ FROM_CACHE=true; onBoot(cb,true); } }catch(e){ FROM_CACHE=false; console.warn(e); }
+</script>
+<script>
+/* ===================== 내보내기 (v37) =====================
+   엑셀(.xlsx): ①품목별(번호) ②위치별 ③위치도 모양 그대로(시트마다 탭) — 화면에서 직접 만듦(라이브러리 없음)
+   위치도 그림(.png): 시트 하나를 밝은 그림으로
+   폰에 저장 = 브라우저 다운로드 / 보낼 링크 = 서버가 드라이브에 올리고 "링크 있는 누구나 보기" 주소를 돌려줌 */
+var XF='xlsx', XSH=0;
+function xMap(){ try{ var sn=window.locApi&&locApi.snapshot(); return sn&&sn.data?JSON.parse(sn.data):{sheets:[]}; }catch(e){ return {sheets:[]}; } }
+function xToday(){ var d=new Date(), p=function(n){return (n<10?'0':'')+n;}; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+function xCode(r,c){ var s='',n=r; do{ s=String.fromCharCode(65+n%26)+s; n=Math.floor(n/26)-1; }while(n>=0); return s+(c+1); }
+function xOrd(){ try{ return (window.locApi&&locApi.orderMap&&locApi.orderMap())||{}; }catch(e){ return {}; } }
+/** 위치(키) → 그 칸에 있는 [{id,name,cat,qty}] */
+function xStockByLoc(){ var o={}; DATA.items.forEach(function(it){ Object.keys(it.locs||{}).forEach(function(k){ var q=Number(it.locs[k])||0; if(q) (o[k]=o[k]||[]).push({id:it.id,name:it.name,cat:it.cat,qty:q}); }); }); return o; }
+/** 칸 하나의 층별 내용: [{key, floor, items:[{name,cat,qty,pin}], memo}] */
+function xCellLayers(sheet,r,c,x,byLoc,IM){ return (x.layers&&x.layers.length?x.layers:[{t:''}]).map(function(L,i){
+  var key=sheet.name+' '+xCode(r,c)+(i?' '+(i+1)+'층':''), st=(byLoc[key]||[]).slice(), items=[];
+  (L.p||[]).forEach(function(pr){ var it=IM[pr.id]||{name:pr.name,cat:''}, a=null; for(var j=0;j<st.length;j++) if(st[j].id===pr.id){ a=st.splice(j,1)[0]; break; }
+    items.push({name:it.name,cat:it.cat||'',qty:a?a.qty:0,pin:true}); });
+  st.forEach(function(a){ items.push({name:a.name,cat:a.cat,qty:a.qty,pin:false}); });
+  return {key:key, floor:(x.layers&&x.layers.length>1)?(i+1)+'층':'', items:items, memo:String(L.t||'').trim()}; }); }
+function xRows(){
+  var M=xMap(), byLoc=xStockByLoc(), IM={}, ord=xOrd(), used={}; DATA.items.forEach(function(it){ IM[it.id]=it; });
+  // ① 품목별
+  var items=DATA.items.slice().sort(function(a,b){ return (a.cat||'').localeCompare(b.cat||'','ko')||(''+a.name).localeCompare(''+b.name,'ko',{numeric:true}); });
+  var A=[[{v:'번호',s:1},{v:'품명',s:1},{v:'분류',s:1},{v:'총수량',s:1},{v:'위치 (칸: 수량)',s:1},{v:'비고',s:1}]];
+  items.forEach(function(it,i){ var ks=Object.keys(it.locs||{}).filter(function(k){return Number(it.locs[k]);});
+    A.push([i+1, ''+it.name, it.cat||'', Number(it.total)||0, {v:ks.map(function(k){return k+': '+fmt(it.locs[k]);}).join('\n'),s:2}, ord[it.id]==='o'?'발주완료':(ord[it.id]?'재고X(발주 필요)':'')]); });
+  // ② 위치별 + ③ 위치도
+  var B=[[{v:'시트',s:1},{v:'칸',s:1},{v:'층',s:1},{v:'칸 이름',s:1},{v:'종류',s:1},{v:'품명',s:1},{v:'분류',s:1},{v:'수량',s:1},{v:'지정',s:1}]], maps=[];
+  (M.sheets||[]).forEach(function(sh){
+    var grid=[], merges=[], covered={}, r, c, row;
+    row=[{v:sh.name,s:1}]; for(c=0;c<sh.cols;c++) row.push({v:c+1,s:1}); grid.push(row);
+    for(r=0;r<sh.rows;r++){ row=[{v:xCode(r,0).replace(/\d+$/,''),s:1}];
+      for(c=0;c<sh.cols;c++){ var x=(sh.cells||{})[r+','+c];
+        if(covered[r+','+c]||!x){ row.push(covered[r+','+c]?{v:'',s:covered[r+','+c]}:''); continue; }
+        var rs=x.rs||1, cs=x.cs||1, st=x.type==='slot'?2:3;
+        if(rs*cs>1){ merges.push([r+1,c+1,r+rs,c+cs]); for(var i=0;i<rs;i++) for(var j=0;j<cs;j++) if(i||j) covered[(r+i)+','+(c+j)]=st; }
+        if(x.type!=='slot'){ row.push({v:x.label||'',s:3}); continue; }
+        var lines=[]; if(x.label) lines.push(x.label); if(x.kind) lines.push('['+x.kind+']');
+        xCellLayers(sh,r,c,x,byLoc,IM).forEach(function(L){ used[L.key]=true; if(L.floor) lines.push('— '+L.floor+' —');
+          L.items.forEach(function(a){ lines.push(a.name+(a.cat?'('+a.cat+')':'')+' '+fmt(a.qty));
+            B.push([sh.name, xCode(r,c), L.floor, x.label||'', x.kind||'', ''+a.name, a.cat||'', a.qty, a.pin?'지정':'']); });
+          if(L.memo) lines.push(L.memo); });
+        row.push({v:lines.join('\n'),s:2}); }
+      grid.push(row); }
+    maps.push({name:'위치도 '+sh.name, rows:grid, widths:[5].concat(Array.apply(null,Array(sh.cols)).map(function(){return 17;})), merges:merges});
+  });
+  Object.keys(byLoc).forEach(function(k){ if(used[k]) return; byLoc[k].forEach(function(a){ B.push(['(칸 미지정)', k, '', '', '', ''+a.name, a.cat||'', a.qty, '']); }); });
+  return [{name:'품목별', rows:A, widths:[6,24,12,10,46,16]}, {name:'위치별', rows:B, widths:[12,7,6,16,9,24,12,10,6]}].concat(maps);
+}
+/* ---- 아주 작은 xlsx 만들기 (zip 저장 방식, 압축 없음) ---- */
+var XCRC=null;
+function xCrc(u){ if(!XCRC){ XCRC=[]; for(var n=0;n<256;n++){ var c=n; for(var k=0;k<8;k++) c=c&1?(0xEDB88320^(c>>>1)):(c>>>1); XCRC[n]=c>>>0; } } var crc=-1; for(var i=0;i<u.length;i++) crc=XCRC[(crc^u[i])&255]^(crc>>>8); return (crc^-1)>>>0; }
+function xZip(files){ var enc=new TextEncoder(), parts=[], cen=[], off=0;
+  function le(n,b){ var a=[]; for(var i=0;i<b;i++) a.push((n>>>(8*i))&255); return a; }
+  files.forEach(function(f){ var nm=enc.encode(f.name), d=enc.encode(f.data), crc=xCrc(d);
+    var h=[].concat([0x50,0x4b,3,4],le(20,2),le(0x800,2),le(0,2),le(0,2),le(0x21,2),le(crc,4),le(d.length,4),le(d.length,4),le(nm.length,2),le(0,2));
+    parts.push(new Uint8Array(h),nm,d);
+    cen.push({h:[].concat([0x50,0x4b,1,2],le(20,2),le(20,2),le(0x800,2),le(0,2),le(0,2),le(0x21,2),le(crc,4),le(d.length,4),le(d.length,4),le(nm.length,2),le(0,2),le(0,2),le(0,2),le(0,2),le(0,4),le(off,4)),nm:nm});
+    off+=h.length+nm.length+d.length; });
+  var cs=0; cen.forEach(function(c){ parts.push(new Uint8Array(c.h),c.nm); cs+=c.h.length+c.nm.length; });
+  parts.push(new Uint8Array([].concat([0x50,0x4b,5,6],le(0,2),le(0,2),le(cen.length,2),le(cen.length,2),le(cs,4),le(off,4),le(0,2))));
+  var total=0; parts.forEach(function(p){ total+=p.length; }); var out=new Uint8Array(total), o=0; parts.forEach(function(p){ out.set(p,o); o+=p.length; }); return out; }
+function xEsc(v){ return String(v).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function xCol(n){ var s=''; n++; while(n>0){ var m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
+function xSheetName(n,used){ n=String(n).replace(/[\[\]:*?\/\\]/g,' ').trim().slice(0,31)||'시트'; var b=n,i=2; while(used[n]){ n=b.slice(0,28)+' '+(i++); } used[n]=true; return n; }
+function xlsxBuild(sheets){
+  var used={}, names=sheets.map(function(s){ return xSheetName(s.name,used); });
+  var H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n', NS='http://schemas.openxmlformats.org/spreadsheetml/2006/main', RN='http://schemas.openxmlformats.org/officeDocument/2006/relationships', PR='http://schemas.openxmlformats.org/package/2006/relationships';
+  var files=[{name:'[Content_Types].xml', data:H+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map(function(s,i){ return '<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join('')+'</Types>'},
+    {name:'_rels/.rels', data:H+'<Relationships xmlns="'+PR+'"><Relationship Id="rId1" Type="'+RN+'/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
+    {name:'xl/workbook.xml', data:H+'<workbook xmlns="'+NS+'" xmlns:r="'+RN+'"><sheets>'+names.map(function(n,i){ return '<sheet name="'+xEsc(n).replace(/"/g,'&quot;')+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>'; }).join('')+'</sheets></workbook>'},
+    {name:'xl/_rels/workbook.xml.rels', data:H+'<Relationships xmlns="'+PR+'">'+sheets.map(function(s,i){ return '<Relationship Id="rId'+(i+1)+'" Type="'+RN+'/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>'; }).join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="'+RN+'/styles" Target="styles.xml"/></Relationships>'},
+    // 스타일: 0 기본 / 1 머리글(굵게·회색) / 2 줄바꿈·테두리 / 3 이름표(가운데·회색)
+    {name:'xl/styles.xml', data:H+'<styleSheet xmlns="'+NS+'"><fonts count="2"><font><sz val="10"/><name val="맑은 고딕"/></font><font><b/><sz val="10"/><name val="맑은 고딕"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1F5F9"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF94A3B8"/></left><right style="thin"><color rgb="FF94A3B8"/></right><top style="thin"><color rgb="FF94A3B8"/></top><bottom style="thin"><color rgb="FF94A3B8"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs></styleSheet>'}];
+  sheets.forEach(function(sh,si){
+    var x=H+'<worksheet xmlns="'+NS+'"><sheetViews><sheetView workbookViewId="0"'+(si===0?' tabSelected="1"':'')+'><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
+    if(sh.widths) x+='<cols>'+sh.widths.map(function(w,i){ return '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>'; }).join('')+'</cols>';
+    x+='<sheetData>'+sh.rows.map(function(row,r){ return '<row r="'+(r+1)+'">'+row.map(function(cell,c){
+      var v=cell, st=0; if(cell&&typeof cell==='object'){ v=cell.v; st=cell.s||0; }
+      if((v===''||v==null)&&!st) return ''; var ref=xCol(c)+(r+1), sa=st?' s="'+st+'"':'';
+      if(typeof v==='number'&&isFinite(v)) return '<c r="'+ref+'"'+sa+'><v>'+v+'</v></c>';
+      return '<c r="'+ref+'"'+sa+' t="inlineStr"><is><t xml:space="preserve">'+xEsc(v==null?'':v)+'</t></is></c>'; }).join('')+'</row>'; }).join('')+'</sheetData>';
+    if(sh.merges&&sh.merges.length) x+='<mergeCells count="'+sh.merges.length+'">'+sh.merges.map(function(m){ return '<mergeCell ref="'+xCol(m[1])+(m[0]+1)+':'+xCol(m[3])+(m[2]+1)+'"/>'; }).join('')+'</mergeCells>';
+    files.push({name:'xl/worksheets/sheet'+(si+1)+'.xml', data:x+'</worksheet>'}); });
+  return xZip(files);
+}
+/* ---- 위치도 그림 (밝은 화면, 시트 하나) ---- */
+function xPng(si,cb){
+  var M=xMap(), sh=(M.sheets||[])[si]; if(!sh){ cb(null); return; }
+  var byLoc=xStockByLoc(), IM={}; DATA.items.forEach(function(it){ IM[it.id]=it; });
+  var CW=190, PAD=10, HEAD=64, LH=24, FONT='"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif';
+  var cv=document.createElement('canvas'), g=cv.getContext('2d');
+  function wrap(t,font,w){ g.font=font; var out=[], cur=''; String(t).split('').forEach(function(ch){ if(g.measureText(cur+ch).width>w&&cur){ out.push(cur); cur=ch; } else cur+=ch; }); if(cur) out.push(cur); return out; }
+  var cells=[], rowH=[]; for(var r=0;r<sh.rows;r++) rowH[r]=70;
+  Object.keys(sh.cells||{}).forEach(function(k){ var p=k.split(','), r=+p[0], c=+p[1], x=sh.cells[k], rs=x.rs||1, cs=x.cs||1, w=cs*CW-PAD*2-6, L=[];
+    if(x.type==='slot'){ if(x.label) wrap(x.label,'700 17px '+FONT,w).forEach(function(t){ L.push({t:t,f:'700 17px '+FONT,c:'#0F172A'}); });
+      xCellLayers(sh,r,c,x,byLoc,IM).forEach(function(ly){ if(ly.floor) L.push({t:ly.floor,f:'500 13px '+FONT,c:'#64748B',line:true});
+        ly.items.forEach(function(a){ var nm=wrap(a.name+(a.cat?' ('+a.cat+')':''),'600 16px '+FONT,w); nm.forEach(function(t){ L.push({t:t,f:'600 16px '+FONT,c:a.qty?'#0F172A':'#64748B'}); });
+          L.push({t:a.qty?fmt(a.qty)+'개':'0', f:(a.qty?'800 19px ':'500 14px ')+FONT, c:a.qty?'#1D4ED8':'#94A3B8'}); });
+        if(ly.memo) wrap(ly.memo.replace(/\n/g,' / '),'400 13px '+FONT,w).slice(0,3).forEach(function(t){ L.push({t:t,f:'400 13px '+FONT,c:'#64748B'}); }); }); }
+    else wrap(x.label||'','700 19px '+FONT,w).forEach(function(t){ L.push({t:t,f:'700 19px '+FONT,c:'#334155',mid:true}); });
+    var need=Math.ceil((30+L.length*LH+PAD)/rs); for(var i=0;i<rs;i++) if(need>rowH[r+i]) rowH[r+i]=need;
+    cells.push({r:r,c:c,rs:rs,cs:cs,x:x,L:L,has:L.some(function(l){return l.c==='#1D4ED8';})}); });
+  var y0=[HEAD+34], H=HEAD+34; for(r=0;r<sh.rows;r++){ y0[r]=H; H+=rowH[r]; }
+  var W=40+sh.cols*CW+16; H+=16; var sc=Math.min(1,16000/Math.max(W,H),Math.sqrt(24000000/(W*H)));
+  cv.width=Math.round(W*sc); cv.height=Math.round(H*sc); g.scale(sc,sc);
+  g.fillStyle='#F5F7FA'; g.fillRect(0,0,W,H); g.textBaseline='top';
+  g.fillStyle='#0F172A'; g.font='800 28px '+FONT; g.fillText('써브텍 자재 위치 · '+sh.name,16,16);
+  g.fillStyle='#64748B'; g.font='500 15px '+FONT; g.textAlign='right'; g.fillText(xToday()+' 기준',W-16,24); g.textAlign='center';
+  g.font='600 14px '+FONT; for(c=0;c<sh.cols;c++) g.fillText(c+1,40+c*CW+CW/2,HEAD+10);
+  for(r=0;r<sh.rows;r++) g.fillText(xCode(r,0).replace(/\d+$/,''),20,y0[r]+rowH[r]/2-8);
+  cells.forEach(function(q){ var x=40+q.c*CW+3, y=y0[q.r]+3, w=q.cs*CW-6, h=-6; for(var i=0;i<q.rs;i++) h+=rowH[q.r+i];
+    var slot=q.x.type==='slot';
+    g.fillStyle=slot?'#FFFFFF':(q.x.type==='label'?'#E2E8F0':'#F5F7FA'); g.strokeStyle=q.has?'#1D4ED8':'#CBD5E1'; g.lineWidth=q.has?2.5:1.2;
+    if(q.x.type==='void') g.setLineDash([5,4]); g.beginPath(); if(g.roundRect) g.roundRect(x,y,w,h,8); else g.rect(x,y,w,h); g.fill(); g.stroke(); g.setLineDash([]);
+    if(slot){ g.textAlign='left'; g.fillStyle='#64748B'; g.font='600 13px '+FONT; g.fillText(xCode(q.r,q.c),x+PAD,y+8);
+      if(q.x.kind){ g.textAlign='right'; g.fillStyle={'파렛트':'#8A6A45','L카':'#1D4ED8','초록차':'#15803D'}[q.x.kind]||'#64748B'; g.font='700 13px '+FONT; g.fillText(q.x.kind,x+w-PAD,y+8); }
+      var yy=y+30; q.L.forEach(function(l){ if(l.line){ g.strokeStyle='#E2E8F0'; g.lineWidth=1; g.beginPath(); g.moveTo(x+PAD,yy+2); g.lineTo(x+w-PAD,yy+2); g.stroke(); }
+        g.textAlign='left'; g.fillStyle=l.c; g.font=l.f; g.fillText(l.t,x+PAD,yy+(l.line?6:0)); yy+=LH; }); }
+    else { var yy2=y+h/2-q.L.length*LH/2; g.textAlign='center'; q.L.forEach(function(l){ g.fillStyle=l.c; g.font=l.f; g.fillText(l.t,x+w/2,yy2); yy2+=LH; }); } });
+  cv.toBlob(function(b){ cb(b); },'image/png');
+}
+/* ---- 창 ---- */
+function openExport(){ if(!window.locApi||!DATA){ notice('아직 불러오는 중이에요'); return; }
+  var M=xMap(); XSH=0; document.getElementById('xSheets').innerHTML=(M.sheets||[]).map(function(sh,i){ return '<button data-i="'+i+'" onclick="setXsh('+i+')">'+esc(sh.name)+'</button>'; }).join('');
+  document.getElementById('xRes').classList.add('hidden'); setXf('xlsx'); document.getElementById('xShade').classList.remove('hidden'); document.getElementById('xPanel').classList.remove('hidden'); }
+function closeExport(){ document.getElementById('xShade').classList.add('hidden'); document.getElementById('xPanel').classList.add('hidden'); }
+function setXf(f){ XF=f; document.getElementById('xfX').classList.toggle('on',f==='xlsx'); document.getElementById('xfP').classList.toggle('on',f==='png');
+  document.getElementById('xDesc').textContent=f==='xlsx'?'엑셀 파일 하나에 다 들어갑니다.\n· 품목별: 번호 · 품명 · 분류 · 총수량 · 위치\n· 위치별: 칸 · 층 · 품명 · 수량\n· 위치도: 공장 모양 그대로 (시트마다 탭)':'위치도를 밝은 그림 한 장으로 만듭니다. 시트를 고르세요.';
+  document.getElementById('xSheets').classList.toggle('hidden',f!=='png'); setXsh(XSH); document.getElementById('xRes').classList.add('hidden'); }
+function setXsh(i){ XSH=i; Array.prototype.forEach.call(document.querySelectorAll('#xSheets button'),function(b){ b.classList.toggle('on',+b.dataset.i===i); }); }
+function xMake(cb){ var M=xMap();
+  if(XF==='xlsx'){ var u=xlsxBuild(xRows()); cb(new Blob([u],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'써브텍재고_'+xToday()+'.xlsx'); return; }
+  var sh=(M.sheets||[])[XSH]; xPng(XSH,function(b){ cb(b,'써브텍위치도_'+String(sh?sh.name:'').replace(/[^0-9A-Za-z가-힣]/g,'')+'_'+xToday()+'.png'); }); }
+function doExport(how){
+  var btns=document.querySelectorAll('#xPanel .xacts button'); function busy(v){ Array.prototype.forEach.call(btns,function(b){ b.disabled=v; }); }
+  busy(true);
+  try{ xMake(function(blob,name){
+    if(!blob){ busy(false); notice('만들지 못했어요. 위치도를 먼저 열어 주세요.',1); return; }
+    if(how==='save'){ var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },4000);
+      busy(false); notice('"'+name+'" 저장을 시작했어요.\n폰에서 저장이 안 되면 "보낼 링크 만들기"를 써 주세요.'); return; }
+    var fr=new FileReader(); fr.onload=function(){ var b64=String(fr.result).split(',')[1];
+      google.script.run.withSuccessHandler(function(res){ busy(false); document.getElementById('xLink').value=res.url; document.getElementById('xRes').classList.remove('hidden'); })
+        .withFailureHandler(function(e){ busy(false); notice(e,1,'링크를 만들지 못했어요: '); }).exportSave({name:name, mime:blob.type, data:b64}); };
+    fr.readAsDataURL(blob); }); }catch(e){ busy(false); notice(e,1,'만들지 못했어요: '); }
+}
+function copyXLink(){ var t=document.getElementById('xLink'); function manual(){ t.focus(); t.select(); try{ document.execCommand('copy'); notice('링크를 복사했어요. 카톡·문자에 붙여넣으세요'); }catch(e){ notice('링크를 길게 눌러 복사해 주세요'); } }
+  try{ navigator.clipboard.writeText(t.value).then(function(){ notice('링크를 복사했어요. 카톡·문자에 붙여넣으세요'); },manual); }catch(e){ manual(); } }
 </script>
 </body>
 </html>

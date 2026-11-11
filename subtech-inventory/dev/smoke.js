@@ -100,6 +100,18 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
   ok(await pg.evaluate(() => window.__g.isConnected) && (await L('status').innerText()) === '저장됨', '최신이 저장본과 같으면 다시 그리지 않고 "저장됨"');
   await pg.evaluate(() => localStorage.removeItem('mockDelay'));
 
+  console.log('내보내기 (v37)');
+  await pg.click('#navTotal'); await pg.locator('#viewTotal .sortbtn').tap(); await pg.waitForTimeout(100);
+  const xl = await pg.evaluate(() => { const rows = xRows(), u = xlsxBuild(rows); return { tabs: rows.map(r => r.name), head: rows[0].rows[0].map(c => c.v), n: rows[0].rows.length, zip: u[0] === 0x50 && u[1] === 0x4b, len: u.length }; });
+  ok(xl.zip && xl.len > 2000 && xl.tabs[0] === '품목별' && xl.tabs[1] === '위치별' && /^위치도 /.test(xl.tabs[2]) && xl.head[0] === '번호' && xl.n === 4, '엑셀: 품목별(번호)·위치별·위치도 탭');
+  await pg.locator('#xPanel .xacts .pri').tap(); await pg.waitForTimeout(300);
+  c = (await calls()).filter(x => x.exp);
+  ok(c.length === 1 && /\.xlsx$/.test(c[0].exp.name) && (await pg.inputValue('#xLink')).startsWith('https://drive.google.com/'), '보낼 링크 만들기 → 드라이브 링크 표시');
+  await pg.locator('#xfP').tap(); await pg.locator('#xPanel .xacts .pri').tap(); await pg.waitForTimeout(600);
+  c = (await calls()).filter(x => x.exp);
+  ok(c.length === 2 && c[1].exp.mime === 'image/png' && c[1].exp.len > 1000, '위치도 그림(PNG) 링크');
+  await pg.evaluate(() => closeExport());
+
   ok(errs.length === 0, '페이지 오류 없음 ' + (errs.length ? JSON.stringify(errs) : ''));
   await b.close();
   console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과');

@@ -6,7 +6,7 @@
  * - 메모(업체 사양), 조립 가능 수량(BOM), 월별 입출고 리포트 포함.
  */
 
-var APP_VERSION = 'v36'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
+var APP_VERSION = 'v37'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
 
 var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
@@ -653,6 +653,20 @@ function resolveImgs_(arr) { return (arr || []).map(resolveImg_).filter(Boolean)
 function imgList_(cell) { return ('' + cell).split(',').map(function (s) { return s.trim(); }).filter(Boolean).map(imgObj_).filter(Boolean); }
 function ox_(v) { return v === 'O' ? 'O' : (v === 'X' ? 'X' : ''); }
 function oxParse_(v) { v = ('' + v).trim(); if (!v) return ['', '']; var c = v.charAt(0).toUpperCase(); var base = c === 'O' ? 'O' : (c === 'X' ? 'X' : ''); var rest = base ? v.substring(1).trim() : v; return [base, rest]; }
+/** 내보내기 파일(엑셀·그림)을 드라이브에 올리고 "링크 있는 누구나 보기" 주소를 돌려줌 — 구글 계정 없이 열림 (v37) */
+function exportSave(p) {
+  if (!p || !p.data) throw new Error('보낼 파일이 없어요.');
+  var okMime = { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx', 'image/png': '.png' };
+  if (!okMime[p.mime]) throw new Error('보낼 수 없는 파일 형식이에요.');
+  var name = String(p.name || '써브텍재고').replace(/[\\/:*?"<>|]/g, '').slice(0, 80);
+  if (name.slice(-okMime[p.mime].length) !== okMime[p.mime]) name += okMime[p.mime];
+  var props = PropertiesService.getScriptProperties(), id = props.getProperty('EXPORT_FOLDER'), folder = null;
+  if (id) { try { folder = DriveApp.getFolderById(id); } catch (e) {} }
+  if (!folder) { folder = DriveApp.createFolder('써브텍 재고 - 내보내기'); props.setProperty('EXPORT_FOLDER', folder.getId()); }
+  var f = folder.createFile(Utilities.newBlob(Utilities.base64Decode(p.data), p.mime, name));
+  f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return { ok: true, name: name, url: 'https://drive.google.com/file/d/' + f.getId() + '/view' };
+}
 function saveImage_(base64, mime, name) {
   var f = getMemoFolder_().createFile(Utilities.newBlob(Utilities.base64Decode(base64), mime, name));
   f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
