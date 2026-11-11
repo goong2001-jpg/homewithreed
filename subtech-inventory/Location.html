@@ -82,6 +82,7 @@
 #locApp .it{display:block;font-weight:600;line-height:1.25;margin-top:2px;overflow-wrap:anywhere}
 #locApp .it b{font-weight:800;font-variant-numeric:tabular-nums}
 #locApp .it b.q0{opacity:.4;font-weight:400}
+#locApp .ct{font-weight:500;font-size:.8em;color:var(--sub);margin-left:1px;white-space:nowrap}
 #locApp .it .tq{font-size:.82em;color:var(--sub);font-weight:400;white-space:nowrap}
 /* 재고X (발주 필요) */
 #locApp .tools button.xbtn{border-color:#B3412E;background:#B3412E;color:#fff;font-weight:700}
@@ -407,6 +408,11 @@ function ensure(s,r,c){const k=K(r,c);if(!s.cells[k])s.cells[k]=def();return s.c
 const hasContent=x=>String(x.label||'').trim()||(x.layers||[]).some(L=>String(L.t||'').trim()||(L.p||[]).length);
 /* 지정 제품: 칸의 층마다 L.p = [{id, name}] (재고가 0이어도 칸에 이름이 보임) */
 const prodName=pr=>(ITEMMAP[pr.id]&&ITEMMAP[pr.id].name)||pr.name||pr.id;
+/** 분류 (품목ID = "품명||분류" 이라 목록에 없어도 알 수 있음) */
+const prodCat=pr=>(ITEMMAP[pr.id]&&ITEMMAP[pr.id].cat)||String(pr.id||'').split('||')[1]||'';
+const prodFull=pr=>prodName(pr)+(prodCat(pr)?'('+prodCat(pr)+')':'');
+/** 칸·칩에 보여줄 이름: 품명 + 작은 글씨 (분류) — 같은 이름이 여러 분류에 있어도 구분되게 */
+const nameCat=(nm,cat)=>esc(nm)+(cat?`<small class="ct">(${esc(cat)})</small>`:'');
 const uniqP=a=>a.filter((x,i)=>a.findIndex(y=>y.id===x.id)===i);
 const clone=o=>JSON.parse(JSON.stringify(o));
 /* 적재 방식: 칸마다 하나 (x.kind). 종류를 늘리려면 여기에 한 줄 추가 */
@@ -544,8 +550,8 @@ function cellHTML(x,r,c,s,T){
   h+='<span class="layers">'+x.layers.map((L,i)=>{
     // 📌지정 제품(수량, 0이면 흐리게) → 그 밖의 재고 → 손으로 적은 메모. 한 줄에 하나
     const pp=L.p||[];
-    const ls=pp.map(pr=>{const a=st[i].find(z=>z.id===pr.id);return `<span class="it pin${isOrd(pr.id)?' oo':isNeed(pr.id)?' xo':''}">${esc(prodName(pr))} <b${a?'':' class="q0"'}>${fmtN(a?a.qty:0)}</b>${a?totTag(T,pr.id,a.qty):''}</span>`})
-      .concat(st[i].filter(a=>!pp.some(pr=>pr.id===a.id)).map(a=>`<span class="it${isOrd(a.id)?' oo':isNeed(a.id)?' xo':''}">${esc(a.name)} <b>${fmtN(a.qty)}</b>${totTag(T,a.id,a.qty)}</span>`),
+    const ls=pp.map(pr=>{const a=st[i].find(z=>z.id===pr.id);return `<span class="it pin${isOrd(pr.id)?' oo':isNeed(pr.id)?' xo':''}">${nameCat(prodName(pr),prodCat(pr))} <b${a?'':' class="q0"'}>${fmtN(a?a.qty:0)}</b>${a?totTag(T,pr.id,a.qty):''}</span>`})
+      .concat(st[i].filter(a=>!pp.some(pr=>pr.id===a.id)).map(a=>`<span class="it${isOrd(a.id)?' oo':isNeed(a.id)?' xo':''}">${nameCat(a.name,a.cat)} <b>${fmtN(a.qty)}</b>${totTag(T,a.id,a.qty)}</span>`),
               lines(L.t).map(t=>`<span class="it memo">${esc(t)}</span>`));
     const body=ls.length?ls.slice(0,4).join('')+(ls.length>4?`<span class="more">외 ${ls.length-4}개</span>`:''):'<i>–</i>';
     return `<span class="layer">${split?`<b class="ly">${i+1}층</b>`:''}${body}</span>`}).join('')+'</span>';
@@ -857,12 +863,13 @@ function openPick(i){
   const norm=v=>String(v||'').replace(/\s+/g,'').toLowerCase();
   const draw=()=>{const L=get(s,r,c).layers[i]||{},have=L.p||[],here=stockAt(slotKey(s,r,c,i)).map(a=>a.id),q=norm(inp.value);
     if(!ITEMS.length){box.innerHTML='<p class="none">품목 목록을 불러오는 중…</p>';return}
-    const list=ITEMS.filter(it=>!have.some(pr=>pr.id===it.id)&&(!q||norm(it.name).includes(q)))
-      .sort((a,b)=>(here.includes(b.id)-here.includes(a.id))||String(a.name).localeCompare(String(b.name))).slice(0,40);
+    const qr=inp.value,rk=it=>q?srank(it,qr):0; // "h200wf 기판"처럼 분류까지 검색, 정확히 맞는 이름 먼저
+    const list=ITEMS.filter(it=>!have.some(pr=>pr.id===it.id)&&rk(it)>=0)
+      .sort((a,b)=>(here.includes(b.id)-here.includes(a.id))||(rk(a)-rk(b))||String(a.name).localeCompare(String(b.name))||String(a.cat).localeCompare(String(b.cat))).slice(0,40);
     box.innerHTML=list.length?list.map(it=>`<button class="pick" data-id="${esc(it.id)}"><span>${esc(it.name)}${here.includes(it.id)?' <small>· 이 칸에 재고 있음</small>':''}</span><small>${esc(it.cat||'')}</small></button>`).join('')
       :'<p class="none">맞는 품목이 없어요</p>';
     box.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{const it=ITEMMAP[b.dataset.id];if(!it)return;
-      const y=ensure(s,r,c).layers[i];y.p=uniqP((y.p||[]).concat({id:it.id,name:it.name}));save();renderGrid();drawCell();toast(it.name+' 지정했어요')})};
+      const y=ensure(s,r,c).layers[i];y.p=uniqP((y.p||[]).concat({id:it.id,name:it.name}));save();renderGrid();drawCell();toast(it.name+(it.cat?'('+it.cat+')':'')+' 지정했어요')})};
   inp.oninput=draw;P.querySelector('[data-a="back"]').onclick=()=>drawCell();draw();setTimeout(()=>inp.focus(),50);
 }
 
@@ -1087,7 +1094,7 @@ function drawCell(){
   ${x.type==='slot'&&x.layers.length>1&&x.layers.some((L,i)=>layerMovable(s,r,c,i))?`<button class="mvall" data-mvcell="1">⇄ 칸째로 이동 (${x.layers.map((L,i)=>(i+1)+'층').join('·')} 모두)</button>`:''}
   ${x.type==='slot'?x.layers.map((L,i)=>{const k=slotKey(s,r,c,i),list=stockAt(k);return `<div class="sk"><h3>현재 재고${x.layers.length>1?' · '+(i+1)+'층':''}<small>${esc(k)}</small></h3>
     ${stockLoaded||!GAS?stockRows(list,k):'<p class="none">불러오는 중…</p>'}<button class="in" data-in="${esc(k)}">＋ 이 칸에 입고</button>${layerMovable(s,r,c,i)?`<button class="mv" data-mvl="${i}">⇄ ${x.layers.length>1?(i+1)+'층':'칸'} 전체 이동</button>`:''}
-    ${GAS?`<div class="pp"><span class="pk">📌 지정 제품</span>${(L.p||[]).map((pr,pi)=>`<span class="chip">${esc(prodName(pr))}<button data-unp="${i},${pi}" aria-label="${esc(prodName(pr))} 지정 해제">✕</button></span>`).join('')}<button class="mv" data-pick="${i}">＋ 제품 지정</button></div>`:''}</div>`}).join(''):''}
+    ${GAS?`<div class="pp"><span class="pk">📌 지정 제품</span>${(L.p||[]).map((pr,pi)=>`<span class="chip">${nameCat(prodName(pr),prodCat(pr))}<button data-unp="${i},${pi}" aria-label="${esc(prodName(pr))} 지정 해제">✕</button></span>`).join('')}<button class="mv" data-pick="${i}">＋ 제품 지정</button></div>`:''}</div>`}).join(''):''}
   ${x.type==='slot'?x.layers.map((L,i)=>`<label class="f">${x.layers.length>1?(i+1)+'층 메모':'메모 (직접 적는 자재)'}<textarea data-i="${i}" rows="3" placeholder="자재명을 한 줄에 하나씩">${esc(L.t)}</textarea></label>`).join(''):''}
   <div class="acts">
     ${x.type==='slot'?(x.layers.length===1?'<button data-a="split">1층·2층으로 나누기</button>':`${x.layers.length<4?'<button data-a="addL">층 추가</button>':''}<button data-a="joinL">층 없애기</button>`):''}
@@ -1372,7 +1379,7 @@ function renderResults(){
     if(String(x.label||'').toLowerCase().includes(q))out.push({si,r,c,w:'',t:x.label});
     if(x.kind&&String(x.kind).toLowerCase().includes(q))out.push({si,r,c,w:x.label||'',t:'적재: '+x.kind});
     if(x.type==='slot')x.layers.forEach((L,i)=>lines(L.t).forEach(t=>{if(t.toLowerCase().includes(q))out.push({si,r,c,w:x.layers.length>1?(i+1)+'층':'',t})}))
-    if(x.type==='slot')x.layers.forEach((L,i)=>(L.p||[]).forEach(pr=>{const nm=prodName(pr);
+    if(x.type==='slot')x.layers.forEach((L,i)=>(L.p||[]).forEach(pr=>{const nm=prodFull(pr);
       if(nm.toLowerCase().includes(q)&&!stockAt(slotKey(s,r,c,i)).some(a=>a.id===pr.id))out.push({si,r,c,pid:pr.id,w:(x.layers.length>1?(i+1)+'층 ':'')+(x.label||''),t:'📌'+nm+' · 지정 (재고 0)'})}))}
   });
   // 재고가 있는 품목은 위 카드에 나오므로, 아래 칸 목록에서는 📌지정(재고 0)·이름·메모만
@@ -1470,7 +1477,7 @@ function appSlots(){const sheets=[],slots=[];S.sheets.forEach(s=>{const sheet=St
   Object.keys(s.cells||{}).map(k=>k.split(',').map(Number)).sort((a,b)=>a[0]-b[0]||a[1]-b[1]).forEach(([r,c])=>{const x=s.cells[K(r,c)];if(!x||x.type!=='slot')return;
     const n=Math.max(1,(x.layers||[]).length);for(let i=0;i<n;i++){const L=(x.layers||[])[i]||{};
       slots.push({key:slotKey(s,r,c,i),sheet,code:code(r,c),label:String(x.label||'').trim(),kind:x.kind||'',layer:i,n,p:(L.p||[]).map(pr=>pr.id),
-        note:((L.p||[])[0]||{}).name||lines(L.t)[0]||''})}})});return{sheets,slots}}
+        note:((L.p||[])[0]?prodFull(L.p[0]):'')||lines(L.t)[0]||''})}})});return{sheets,slots}}
 function mapToHost(){if(host()&&S)host().mapChanged(appSlots())}
 function stockToHost(){if(host())host().stockChanged(STK)}
 if(HOSTED){

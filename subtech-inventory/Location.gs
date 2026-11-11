@@ -97,6 +97,11 @@ function locApply(json, baseVersion, mv) {
 }
 
 /** "위치목록" 시트: 검색·필터용 평평한 표 */
+/** 📌지정 제품 표시 이름: 품명(분류) — 품목ID가 "품명||분류" */
+function locProdLabel_(pr) {
+  const cat = String(pr.id || '').split('||')[1] || '';
+  return (pr.name || String(pr.id || '').split('||')[0]) + (cat ? '(' + cat + ')' : '');
+}
 function locWriteList_(obj) {
   const ss = locBook_();
   const sh = ss.getSheetByName(LOC_LIST) || ss.insertSheet(LOC_LIST);
@@ -109,7 +114,7 @@ function locWriteList_(obj) {
       const code = locCode_(rc[0], rc[1]);
       const split = (x.layers || []).length > 1;
       (x.layers || []).forEach((L, i) => {
-        (L.p || []).forEach(pr => rows.push([s.name, code, x.label || '', split ? (i + 1) + '층' : '', '[제품] ' + (pr.name || pr.id), x.kind || '']));
+        (L.p || []).forEach(pr => rows.push([s.name, code, x.label || '', split ? (i + 1) + '층' : '', '[제품] ' + locProdLabel_(pr), x.kind || '']));
         String(L.t || '').split('\n').map(t => t.trim()).filter(Boolean)
           .forEach(t => rows.push([s.name, code, x.label || '', split ? (i + 1) + '층' : '', t, x.kind || '']));
       });
@@ -168,7 +173,7 @@ function locSlots_(obj) {
           out.push({ key: sheet + ' ' + code + (i ? ' ' + (i + 1) + '층' : ''), sheet: sheet, code: code,
                      label: String(x.label || '').trim(), kind: x.kind || '', layer: i, n: n,
                      p: (((x.layers || [])[i] || {}).p || []).map(pr => pr.id),
-                     note: ((((x.layers || [])[i] || {}).p || [])[0] || {}).name ||
+                     note: ((((x.layers || [])[i] || {}).p || [])[0] ? locProdLabel_(x.layers[i].p[0]) : '') ||
                            String(((x.layers || [])[i] || {}).t || '').split('\n').map(t => t.trim()).filter(Boolean)[0] || '' });
       });
   });
