@@ -48,7 +48,11 @@ var F={
  locQuickIn:function(p){CALLS.push({quickIn:p});var it=item(p.id);var t=p.lines.reduce(function(a,l){return a+l.boxes*l.per},0);it.locs[p.loc]=(it.locs[p.loc]||0)+t;sumLocs(it);return {item:it,created:false}},
  locQuickOut:function(p){CALLS.push({quickOut:p});var it=item(p.id);var t=p.loose+p.lines.reduce(function(a,l){return a+l.boxes*l.per},0);it.locs[p.loc]=(it.locs[p.loc]||0)-t;sumLocs(it);return {item:it}},
  save:function(p){CALLS.push({save:p});var it=item(p.id);var t=p.lines.reduce(function(a,l){return a+(+l.boxes||0)*(+l.per||0)},0)*(p.type==='출고'?-1:1);it.locs[p.loc]=(it.locs[p.loc]||0)+t;sumLocs(it);return {ok:true,total:it.total,locs:it.locs}},
- getHistory:function(){return []},
+ getHistory:function(id){return [{row:9,k:1700000000000,cancel:true,undone:false,date:'11-11 10:05',type:'출고',loc:'1층 B2',boxes:0,delta:30,staff:'홍길동',imgs:[]},
+   {row:8,k:1700000000000,cancel:false,undone:true,date:'11-11 10:00',type:'출고',loc:'1층 B2',boxes:0,delta:-30,staff:'홍길동',imgs:[]},
+   {row:7,k:1690000000000,cancel:false,undone:false,date:'11-10 09:00',type:'입고',loc:'1층 B2',boxes:1,delta:50,staff:'김철수',imgs:[]}]},
+ undoTransaction:function(row,k){CALLS.push({undo:[row,k]});var it=item('SV7||기판');return {ok:true,id:it.id,total:it.total,locs:it.locs,rows:1}},
+ getRecentLog:function(){return []}, getMonthlyReport:function(){return []},
  resetAllStock:function(p){if(p.confirm!=='초기화')throw new Error('확인 문구');ITEMS.forEach(function(it){Object.keys(it.locs).forEach(function(k){it.locs[k]=0});it.total=0});return {ok:true,rows:ITEMS.length}}};
 function runner(s,f){var o={withSuccessHandler:function(h){return runner(h,f)},withFailureHandler:function(h){return runner(s,h)}};
  Object.keys(F).forEach(function(n){o[n]=function(){var a=arguments;setTimeout(function(){try{var r=JSON.parse(JSON.stringify(F[n].apply(null,a)));s&&s(r)}catch(e){f&&f(e)}},n==='appBoot'?DELAY:20)}});return o}

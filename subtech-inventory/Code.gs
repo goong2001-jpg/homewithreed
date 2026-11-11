@@ -6,7 +6,7 @@
  * - 메모(업체 사양), 조립 가능 수량(BOM), 월별 입출고 리포트 포함.
  */
 
-var APP_VERSION = 'v33'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
+var APP_VERSION = 'v34'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
 
 var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
@@ -100,7 +100,7 @@ function doGet(e) {
   // 한 화면: Index 안에 위치도(Location.html)를 끼워 넣음 (<?!= locInclude() ?>). 첫 화면 = 위치도.
   // 예전 주소(?page=location&q=…)도 그대로 열림 — 화면에서 q 를 읽어 위치도 검색
   return HtmlService.createTemplateFromFile('Index').evaluate().setTitle('써브텍 재고')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1');
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=3');
 }
 function showUrl() {
   var url = ScriptApp.getService().getUrl();
@@ -384,9 +384,11 @@ function getHistory(id) {
   var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG), out = [];
   if (!log || log.getLastRow() < 2) return out;
   var v = log.getRange(2, 1, log.getLastRow() - 1, 13).getValues();
+  var un = undoneSet_(v);
   for (var i = v.length - 1; i >= 0 && out.length < 20; i--) {
     if (v[i][1] !== id) continue;
-    out.push({ row: i + 2, date: v[i][0] ? fmtDt_(v[i][0]) : '', type: v[i][5], loc: v[i][4],
+    out.push({ row: i + 2, k: undoKey_(v[i]), cancel: isCancelRow_(v[i]), undone: !!un[i],
+               date: v[i][0] ? fmtDt_(v[i][0]) : '', type: v[i][5], loc: v[i][4],
                boxes: Number(v[i][6]) || 0, delta: Number(v[i][9]) || 0, staff: v[i][10], imgs: imgList_(v[i][12]) });
   }
   return out;
@@ -398,8 +400,10 @@ function getRecentLog() {
   if (!log || log.getLastRow() < 2) return out;
   var n = log.getLastRow() - 1, take = Math.min(n, 60);
   var v = log.getRange(log.getLastRow() - take + 1, 1, take, 13).getValues();
+  var un = undoneSet_(v);
   for (var i = v.length - 1; i >= 0; i--) {
-    out.push({ row: log.getLastRow() - take + 1 + i, date: v[i][0] ? fmtDt2_(v[i][0]) : '',
+    out.push({ row: log.getLastRow() - take + 1 + i, k: undoKey_(v[i]), cancel: isCancelRow_(v[i]), undone: !!un[i],
+               date: v[i][0] ? fmtDt2_(v[i][0]) : '',
                name: v[i][2], cat: v[i][3], type: v[i][5], loc: v[i][4],
                boxes: Number(v[i][6]) || 0, delta: Number(v[i][9]) || 0,
                staff: v[i][10], memo: v[i][11], imgs: imgList_(v[i][12]) });
@@ -407,15 +411,59 @@ function getRecentLog() {
   return out;
 }
 
-/** 이력에서 거래 한 건 취소(삭제) → 재고 자동 원복 */
-function undoTransaction(row) {
-  var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
-  var r = log.getRange(row, 1, 1, 13).getValues()[0], id = r[1];
-  ('' + r[12]).split(',').map(function (s) { return s.trim(); }).filter(Boolean)
-    .forEach(function (fid) { try { DriveApp.getFileById(fid).setTrashed(true); } catch (e) {} });
-  log.deleteRow(row);
-  var s = computeStock_()[id] || { total: 0, locs: {} };
-  return { ok: true, id: id, total: s.total, locs: s.locs };
+/* 거래 취소 (v34~): 줄을 지우지 않고 '반대 줄'을 덧붙입니다.
+   취소 줄 = 같은 구분·위치·박스수, 총개수와 증감수량만 부호 반대, 메모 "취소: 원래일시 구분 #원래줄의 시각키".
+   (구분을 그대로 두고 총개수를 음수로 적어서 월별 리포트 합계도 자동으로 맞습니다.) */
+function undoKey_(r) { var t = r[0]; return (t && t.getTime) ? t.getTime() : String(t); }
+function isCancelRow_(r) { return /^취소: /.test('' + r[11]); }
+/** 이미 취소된 줄 찾기: rows(시트 2행부터) → {인덱스:true} */
+function undoneSet_(v) {
+  var cnt = {}, out = {};
+  v.forEach(function (r) {
+    var m = /^취소: .*#(.+)$/.exec('' + r[11]); if (!m) return;
+    var k = m[1] + '|' + r[1] + '|' + r[4] + '|' + (0 - (Number(r[9]) || 0));
+    cnt[k] = (cnt[k] || 0) + 1;
+  });
+  v.forEach(function (r, i) {
+    if (isCancelRow_(r)) return;
+    var k = undoKey_(r) + '|' + r[1] + '|' + r[4] + '|' + (Number(r[9]) || 0);
+    if (cnt[k] > 0) { cnt[k]--; out[i] = true; }
+  });
+  return out;
+}
+/** 이력에서 거래 한 건 취소 → 반대 줄을 덧붙여 재고 원복 (거래로그는 지우지 않음). key = 화면이 본 그 줄의 시각키(줄이 밀렸는지 확인) */
+function undoTransaction(row, key) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
+    var n = log.getLastRow() - 1, i = Number(row) - 2;
+    if (n < 1 || !(i >= 0 && i < n)) throw new Error('이력이 바뀌었어요. 이력을 다시 열어서 해주세요.');
+    var v = log.getRange(2, 1, n, 13).getValues(), r = v[i], id = r[1];
+    if (!id || (key != null && String(undoKey_(r)) !== String(key))) throw new Error('이력이 바뀌었어요. 이력을 다시 열어서 해주세요.');
+    if (isCancelRow_(r)) throw new Error('취소 기록은 다시 취소할 수 없어요. 필요하면 새로 입력해 주세요.');
+    if (r[5] === '기록' || !(Number(r[9]) || 0)) throw new Error('수량이 바뀌지 않은 기록이라 취소할 것이 없어요.');
+    var un = undoneSet_(v);
+    if (un[i]) throw new Error('이미 취소된 거래예요.');
+    var targets = [i];
+    if (r[5] === '이동') { // 이동은 두 줄(보낸 칸·받은 칸)이 한 쌍 → 같이 취소
+      [i - 1, i + 1].some(function (j) {
+        var q = v[j];
+        if (q && !un[j] && !isCancelRow_(q) && q[5] === '이동' && q[1] === id && String(undoKey_(q)) === String(undoKey_(r)) &&
+            ('' + q[11]) === ('' + r[11]) && (Number(q[9]) || 0) === -(Number(r[9]) || 0)) { targets.push(j); return true; }
+        return false;
+      });
+    }
+    var now = new Date();
+    var rows = targets.map(function (j) {
+      var q = v[j];
+      return [now, q[1], q[2], q[3], q[4], q[5], q[6], q[7], -(Number(q[8]) || 0), -(Number(q[9]) || 0), q[10],
+              '취소: ' + (q[0] ? fmtDt_(q[0]) : '') + ' ' + q[5] + ' #' + undoKey_(q), ''];
+    });
+    log.getRange(log.getLastRow() + 1, 1, rows.length, 13).setValues(rows);
+    var s = computeStock_()[id] || { total: 0, locs: {} };
+    return { ok: true, id: id, total: s.total, locs: s.locs, rows: rows.length };
+  } finally { lock.releaseLock(); }
 }
 
 /** 재고 조정(실사): 선택 위치의 재고를 target 값으로 맞춤 (차액만 기록) */

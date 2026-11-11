@@ -55,6 +55,24 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
   await pg.click('#navTotal'); await pg.waitForTimeout(100);
   ok((await pg.locator('#totList').innerText()).includes('총수량'), '위치별 "(총수량 N개)"');
 
+  console.log('입출고 탭: 담당자 기억 · 거래 취소 (v34)');
+  await pg.click('#navInput'); await pg.waitForTimeout(100);
+  await pg.locator('#searchList .gr').first().tap(); await pg.waitForTimeout(300);
+  await pg.selectOption('#staffSel', '김철수');
+  ok(await pg.evaluate(() => localStorage.getItem('subtek-staff')) === '김철수', '담당자 고르면 기억');
+  const hist = await pg.locator('#histList').innerText();
+  ok(/취소 기록/.test(hist) && /취소됨/.test(hist) && await pg.locator('#histList .undo').count() === 1, '이력: 취소 기록·취소됨 표시, 취소 버튼은 남은 거래에만');
+  await pg.locator('#histList .undo').tap(); await pg.waitForTimeout(200);
+  c = (await calls()).filter(x => x.undo);
+  ok(c.length === 1 && c[0].undo[0] === 7 && c[0].undo[1] === 1690000000000, '취소 → undoTransaction(줄, 시각키)');
+  await pg.reload(); await pg.waitForTimeout(800); await pg.click('#navInput'); await pg.locator('#searchList .gr').first().tap(); await pg.waitForTimeout(200);
+  ok(await pg.inputValue('#staffSel') === '김철수', '다시 열어도 담당자 그대로');
+
+  console.log('다크 모드 (v34)');
+  await pg.emulateMedia({ colorScheme: 'dark' }); await pg.click('#navStock'); await pg.waitForTimeout(100);
+  ok(await pg.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(25, 28, 30)', '현재고 탭도 어두운 배경');
+  await pg.emulateMedia({ colorScheme: 'light' });
+
   ok(errs.length === 0, '페이지 오류 없음 ' + (errs.length ? JSON.stringify(errs) : ''));
   await b.close();
   console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과');
