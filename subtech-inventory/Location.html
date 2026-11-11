@@ -340,6 +340,51 @@
 #locApp .kindsel button.k-kp.on{background:#8A6A45;border-color:#8A6A45;color:#fff}#locApp .kindsel button.k-kl.on{background:#1D4ED8;border-color:#1D4ED8;color:#fff}#locApp .kindsel button.k-kg.on{background:#15803D;border-color:#15803D;color:#fff}
 :root[data-theme="dark"] #locApp .kb.kp{color:#D0A878}:root[data-theme="dark"] #locApp .kb.kl{color:#8FB4FF}:root[data-theme="dark"] #locApp .kb.kg{color:#5FD08A}
 :root[data-theme="dark"] #locApp .kindsel button.k-kp:not(.on){color:#D0A878}:root[data-theme="dark"] #locApp .kindsel button.k-kl:not(.on){color:#8FB4FF}:root[data-theme="dark"] #locApp .kindsel button.k-kg:not(.on){color:#5FD08A}
+/* v40: 보기 3단 · 분류 칩 */
+#locApp .viewbar{display:flex;align-items:center;gap:8px;padding:8px 12px 0}
+#locApp .viewbar .vl{font-size:13px;color:var(--sub)}
+#locApp .vseg{display:inline-flex;border:1.5px solid var(--line);border-radius:9px;overflow:hidden;background:var(--slot)}
+#locApp .vseg button{min-height:42px;min-width:64px;padding:0 14px;border:0;background:transparent;font-size:14.5px}
+#locApp .vseg button+button{border-left:1.5px solid var(--line)}
+#locApp .vseg button.on{background:var(--ink);color:var(--paper);font-weight:700}
+#locApp .catbar{display:flex;gap:6px;overflow-x:auto;padding:8px 12px 0;scrollbar-width:none}
+#locApp .catbar::-webkit-scrollbar{display:none}
+#locApp .catbar[hidden]{display:none}
+#locApp .catbar button{flex:0 0 auto;min-height:38px;padding:0 13px;border:1.5px solid var(--line);border-radius:19px;background:var(--slot);font-size:13.5px;white-space:nowrap}
+#locApp .catbar button small{color:var(--sub);font-size:12px}
+#locApp .catbar button.on{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:700}
+#locApp .catbar button.on small{color:inherit;opacity:.8}
+#locApp .cell.dimc{opacity:.25}
+/* 배치: 한 화면에 전체, 글씨 없이 모양과 색만 */
+#locApp .grid.v-map{gap:2px;grid-auto-rows:36px;min-width:0}
+#locApp .grid.v-map .cell{min-height:0;padding:0;align-items:center;justify-content:center;border-width:1px;border-radius:4px;box-shadow:none}
+#locApp .grid.v-map .cell.slot{background:var(--slot);color:var(--sub)}
+#locApp .grid.v-map .cell.slot.emp{background:transparent;border-style:dashed}
+#locApp .grid.v-map .cell.slot.asg{background:#DCE3EC;border-color:#C3CCD8}
+#locApp .grid.v-map .cell.slot.stocked{background:#334155;border-color:#334155;color:#fff}
+#locApp .grid.v-map .cell.kk-kp{color:#8A6A45;border-color:#8A6A45}#locApp .grid.v-map .cell.kk-kl{color:#1D4ED8;border-color:#1D4ED8}#locApp .grid.v-map .cell.kk-kg{color:#15803D;border-color:#15803D}
+#locApp .grid.v-map .cell.kk-kp.asg,#locApp .grid.v-map .cell.kk-kl.asg,#locApp .grid.v-map .cell.kk-kg.asg{background:var(--slot)}
+#locApp .grid.v-map .cell.stocked.kk-kp{background:#8A6A45;color:#fff}#locApp .grid.v-map .cell.stocked.kk-kl{background:#1D4ED8;color:#fff}#locApp .grid.v-map .cell.stocked.kk-kg{background:#15803D;color:#fff}
+#locApp .grid.v-map .cell.label{font-size:11px;line-height:1.1}
+#locApp .grid.v-map .cell.label .lbl{font-size:11px;font-weight:700;overflow:hidden;max-height:100%}
+#locApp .grid.v-map .cell.hit{background:var(--hitline);border-color:var(--hitline);color:#1F2326;box-shadow:0 0 0 2px var(--hitline)}
+#locApp .grid.v-map .cell.hasx{box-shadow:inset 0 0 0 2px #B3412E}
+#locApp .wrap:has(.grid.v-map){overflow-x:hidden}
+/* 이름: 칸 크기 같게, 대표 품목 하나만 크게 */
+#locApp .grid.v-name{grid-auto-rows:calc(var(--ch) + 4px)}
+#locApp .grid.v-name .cell{min-height:0;overflow:hidden;gap:1px;box-shadow:none}
+#locApp .grid.v-name .cell.label{justify-content:center;align-items:center}
+#locApp .grid.v-name .code{display:flex;align-items:center;gap:3px}
+#locApp .grid.v-name .n1{font-weight:700;font-size:1.02em;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+#locApp .grid.v-name .n1.lb{font-weight:500;color:var(--sub)}
+#locApp .grid.v-name .n2{font-size:1.05em;font-variant-numeric:tabular-nums;margin-top:auto}
+#locApp .grid.v-name .n2 b{font-weight:800}
+#locApp .grid.v-name .n2 i{font-style:normal;color:var(--sub);opacity:.6}
+#locApp .grid.v-name .n2 em{font-style:normal;font-size:.8em;color:var(--sub);margin-left:2px}
+#locApp .grid.v-name .cell.asg{background:#F1F5F9}
+:root[data-theme="dark"] #locApp .grid.v-map .cell.slot.asg{background:#3A4044;border-color:#4B5155}
+:root[data-theme="dark"] #locApp .grid.v-map .cell.slot.stocked:not(.kk-kp):not(.kk-kl):not(.kk-kg){background:#C8CBC5;border-color:#C8CBC5;color:#191C1E}
+:root[data-theme="dark"] #locApp .grid.v-name .cell.asg{background:#262B2E}
 </style>
 
 <div id="locApp">
@@ -367,6 +412,8 @@
       <button data-el="bTheme" hidden>화면 어둡게</button>
     </div>
     <p class="hint" data-el="hint">칸을 누르면 이름과 자재를 적을 수 있어요. 칸을 <b>길게 누른 채 끌면</b> 다른 칸으로 옮겨져요.</p>
+    <div class="viewbar"><span class="vl">보기</span><div class="vseg" data-el="vSeg"><button data-v="map">배치</button><button data-v="name">이름</button><button data-v="full">전체</button></div></div>
+    <div class="catbar" data-el="catBar"></div>
     <div class="stkbar" data-el="stkBar"></div>
     <div class="mergeBar" data-el="qtyBar" hidden><span>✏️ 수량 입력 중 — 칸을 누르면 바로 수량을 넣어요</span><button class="ghost" data-el="bQtyEnd">끝내기</button></div>
     <div class="mergeBar" data-el="moveBar" hidden><span data-el="moveInfo"></span><button class="ghost" data-el="bMvCancel">취소</button></div>
@@ -579,7 +626,32 @@ document.addEventListener('visibilitychange',()=>{if(HOSTED)return; // 재고앱
 });
 
 /* ---------- 그리기 ---------- */
-function render(){if(!S)return;renderTabs();renderGrid();renderMerge();renderStockBar();renderMoveBar();renderOutBtn()}
+function render(){if(!S)return;renderTabs();renderCats();renderGrid();renderMerge();renderStockBar();renderMoveBar();renderOutBtn()}
+/* ---------- 보기 3단 (v40): 배치(모양만, 한 화면에) / 이름(칸마다 대표 품목 하나) / 전체(글씨 전부) + 분류 칩 ---------- */
+let VIEW='full',CATF='';try{const v=localStorage.getItem('subtek-loc-view');if(v==='map'||v==='name')VIEW=v}catch(e){}
+function setView(v){VIEW=v;try{localStorage.setItem('subtek-loc-view',v)}catch(e){}render()}
+/** 칸 안 품목 [{name,cat,qty}] (📌지정 + 재고), 손메모 줄 수 */
+function cellItems(s,r,c,x){const out=[];let memo=0;x.layers.forEach((L,i)=>{const st=stockAt(slotKey(s,r,c,i)),pp=L.p||[];
+  pp.forEach(pr=>{const a=st.find(z=>z.id===pr.id);out.push({name:prodName(pr),cat:prodCat(pr),qty:a?a.qty:0})});
+  st.filter(a=>!pp.some(pr=>pr.id===a.id)).forEach(a=>out.push({name:a.name,cat:a.cat,qty:a.qty}));memo+=lines(L.t).length});return{items:out,memo}}
+function renderCats(){const bar=E('catBar'),s=sh(),cnt={};
+  for(const k in s.cells){const x=s.cells[k];if(x.type!=='slot')continue;const[r,c]=k.split(',').map(Number);
+    new Set(cellItems(s,r,c,x).items.map(i=>i.cat).filter(Boolean)).forEach(ct=>cnt[ct]=(cnt[ct]||0)+1)}
+  const cats=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);if(CATF&&!cnt[CATF])CATF='';
+  E('vSeg').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===VIEW);b.onclick=()=>setView(b.dataset.v)});
+  bar.hidden=!cats.length;
+  bar.innerHTML=cats.length?`<button data-c="" class="${CATF?'':'on'}">전체</button>`+cats.map(ct=>`<button data-c="${esc(ct)}" class="${CATF===ct?'on':''}">${esc(ct)} <small>${cnt[ct]}</small></button>`).join(''):'';
+  bar.querySelectorAll('button').forEach(b=>b.onclick=()=>{CATF=b.dataset.c===CATF?'':b.dataset.c;renderCats();renderGrid()})}
+/** 배치·이름 보기의 칸 내용 */
+function cellHTMLView(x,r,c,s){
+  if(x.type==='label')return x.cs>=2||VIEW==='name'?`<span class="lbl">${esc(x.label||'')}</span>`:'';
+  if(x.type==='void')return VIEW==='name'&&x.label?`<span class="name">${esc(x.label)}</span>`:'';
+  const ki=x.kind&&KINDS[x.kind]?kindIcon(x.kind,VIEW==='map'?15:14):'';
+  if(VIEW==='map')return ki;
+  const ci=cellItems(s,r,c,x),its=ci.items.slice().sort((a,b)=>b.qty-a.qty),a=its[0],more=its.length-1;
+  return `<span class="code">${code(r,c)}${ki?` <span class="kb ${KINDS[x.kind].cls}">${ki}</span>`:''}</span>`+
+    (a?`<span class="n1">${esc(a.name)}</span><span class="n2">${a.qty?`<b>${fmtN(a.qty)}</b>`:'<i>0</i>'}${more>0?` <em>+${more}</em>`:''}</span>`
+      :(x.label?`<span class="n1 lb">${esc(x.label)}</span>`:(ci.memo?'<span class="n2"><i>메모</i></span>':'')))}
 /* 시트 색: 시트 순서대로 (구분이 잘 되는 색) */
 const SHEETC=['#2563EB','#16A34A','#D97706','#9333EA','#DC2626','#0891B2','#DB2777','#4D7C0F','#4F46E5','#EA580C'];
 const sheetColor=i=>SHEETC[i%SHEETC.length];
@@ -631,16 +703,21 @@ function bigStyle(d,x){
 function cellX(s,r,c,x){let n=false,o=false;x.layers.forEach((L,i)=>{(L.p||[]).map(pr=>pr.id).concat(stockAt(slotKey(s,r,c,i)).map(a=>a.id)).forEach(id=>{if(isNeed(id))n=true;else if(isOrd(id))o=true})});return n?' hasx':o?' haso':''}
 function renderGrid(){
   const s=sh(),g=E('grid'),q=query(),cov=covered(s),T=totals();
-  g.style.gridTemplateColumns=`repeat(${s.cols},minmax(var(--cw),1fr))`;g.innerHTML='';
+  g.className='grid v-'+VIEW;g.style.gridTemplateColumns=VIEW==='map'?`repeat(${s.cols},minmax(0,1fr))`:`repeat(${s.cols},minmax(var(--cw),1fr))`;g.innerHTML='';
   for(let r=0;r<s.rows;r++)for(let c=0;c<s.cols;c++){
     const k=K(r,c);if(cov[k])continue;const x=get(s,r,c);
     const d=document.createElement('button');
-    d.className='cell '+x.type+(sel.has(k)||(MV&&MV.src&&MV.src.si===S.cur&&MV.src.r===r&&MV.src.c===c)?' sel src':'')+(q&&(matches(x,q)||stockMatch(s,r,c,q))?' hit':'')+(flashKey===k?' flash':'')+(cellHasStock(s,r,c)?' stocked':'')+(x.type==='slot'?cellX(s,r,c,x):'');
+    d.className='cell '+x.type+(sel.has(k)||(MV&&MV.src&&MV.src.si===S.cur&&MV.src.r===r&&MV.src.c===c)?' sel src':'')+(q&&(matches(x,q)||stockMatch(s,r,c,q))?' hit':'')+(flashKey===k?' flash':'')+(cellHasStock(s,r,c)?' stocked':'')+(x.type==='slot'?cellX(s,r,c,x):'')+viewCls(s,r,c,x);
     d.style.gridRow=`${r+1} / span ${x.rs}`;d.style.gridColumn=`${c+1} / span ${x.cs}`;d.dataset.k=k;
     d.setAttribute('aria-label',code(r,c)+(x.label?' '+x.label:''));
-    d.innerHTML=cellHTML(x,r,c,s,T);bigStyle(d,x);d.onclick=()=>tap(r,c);g.appendChild(d);
+    if(VIEW==='full'){d.innerHTML=cellHTML(x,r,c,s,T);bigStyle(d,x)}else d.innerHTML=cellHTMLView(x,r,c,s);
+    d.onclick=()=>tap(r,c);g.appendChild(d);
   }
 }
+/** 보기·분류 칩에 따른 칸 표시: 종류(kk-), 자리만 지정(asg), 빈 칸(emp), 분류 칩에 맞으면 hit / 아니면 dimc */
+function viewCls(s,r,c,x){if(x.type!=='slot')return CATF?' dimc':'';const ci=cellItems(s,r,c,x);
+  let k=(x.kind&&KINDS[x.kind]?' kk-'+KINDS[x.kind].cls:'')+(ci.items.length||ci.memo?(cellHasStock(s,r,c)?'':' asg'):' emp');
+  if(CATF)k+=ci.items.some(i=>i.cat===CATF)?' hit':' dimc';return k}
 function renderMerge(){
   E('floor').classList.toggle('merging',mergeMode);E('bMerge').classList.toggle('on',mergeMode);drawMore();
   E('mergeBar').hidden=!mergeMode;E('hint').hidden=mergeMode;
@@ -648,7 +725,7 @@ function renderMerge(){
 }
 
 /* ---------- 칸 ---------- */
-function tap(r,c){if(Date.now()-dragIgnoreClick<450)return;if(mergeMode&&staleBlock())return;const k=K(r,c);if(PIN){pickIn(r,c);return}if(MV){pickDest(r,c);return}if(mergeMode){sel.has(k)?sel.delete(k):sel.add(k);render();return}cur={r,c};if(QM&&get(sh(),r,c).type==='slot'){openQty();return}openCell()}
+function tap(r,c){if(Date.now()-dragIgnoreClick<450)return;if(mergeMode&&staleBlock())return;const k=K(r,c);if(PIN){pickIn(r,c);return}if(MV){pickDest(r,c);return}if(mergeMode){sel.has(k)?sel.delete(k):sel.add(k);render();return}if(VIEW==='map'&&!QM){VIEW='full';try{localStorage.setItem('subtek-loc-view','full')}catch(e){}flashCell(S.cur,r,c);toast('크게 보는 중 · 위쪽 "배치"를 누르면 전체로 돌아가요');return}cur={r,c};if(QM&&get(sh(),r,c).type==='slot'){openQty();return}openCell()}
 function doMerge(){
   if(sel.size<2){toast('두 칸 이상 골라주세요');return}
   const s=sh();let r0=99,c0=99,r1=-1,c1=-1;

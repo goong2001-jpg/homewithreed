@@ -93,6 +93,19 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
   await pg.context().setOffline(false); await pg.waitForTimeout(200);
   ok(!(await pg.locator('#netBar').isVisible()), '다시 연결되면 안내 사라짐');
 
+  console.log('보기 3단 · 분류 칩 (v40)');
+  await pg.click('#navLoc'); await pg.waitForTimeout(100);
+  await pg.locator('#locApp [data-v="map"]').tap(); await pg.waitForTimeout(150);
+  ok(await pg.locator('#locApp .grid.v-map .cell').count() === 9 && (await pg.locator('#locApp .grid .cell[data-k="1,1"]').innerText()).trim() === '' && await pg.locator('#locApp .grid .cell[data-k="1,1"].stocked').count() === 1, '배치: 글씨 없이 색으로 (재고 있는 칸 진하게)');
+  ok(await pg.locator('#locApp .grid .cell[data-k="0,0"] svg').count() === 1 && await pg.evaluate(() => { const g = document.querySelector('#locApp .grid'); return g.scrollWidth <= g.parentElement.clientWidth + 1; }), '배치: 종류 모양 표시, 한 화면 너비에 다 들어옴');
+  await pg.locator('#locApp .grid .cell[data-k="1,1"]').tap(); await pg.waitForTimeout(300);
+  ok(await pg.locator('#locApp .grid.v-full').count() === 1 && await pg.locator('#locApp .panel').isHidden(), '배치에서 칸을 누르면 그 자리를 전체 보기로');
+  await pg.locator('#locApp [data-v="name"]').tap(); await pg.waitForTimeout(150);
+  ok((await pg.locator('#locApp .grid.v-name .cell[data-k="1,1"] .n1').innerText()) === 'SV7', '이름: 칸마다 대표 품목 하나');
+  await pg.locator('#locApp .catbar [data-c="기판"]').tap(); await pg.waitForTimeout(150);
+  ok(await pg.locator('#locApp .cell[data-k="0,0"].hit').count() === 1 && await pg.locator('#locApp .cell[data-k="1,0"].dimc').count() === 1, '분류 칩: 기판 있는 칸만 켜짐');
+  await pg.locator('#locApp .catbar [data-c=""]').tap(); await pg.locator('#locApp [data-v="full"]').tap(); await pg.waitForTimeout(150);
+
   console.log('켤 때 속도 (v36)');
   await pg.evaluate(() => localStorage.setItem('mockDelay', '2500')); await pg.reload(); await pg.waitForTimeout(500);
   ok((await L('status').innerText()).includes('최신 확인 중'), '저장본으로 바로 뜸 (최신 확인 중)');
