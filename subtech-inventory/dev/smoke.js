@@ -123,6 +123,16 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
   ok(c.length === u0 + 1 && c[c.length - 1].undo[0] === 7 && c[c.length - 1].undo[1] === 1690000000000, '품목 창에서 거래 취소 (줄, 시각키)');
   await pg.locator('#locApp .panel [data-a="close"]').first().tap();
 
+  console.log('레시피 도우미 (v42)');
+  await pg.evaluate(() => { go('build'); openNewBom(); document.getElementById('bomFinished').value = 'SV7||완포'; renderBomSug(); }); await pg.waitForTimeout(150);
+  ok((await pg.locator('#bomSug .bsw').first().innerText()).includes('SV7') && (await pg.locator('#bomSug .bsw').first().innerText()).includes('기판'), '완제품을 고르면 같은 이름의 기판을 추천');
+  await pg.locator('#bomSug .bsc').first().tap(); await pg.waitForTimeout(100);
+  ok(await pg.evaluate(() => BF.parts.length === 1 && BF.parts[0].id === 'SV7||기판') && await pg.locator('#bomSug .bsc.on').count() === 1, '추천을 누르면 부품 목록에 추가');
+  await pg.locator('#bsQ').fill('x1'); await pg.waitForTimeout(100);
+  ok((await pg.locator('#bomSug').innerText()).includes('X1'), '직접 찾기로 부품 검색');
+  await pg.locator('#bomSug .bsc.on').first().tap(); await pg.waitForTimeout(100);
+  ok(await pg.evaluate(() => BF.parts.length === 1 && BF.parts[0].id === ''), '다시 누르면 빠짐');
+
   console.log('켤 때 속도 (v36)');
   await pg.evaluate(() => localStorage.setItem('mockDelay', '2500')); await pg.reload(); await pg.waitForTimeout(500);
   ok((await L('status').innerText()).includes('최신 확인 중'), '저장본으로 바로 뜸 (최신 확인 중)');

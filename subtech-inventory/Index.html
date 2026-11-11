@@ -83,6 +83,12 @@
   .bcard .bneck { font-size:12.5px; } .bpart { font-size:13px; } .bact span { font-size:13px; padding:6px 0; } .oxchip { font-size:12px; } .mphoto .mplabel { font-size:11.5px; } .memocard .foot { font-size:12px; }
   .field2 .k2 { font-size:12px; } .nav div { font-size:11.5px; } .nav .ic { font-size:20px; }
   .tcard .th .tt small { font-size:12px; } .trow { font-size:14px; } .trow .ts { font-size:12.5px; } .dangerbox { font-size:12.5px; } .sgrp .gh span { font-size:12.5px; } .sgrp .gr { font-size:14px; }
+  /* v42: 레시피 도우미 */
+  .bsbox { background:#fff; border:1.5px solid #cfe0ff; border-radius:12px; padding:12px 14px; margin-bottom:10px; } .bst { font-size:15px; font-weight:800; } .bst small { font-size:12px; font-weight:500; color:#6b7889; margin-left:6px; }
+  .bstip { font-size:12.5px; color:#6b7889; margin-top:4px; line-height:1.5; } .bsl { font-size:12.5px; font-weight:700; color:#6b7889; margin:12px 0 6px; } .bsw { display:flex; flex-wrap:wrap; gap:6px; }
+  .bsc { display:inline-flex; align-items:center; gap:4px; min-height:40px; padding:0 12px; border-radius:20px; border:1.5px solid #dde3ec; background:#fff; font-size:14px; font-weight:700; color:#1f2733; cursor:pointer; } .bsc small { font-size:12px; font-weight:500; color:#6b7889; }
+  .bsc.on { background:#2563eb; border-color:#2563eb; color:#fff; } .bsc.on small { color:#dbe6ff; } .bsc.cp { border-style:dashed; color:#2563eb; }
+  .bsq { width:100%; border:1.5px solid #dde3ec; border-radius:10px; padding:11px 12px; font-size:15px; outline:none; margin-bottom:8px; } .bsn { font-size:13px; color:#8a97a8; }
   /* v41: 더보기 */
   .mlist { background:#fff; border:1.5px solid #e6ebf2; border-radius:14px; overflow:hidden; } .mrow2 { padding:15px 16px; border-bottom:1px solid #eef1f5; cursor:pointer; } .mrow2:last-child { border-bottom:0; } .mrow2:active { background:#f0f4ff; }
   .mrow2 b { display:block; font-size:16px; } .mrow2 span { display:block; font-size:13px; color:#6b7889; margin-top:2px; } .mver { text-align:center; color:#8a97a8; font-size:13px; margin-top:16px; }
@@ -135,6 +141,7 @@
     .xpanel { background:#232729; } .xseg button, .xsheets button, .xacts button { background:#2C3134; border-color:#3A4044; color:#C8CBC5; } .xseg button.on { background:#E3E5E0; color:#191C1E; border-color:#E3E5E0; }
     .xsheets button.on { background:#1D2A44; border-color:#7FA8FF; color:#9CBBFF; } .xacts button { color:#E3E5E0; } .xacts button.pri { background:#2563eb; border-color:#2563eb; color:#fff; } .xd { color:#C8CBC5; }
     .xres textarea { background:#191C1E; border-color:#3A4044; color:#E3E5E0; } .xres button { background:#E3E5E0; color:#191C1E; }
+    .bsbox { background:#232729; border-color:#30446E; } .bsc { background:#2C3134; border-color:#3A4044; color:#E3E5E0; } .bsc small { color:#9AA09C; } .bsc.on { background:#2563eb; border-color:#2563eb; color:#fff; } .bsc.cp { color:#7FA8FF; } .bsq { background:#2C3134; border-color:#3A4044; color:#E3E5E0; }
     .mlist { background:#232729; border-color:#3A4044; } .mrow2 { border-color:#3A4044; } .mrow2:active { background:#2C3134; } .mrow2 span { color:#9AA09C; }
     .dk-ink { color:#E3E5E0 !important; } .locchip.none { background:#2C3134; color:#9AA09C; } .locchip.pin { background:#3D2A14; color:#FDBA74; }
 </style>
@@ -236,7 +243,8 @@ function setTheme(t){ t=(t==='dark')?'dark':'light'; document.documentElement.da
 
 <!-- 조립 레시피 작성/수정 -->
 <div class="body hidden" id="viewBomForm">
-  <div class="field2"><div class="k2">완제품 * (목록에서 선택)</div><select id="bomFinished" class="selfull"></select></div>
+  <div class="field2"><div class="k2">완제품 * (목록에서 선택)</div><select id="bomFinished" class="selfull" onchange="renderBomSug()"></select></div>
+  <div id="bomSug"></div>
   <div class="label">필요 부품 (완제품 1개당)</div>
   <div id="bomParts"></div>
   <div class="addline" onclick="addBomPart()">＋ 부품 추가</div>
@@ -328,7 +336,7 @@ window.addEventListener('online',function(){ netBar(); notice('인터넷이 다�
 document.addEventListener('DOMContentLoaded',netBar);
 </script>
 <script>
-var HTML_VERSION = 'v41'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v42'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var BOMROWS = null, MEMO_SHOWN = 50, PREFETCHED = false;
@@ -716,12 +724,52 @@ function renderBuild(arr){ BUILDS=arr||[];
 }
 function itemById(id){ return DATA.items.filter(function(x){return x.id===id;})[0]; }
 function itemOptions(sel){ return '<option value="">— 품목 선택 —</option>'+DATA.items.map(function(it){return '<option value="'+esc(it.id)+'"'+(it.id===sel?' selected':'')+'>'+esc(it.name)+' ('+esc(it.cat||'-')+')</option>';}).join(''); }
-function openNewBom(){ BF={parts:[{id:'',per:1}]}; document.getElementById('bomFinished').innerHTML=itemOptions(''); renderBomParts(); go('bomForm'); }
+function openNewBom(){ BF={parts:[{id:'',per:1}]}; document.getElementById('bomFinished').innerHTML=itemOptions(''); renderBomParts(); BSQ=''; renderBomSug(); go('bomForm'); }
 function editBom(bi){ var b=BUILDS[bi]; if(!b)return; BF={origName:b.name,origCat:b.cat,parts:b.parts.map(function(p){return {id:p.name+'||'+p.cat,per:p.per};})};
-  document.getElementById('bomFinished').innerHTML=itemOptions(b.name+'||'+b.cat); renderBomParts(); go('bomForm'); }
+  document.getElementById('bomFinished').innerHTML=itemOptions(b.name+'||'+b.cat); renderBomParts(); BSQ=''; renderBomSug(); go('bomForm'); }
 function deleteBom(bi){ var b=BUILDS[bi]; if(!b)return; if(!confirm('"'+b.name+'" 조립 레시피를 삭제할까요?'))return;
   google.script.run.withSuccessHandler(loadBuild).withFailureHandler(function(e){notice(e,1);}).deleteBOM(b.name,b.cat); }
 function addBomPart(){ BF.parts.push({id:'',per:1}); renderBomParts(); }
+/* ---- 레시피 도우미 (v42): 완제품을 고르면 부품 후보를 추천 — 누르면 아래 부품 목록에 추가/빼기 ----
+   ① 같은 이름의 다른 분류 (선작업완료는 기판에서, 벌크·완포·소박스는 선작업완료→기판 순)
+   ② 이름이 비슷한 부품 (케이스·방열판·센서…)  ③ 직접 찾기  ④ 비슷한 제품의 레시피 복사 */
+var BSQ='';
+function bsNorm(v){ return String(v||'').replace(/\s+/g,'').toLowerCase(); }
+function bsHas(id){ return BF.parts.some(function(p){ return p.id===id; }); }
+function bsToggle(id){ if(bsHas(id)) BF.parts=BF.parts.filter(function(p){ return p.id!==id; }); else { BF.parts=BF.parts.filter(function(p){ return p.id; }); BF.parts.push({id:id,per:1}); }
+  if(!BF.parts.length) BF.parts=[{id:'',per:1}]; renderBomParts(); renderBomSug(true); }
+function bsCopy(fid){ var fin=itemById(val('bomFinished')), src=fid.split('||'); if(!fin) return;
+  var parts=(BOMROWS||[]).filter(function(r){ return r[0]===src[0]&&r[1]===src[1]; }).map(function(r){
+    var id=r[2]+'||'+r[3]; if(r[2]===src[0]){ var same=fin.name+'||'+r[3]; if(itemById(same)) id=same; } // 완제품과 같은 이름의 부품은 새 완제품 이름으로 바꿔서
+    return {id:id, per:r[4]||1}; }).filter(function(p){ return itemById(p.id)&&p.id!==fin.id; });
+  if(!parts.length){ notice('복사할 부품이 없어요'); return; } BF.parts=parts; renderBomParts(); renderBomSug(true); notice('"'+src[0]+'" 레시피를 가져왔어요. 맞지 않는 부품은 빼거나 바꿔 주세요.'); }
+function bomSuggest(fin){
+  var same=DATA.items.filter(function(it){ return it.name===fin.name&&it.id!==fin.id; }), rank={'선작업완료':0,'기판':1,'케이스':2,'방열판':3,'소박스':4,'대박스':5};
+  if(fin.cat==='선작업완료') rank={'기판':0};
+  same.sort(function(a,b){ return (rank[a.cat]==null?9:rank[a.cat])-(rank[b.cat]==null?9:rank[b.cat]); });
+  if(fin.cat==='선작업완료') same=same.filter(function(it){ return it.cat==='기판'; });
+  else same=same.filter(function(it){ return it.cat!=='벌크'&&it.cat!=='완포'; }); // 벌크·완포는 포장 방식(결과물)이라 부품 후보에서 뺌
+  var n=bsNorm(fin.name), base=n.replace(/\(.*$/,''), pre=(base.match(/^[a-z가-힣]+\d*/)||[''])[0], seen={}; same.forEach(function(it){ seen[it.id]=1; });
+  var near=DATA.items.filter(function(it){ if(seen[it.id]||it.id===fin.id||it.cat==='벌크'||it.cat==='완포'||it.cat==='선작업완료') return false; var m=bsNorm(it.name);
+    return m!==n && (m.indexOf(base)>=0 || (base.length>=3&&base.indexOf(m)>=0&&m.length>=3) || (pre.length>=3&&m.indexOf(pre)===0)); }).slice(0,14);
+  var rec={}, order=[]; (BOMROWS||[]).forEach(function(r){ var k=r[0]+'||'+r[1]; if(k!==fin.id&&!rec[k]){ rec[k]={id:k,name:r[0],cat:r[1],n:0}; order.push(k); } if(rec[k]) rec[k].n++; });
+  var copies=order.map(function(k){ return rec[k]; }).sort(function(a,b){ var x=bsNorm(a.name).indexOf(pre)===0?0:1, y=bsNorm(b.name).indexOf(pre)===0?0:1; return x-y; }).slice(0,6);
+  return {same:same, near:near, copies:copies};
+}
+function renderBomSug(keepFocus){
+  var box=document.getElementById('bomSug'), fin=itemById(val('bomFinished')); if(!box) return; if(!fin){ box.innerHTML=''; return; }
+  var g=bomSuggest(fin), q=bsNorm(BSQ);
+  function chip(it){ var on=bsHas(it.id); return '<span class="bsc'+(on?' on':'')+'" onclick="bsToggle(\''+esc(it.id).replace(/'/g,"\\'")+'\')">'+(on?'✓ ':'＋ ')+esc(it.name)+' <small>'+esc(it.cat||'')+'</small></span>'; }
+  var found=q?DATA.items.filter(function(it){ return it.id!==fin.id&&bsNorm(it.name+it.cat).indexOf(q)>=0; }).slice(0,16):[];
+  var tip=fin.cat==='선작업완료'?'선작업완료는 보통 같은 이름의 기판 1개로 만듭니다.':'보통 순서: 기판 → 선작업완료 → 방열판 · 노브 · 명판 → 벌크 또는 소박스 포장. 필요한 것만 골라 주세요.';
+  box.innerHTML='<div class="bsbox"><div class="bst">부품 추천 <small>누르면 아래 목록에 들어가요</small></div><div class="bstip">'+tip+'</div>'+
+    (g.same.length?'<div class="bsl">같은 이름</div><div class="bsw">'+g.same.map(chip).join('')+'</div>':'')+
+    (g.near.length?'<div class="bsl">이름이 비슷한 부품</div><div class="bsw">'+g.near.map(chip).join('')+'</div>':'')+
+    '<div class="bsl">직접 찾기</div><input class="bsq" id="bsQ" placeholder="부품 이름 (예: 무소음, 노브)" value="'+esc(BSQ)+'" oninput="BSQ=this.value;renderBomSug(true)">'+
+    (q?'<div class="bsw">'+(found.length?found.map(chip).join(''):'<span class="bsn">찾는 부품이 없어요. 더보기 → 입출고에서 새 품목으로 먼저 추가해 주세요.</span>')+'</div>':'')+
+    (g.copies.length?'<div class="bsl">비슷한 제품 레시피 가져오기</div><div class="bsw">'+g.copies.map(function(c){ return '<span class="bsc cp" onclick="bsCopy(\''+esc(c.id).replace(/'/g,"\\'")+'\')">'+esc(c.name)+' <small>'+esc(c.cat)+' · 부품 '+c.n+'개</small></span>'; }).join('')+'</div>':'')+'</div>';
+  if(keepFocus&&BSQ){ var i=document.getElementById('bsQ'); if(i){ i.focus(); try{ i.setSelectionRange(BSQ.length,BSQ.length); }catch(e){} } }
+}
 function delBomPart(i){ BF.parts.splice(i,1); if(!BF.parts.length) BF.parts=[{id:'',per:1}]; renderBomParts(); }
 function onBomPart(i,f,v){ BF.parts[i][f]=v; }
 function renderBomParts(){ document.getElementById('bomParts').innerHTML=BF.parts.map(function(p,i){
