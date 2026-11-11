@@ -83,6 +83,9 @@
   .bcard .bneck { font-size:12.5px; } .bpart { font-size:13px; } .bact span { font-size:13px; padding:6px 0; } .oxchip { font-size:12px; } .mphoto .mplabel { font-size:11.5px; } .memocard .foot { font-size:12px; }
   .field2 .k2 { font-size:12px; } .nav div { font-size:11.5px; } .nav .ic { font-size:20px; }
   .tcard .th .tt small { font-size:12px; } .trow { font-size:14px; } .trow .ts { font-size:12.5px; } .dangerbox { font-size:12.5px; } .sgrp .gh span { font-size:12.5px; } .sgrp .gr { font-size:14px; }
+  /* v41: 더보기 */
+  .mlist { background:#fff; border:1.5px solid #e6ebf2; border-radius:14px; overflow:hidden; } .mrow2 { padding:15px 16px; border-bottom:1px solid #eef1f5; cursor:pointer; } .mrow2:last-child { border-bottom:0; } .mrow2:active { background:#f0f4ff; }
+  .mrow2 b { display:block; font-size:16px; } .mrow2 span { display:block; font-size:13px; color:#6b7889; margin-top:2px; } .mver { text-align:center; color:#8a97a8; font-size:13px; margin-top:16px; }
   /* v37: 내보내기 창 */
   .xshade { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:80; }
   .xpanel { position:fixed; left:0; right:0; bottom:0; z-index:81; background:#fff; border-radius:18px 18px 0 0; padding:16px 16px 22px; max-height:86vh; overflow:auto; }
@@ -132,6 +135,7 @@
     .xpanel { background:#232729; } .xseg button, .xsheets button, .xacts button { background:#2C3134; border-color:#3A4044; color:#C8CBC5; } .xseg button.on { background:#E3E5E0; color:#191C1E; border-color:#E3E5E0; }
     .xsheets button.on { background:#1D2A44; border-color:#7FA8FF; color:#9CBBFF; } .xacts button { color:#E3E5E0; } .xacts button.pri { background:#2563eb; border-color:#2563eb; color:#fff; } .xd { color:#C8CBC5; }
     .xres textarea { background:#191C1E; border-color:#3A4044; color:#E3E5E0; } .xres button { background:#E3E5E0; color:#191C1E; }
+    .mlist { background:#232729; border-color:#3A4044; } .mrow2 { border-color:#3A4044; } .mrow2:active { background:#2C3134; } .mrow2 span { color:#9AA09C; }
     .dk-ink { color:#E3E5E0 !important; } .locchip.none { background:#2C3134; color:#9AA09C; } .locchip.pin { background:#3D2A14; color:#FDBA74; }
 </style>
 <script>
@@ -287,13 +291,25 @@ function setTheme(t){ t=(t==='dark')?'dark':'light'; document.documentElement.da
 <div class="netbar hidden" id="netBar">📡 인터넷 끊김 — 연결될 때까지 저장이 안 됩니다</div>
 <div class="notice hidden" id="notice" onclick="this.className='notice hidden'"></div>
 
+<!-- 더보기 (v41): 예전 탭과 도구 모음 -->
+<div class="body hidden" id="viewMore">
+  <div class="mlist">
+    <div class="mrow2" onclick="go('search')"><b>입출고</b><span>품목을 골라 입고 · 출고 · 조정 · 이동, 새 품목 추가</span></div>
+    <div class="mrow2" onclick="go('stock')"><b>현재고</b><span>수량순 목록, 안전재고 경고</span></div>
+    <div class="mrow2" onclick="go('build')"><b>조립</b><span>레시피(BOM), 조립 가능 수량, 조립 실행</span></div>
+    <div class="mrow2" onclick="go('memo')"><b>업체 메모</b><span>업체 사양 · 사진</span></div>
+    <div class="mrow2" onclick="go('report')"><b>월별 리포트</b><span>입고 · 출고 월별 합계</span></div>
+    <div class="mrow2" onclick="go('log')"><b>전체 이력</b><span>최근 입출고 60건, 거래 취소</span></div>
+    <div class="mrow2" onclick="openExport()"><b>내보내기</b><span>엑셀 파일 · 위치도 그림, 카톡으로 보낼 링크</span></div>
+    <div class="mrow2" onclick="setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');drawMore2()"><b id="moreTheme">화면 어둡게</b><span>밝은 화면이 기본입니다</span></div>
+  </div>
+  <div class="mver" id="moreVer"></div>
+</div>
+
 <div class="nav">
   <div id="navLoc" class="on" onclick="go('loc')"><span class="ic">📍</span>위치도</div>
-  <div id="navTotal" onclick="go('total')"><span class="ic">🧮</span>총수량</div>
-  <div id="navInput" onclick="go('search')"><span class="ic">➕</span>입출고</div>
-  <div id="navStock" onclick="go('stock')"><span class="ic">📊</span>현재고</div>
-  <div id="navBuild" onclick="go('build')"><span class="ic">🧩</span>조립</div>
-  <div id="navMemo" onclick="go('memo')"><span class="ic">📝</span>메모</div>
+  <div id="navTotal" onclick="go('total')"><span class="ic">🧮</span>품목</div>
+  <div id="navMore" onclick="go('more')"><span class="ic">☰</span>더보기</div>
 </div>
 
 <script>
@@ -312,7 +328,7 @@ window.addEventListener('online',function(){ netBar(); notice('인터넷이 다�
 document.addEventListener('DOMContentLoaded',netBar);
 </script>
 <script>
-var HTML_VERSION = 'v40'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
+var HTML_VERSION = 'v41'; // 업데이트 확인용 (Code.gs의 APP_VERSION과 짝)
 var DATA = { items: [], staff: [], locations: [], layout: [] };
 var MEMOS = null, MF = { extras: [] }, BUILDS = [], BF = { parts: [] };
 var BOMROWS = null, MEMO_SHOWN = 50, PREFETCHED = false;
@@ -898,14 +914,15 @@ function delMemo(row){ if(!confirm('이 메모를 삭제할까요? (사진도 �
 var CURV='loc';
 function go(v){
   CURV=v; document.getElementById('appbar').classList.toggle('hidden', v==='loc');
-  ['Loc','Total','Search','Input','NewItem','Done','Stock','Report','Build','BomForm','BuildRun','Log','Memo','MemoForm'].forEach(function(n){document.getElementById('view'+n).classList.add('hidden');});
+  ['Loc','Total','Search','Input','NewItem','Done','Stock','Report','Build','BomForm','BuildRun','Log','Memo','MemoForm','More'].forEach(function(n){document.getElementById('view'+n).classList.add('hidden');});
   document.getElementById('saveBtn').classList.add('hidden'); setNav(v);
   if(v==='loc'){ show('Loc'); if(window.locApi) locApi.setStock(DATA.items, DATA.staff); } // 재고는 이미 받은 품목 목록으로 — 서버 안 부름
   if(v==='search'){ show('Search'); resetBar(); renderSearch(); }
   if(v==='input'){ show('Input'); document.getElementById('saveBtn').classList.remove('hidden'); }
   if(v==='newItem'){ show('NewItem'); resetBar('📦','새 품목 추가','품목을 새로 등록합니다'); }
   if(v==='done'){ show('Done'); resetBar(); }
-  if(v==='total'){ show('Total'); resetBar('🧮','총수량','품목별 총수량 · 위치별 수량'); renderTotal(); }
+  if(v==='total'){ show('Total'); resetBar('🧮','품목','품목별 총수량 · 위치별 수량'); renderTotal(); }
+  if(v==='more'){ show('More'); resetBar('☰','더보기','입출고 · 현재고 · 조립 · 메모 · 리포트 · '+HTML_VERSION); drawMore2(); }
   if(v==='stock'){ show('Stock'); resetBar('📊','현재고','실시간 자동 집계'); renderStock(); }
   if(v==='report'){ show('Report'); resetBar('📅','월별 리포트','입고·출고 월별 집계'); loadReport(); }
   if(v==='log'){ show('Log'); resetBar('🕒','전체 이력','최근 입출고 60건'); loadLog(); }
@@ -916,8 +933,8 @@ function go(v){
   if(v==='memoForm'){ show('MemoForm'); resetBar('📝', MF.row?'메모 수정':'새 메모', '업체 사양 기록'); }
 }
 function show(n){ document.getElementById('view'+n).classList.remove('hidden'); }
-function setNav(v){ var g=(v==='search'||v==='input'||v==='newItem'||v==='done'); document.getElementById('navLoc').className=v==='loc'?'on':''; document.getElementById('navTotal').className=v==='total'?'on':'';
-  document.getElementById('navInput').className=g?'on':''; document.getElementById('navStock').className=(v==='stock'||v==='report'||v==='log')?'on':''; document.getElementById('navBuild').className=(v==='build'||v==='bomForm'||v==='buildRun')?'on':''; document.getElementById('navMemo').className=(v==='memo'||v==='memoForm')?'on':''; }
+function setNav(v){ document.getElementById('navLoc').className=v==='loc'?'on':''; document.getElementById('navTotal').className=v==='total'?'on':''; document.getElementById('navMore').className=(v!=='loc'&&v!=='total')?'on':''; }
+function drawMore2(){ var t=document.getElementById('moreTheme'); if(t) t.textContent=document.documentElement.dataset.theme==='dark'?'화면 밝게':'화면 어둡게'; var m=document.getElementById('moreVer'); if(m) m.textContent='써브텍 재고앱 '+HTML_VERSION; }
 function resetBar(ic,t,s){ document.getElementById('barIcon').textContent=ic||'📦'; document.getElementById('barTitle').textContent=t||'써브텍 재고'; document.getElementById('barSub').textContent=s||('입고 · 출고를 빠르게 기록하세요 · '+HTML_VERSION); }
 // (맨 끝에서 실행: 위의 변수들이 다 준비된 뒤) 지난번 데이터로 먼저 그리기
 try{ var cb=JSON.parse(localStorage.getItem(BOOT_KEY)||'null'); if(cb&&cb.version===HTML_VERSION&&cb.loc&&cb.loc.data){ FROM_CACHE=true; onBoot(cb,true); } }catch(e){ FROM_CACHE=false; console.warn(e); }

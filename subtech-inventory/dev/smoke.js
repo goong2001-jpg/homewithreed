@@ -57,7 +57,7 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
   ok((await pg.locator('#totList').innerText()).includes('총수량'), '위치별 "(총수량 N개)"');
 
   console.log('입출고 탭: 담당자 기억 · 거래 취소 (v34)');
-  await pg.click('#navInput'); await pg.waitForTimeout(100);
+  await pg.evaluate(() => go('search')); await pg.waitForTimeout(100);
   await pg.locator('#searchList .gr').first().tap(); await pg.waitForTimeout(300);
   await pg.selectOption('#staffSel', '김철수');
   ok(await pg.evaluate(() => localStorage.getItem('subtek-staff')) === '김철수', '담당자 고르면 기억');
@@ -66,11 +66,11 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
   await pg.locator('#histList .undo').tap(); await pg.waitForTimeout(200);
   c = (await calls()).filter(x => x.undo);
   ok(c.length === 1 && c[0].undo[0] === 7 && c[0].undo[1] === 1690000000000, '취소 → undoTransaction(줄, 시각키)');
-  await pg.reload(); await pg.waitForTimeout(800); await pg.click('#navInput'); await pg.locator('#searchList .gr').first().tap(); await pg.waitForTimeout(200);
+  await pg.reload(); await pg.waitForTimeout(800); await pg.evaluate(() => go('search')); await pg.locator('#searchList .gr').first().tap(); await pg.waitForTimeout(200);
   ok(await pg.inputValue('#staffSel') === '김철수', '다시 열어도 담당자 그대로');
 
   console.log('다크 모드 (v34)');
-  await pg.emulateMedia({ colorScheme: 'dark' }); await pg.click('#navStock'); await pg.waitForTimeout(100);
+  await pg.emulateMedia({ colorScheme: 'dark' }); await pg.evaluate(() => go('stock')); await pg.waitForTimeout(100);
   ok(await pg.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(246, 248, 251)', '폰이 다크 모드여도 밝은 화면이 기본 (v38)');
   await pg.evaluate(() => setTheme('dark'));
   ok(await pg.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(25, 28, 30)', '"화면 어둡게"를 고르면 모든 탭이 어두운 배경');
@@ -105,6 +105,23 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
   await pg.locator('#locApp .catbar [data-c="기판"]').tap(); await pg.waitForTimeout(150);
   ok(await pg.locator('#locApp .cell[data-k="0,0"].hit').count() === 1 && await pg.locator('#locApp .cell[data-k="1,0"].dimc').count() === 1, '분류 칩: 기판 있는 칸만 켜짐');
   await pg.locator('#locApp .catbar [data-c=""]').tap(); await pg.locator('#locApp [data-v="full"]').tap(); await pg.waitForTimeout(150);
+
+  console.log('탭 3개 · 더보기 · 품목 창 이력 (v41)');
+  ok(await pg.locator('.nav > div').count() === 3, '아래 탭 3개 (위치도 · 품목 · 더보기)');
+  await pg.click('#navMore'); await pg.waitForTimeout(100);
+  ok(await pg.locator('#viewMore .mrow2').count() === 8 && (await pg.locator('#moreVer').innerText()).includes('v'), '더보기에 입출고·현재고·조립·메모·리포트·이력·내보내기');
+  await pg.locator('#viewMore .mrow2').nth(2).tap(); await pg.waitForTimeout(150);
+  ok(await pg.locator('#viewBuild').isVisible() && await pg.locator('#navMore.on').count() === 1, '더보기 → 조립 화면');
+  await pg.click('#navLoc'); await pg.waitForTimeout(100);
+  await pg.locator('#locApp .cell[data-k="1,1"]').tap(); await pg.waitForTimeout(200);
+  await pg.locator('#locApp .panel [data-item]').first().tap(); await pg.waitForTimeout(200);
+  await pg.locator('#locApp .panel [data-a="hist"]').tap(); await pg.waitForTimeout(250);
+  ok(await pg.locator('#locApp .ihist .hr').count() === 3 && await pg.locator('#locApp .ihist [data-undo]').count() === 1, '품목 창: 최근 이력 표시, 취소는 남은 거래에만');
+  const u0 = (await calls()).filter(x => x.undo).length;
+  await pg.locator('#locApp .ihist [data-undo]').tap(); await pg.waitForTimeout(300);
+  c = (await calls()).filter(x => x.undo);
+  ok(c.length === u0 + 1 && c[c.length - 1].undo[0] === 7 && c[c.length - 1].undo[1] === 1690000000000, '품목 창에서 거래 취소 (줄, 시각키)');
+  await pg.locator('#locApp .panel [data-a="close"]').first().tap();
 
   console.log('켤 때 속도 (v36)');
   await pg.evaluate(() => localStorage.setItem('mockDelay', '2500')); await pg.reload(); await pg.waitForTimeout(500);

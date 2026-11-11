@@ -385,6 +385,17 @@
 :root[data-theme="dark"] #locApp .grid.v-map .cell.slot.asg{background:#3A4044;border-color:#4B5155}
 :root[data-theme="dark"] #locApp .grid.v-map .cell.slot.stocked:not(.kk-kp):not(.kk-kl):not(.kk-kg){background:#C8CBC5;border-color:#C8CBC5;color:#191C1E}
 :root[data-theme="dark"] #locApp .grid.v-name .cell.asg{background:#262B2E}
+/* v41: 품목 창 이력 */
+#locApp .ihist{margin-top:12px;border-top:1.5px solid var(--line);padding-top:6px}
+#locApp .ihist[hidden]{display:none}
+#locApp .ihist .hr{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:14px}
+#locApp .ihist .hr b{min-width:92px;font-variant-numeric:tabular-nums}
+#locApp .ihist .hr b.p{color:#15803D}#locApp .ihist .hr b.m{color:#B3412E}
+#locApp .ihist .hr span{flex:1;min-width:0;color:var(--sub);font-size:13px}
+#locApp .ihist .hr span small{display:block;font-size:12px;opacity:.8}
+#locApp .ihist .hr em{font-style:normal;font-size:12.5px;color:var(--sub);white-space:nowrap}
+#locApp .ihist .hr button{min-height:40px;padding:0 14px;border:1.5px solid #B3412E;border-radius:6px;background:transparent;color:#B3412E;font-weight:700}
+#locApp .ihist .hr.off{opacity:.5}#locApp .ihist .hr.off b{text-decoration:line-through}
 </style>
 
 <div id="locApp">
@@ -943,6 +954,16 @@ function openOut(key,id){
   draw();openPanel();setTimeout(()=>{const f=P.querySelector('[data-ob="0"]');if(f)f.focus()},60);
 }
 /** 서버가 돌려준 품목(위치별 수량 포함)으로 위치도 재고·품목 목록 갱신 */
+/* 품목 창의 최근 이력 (v41): 입출고 탭에 가지 않고도 거래를 보고 취소 */
+function itemHistory(id){const P=E('panelBody'),box=P.querySelector('[data-ih]');if(!box)return;box.hidden=false;box.innerHTML='<p class="none">이력을 불러오는 중…</p>';
+  GAS.withSuccessHandler(rows=>{if(P.dataset.kind!=='item'||P.dataset.id!==id)return;const ix=keyIndex();
+    box.innerHTML=rows.length?rows.map(h=>{const off=h.cancel||h.undone,q=h.type==='기록'?'—':(h.delta>=0?'＋':'−')+fmtN(Math.abs(h.delta));
+      return `<div class="hr${off?' off':''}"><b class="${h.delta<0?'m':'p'}">${esc(h.type)} ${q}</b><span>${esc(locLabel(h.loc,ix))}${h.staff?' · '+esc(h.staff):''}<small>${esc(h.date)}</small></span>${h.cancel?'<em>취소 기록</em>':h.undone?'<em>취소됨</em>':(h.type==='기록'||!h.delta)?'':`<button data-undo="${h.row}" data-k="${esc(h.k)}">취소</button>`}</div>`}).join(''):'<p class="none">기록 없음</p>';
+    box.querySelectorAll('[data-undo]').forEach(b=>b.onclick=()=>{if(!confirm('이 거래를 취소할까요?\n재고가 원래대로 돌아가고, 이력에는 취소 기록이 한 줄 남습니다.'))return;b.disabled=true;
+      const k=/^\d+$/.test(b.dataset.k)?Number(b.dataset.k):b.dataset.k;
+      GAS.withSuccessHandler(res=>{const x=Object.assign({},ITEMMAP[id]||{id:id},{id:id,total:res.total,locs:res.locs});upsertItem(x);if(host())host().itemUpserted(x);renderGrid();renderStockBar();toast('거래를 취소했어요');openItem(id);itemHistory(id)})
+        .withFailureHandler(e=>{b.disabled=false;toast((e&&e.message)||'취소하지 못했어요')}).undoTransaction(Number(b.dataset.undo),k)})})
+    .withFailureHandler(e=>{box.innerHTML='<p class="none">이력을 불러오지 못했어요</p>'}).getHistory(id)}
 function upsertItem(it){
   const x={id:it.id,name:String(it.name),cat:String(it.cat||''),unit:Number(it.unit)||0};
   if(!ITEMMAP[x.id])ITEMS.push(x);else Object.assign(ITEMMAP[x.id],x);ITEMMAP[x.id]=ITEMMAP[x.id]||x;
@@ -1580,8 +1601,10 @@ function openItem(id){
   P.innerHTML=`<div class="ph"><h2>${esc(c.name)}<small>${esc(c.cat)}</small></h2><button class="x" data-a="close">닫기</button></div>
   <div class="icard" style="padding:0;border:0"><div class="ih"><span>위치 ${c.rows.filter(w=>w.qty).length}곳</span><span class="tot" style="font-size:18px">총 ${fmtN(c.total)}개</span></div>
   ${c.rows.map(w=>`<button class="lr${w.qty?'':' z'}" data-goloc="${esc(w.k)}"><span>${w.pin?'📌 ':''}${esc(w.label)}</span><b>${fmtN(w.qty)}</b></button>`).join('')||'<p class="none">재고 없음</p>'}</div>
-  <div class="acts" style="margin-top:12px">${xBtns(id)}<button data-a="io">재고앱에서 입출고</button></div>`;
+  <div class="acts" style="margin-top:12px">${xBtns(id)}<button data-a="io">재고앱에서 입출고</button>${GAS?'<button data-a="hist">최근 이력 · 취소</button>':''}</div>
+  <div class="ihist" data-ih hidden></div>`;
   P.querySelector('[data-a="close"]').onclick=closePanel;
+  const hb=P.querySelector('[data-a="hist"]');if(hb)hb.onclick=()=>itemHistory(id);
   P.querySelector('[data-a="io"]').onclick=()=>openApp({item:id});
   bindX(P);
   P.querySelectorAll('[data-goloc]').forEach(b=>b.onclick=()=>goLoc(b.dataset.goloc));
