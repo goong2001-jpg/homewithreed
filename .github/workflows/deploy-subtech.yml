@@ -63,6 +63,8 @@ jobs:
           HTML=$(grep -oP "var HTML_VERSION = '\K[^']+" Index.html)
           echo "Code.gs=$APP Index.html=$HTML"
           if [ "$APP" != "$HTML" ]; then echo "::error::버전 불일치 Code.gs=$APP Index.html=$HTML"; exit 1; fi
+          # 서버 함수 테스트 + Index.html 템플릿 검사 (<? ?> 가 잘못 들어가면 앱이 안 열림 — v39)
+          node dev/server-test.js
 
       - name: 올릴 파일 준비
         if: steps.check.outputs.ready == 'true'
