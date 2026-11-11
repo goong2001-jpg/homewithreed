@@ -42,6 +42,13 @@ throws(() => R('locSetQty', { rows: [{ id: 'NO', loc: 'x', qty: 1 }] }), '없는
   const m = R('getHistory', 'SV7||기판')[0], n1 = log.rows.length, um = R('undoTransaction', m.row, m.k);
   ok(um.rows === 2 && log.rows.length === n1 + 2 && um.locs['1층 A1'] === 200 && !um.locs['1층 B2'], '이동 취소 → 두 줄 한 번에 원복');
 }
+// 출고는 그 위치에 있는 만큼만 (v43) + 마이너스 재고 정리(반대 방향 이동)
+{ throws(() => R('save', { id: 'SV7||기판', name: 'SV7', cat: '기판', type: '출고', loc: '1층 C3', lines: [{ boxes: 1, per: 10 }] }), '물건이 없는 위치에서 출고');
+  const a0 = R('computeStock_')['SV7||기판'].locs['1층 A1'];
+  log.rows.push([new Date(), 'SV7||기판', 'SV7', '기판', '옛위치', '출고', 1, 50, 50, -50, '', '', '']); // 예전에 생긴 마이너스 재고
+  R('locMove', { groups: [{ fromLoc: '1층 A1', toLoc: '옛위치', moves: [{ id: 'SV7||기판', qty: 50 }] }] });
+  const st2 = R('computeStock_')['SV7||기판'].locs;
+  ok(!st2['옛위치'] && st2['1층 A1'] === a0 - 50, '마이너스 재고 −50 정리: 실제 칸에서 50 빼고 옛 위치는 0'); }
 throws(() => R('resetAllStock', { confirm: 'no' }), '초기화 확인 문구');
 R('resetAllStock', { confirm: '초기화' });
 const st = R('computeStock_');

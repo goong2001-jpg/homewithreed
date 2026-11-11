@@ -133,6 +133,14 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
   await pg.locator('#bomSug .bsc.on').first().tap(); await pg.waitForTimeout(100);
   ok(await pg.evaluate(() => BF.parts.length === 1 && BF.parts[0].id === ''), '다시 누르면 빠짐');
 
+  console.log('출고는 물건이 있는 위치에서만 (v43)');
+  await pg.evaluate(() => { go('search'); select(DATA.items.findIndex(x => x.id === 'SV7||기판')); }); await pg.waitForTimeout(200);
+  await pg.evaluate(() => setType('출고')); await pg.waitForTimeout(100);
+  ok(await pg.inputValue('#locSel') === '1층 B2', '출고를 누르면 물건이 있는 위치가 자동 선택');
+  await pg.evaluate(() => { ensureLocOption('locSel', '1층 C3'); document.getElementById('locSel').value = '1층 C3'; lines = [{ boxes: '1', per: '10' }]; renderInput(); document.getElementById('locSel').value = '1층 C3'; updateTotal(); }); await pg.waitForTimeout(100);
+  ok(await pg.locator('#saveBtn').isDisabled() && await pg.locator('#warnLine').isVisible(), '물건이 없는 위치에서는 출고 저장이 막힘');
+  await pg.evaluate(() => go('loc'));
+
   console.log('켤 때 속도 (v36)');
   await pg.evaluate(() => localStorage.setItem('mockDelay', '2500')); await pg.reload(); await pg.waitForTimeout(500);
   ok((await L('status').innerText()).includes('최신 확인 중'), '저장본으로 바로 뜸 (최신 확인 중)');

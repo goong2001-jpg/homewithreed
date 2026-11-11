@@ -6,7 +6,7 @@
  * - 메모(업체 사양), 조립 가능 수량(BOM), 월별 입출고 리포트 포함.
  */
 
-var APP_VERSION = 'v42'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
+var APP_VERSION = 'v43'; // 업데이트 확인용 버전 (Index.html의 HTML_VERSION과 짝)
 
 var OLD_SHEET_ID = '1yju8vEskIH0_SJvqhoe4-OGLD3SVm4T-wfiimOOY6VE';
 var OLD_TAB_NAME = '전체(수정중)';
@@ -316,6 +316,10 @@ function save(payload) {
     rows.push([now, payload.id, payload.name, payload.cat, payload.loc || DEFAULT_LOCATIONS[0], payload.type, boxes, per, t, sign * t, payload.staff || '', payload.memo || '', imgIds]);
   });
   if (!rows.length) throw new Error('수량을 입력하세요.');
+  if (payload.type === '출고') { // 그 위치에 있는 만큼만 출고 (v43) — 다른 위치에서 빼면 마이너스 재고가 생김
+    var loc0 = rows[0][4], have = (((computeStock_()[payload.id] || {}).locs || {})[loc0]) || 0, out = rows.reduce(function (a, r) { return a + r[8]; }, 0);
+    if (out > have) throw new Error('"' + loc0 + '"에는 ' + have + '개뿐이라 ' + out + '개를 출고할 수 없어요. 보관 위치를 물건이 있는 곳으로 바꿔 주세요.');
+  }
   log.getRange(log.getLastRow() + 1, 1, rows.length, 13).setValues(rows);
   var s = computeStock_()[payload.id] || { total: 0, locs: {} };
   return { ok: true, total: s.total, locs: s.locs };

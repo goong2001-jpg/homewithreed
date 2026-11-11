@@ -979,7 +979,7 @@ function confirmMove(){
   P.innerHTML=`<div class="ph"><h2>이동 확인</h2><button class="x" data-a="close">닫기</button></div>
   ${MV.parts.map((p,pi)=>`<div class="sk"><p class="mvto">${esc(p.from)} → <b>${esc(p.to)}</b></p>
     ${p.items.length?p.items.map((a,ii)=>`<div class="srow"><span class="nm">${esc(a.name)}${a.cat?`<small>${esc(a.cat)}</small>`:''}</span>
-      <input type="number" inputmode="numeric" min="0" max="${a.qty}" value="${a.qty}" data-q="${pi},${ii}" aria-label="${esc(a.name)} 옮길 수량"><small>/ ${fmtN(a.qty)}</small></div>`).join(''):'<p class="none">재고 없음 (메모만)</p>'}</div>`).join('')}
+      <input type="number" inputmode="numeric" min="0" max="${Math.abs(a.qty)}" value="${Math.abs(a.qty)}" data-q="${pi},${ii}" aria-label="${esc(a.name)} 옮길 수량"><small>/ ${fmtN(a.qty)}</small></div>${a.qty<0?`<p class="note" style="margin:2px 0 8px">마이너스 재고예요. 저장하면 받는 칸의 수량에서 ${fmtN(-a.qty)}개를 빼서 정리합니다 (받는 칸에 이 품목이 그만큼 있어야 해요).</p>`:''}`).join(''):'<p class="none">재고 없음 (메모만)</p>'}</div>`).join('')}
   ${memo?'<label class="chk"><input type="checkbox" data-f="memo" checked> 직접 적은 메모·📌지정 제품도 같이 옮기기</label>':''}
   ${MV.parts.some(p=>p.items.length)&&GAS?`<label class="f">담당자<select data-f="staff">${staff.map(n=>`<option${n===st?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
   <div class="acts"><button class="ghost" data-a="cancel">취소</button><button data-a="go" style="background:var(--ink);color:var(--paper);font-weight:700">⇄ 이동 저장</button></div>`;
@@ -989,13 +989,18 @@ function confirmMove(){
   openPanel();
 }
 function doMove(btn){
-  const P=E('panelBody'),groups=MV.parts.map(p=>({fromLoc:p.from,toLoc:p.to,moves:[]}));
+  const P=E('panelBody'),groups=MV.parts.map(p=>({fromLoc:p.from,toLoc:p.to,moves:[]})),neg=[];
   let bad='';
   P.querySelectorAll('[data-q]').forEach(inp=>{const[pi,ii]=inp.dataset.q.split(',').map(Number),a=MV.parts[pi].items[ii],q=Math.floor(Number(inp.value)||0);
+    if(a.qty<0){ // 마이너스 재고 정리 (v43): "−N개를 A→B로" = "N개를 B→A로". 받는 칸(B)에 그 품목이 N개 이상 있어야 함
+      const p=MV.parts[pi],have=(stockAt(p.to).find(z=>z.id===a.id)||{}).qty||0;
+      if(q<0||q>-a.qty)bad=`${a.name}: 0~${fmtN(-a.qty)}개 사이로 입력하세요`;
+      else if(q>have)bad=`${a.name}: 받는 칸에 ${fmtN(have)}개뿐이에요. 이 품목이 실제로 있는 칸을 골라 주세요`;
+      else if(q>0)neg.push({fromLoc:p.to,toLoc:p.from,moves:[{id:a.id,qty:q}]});return}
     if(q<0||q>a.qty)bad=`${a.name}: 0~${fmtN(a.qty)}개 사이로 입력하세요`;if(q>0)groups[pi].moves.push({id:a.id,qty:q})});
   if(bad){toast(bad);return}
   const memoBox=P.querySelector('[data-f="memo"]'),withMemo=!!(memoBox&&memoBox.checked);
-  const send=groups.filter(g=>g.moves.length);
+  const send=groups.filter(g=>g.moves.length).concat(neg);
   if(!send.length&&!withMemo){toast('옮길 수량을 입력하세요');return}
   const staffSel=P.querySelector('[data-f="staff"]'),staff=staffSel?staffSel.value:'';
   try{if(staff)localStorage.setItem('subtek-staff',staff)}catch(e){}
