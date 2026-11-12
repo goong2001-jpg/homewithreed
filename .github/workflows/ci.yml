@@ -50,6 +50,18 @@ jobs:
         working-directory: ${{ matrix.app }}
         run: CI=true npm run build
 
+  # couple-budget 이력 자동 기록 도구(couple-budget/dev/history.mjs) —
+  # 배포 뒤 CHANGELOG.md 를 쓰는 스크립트라, 깨지면 이력이 조용히 멈추므로 여기서 지킨다
+  couple-budget-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 이력 기록 도구 테스트
+        run: node --test couple-budget/dev/history.test.mjs
+
   # Cloudflare Worker: 타입체크 + node --test (Node 22 필요)
   worker:
     runs-on: ubuntu-latest

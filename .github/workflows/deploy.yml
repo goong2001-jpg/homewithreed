@@ -25,6 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # couple-budget/version.json 이 앱을 마지막으로 바꾼 커밋을 찾으려면 이력이 필요하다
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -52,6 +55,12 @@ jobs:
         run: |
           npm ci
           npm run build
+
+      # 배포된 가계부가 어느 버전인지 .../couple-budget/version.json 으로 확인할 수 있게 한다.
+      # 앱 코드가 아니라 결과물 폴더에 파일 하나를 더할 뿐이고, 실패해도 배포는 계속한다.
+      - name: couple-budget version.json
+        continue-on-error: true
+        run: node couple-budget/dev/version-json.mjs --out couple-budget/build/version.json
 
       - name: Build asset-tracker
         working-directory: asset-tracker
@@ -149,7 +158,54 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # couple-budget 변경 이력을 couple-budget/CHANGELOG.md 맨 위에 자동으로 붙인다.
+  # - 배포가 성공한 뒤에만 돈다 (needs: deploy)
+  # - continue-on-error: 여기서 실패해도 배포 결과는 성공으로 남는다
+  # - 기록 커밋은 GITHUB_TOKEN 으로 푸시하고 [skip ci] 를 달아 이 워크플로를 다시 돌리지 않는다
+  # - 같은 커밋은 한 번만 기록한다(<!-- sha:… --> 표시). 실패·취소로 빠진 것은 다음 배포 때 따라잡는다
+  # - 다른 앱만 바뀐 배포에서는 기록할 게 없어서 아무것도 하지 않는다
+  couple-budget-changelog:
+    needs: deploy
+    if: github.ref == 'refs/heads/claude/intelligent-cannon-txjx76'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: CHANGELOG.md 에 이번 배포 기록
+        env:
+          BRANCH: ${{ github.ref_name }}
+          DEPLOYED_SHA: ${{ github.sha }}
+        run: bash couple-budget/dev/record-changelog.sh
+
+      - name: 배포된 version.json 확인
+        continue-on-error: true
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          url="${PAGE_URL%/}/couple-budget/version.json"
+          for i in $(seq 1 12); do
+            if curl -fsS "$url?t=$(date +%s)" -o version.json \
+               && grep -q "\"deployedCommit\": \"$GITHUB_SHA\"" version.json; then
+              echo "배포 확인됨: $url"; cat version.json; exit 0
+            fi
+            sleep 10
+          done
+          echo "::warning::version.json 이 아직 이번 커밋을 가리키지 않습니다 ($url)"
+          cat version.json 2>/dev/null || true
+          exit 1

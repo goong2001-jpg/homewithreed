@@ -2,6 +2,10 @@
 
 폴더마다 독립된 정적 앱이 들어 있다. 각 앱 작업은 해당 폴더 README를 따른다.
 
+## 가계부 (couple-budget)
+`couple-budget`(우리집 하루수입 가계부) 작업은 시작 전에 `couple-budget/HANDOFF.md` 를 먼저 읽고 `couple-budget/CLAUDE.md` 규칙을 따른다.
+`couple-budget/CHANGELOG.md` 는 배포 때 자동 기록되므로 손대지 않는다.
+
 ## 기술 학습 코치
 사용자가 "시작", "복습", "면접모드"라고 하거나 기술 학습 코칭을 요청하면
 `tech-coach/CLAUDE.md` 지침을 읽고 그대로 진행한다.
