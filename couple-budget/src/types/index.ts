@@ -102,7 +102,16 @@ export interface Expense extends Syncable {
   content: string;
   personId: string;
   createdAt: number;
+  /**
+   * '이 날은 안 썼어요' 표시 (v17). 금액 0원짜리 기록으로 남긴다.
+   * 새 컬렉션을 만들지 않은 이유: Firestore 규칙·백업 형식을 그대로 두고도 두 폰에 넘어가게 하려고.
+   * 옛 기록에는 이 필드가 없다 — 없으면 보통 지출이다.
+   */
+  noSpend?: boolean;
 }
+
+/** '안 쓴 날' 표시에 넣는 내용 글자 (옛 버전 앱에서는 0원짜리 내역으로 보인다) */
+export const NO_SPEND_CONTENT = '안 쓴 날';
 
 // ================= 카테고리별 월 상한 (예산) =================
 
@@ -140,6 +149,20 @@ export interface FrequentExpense {
   personId: string;
   count: number;
   lastDate: DateKey;
+}
+
+/** 매달 나가는 것 같은 지출 — 고정지출로 옮기자고 권할 후보 (budget.ts recurringCandidates 산출물) */
+export interface RecurringCandidate {
+  /** 내용+금액으로 만든 열쇠 — '아니에요'를 누른 후보를 이 폰이 기억할 때 쓴다 */
+  key: string;
+  content: string;
+  amount: number;
+  category: ExpenseCategory;
+  personId: string;
+  /** 연달아 나온 달 (오래된 달부터) */
+  months: MonthKey[];
+  /** 고정지출로 옮기면 시작할 달 = 마지막으로 적은 달의 다음 달 (두 번 빠지지 않게) */
+  startMonth: MonthKey;
 }
 
 // ================= 경조사 · 용돈 (오고 간 돈, 별도 장부) =================
@@ -287,6 +310,7 @@ export interface MonthBudget {
 
 // ========================== 뷰 / 동기화 ==========================
 
+/** 'top' 은 탭이 아니라 내역 탭 안의 보기다 (v17 — 탭을 5개로 줄였다) */
 export type View = 'home' | 'add' | 'history' | 'top' | 'gifts' | 'settings';
 
 /** 입력 화면이 지출을 받는지 수입을 받는지 */

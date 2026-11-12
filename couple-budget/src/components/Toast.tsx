@@ -5,7 +5,7 @@ export interface ToastMessage {
   /** 같은 글자가 연달아 와도 다시 띄우도록 매번 다른 값 */
   key: number;
   text: string;
-  tone: 'warn' | 'over';
+  tone: 'warn' | 'over' | 'ok';
 }
 
 interface Props {
@@ -26,7 +26,7 @@ export default function Toast({ toast, onDone, ms = 3000 }: Props) {
   }, [toast, onDone, ms]);
 
   if (!toast) return null;
-  const color = toast.tone === 'over' ? '#e74c3c' : '#f39c12';
+  const color = toast.tone === 'over' ? '#e74c3c' : toast.tone === 'warn' ? '#f39c12' : '#27ae60';
 
   return (
     <div

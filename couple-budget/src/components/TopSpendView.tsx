@@ -5,6 +5,7 @@ import {
 import { monthExpenses, topExpenses } from '../utils/budget';
 import { dateLabel, shortWon, won } from '../utils/format';
 import MonthHeader from './MonthHeader';
+import HistoryTabs from './HistoryTabs';
 
 interface Props {
   month: MonthKey;
@@ -17,6 +18,8 @@ interface Props {
   onToday: () => void;
   onEditExpense: (expense: Expense) => void;
   onGoSettings: () => void;
+  /** 내역 탭 안에서 '전체 내역'으로 돌아간다 */
+  onSwitch: (v: 'history' | 'top') => void;
 }
 
 const MEDAL = ['🥇', '🥈', '🥉'];
@@ -29,7 +32,7 @@ const MEDAL = ['🥇', '🥈', '🥉'];
  */
 export default function TopSpendView({
   month, budget, persons, expenses, syncStatus,
-  onPrev, onNext, onToday, onEditExpense, onGoSettings,
+  onPrev, onNext, onToday, onEditExpense, onGoSettings, onSwitch,
 }: Props) {
   const [personFilter, setPersonFilter] = useState<string>('all');
   const [limit, setLimit] = useState(5);
@@ -70,6 +73,8 @@ export default function TopSpendView({
         syncStatus={syncStatus}
         onSyncClick={onGoSettings}
       />
+
+      <HistoryTabs active="top" onChange={onSwitch} />
 
       <div style={{ display: 'flex', gap: 7, padding: '12px 16px 4px', overflowX: 'auto' }}>
         <button

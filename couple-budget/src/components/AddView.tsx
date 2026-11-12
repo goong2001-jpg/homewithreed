@@ -21,6 +21,11 @@ interface Props {
   onDeleteExpense: (id: string) => void;
   onSaveIncome: React.ComponentProps<typeof IncomeForm>['onSave'];
   onDeleteIncome: (id: string) => void;
+  /** 이 폰 주인 (없으면 첫 번째 사람) */
+  defaultPersonId?: string;
+  onSetOwner?: (personId: string) => void;
+  /** 지출 날짜를 미리 채워서 열 때 (홈의 '입력이 빠진 날') */
+  initialDate?: string;
   onDone: () => void;
 }
 
@@ -33,7 +38,8 @@ interface Props {
 export default function AddView({
   month, persons, budget, mode, onModeChange,
   editingExpense, editingIncome, frequent,
-  onSaveExpense, onDeleteExpense, onSaveIncome, onDeleteIncome, onDone,
+  onSaveExpense, onDeleteExpense, onSaveIncome, onDeleteIncome,
+  defaultPersonId, onSetOwner, initialDate, onDone,
 }: Props) {
   const editing = !!(editingExpense || editingIncome);
   // 칩으로 고른 지출. seq 로 같은 칩 재선택도 구분한다
@@ -83,6 +89,7 @@ export default function AddView({
           persons={persons}
           budget={budget}
           initial={editingIncome}
+          defaultPersonId={defaultPersonId}
           onSave={onSaveIncome}
           onDelete={onDeleteIncome}
           onDone={onDone}
@@ -101,6 +108,9 @@ export default function AddView({
             budget={budget}
             initial={editingExpense}
             preset={editing ? undefined : preset}
+            defaultPersonId={defaultPersonId}
+            onSetOwner={onSetOwner}
+            initialDate={initialDate}
             onSave={onSaveExpense}
             onDelete={onDeleteExpense}
             onDone={onDone}

@@ -17,11 +17,13 @@ interface Props {
     kind: GiftKind; counterparty: string; personId: string; memo: string;
   }) => void;
   onDelete?: (id: string) => void;
+  /** 이 폰 주인 — 새로 쓸 때 기본으로 고를 사람 */
+  defaultPersonId?: string;
   onDone: () => void;
 }
 
 export default function GiftForm({
-  persons, initial, defaultDirection, onSave, onDelete, onDone,
+  persons, initial, defaultPersonId, defaultDirection, onSave, onDelete, onDone,
 }: Props) {
   const sorted = [...persons].sort((a, b) => a.order - b.order);
   const editing = !!initial;
@@ -36,7 +38,7 @@ export default function GiftForm({
     (defaultDirection ?? 'out') === 'in' ? '용돈' : '축의금'
   ));
   const [counterparty, setCounterparty] = useState(initial?.counterparty ?? '');
-  const [personId, setPersonId] = useState(initial?.personId ?? sorted[0]?.id ?? 'p1');
+  const [personId, setPersonId] = useState(initial?.personId ?? defaultPersonId ?? sorted[0]?.id ?? 'p1');
   const [date, setDate] = useState(initial?.date ?? todayKey());
   const [memo, setMemo] = useState(initial?.memo ?? '');
   const [error, setError] = useState('');

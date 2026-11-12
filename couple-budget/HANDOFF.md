@@ -1,6 +1,6 @@
 # 인수인계 — 우리집 하루수입 가계부 (couple-budget)
 
-> 마지막 정리: **2026-11-12 · v16** · 이 문서는 다음 작업자(사람이든 다른 AI 모델이든)가
+> 마지막 정리: **2026-11-12 · v17** · 이 문서는 다음 작업자(사람이든 다른 AI 모델이든)가
 > 이 앱을 처음 보고도 안전하게 이어서 고칠 수 있게 쓴 것이다. 작업 전에 끝까지 읽는다.
 
 ---
@@ -51,10 +51,12 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 
 - **localStorage 키** (`src/utils/storage.ts` 의 `KEYS`) — 이름 변경·삭제 금지
   `couple_budget_persons` · `couple_budget_incomes` · `couple_budget_fixed` · `couple_budget_expenses` · `couple_budget_gifts` · `couple_budget_budgets` · `couple_budget_settings` · `couple_budget_seeded_room`
+  그리고 **이 폰 전용** `couple_budget_device` (`src/utils/device.ts`, v17) — 이 폰 주인·'아니에요'라고 한 반복 지출. **동기화·백업에 넣지 않는다** (기기의 성질이라 넘기면 두 폰이 서로 덮어쓴다)
 - **Firestore 경로** — `rooms/{우리집코드}/{persons|incomes|fixedExpenses|expenses|gifts|budgets}/{id}` 컬렉션 이름 변경 금지
 - **id 형식** — 기본 사람 `p1`·`p2`, 카테고리 예산 `budget-식비` (카테고리에서 정해지는 id 라 두 폰이 같은 문서로 합쳐진다). 바꾸면 중복이 생긴다
 - **삭제는 툼스톤** — `deleted: true` + `updatedAt` 갱신으로만 지운다. 배열에서 빼거나 Firestore 문서를 진짜로 지우면 **상대 폰에서 되살아난다**
 - **`updatedAt` 은 `Date.now()`** — `serverTimestamp()` 로 바꾸지 말 것 (오프라인에서 null 이라 병합이 깨진다, `merge.ts` 주석)
+- **'안 쓴 날' 표시는 지출 기록이다** — `amount: 0` + `noSpend: true` + 내용 `안 쓴 날` (v17). 새 컬렉션을 만들지 않았다(규칙·백업 형식 그대로). 지출을 세는 곳은 `monthExpenses()`·`isNoSpend()` 로 걸러야 건수에 섞이지 않는다
 - **필드 추가는 OK, 이름 변경·타입 변경은 금지** — 옛 기록은 새 필드가 없으므로 항상 없을 때의 기본값을 처리한다
 - **백업 파일 형식** — `format: 'couple-budget-backup'`. 지금 `BACKUP_VERSION = 2`. 올릴 때는 **옛 버전 파일 읽기를 반드시 유지**
 - `이 기기의 기록 모두 지우기` 같은 파괴적 기능을 새로 만들 땐 두 번 누르기 확인을 둔다 (기존 관례)
@@ -66,15 +68,16 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 - `.github/workflows/deploy.yml` 은 **저장소의 모든 앱이 같이 쓴다.** 이 앱 때문에 고칠 때 다른 앱 빌드 단계를 건드리지 않는다. 테스트(`ci.yml`)가 하나라도 깨지면 **모든 앱 배포가 멈춘다**
 - `src/sync/types.ts` 에 firebase import 금지 — firebase 는 `syncClient.ts` 에서만 **동적 import** (메인 번들에 들어가면 동기화 안 쓰는 사람도 수백 KB 를 받는다. `dev/check.sh` 가 검사한다)
 - 경조사(`gifts`)와 카테고리 예산(`budgets`)은 **저금통 계산에 넣지 않는다** — 의도된 설계 (3-3 참고)
+- `public/sw.js` (v17, 오프라인 열기) — **화면(index.html)은 항상 네트워크 먼저**라는 규칙을 바꾸지 않는다. 저장본을 먼저 쓰게 바꾸면 "새로고침해도 옛 버전"이 된다. 범위는 이 앱 폴더뿐
 - 앱 안의 Firebase 설정 안내 문구는 사용자가 실제로 4번 막혔던 끝에 맞춘 것이다(3-4). 콘솔 화면을 확인하지 않고 추측으로 바꾸지 않는다
 
 ### 2-3. 버전 올리는 법 · 커밋 메시지 규칙
 
-- **PR(또는 기본 브랜치에 들어가는 변경) 하나 = 버전 하나.** 다음 번호 = `CHANGELOG.md` 맨 위 버전 + 1 (지금 v16 → 다음 **v17**)
+- **PR(또는 기본 브랜치에 들어가는 변경) 하나 = 버전 하나.** 다음 번호 = `CHANGELOG.md` 맨 위 버전 + 1 (지금 v17 → 다음 **v18**)
 - 기본 브랜치에 들어가는 커밋(= squash 병합 커밋)의 메시지:
 
   ```
-  v17: 무엇을 바꿨는지 한 줄 (#PR번호)
+  v18: 무엇을 바꿨는지 한 줄 (#PR번호)
 
   - 바뀐 점 하나
   - 바뀐 점 둘
@@ -85,7 +88,7 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
   - 본문은 `- ` 목록. 사용자가 CHANGELOG 를 폰으로 읽으니 **사용자 말로** 쓴다 (함수 이름보다 "무엇이 달라졌나")
   - `## 제목` 은 써도 되지만 기록할 때 굵은 글씨로 바뀐다. `Co-Authored-By` 같은 꼬리표는 자동으로 빠진다
 - `package.json` 의 `"version": "0.1.0"` 은 **쓰지 않는다** (CRA 기본값 그대로 둔다). 버전의 기준은 커밋 메시지다
-- 앱 화면 안에는 버전 표시가 없다 (v16 기준). 버전은 version.json 과 CHANGELOG 로 본다
+- 앱 **설정 탭 맨 아래**에 버전이 한 줄로 보인다 (v17, version.json 을 읽는다). 개발 서버에는 version.json 이 없어서 안 보인다
 
 ### 2-4. 브랜치 · PR 방식 (이 앱이 써 온 방식 그대로)
 
@@ -99,8 +102,8 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 3. 커밋 (메시지 규칙 2-3) → **푸시 전에** `git pull --rebase origin claude/intelligent-cannon-txjx76`
    (배포 뒤 Actions 봇이 CHANGELOG 커밋을 기본 브랜치에 넣기 때문에, 오래 작업했으면 뒤처져 있다)
 4. `git push -u origin <작업브랜치>` — 원격 작업 브랜치에 **이미 병합된 옛 커밋만** 남아 있어서 거절되면 `--force-with-lease` (병합 안 된 커밋이 있으면 절대 강제 푸시하지 말 것)
-5. GitHub MCP 로 PR 생성: base = `claude/intelligent-cannon-txjx76`, 제목 = `v17: …`
-6. **squash 병합**: `merge_pull_request(merge_method="squash", commit_title="v17: … (#PR번호)", commit_message="- …\n- …")`
+5. GitHub MCP 로 PR 생성: base = `claude/intelligent-cannon-txjx76`, 제목 = `v18: …`
+6. **squash 병합**: `merge_pull_request(merge_method="squash", commit_title="v18: … (#PR번호)", commit_message="- …\n- …")`
    → `commit_title`·`commit_message` 를 **꼭 직접 넣는다.** 안 넣으면 GitHub 기본 제목이 들어가 버전이 빠진다
 7. 배포 성공까지 확인 (4장). 끝나면 사용자에게 "폰에서 새로고침" 안내
 
@@ -139,13 +142,14 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 | 파일 | 역할 |
 |---|---|
 | **진입·상태** | |
-| `src/App.tsx` | 화면 전환(탭 6개), 수정 중인 항목, 모든 돈 계산을 **한 번만** 해서 아래로 내려준다. 지출 저장 후 상한 넘김 토스트 |
+| `src/App.tsx` | 화면 전환(탭 5개 + 내역 탭 안의 TOP5), 수정 중인 항목, 모든 돈 계산을 **한 번만** 해서 아래로 내려준다. 지출 저장 후 '저장했어요'·상한 넘김 토스트. 입력이 빠진 날·반복 지출 후보도 여기서 계산 |
 | `src/hooks/useLedger.ts` | ★ **단일 진실 공급원.** 모든 기록의 state·localStorage 저장·클라우드 push·병합·백업 가져오기·자동 1회 올리기 |
 | `src/hooks/useSync.ts` | Firebase 연결 수명. 작은 컬렉션은 전부, 지출은 **보고 있는 달만** 구독 |
 | `src/hooks/useAppSettings.ts` | 동기화 설정(Firebase 설정 원문·우리집 코드). **절대 클라우드로 안 올림** |
 | `src/hooks/useMonthNav.ts` | 보고 있는 달 이동 |
+| `src/hooks/useDevice.ts` · `src/utils/device.ts` | **이 폰에만** 두는 설정(이 폰 주인, 거절한 반복 지출). 동기화 금지 |
 | **계산 (순수 함수, 테스트 있음)** | |
-| `src/utils/budget.ts` | ★ 하루 수입·여유돈·저금통 비율·사람별·카테고리별·TOP·상한 상태·자주 쓰는 지출. `todayKey` 는 로컬 날짜 |
+| `src/utils/budget.ts` | ★ 하루 수입·여유돈·저금통 비율·사람별·카테고리별·TOP·상한 상태·자주 쓰는 지출·**입력이 빠진 날(`missingDays`)·반복 지출 후보(`recurringCandidates`)**. `todayKey` 는 로컬 날짜 |
 | `src/utils/gifts.ts` | 경조사 거르기·합계·상대별·사람별 집계 |
 | `src/utils/weekly.ts` | 주간 리포트(월~일) 계산 |
 | `src/utils/merge.ts` | id 기준 last-write-wins 병합, 로컬 승자 되밀기, Firestore undefined 제거 |
@@ -160,15 +164,16 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 | `src/sync/types.ts` | `SyncClient` 계약 (firebase import 금지) |
 | `src/sync/syncClient.ts` | firebase 를 만지는 **유일한** 파일. 연결 테스트·오류를 "마법사 몇 단계 탓"으로 번역 |
 | **화면 (탭 순서)** | |
-| `HomeView` · `PiggyGauge` · `piggyShapes` · `StatRow` · `PersonBars` · `BudgetLimits` · `WeeklyReportCard` | 🐷 저금통 탭 |
-| `AddView` · `ExpenseForm` · `IncomeForm` · `FrequentChips` | ➕ 입력 탭 (지출/수입 전환, 수정 겸용) |
-| `HistoryView` · `ExpenseItem` · `CategoryBreakdown` | 📋 내역 탭 |
-| `TopSpendView` | 🏆 TOP5 탭 |
+| `HomeView` · `PiggyGauge` · `piggyShapes` · `StatRow` · `PersonBars` · `BudgetLimits` · `WeeklyReportCard` · `MissingDaysCard` · `RecurringCard` | 🐷 저금통 탭 (순서: 저금통 → 하루 쓸 돈 → 입력 버튼 → 빠진 날 알림 → 나머지) |
+| `AddView` · `ExpenseForm` · `IncomeForm` · `FrequentChips` | ➕ 입력 탭 (지출/수입 전환, 수정 겸용). 지출은 오늘·어제·그제 칩, '저장 후 하나 더' |
+| `HistoryView` · `ExpenseItem` · `CategoryBreakdown` · `HistoryTabs` | 📋 내역 탭. '안 쓴 날' 표시도 여기서 보이고 지운다 |
+| `TopSpendView` | 🏆 TOP5 — 탭이 아니라 **내역 탭 안의 전환**(`HistoryTabs`). `View` 값 `'top'` 은 그대로 |
 | `GiftsView` · `GiftForm` | 🧧 경조사 탭 |
-| `SettingsView` · `IncomeCard` · `FixedExpenseCard` · `CategoryBudgetCard` · `PersonsCard` · `SyncCard` · `ExchangeCard` | ⚙️ 설정 탭 |
+| `SettingsView` · `IncomeCard` · `FixedExpenseCard` · `CategoryBudgetCard` · `PersonsCard` · `SyncCard` · `ExchangeCard` · `VersionLine` | ⚙️ 설정 탭 ('이 폰은 누구 폰?' 은 `PersonsCard` 안) |
 | `TabBar` · `MonthHeader` · `SyncBadge` · `Toast` | 공용 |
 | **문서·도구 (앱 기능과 무관)** | |
 | `HANDOFF.md` · `CLAUDE.md` · `CHANGELOG.md` · `README.md` | 인수인계 · AI 작업 규칙 · 자동 이력 · 사용자용 설명(Firebase 설정법 포함) |
+| `public/sw.js` | 오프라인에서도 앱이 열리게 하는 서비스워커 (2-2 의 규칙) |
 | `dev/check.sh` | 한 줄 점검 (4-2) |
 | `dev/smoke.mjs` | 실제 빌드를 배포 경로로 띄워 브라우저로 클릭해 보는 점검 |
 | `dev/history.mjs` · `changelog.mjs` · `record-changelog.sh` · `version-json.mjs` · `history.test.mjs` | 자동 이력·버전 표시 도구와 그 테스트 |
@@ -182,7 +187,7 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 | `Person` | name, color, order, createdAt | 부부 + 자녀. 기본 `p1`(나)·`p2`(와이프), `updatedAt: 0` = 손 안 댄 기본값 |
 | `IncomeEntry` | month, personId, amount, memo | **건별** (급여 1건 + 부업 일당 여러 건) |
 | `FixedExpense` | name, amount, startMonth, endMonth\|null, personId\|null | 매달 반복, 하루 수입 계산 **전에** 뺀다 |
-| `Expense` | date, **month**(비정규화), amount, category, content, personId, createdAt | 카테고리 8종 고정 |
+| `Expense` | date, **month**(비정규화), amount, category, content, personId, createdAt, noSpend? | 카테고리 8종 고정. `noSpend: true` = '안 쓴 날' 표시(0원) |
 | `GiftEntry` | date, month, direction(in/out), amount, kind, counterparty, personId, memo | 경조사·용돈. 저금통과 무관 |
 | `CategoryBudget` | category, monthlyLimit | id = `budget-{카테고리}` |
 | `AppSettings.sync` | enabled, roomCode, firebaseConfigText | 로컬 전용, 클라우드 금지 |
@@ -200,7 +205,8 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 - **자동 1회 올리기** — 연결되면 이 기기 기존 기록을 방에 한 번 올린다(2.5초 뒤, 먼저 받은 스냅샷과 병합 후). 방 코드별로 한 번(`couple_budget_seeded_room`)
 - **둘이 쓰는 세 단계** — ① 혼자(설정 0) ② 파일로 주고받기(서버 0) ③ 본인 Firebase(실시간). **저장소 주인이 남의 데이터를 갖지 않는 구조**가 사용자 요구였다 — 공용 Firebase 를 만들어 주지 말 것
 - **경조사·카테고리 예산은 저금통과 분리** — 축의금이 하루 예산에서 빠지면 "헤프게 썼다"는 신호가 아닌데 저금통이 빨개진다. 상한은 스스로의 약속일 뿐
-- **안 적은 날 = 안 쓴 날로 계산된다** — 입력을 빼먹으면 여유돈이 실제보다 좋아 보인다 (6장 아이디어)
+- **안 적은 날 = 안 쓴 날로 계산된다** — 그래서 홈이 "N일째 기록이 없어요"라고 묻는다(v17). 어제부터 거꾸로 **연달아** 빈 날만, 이번 달 안에서만, 첫 기록 이후만 센다. 계산 자체는 그대로다(표시는 0원)
+- **반복 지출 제안** — 같은 내용·금액이 석 달 연속 달마다 딱 한 번이면 고정지출로 옮기자고 권한다. 옮기면 **마지막으로 적은 달의 다음 달부터** 시작(두 번 빠지지 않게)
 
 ### 3-4. 지금까지 겪은 함정·버그와 해결법
 
@@ -255,12 +261,12 @@ bash couple-budget/dev/check.sh --quick  # 단위 테스트만 (빌드·브라�
 |---|---|
 | Node 버전 | 22 권장 (CI 와 같음), 18 이상 필수 |
 | 의존성 | `node_modules` 없으면 `npm ci` |
-| 단위 테스트 | `src/**/*.test.ts` — 계산·병합·백업·주간 리포트·경조사 (v16 기준 **178건**) |
+| 단위 테스트 | `src/**/*.test.ts` — 계산·병합·백업·주간 리포트·경조사 (v17 기준 **203건**) |
 | 이력 도구 테스트 | `dev/history.test.mjs` — 임시 git 저장소로 기록·중복 방지·따라잡기 (18건) |
 | 문서 | HANDOFF·CLAUDE·CHANGELOG·README 있음, CHANGELOG 자동 표시 있음 |
 | 배포 빌드 | `CI=true` (경고 = 실패, CI 와 같은 조건) |
 | 빌드 결과 | firebase·xlsx 가 메인 번들 밖, 메인 번들 gzip 200KB 미만(지금 ~100KB), 배포 경로 `/homewithreed/couple-budget/` |
-| 브라우저 스모크 | 실제 빌드를 배포 경로로 띄워 탭 6개 순회 → 수입 입력 → 하루 금액 → 지출 입력 → 새로고침 유지 → 경조사 탭 → 390px 가로 스크롤 없음 → 콘솔 오류 0. playwright 가 없으면 건너뜀 (`npm i --no-save playwright && npx playwright install chromium`) |
+| 브라우저 스모크 | 실제 빌드를 배포 경로로 띄워 탭 5개 순회 → 내역 안 TOP5 → 수입 입력 → 하루 금액 → 지출 입력·저장 알림 → 저장 후 하나 더·어제 날짜 → 이 폰 주인 기억 → 새로고침 유지 → **오프라인으로 다시 열기** → 경조사 탭 → 390px 가로 스크롤 없음 → 콘솔 오류 0. playwright 가 없으면 건너뜀 (`npm i --no-save playwright && npx playwright install chromium`) |
 
 화면을 바꿨다면 **폰 폭(390px)으로 직접 눌러 보는 것**까지가 테스트다. 날짜에 따라 숫자가 바뀌는 화면은 `Date` 를 고정해서 본다.
 개발 서버: `cd couple-budget && BROWSER=none PORT=3111 npx react-scripts start` → http://localhost:3111/homewithreed/couple-budget/
@@ -271,7 +277,7 @@ bash couple-budget/dev/check.sh --quick  # 단위 테스트만 (빌드·브라�
 cd <저장소 루트>
 git add -A couple-budget                    # 다른 앱 폴더를 섞지 않는다
 git commit -F - <<'EOF'
-v17: 무엇을 바꿨는지
+v18: 무엇을 바꿨는지
 
 - 바뀐 점
 - 바뀐 점
@@ -281,8 +287,8 @@ git push -u origin <작업브랜치>              # 거절되면 2-4 의 4번
 ```
 
 그다음 GitHub MCP:
-- `create_pull_request(owner="goong2001-jpg", repo="homewithreed", base="claude/intelligent-cannon-txjx76", head="<작업브랜치>", title="v17: …", body=…)`
-- `merge_pull_request(…, pullNumber=N, merge_method="squash", commit_title="v17: … (#N)", commit_message="- …\n- …")`
+- `create_pull_request(owner="goong2001-jpg", repo="homewithreed", base="claude/intelligent-cannon-txjx76", head="<작업브랜치>", title="v18: …", body=…)`
+- `merge_pull_request(…, pullNumber=N, merge_method="squash", commit_title="v18: … (#N)", commit_message="- …\n- …")`
 - 405(충돌)가 나면: 2-4 의 1번처럼 브랜치를 최신에서 다시 만들고 내 커밋만 `cherry-pick` → `--force-with-lease` → 다시 병합
 
 ### 4-4. 배포 성공 확인
@@ -295,7 +301,7 @@ GitHub MCP 로:
 2. `actions_list(method="list_workflow_jobs", resource_id="<run id>")`
    → `test` · `build` · `deploy` · `couple-budget-changelog` 네 개가 모두 success
 3. `get_job_logs(job_id=<couple-budget-changelog 의 id>, return_content=true, tail_lines=40)`
-   → `CHANGELOG: 기록해서 푸시했습니다` 와 `배포 확인됨` + version.json 내용 (`"version": "v17"`)
+   → `CHANGELOG: 기록해서 푸시했습니다` 와 `배포 확인됨` + version.json 내용 (`"version": "v18"`)
 4. 이력 반영 확인
    ```bash
    git fetch origin claude/intelligent-cannon-txjx76
@@ -310,7 +316,7 @@ GitHub MCP 로:
 
 ### 4-5. 사용자에게 알리기
 
-"배포 끝났어. 폰에서 앱 열고 새로고침하면 보여 (와이프 폰도)." — 서비스워커가 없어서 새로고침이면 새 버전이 뜬다.
+"배포 끝났어. 폰에서 앱 열고 새로고침하면 보여 (와이프 폰도)." — 서비스워커(v17)는 화면을 **네트워크 먼저** 받으므로 온라인이면 새로고침 한 번에 새 버전이 뜬다. 설정 탭 맨 아래 버전 줄로 확인할 수 있다.
 
 ---
 
@@ -320,7 +326,8 @@ GitHub MCP 로:
 
 | 버전 | 날짜(KST) | PR | 내용 |
 |---|---|---|---|
-| v16 | 2026-11-12 | — | 인수인계 문서(HANDOFF·CLAUDE·CHANGELOG), `dev/` 점검 도구, 배포 후 이력 자동 기록, version.json |
+| v17 | 2026-11-12 | — | 입력 편하게(이 폰 주인·저장 후 하나 더·날짜 칩·저장 알림·입력 버튼 위로), 입력이 빠진 날 알림·'안 썼어요', 반복 지출→고정지출 제안, 버전 표시, 탭 5개(TOP5 는 내역 안), 오프라인 열기 |
+| v16 | 2026-11-12 | #60 | 인수인계 문서(HANDOFF·CLAUDE·CHANGELOG), `dev/` 점검 도구, 배포 후 이력 자동 기록, version.json |
 | v15 | 2026-10-23 | #46 | 카테고리 월 상한·경고, 자주 쓰는 지출 칩, 주간 리포트·카톡 공유, 백업 v2 *(다른 세션)* |
 | v14 | 2026-10-23 | #46 | 오프라인 낡은 수정 되밀기, 규칙 `updatedAt` 가드, CI 테스트 게이트·Node 22 *(다른 세션)* |
 | v13 | 2026-09-19 | #32 | 경조사·용돈 장부 탭 |
@@ -338,17 +345,15 @@ GitHub MCP 로:
 
 ## 6. 남은 일 · 아이디어 (우선순위 순)
 
-입력이 힘들다는 사용자 피드백(2026-11-06)에 대한 제안 중 **아직 안 한 것**:
+입력이 힘들다는 사용자 피드백(2026-11-06)에 대한 제안은 **v17 에서 대부분 끝냈다**
+(이 폰 주인 기억 · 안 적은 날 드러내기 · 저장하고 계속 적기 · 반복 지출→고정지출 제안 · 오프라인 열기 · 버전 표시 · 자주 쓰는 지출 v15).
 
-1. **이 폰은 누구 폰인지 기억** — 지금 입력 기본 사람이 항상 첫 번째(남편)라 와이프는 매번 한 번 더 누른다. **localStorage 에만** 두고 동기화하지 않는 게 핵심 (기기의 성질이라 같이 넘기면 서로 덮어쓴다). 가장 싸고 효과 큼
-2. **안 적은 날 드러내기** — "3일째 입력이 없어요" + "그날은 안 썼어요"(0원 표시). 지금은 입력을 빼먹을수록 여유돈이 좋아 보인다 (정확성 문제)
-3. **저장하고 계속 적기** — 지금은 저장하면 무조건 홈으로 간다(`App.tsx` `onDone`). 저녁에 몰아 적기 불편
-4. **반복 지출 → 고정지출로 옮기기 제안** — 같은 금액·내용이 석 달 연속이면 물어보기
-5. **오프라인에서도 앱이 열리게** — 서비스워커가 없어 신호 없는 곳에선 앱 자체가 안 뜰 수 있다 (기록 저장은 오프라인 OK)
-6. **카드 문자 공유로 반자동 입력** — manifest `share_target` (안드로이드만, 아이폰 불가)
-7. **앱 화면에 버전 표시** — 지금은 version.json 뿐 (설정 탭 맨 아래 한 줄이면 충분)
+아직 안 한 것:
 
-이미 된 것: 자주 쓰는 지출 원탭(v15, 최근 90일 상위 5개).
+1. **카드 문자 공유로 반자동 입력** — manifest `share_target` (안드로이드만, 아이폰 불가). 한 명만 쓰게 되면 손해라 보류
+2. **중간에 빈 날** — 지금 알림은 어제부터 거꾸로 *연달아* 빈 날만 본다. 어제는 적고 그제를 빼먹은 경우는 안 알려준다 (일부러 단순하게 시작. 사용자 반응 보고 넓힐지 결정)
+3. **수입·경조사에도 '저장 후 하나 더'** — 지출에만 넣었다
+4. v17 반응 확인 — 탭 5개·홈 순서가 불편하다고 하면 되돌리기 쉽다 (`TabBar.tsx` 의 `TABS`, `HomeView.tsx` 순서)
 
 그 밖에:
 - **주소에서 `goong2001` 숨기기** — 사용자가 아이디 노출을 꺼렸다. Cloudflare Pages 로 옮기는 안을 여러 번 제안했고 **사용자 결정 대기 중**. 옮기면 홈 화면 아이콘 주소가 바뀌니 두 폰 다시 추가해야 함
@@ -358,7 +363,8 @@ GitHub MCP 로:
 ## 7. 사용자가 직접 해야 하는 일
 
 - [ ] **Firestore 보안 규칙 다시 게시** — v14 에서 README 의 규칙이 바뀌었다(`updatedAt` 가드·방 코드 형식). 옛 규칙도 동작은 하지만 새 규칙이 더 안전하다. Firebase 콘솔 → Firestore → 규칙 → README 의 규칙 전체 붙여넣기 → **게시**. *했는지 확인 안 됨*
-- [ ] 새 버전이 배포되면 **두 폰 모두 새로고침**
+- [ ] 새 버전이 배포되면 **두 폰 모두 새로고침** (설정 탭 맨 아래 버전 줄이 같은지 보면 된다)
+- [ ] **설정 → 우리 부부 → "이 폰은 누구 폰인가요?"** 를 각자 폰에서 한 번씩 고르기 (v17)
 - [ ] 두 폰 모두 **홈 화면에 추가**해서 쓰기 (매번 주소 치는 게 입력을 막는 가장 큰 벽)
 - [ ] **우리집 코드**를 안전한 곳에 적어두기 — 잃어버리면 새 폰을 같은 방에 못 붙인다
 - [ ] 가끔 **설정 → Excel 내보내기** 백업 (동기화 안 쓰면 폰 브라우저 데이터가 유일한 사본)

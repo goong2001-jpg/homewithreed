@@ -12,6 +12,7 @@ import FixedExpenseCard from './FixedExpenseCard';
 import PersonsCard from './PersonsCard';
 import SyncCard from './SyncCard';
 import ExchangeCard from './ExchangeCard';
+import VersionLine from './VersionLine';
 import CategoryBudgetCard from './CategoryBudgetCard';
 import WeeklyReportCard from './WeeklyReportCard';
 
@@ -44,6 +45,8 @@ interface Props {
   onDeletePerson: (id: string) => void;
   onSetSync: (patch: Partial<SyncSettings>) => void;
   onImport: React.ComponentProps<typeof ExchangeCard>['onImport'];
+  ownerId?: string;
+  onSetOwner: (id: string) => void;
   onUploadAll: () => number;
   onClearLocal: () => void;
 }
@@ -61,6 +64,7 @@ export default function SettingsView(props: Props) {
     onPrev, onNext, onToday, onAddIncome, onEditIncome, onDeleteIncome, onCopyPrevIncome,
     onSaveFixed, onDeleteFixed,
     onSavePerson, onDeletePerson, onSetSync, onImport, onUploadAll, onClearLocal,
+    ownerId, onSetOwner,
   } = props;
 
   const [confirmClear, setConfirmClear] = useState(false);
@@ -145,6 +149,8 @@ export default function SettingsView(props: Props) {
           expenses={expenses}
           onSave={onSavePerson}
           onDelete={onDeletePerson}
+          ownerId={ownerId}
+          onSetOwner={onSetOwner}
           cardStyle={cardStyle}
         />
 
@@ -217,6 +223,7 @@ export default function SettingsView(props: Props) {
           하루 수입은 그 달의 실제 일수로 나눕니다.
           <br />같은 수입이라도 6월(30일)과 7월(31일)은 하루 금액이 조금 달라요.
         </div>
+        <VersionLine />
       </div>
     </>
   );

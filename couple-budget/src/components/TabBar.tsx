@@ -10,7 +10,6 @@ const TABS: { view: View; icon: string; label: string }[] = [
   { view: 'home', icon: '🐷', label: '저금통' },
   { view: 'add', icon: '➕', label: '입력' },
   { view: 'history', icon: '📋', label: '내역' },
-  { view: 'top', icon: '🏆', label: 'TOP5' },
   { view: 'gifts', icon: '🧧', label: '경조사' },
   { view: 'settings', icon: '⚙️', label: '설정' },
 ];
@@ -35,7 +34,8 @@ export default function TabBar({ active, onChange }: Props) {
       }}
     >
       {TABS.map(t => {
-        const on = active === t.view;
+        // TOP5 는 내역 탭 안의 보기다 — 보고 있는 동안 '내역'에 불이 들어온다
+        const on = active === t.view || (t.view === 'history' && active === 'top');
         return (
           <button
             key={t.view}
@@ -56,11 +56,10 @@ export default function TabBar({ active, onChange }: Props) {
               fontWeight: on ? 700 : 500,
             }}
           >
-            <span style={{ fontSize: 19, lineHeight: 1, filter: on ? 'none' : 'grayscale(0.6)' }}>
+            <span style={{ fontSize: 21, lineHeight: 1, filter: on ? 'none' : 'grayscale(0.6)' }}>
               {t.icon}
             </span>
-            {/* 탭이 여섯 개라 작은 폰에서도 글자가 안 잘리게 줄바꿈을 막는다 */}
-            <span style={{ fontSize: 10.5, whiteSpace: 'nowrap' }}>{t.label}</span>
+            <span style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}>{t.label}</span>
           </button>
         );
       })}

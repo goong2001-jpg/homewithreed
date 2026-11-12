@@ -1,7 +1,7 @@
 import {
   BUDGET_WARN_RATIO, BudgetLevel, BudgetStatusRow, CATEGORIES, CategoryBudget, CategorySpend,
   DateKey, Expense, ExpenseCategory, FixedExpense, FrequentExpense, IncomeEntry, MonthBudget,
-  MonthKey, MonthPhase, Person, PersonSpend,
+  MonthKey, MonthPhase, Person, PersonSpend, RecurringCandidate,
 } from '../types';
 
 /**
@@ -89,8 +89,47 @@ export function monthFixed(fixed: FixedExpense[], month: MonthKey): number {
   return activeFixed(fixed, month).reduce((s, f) => s + num(f.amount), 0);
 }
 
+/** '이 날은 안 썼어요' 표시인지 (금액 0원, 목록·건수에서 뺀다) */
+export const isNoSpend = (e: Expense): boolean => e.noSpend === true;
+
+/** 그 달의 실제 지출. '안 쓴 날' 표시는 지출이 아니므로 뺀다 */
 export function monthExpenses(expenses: Expense[], month: MonthKey): Expense[] {
-  return expenses.filter(e => alive(e) && e.month === month);
+  return expenses.filter(e => alive(e) && e.month === month && !isNoSpend(e));
+}
+
+/** 그 달에 '안 썼어요'라고 표시한 날들의 기록 */
+export function noSpendMarks(expenses: Expense[], month: MonthKey): Expense[] {
+  return expenses.filter(e => alive(e) && e.month === month && isNoSpend(e));
+}
+
+/**
+ * 입력이 빠진 날 — 어제부터 거꾸로 **연달아** 아무 기록도 없는 날들 (오래된 날부터).
+ *
+ * 왜 필요한가: 안 적은 날은 '안 쓴 날'로 계산돼서, 빼먹을수록 여유돈이 실제보다 좋아 보인다.
+ *  · 오늘은 세지 않는다 — 하루가 아직 안 끝났다
+ *  · 이번 달 안에서만 본다 — 지난달은 이미 마감됐고, 지출은 보고 있는 달만 받아온다
+ *  · 이 가계부에 첫 기록을 남긴 날보다 앞은 세지 않는다 — 막 쓰기 시작한 사람을 다그치지 않는다
+ *  · '안 썼어요' 표시가 있는 날은 적은 날이다
+ */
+export function missingDays(expenses: Expense[], now: Date = new Date()): DateKey[] {
+  const recorded = new Set<DateKey>();
+  let first: DateKey | null = null;
+  for (const e of expenses) {
+    if (!alive(e)) continue;
+    recorded.add(e.date);
+    if (first === null || e.date < first) first = e.date;
+  }
+  if (first === null) return [];
+
+  const monthStart = `${thisMonth(now)}-01`;
+  const from = first > monthStart ? first : monthStart;
+  const out: DateKey[] = [];
+  for (let i = 1; i <= 31; i++) {
+    const d = daysAgoKey(now, i);
+    if (d < from || recorded.has(d)) break;
+    out.push(d);
+  }
+  return out.reverse();
 }
 
 /**
@@ -156,7 +195,7 @@ export function budgetStatus(
 ): BudgetStatusRow[] {
   const spent = new Map<ExpenseCategory, number>();
   for (const e of expensesOfMonth) {
-    if (!alive(e)) continue;
+    if (!alive(e) || isNoSpend(e)) continue;
     spent.set(e.category, (spent.get(e.category) ?? 0) + num(e.amount));
   }
 
@@ -235,6 +274,70 @@ export function frequentExpenses(
       b.count - a.count
       || b.lastDate.localeCompare(a.lastDate)
       || b.amount - a.amount)
+    .slice(0, Math.max(0, limit));
+}
+
+// ======================= 반복 지출 → 고정지출 제안 =======================
+
+/**
+ * 같은 내용·같은 금액이 **석 달 연속, 달마다 딱 한 번** 나온 지출 — 고정지출로 옮기자고 권할 후보.
+ *
+ *  · 이번 달까지 석 달(이번 달 포함) 또는 지난달까지 석 달 — 이번 달 치를 아직 안 적었어도 잡는다
+ *  · 한 달에 두 번 이상이면 뺀다 (매일 사는 커피는 고정지출이 아니다)
+ *  · 내용을 안 적은 지출(내용 = 카테고리 이름)은 뺀다 — 서로 다른 지출이 우연히 겹친 것일 수 있다
+ *  · 같은 이름·금액의 고정지출이 이미 있으면 뺀다
+ * 금액 큰 순으로 limit 건.
+ */
+export function recurringCandidates(
+  expenses: Expense[], fixed: FixedExpense[], now: Date = new Date(), limit = 3,
+): RecurringCandidate[] {
+  const cur = thisMonth(now);
+  const oldest = addMonths(cur, -3);
+  const bucket = new Map<string, {
+    perMonth: Map<MonthKey, number>; last: Expense;
+  }>();
+
+  for (const e of expenses) {
+    if (!alive(e) || isNoSpend(e)) continue;
+    if (e.month < oldest || e.month > cur) continue;
+    const amount = num(e.amount);
+    const content = (e.content ?? '').trim();
+    if (amount <= 0 || !content || content === e.category) continue;
+    const key = `${content}\u0000${amount}`;
+    const b = bucket.get(key) ?? { perMonth: new Map<MonthKey, number>(), last: e };
+    b.perMonth.set(e.month, (b.perMonth.get(e.month) ?? 0) + 1);
+    if (e.date >= b.last.date) b.last = e;
+    bucket.set(key, b);
+  }
+
+  const out: RecurringCandidate[] = [];
+  bucket.forEach((b, key) => {
+    const run = (end: MonthKey): MonthKey[] | null => {
+      const months = [addMonths(end, -2), addMonths(end, -1), end];
+      return months.every(m => b.perMonth.get(m) === 1) ? months : null;
+    };
+    const months = run(cur) ?? run(addMonths(cur, -1));
+    if (!months) return;
+    // 그 석 달 밖(더 최근 달)에 두 번 이상 적은 달이 있으면 반복 패턴이 깨진 것
+    if ((b.perMonth.get(cur) ?? 0) > 1) return;
+
+    const content = (b.last.content ?? '').trim();
+    const amount = num(b.last.amount);
+    const already = fixed.some(f =>
+      alive(f) && f.name.trim() === content && num(f.amount) === amount
+      && (!f.endMonth || f.endMonth >= cur));
+    if (already) return;
+
+    const lastMonth = (b.perMonth.get(cur) ?? 0) > 0 ? cur : months[months.length - 1];
+    out.push({
+      key, content, amount,
+      category: b.last.category, personId: b.last.personId,
+      months, startMonth: addMonths(lastMonth, 1),
+    });
+  });
+
+  return out
+    .sort((a, b) => b.amount - a.amount || a.content.localeCompare(b.content))
     .slice(0, Math.max(0, limit));
 }
 
