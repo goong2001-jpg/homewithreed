@@ -314,7 +314,8 @@ export interface MonthBudget {
 export type View = 'home' | 'add' | 'history' | 'top' | 'gifts' | 'settings';
 
 /** 입력 화면이 지출을 받는지 수입을 받는지 */
-export type AddMode = 'expense' | 'income';
+/** 'gift' = 경조사·용돈. 입력 탭에서 적어도 경조사 장부에만 쌓이고 저금통 계산에는 안 들어간다 (v18) */
+export type AddMode = 'expense' | 'income' | 'gift';
 
 export type SyncStatus = 'off' | 'connecting' | 'live' | 'error';
 
