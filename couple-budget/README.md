@@ -257,7 +257,10 @@ npm install
 npm start                        # http://localhost:3000
 npm test -- --watchAll=false     # 계산·병합 로직 단위 테스트
 npm run build                    # 배포 빌드
+bash dev/check.sh                # 한 줄 점검: 테스트·빌드·번들·브라우저 스모크
 ```
+
+작업 규칙·배포 확인 방법·지금까지의 함정은 [`HANDOFF.md`](HANDOFF.md), 변경 이력은 [`CHANGELOG.md`](CHANGELOG.md)(배포 때 자동 기록)에 있습니다.
 
 - CRA(react-scripts 5) + React 19 + TypeScript. 형제 앱들과 같은 구성입니다.
 - 상태는 localStorage 우선. 화면 갱신이 네트워크를 기다리는 일은 없습니다.
