@@ -14,6 +14,8 @@ interface Props {
     id?: string; month: MonthKey; personId: string; amount: number; memo: string;
   }) => void;
   onDelete?: (id: string) => void;
+  /** 이 폰 주인 — 새로 쓸 때 기본으로 고를 사람 */
+  defaultPersonId?: string;
   onDone: () => void;
 }
 
@@ -25,7 +27,7 @@ interface Props {
  * 들어온 대로 한 줄씩 쌓고 합계는 앱이 낸다.
  */
 export default function IncomeForm({
-  month, persons, budget, initial, onSave, onDelete, onDone,
+  month, persons, budget, initial, defaultPersonId, onSave, onDelete, onDone,
 }: Props) {
   const sorted = [...persons].sort((a, b) => a.order - b.order);
   const editing = !!initial;
@@ -33,7 +35,7 @@ export default function IncomeForm({
   const [amountText, setAmountText] = useState(
     initial ? formatAmountInput(String(initial.amount)) : '',
   );
-  const [personId, setPersonId] = useState(initial?.personId ?? sorted[0]?.id ?? 'p1');
+  const [personId, setPersonId] = useState(initial?.personId ?? defaultPersonId ?? sorted[0]?.id ?? 'p1');
   const [memo, setMemo] = useState(initial?.memo ?? '');
   const [targetMonth, setTargetMonth] = useState(initial?.month ?? month);
   const [error, setError] = useState('');

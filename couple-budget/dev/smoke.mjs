@@ -84,14 +84,21 @@ async function main() {
     check('첫 화면이 뜬다 (수입 입력 안내)', /이 달 수입을 먼저 입력해주세요/.test(await text()));
 
     const tabs = await page.$$eval('nav button', bs => bs.map(b => b.textContent.replace(/\s+/g, '')));
-    const want = ['저금통', '입력', '내역', 'TOP5', '경조사', '설정'];
-    check('탭 6개', want.every((w, i) => tabs[i]?.endsWith(w)), tabs.join(','));
+    const want = ['저금통', '입력', '내역', '경조사', '설정'];
+    check('탭 5개', tabs.length === 5 && want.every((w, i) => tabs[i]?.endsWith(w)), tabs.join(','));
 
     for (const t of want) {
       await page.getByRole('button', { name: new RegExp(`${t}$`) }).last().click();
       await page.waitForTimeout(250);
     }
     check('탭을 모두 돌아도 오류가 없다', errors.length === 0, errors[0] ?? '');
+
+    // TOP5 는 내역 탭 안에 있다 (v17)
+    await page.getByRole('button', { name: /내역$/ }).last().click();
+    await page.getByRole('button', { name: '큰 지출 TOP5' }).click();
+    await page.waitForTimeout(200);
+    const lit = await page.$eval('nav button[aria-current="page"]', b => b.textContent);
+    check('내역 탭 안에서 TOP5 로 넘어간다', /내역$/.test(lit) && /이달의 지출 내역이 없습니다/.test(await text()), lit);
 
     // 수입 → 하루 금액이 달력 일수로 나뉘어 나오는지
     await page.getByRole('button', { name: /저금통$/ }).click();
@@ -112,11 +119,68 @@ async function main() {
     await page.getByRole('button', { name: /저장$/ }).click();
     await page.waitForTimeout(300);
     check('지출이 이달 누적 지출에 반영된다', /이달 누적 지출[\s\S]{0,40}12,000원/.test(await text()));
+    check('저장하면 한 줄로 알려준다', /식비 1\.2만원 저장했어요/.test(await text()));
+
+    // 저장 후 하나 더 — 화면에 남아 다음 건을 적는다. 날짜는 '어제'로
+    await page.getByRole('button', { name: '오늘 쓴 돈 입력' }).click();
+    await page.fill('#amount', '3000');
+    await page.getByRole('button', { name: '어제', exact: true }).click();
+    await page.getByRole('button', { name: '저장 후 하나 더' }).click();
+    await page.waitForTimeout(250);
+    const still = await page.inputValue('#amount');
+    check('저장 후 하나 더: 입력 화면에 남고 금액칸이 비워진다',
+      still === '' && /이 화면에서 1건 저장했어요/.test(await text()));
+    const yesterday = await page.evaluate(() => {
+      const n = new Date(); const d = new Date(n.getFullYear(), n.getMonth(), n.getDate() - 1);
+      const p = x => String(x).padStart(2, '0');
+      const key = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      const rows = JSON.parse(localStorage.getItem('couple_budget_expenses') || '[]');
+      return rows.some(r => r.amount === 3000 && r.date === key);
+    });
+    check("'어제' 를 누르면 어제 날짜로 저장된다", yesterday);
+
+    // 이 폰 주인 — 다른 사람을 고르면 기억하겠냐고 묻고, 다음 입력부터 그 사람이 기본
+    await page.getByRole('button', { name: '와이프', exact: true }).click();
+    await page.getByRole('button', { name: /이 폰은 늘 와이프/ }).click();
+    await page.getByRole('button', { name: /저금통$/ }).click();
+    await page.getByRole('button', { name: /입력$/ }).last().click();
+    await page.fill('#amount', '1000');
+    await page.getByRole('button', { name: /저장$/ }).click();
+    await page.waitForTimeout(250);
+    const owner = await page.evaluate(() => {
+      const rows = JSON.parse(localStorage.getItem('couple_budget_expenses') || '[]');
+      const dev = JSON.parse(localStorage.getItem('couple_budget_device') || '{}');
+      return { person: rows.find(r => r.amount === 1000)?.personId, owner: dev.ownerId };
+    });
+    check('이 폰 주인을 기억하고 다음 입력의 기본 사람이 된다',
+      owner.person === 'p2' && owner.owner === 'p2', JSON.stringify(owner));
 
     await page.reload({ waitUntil: 'networkidle' });
     const stored = await page.evaluate(() =>
       JSON.parse(localStorage.getItem('couple_budget_expenses') || '[]').length);
-    check('새로고침해도 기록이 남는다 (localStorage)', stored === 1, `${stored}건`);
+    check('새로고침해도 기록이 남는다 (localStorage)', stored === 3, `${stored}건`);
+
+    // 오프라인 — 서비스워커가 저장해 둔 화면으로 앱이 열린다
+    const swReady = await page.evaluate(async () => {
+      if (!('serviceWorker' in navigator)) return false;
+      const reg = await Promise.race([
+        navigator.serviceWorker.ready, new Promise(r => setTimeout(() => r(null), 8000)),
+      ]);
+      return !!reg && !!navigator.serviceWorker.controller;
+    });
+    check('서비스워커가 이 앱 폴더에만 걸린다', swReady);
+    await page.reload({ waitUntil: 'networkidle' });       // 번들이 저장되도록 한 번 더
+    await page.context().setOffline(true);
+    let offlineOk = false;
+    try {
+      await page.reload({ waitUntil: 'load', timeout: 15000 });
+      await page.waitForSelector('nav button', { timeout: 8000 });
+      offlineOk = /하루 쓸 수 있는 돈/.test(await text());
+    } catch {}
+    await page.context().setOffline(false);
+    check('신호가 없어도 앱이 열리고 기록이 보인다', offlineOk);
+    errors.length = 0;       // 오프라인 동안 실패한 요청(version.json 등)은 오류로 치지 않는다
+    await page.reload({ waitUntil: 'networkidle' });
 
     await page.getByRole('button', { name: /경조사$/ }).click();
     await page.waitForTimeout(250);

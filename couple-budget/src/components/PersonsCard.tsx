@@ -8,11 +8,14 @@ interface Props {
   expenses: Expense[];
   onSave: (input: { id?: string; name: string; color: string; order: number }) => void;
   onDelete: (id: string) => void;
+  /** 이 폰 주인 (이 폰에만 저장, 동기화 안 함) */
+  ownerId?: string;
+  onSetOwner: (id: string) => void;
   cardStyle: React.CSSProperties;
 }
 
 export default function PersonsCard({
-  persons, incomes, fixed, expenses, onSave, onDelete, cardStyle,
+  persons, incomes, fixed, expenses, onSave, onDelete, ownerId, onSetOwner, cardStyle,
 }: Props) {
   const [note, setNote] = useState('');
   const sorted = [...persons].sort((a, b) => a.order - b.order);
@@ -99,6 +102,38 @@ export default function PersonsCard({
           </div>
         </div>
       ))}
+
+      {/* 이 폰 주인 — 입력할 때 '누가' 가 이 사람으로 미리 골라져 있다 */}
+      {sorted.length > 1 && (
+        <div style={{
+          background: '#f7f9fa', borderRadius: 10, padding: '12px 12px 13px', marginBottom: 14,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#455a64' }}>이 폰은 누구 폰인가요?</div>
+          <div style={{ fontSize: 11.5, color: '#90a4ae', margin: '3px 0 9px', lineHeight: 1.6 }}>
+            입력할 때 이 사람이 먼저 골라져 있어요. 이 폰에만 저장되고 배우자 폰에는 안 넘어가요.
+          </div>
+          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+            {sorted.map(p => {
+              const on = ownerId === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => onSetOwner(p.id)}
+                  aria-pressed={on}
+                  style={{
+                    padding: '8px 14px', borderRadius: 18, cursor: 'pointer', fontSize: 13,
+                    border: `1.5px solid ${on ? p.color : '#e0e0e0'}`,
+                    background: on ? `${p.color}14` : '#fff',
+                    color: on ? p.color : '#666', fontWeight: on ? 700 : 500,
+                  }}
+                >
+                  {p.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {note && (
         <div style={{

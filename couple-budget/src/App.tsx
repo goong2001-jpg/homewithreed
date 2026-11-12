@@ -1,10 +1,14 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  AddMode, Expense, GiftDirection, GiftEntry, IncomeEntry, View, budgetIdOf,
+  AddMode, DateKey, Expense, GiftDirection, GiftEntry, IncomeEntry, RecurringCandidate, View,
+  budgetIdOf,
 } from './types';
 import {
-  alive, budgetStatus, computeMonthBudget, frequentExpenses, limitAlert, monthExpenses, monthOf,
+  alive, budgetStatus, computeMonthBudget, frequentExpenses, limitAlert, missingDays,
+  monthExpenses, monthOf, recurringCandidates, thisMonth,
 } from './utils/budget';
+import { defaultPersonId } from './utils/device';
+import { useDevice } from './hooks/useDevice';
 import { shortWon } from './utils/format';
 import { isReportDay, reportAnchor, weeklyReport } from './utils/weekly';
 import { useAppSettings } from './hooks/useAppSettings';
@@ -33,7 +37,10 @@ export default function App() {
   // (탭을 따로 만들지 않는다 — 경조사 탭 안에서만 열리는 화면이라 탭 표시가 유지돼야 한다)
   const [giftForm, setGiftForm] =
     useState<{ entry?: GiftEntry; direction: GiftDirection } | null>(null);
+  // 입력 화면을 열 때 미리 채울 날짜 (홈의 '입력이 빠진 날'에서 넘어올 때만)
+  const [addDate, setAddDate] = useState<DateKey | undefined>();
   const { settings, setSync } = useAppSettings();
+  const { device, setOwner, dismissRecurring } = useDevice();
   const { month, prev, next, goToToday } = useMonthNav();
   const ledger = useLedger(settings.sync, month);
 
@@ -56,6 +63,26 @@ export default function App() {
   );
 
   const nav = { onPrev: prev, onNext: next, onToday: goToToday };
+
+  // 이 폰 주인 — 입력 화면의 '누가' 기본값 (이 폰에만 저장)
+  const ownerId = useMemo(
+    () => defaultPersonId(activePersons, device.ownerId),
+    [activePersons, device.ownerId],
+  );
+
+  // ---- 입력이 빠진 날 · 반복 지출 — 탭을 옮길 때마다 '오늘'을 다시 본다 ----
+  const missing = useMemo(
+    () => missingDays(ledger.expenses, new Date()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ledger.expenses, view],
+  );
+  const recurring = useMemo(() => {
+    const dismissed = new Set(device.dismissedRecurring ?? []);
+    return recurringCandidates(ledger.expenses, ledger.fixed, new Date(), 6)
+      .filter(c => !dismissed.has(c.key))
+      .slice(0, 3);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ledger.expenses, ledger.fixed, device.dismissedRecurring, view]);
 
   // ---- 카테고리별 월 상한 ----
   const budgetRows = useMemo(
@@ -86,6 +113,7 @@ export default function App() {
   const saveExpenseWithAlert: typeof saveExpense = useCallback(input => {
     const limitRec = budgets.find(b => b.id === budgetIdOf(input.category));
     const limit = limitRec && alive(limitRec) ? limitRec.monthlyLimit : 0;
+    let alerted = false;
     if (limit > 0) {
       const m = monthOf(input.date);
       const others = expenses.filter(
@@ -98,6 +126,7 @@ export default function App() {
       const after = others + input.amount;
       const kind = limitAlert(before, after, limit);
       if (kind) {
+        alerted = true;
         setToast({
           key: Date.now(),
           tone: kind,
@@ -108,12 +137,36 @@ export default function App() {
       }
     }
     saveExpense(input);
+    // 상한 경고가 없을 때만 '저장됐다'는 한 줄 — 경고가 더 중요하다
+    if (!alerted) {
+      setToast({
+        key: Date.now(),
+        tone: 'ok',
+        text: `${input.category} ${shortWon(input.amount)} ${input.id ? '고쳤어요' : '저장했어요'}`
+          + (!input.id && input.content && input.content !== input.category ? ` · ${input.content}` : ''),
+      });
+    }
   }, [budgets, expenses, saveExpense]);
 
+  /** 반복 지출을 고정지출로 옮긴다 — 이미 적은 달과 겹치지 않게 그다음 달부터 */
+  const { saveFixed } = ledger;
+  const moveRecurring = useCallback((c: RecurringCandidate) => {
+    saveFixed({
+      name: c.content, amount: c.amount,
+      startMonth: c.startMonth, endMonth: null, personId: c.personId,
+    });
+    dismissRecurring(c.key);
+    setToast({
+      key: Date.now(), tone: 'ok',
+      text: `${c.content} ${shortWon(c.amount)}을 고정지출로 옮겼어요 (${Number(c.startMonth.slice(5))}월부터)`,
+    });
+  }, [saveFixed, dismissRecurring]);
+
   /** 입력 화면을 깨끗한 '새로 쓰기' 상태로 연다 */
-  function openAdd(mode: AddMode) {
+  function openAdd(mode: AddMode, date?: DateKey) {
     setEditingExpense(null);
     setEditingIncome(null);
+    setAddDate(date);
     setAddMode(mode);
     setView('add');
   }
@@ -150,11 +203,28 @@ export default function App() {
             onGoAddIncome={() => openAdd('income')}
             onCopyPrevIncome={() => ledger.copyIncomeFromPrevMonth(month)}
             onSelectPerson={id => { setHistoryPerson(id); setView('history'); }}
+            missingDays={month === thisMonth() ? missing : []}
+            onFillMissing={date => openAdd('expense', date)}
+            onMarkNoSpend={() => {
+              ledger.markNoSpend(missing, ownerId);
+              setToast({ key: Date.now(), tone: 'ok', text: `${missing.length}일을 안 쓴 날로 표시했어요` });
+            }}
+            recurring={recurring}
+            onMoveRecurring={moveRecurring}
+            onDismissRecurring={dismissRecurring}
           />
         )}
 
         {view === 'add' && (
           <AddView
+            // 날짜를 들고 들어오면 칸을 새로 채워야 하므로 화면을 새로 만든다
+            key={addDate ?? 'new'}
+            defaultPersonId={ownerId}
+            onSetOwner={id => {
+              setOwner(id);
+              setToast({ key: Date.now(), tone: 'ok', text: '이 폰의 기본 사람으로 기억했어요 (설정에서 바꿀 수 있어요)' });
+            }}
+            initialDate={addDate}
             month={month}
             persons={activePersons}
             budget={budget}
@@ -173,6 +243,7 @@ export default function App() {
               setView(editingExpense ? 'history' : editingIncome ? 'settings' : 'home');
               setEditingExpense(null);
               setEditingIncome(null);
+              setAddDate(undefined);
             }}
           />
         )}
@@ -195,6 +266,7 @@ export default function App() {
             onDeleteExpense={ledger.deleteExpense}
             onPullAll={() => { void ledger.pullAllExpenses(); }}
             onGoSettings={() => setView('settings')}
+            onSwitch={setView}
           />
         )}
 
@@ -208,6 +280,7 @@ export default function App() {
             {...nav}
             onEditExpense={editExpense}
             onGoSettings={() => setView('settings')}
+            onSwitch={setView}
           />
         )}
 
@@ -217,6 +290,7 @@ export default function App() {
               key={giftForm.entry?.id ?? `new-${giftForm.direction}`}
               persons={activePersons}
               initial={giftForm.entry}
+              defaultPersonId={ownerId}
               defaultDirection={giftForm.direction}
               onSave={ledger.saveGift}
               onDelete={ledger.deleteGift}
@@ -263,6 +337,8 @@ export default function App() {
             onImport={ledger.importBackup}
             onUploadAll={ledger.uploadAll}
             onClearLocal={ledger.clearLocal}
+            ownerId={device.ownerId}
+            onSetOwner={setOwner}
           />
         )}
       </div>

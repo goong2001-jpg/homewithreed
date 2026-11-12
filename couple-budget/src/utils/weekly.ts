@@ -1,5 +1,5 @@
 import { DateKey, Expense, ExpenseCategory, FixedExpense, IncomeEntry } from '../types';
-import { alive, dailyBudgetOf, monthFixed, monthIncome, monthOf, todayKey } from './budget';
+import { alive, dailyBudgetOf, isNoSpend, monthFixed, monthIncome, monthOf, todayKey } from './budget';
 import { shortWon, won } from './format';
 
 /**
@@ -59,7 +59,7 @@ export function reportAnchor(now: Date): Date {
 const sum = (rows: Expense[]) => rows.reduce((s, e) => s + e.amount, 0);
 
 function inRange(expenses: Expense[], start: DateKey, end: DateKey): Expense[] {
-  return expenses.filter(e => alive(e) && e.date >= start && e.date <= end);
+  return expenses.filter(e => alive(e) && !isNoSpend(e) && e.date >= start && e.date <= end);
 }
 
 export function weeklyReport(state: WeeklyState, weekEndDate: Date): WeeklyReport {

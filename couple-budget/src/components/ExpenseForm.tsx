@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   CATEGORIES, CATEGORY_EMOJI, Expense, ExpenseCategory, FrequentExpense, MonthBudget, Person,
 } from '../types';
-import { todayKey } from '../utils/budget';
-import { formatAmountInput, parseAmountInput, signedWon, won } from '../utils/format';
+import { daysAgoKey, todayKey } from '../utils/budget';
+import { formatAmountInput, parseAmountInput, shortWon, signedWon, won } from '../utils/format';
 
 interface Props {
   persons: Person[];
@@ -15,6 +15,12 @@ interface Props {
    * seq 는 같은 칩을 두 번 눌러도 다시 채워지게 하는 일련번호.
    */
   preset?: { item: FrequentExpense; seq: number };
+  /** 이 폰 주인 — 새로 쓸 때 '누가' 의 기본값 (없으면 첫 번째 사람) */
+  defaultPersonId?: string;
+  /** 고른 사람을 이 폰 주인으로 기억시킨다 */
+  onSetOwner?: (personId: string) => void;
+  /** 홈의 '입력이 빠진 날'에서 넘어왔을 때 미리 채울 날짜 */
+  initialDate?: string;
   onSave: (input: {
     id?: string;
     date: string; amount: number; category: ExpenseCategory; content: string; personId: string;
@@ -24,7 +30,8 @@ interface Props {
 }
 
 export default function ExpenseForm({
-  persons, budget, initial, preset, onSave, onDelete, onDone,
+  persons, budget, initial, preset, defaultPersonId, onSetOwner, initialDate,
+  onSave, onDelete, onDone,
 }: Props) {
   const sorted = [...persons].sort((a, b) => a.order - b.order);
   const editing = !!initial;
@@ -32,13 +39,18 @@ export default function ExpenseForm({
   const [amountText, setAmountText] = useState(
     initial ? formatAmountInput(String(initial.amount)) : '',
   );
-  const [personId, setPersonId] = useState(initial?.personId ?? sorted[0]?.id ?? 'p1');
+  const [personId, setPersonId] = useState(
+    initial?.personId ?? defaultPersonId ?? sorted[0]?.id ?? 'p1',
+  );
   const [category, setCategory] = useState<ExpenseCategory>(initial?.category ?? '식비');
   const [content, setContent] = useState(initial?.content ?? '');
-  const [date, setDate] = useState(initial?.date ?? todayKey());
+  const [date, setDate] = useState(initial?.date ?? initialDate ?? todayKey());
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const saveRef = useRef<HTMLButtonElement>(null);
+  const amountRef = useRef<HTMLInputElement>(null);
+  /** '저장 후 하나 더'로 이 화면에서 연달아 적은 건수 */
+  const [savedCount, setSavedCount] = useState(0);
 
   // 칩을 누르면 오늘 날짜로 칸을 채우고 저장 버튼에 초점 — 저장은 사용자가 한 번 더 누른다
   useEffect(() => {
@@ -68,7 +80,8 @@ export default function ExpenseForm({
     borderRadius: 8, fontSize: 15, boxSizing: 'border-box', outline: 'none',
   };
 
-  function handleSubmit() {
+  /** again = 저장하고 이 화면에 남아 다음 건을 적는다 (저녁에 몰아 적을 때) */
+  function handleSubmit(again = false) {
     if (amount <= 0) { setError('금액을 입력해주세요.'); return; }
     if (!date) { setError('날짜를 입력해주세요.'); return; }
     onSave({
@@ -79,8 +92,25 @@ export default function ExpenseForm({
       content: content.trim() || category,
       personId,
     });
-    onDone();
+    if (!again) { onDone(); return; }
+    // 사람·날짜·카테고리는 그대로 둔다 — 몰아 적을 땐 대개 같은 날, 같은 사람이다
+    setAmountText('');
+    setContent('');
+    setError('');
+    setSavedCount(n => n + 1);
+    amountRef.current?.focus();
+    window.scrollTo({ top: 0 });
   }
+
+  const today = todayKey();
+  const now = new Date();
+  const quickDates = [
+    { label: '오늘', value: today },
+    { label: '어제', value: daysAgoKey(now, 1) },
+    { label: '그제', value: daysAgoKey(now, 2) },
+  ];
+  // 기본으로 골라진 사람과 다른 사람을 골랐을 때만 '이 폰 주인으로 기억'을 권한다
+  const ownerUnset = !editing && !!onSetOwner && sorted.length > 1 && personId !== defaultPersonId;
 
   function handleDelete() {
     if (!initial || !onDelete) return;
@@ -102,6 +132,7 @@ export default function ExpenseForm({
         <div style={{ position: 'relative' }}>
           <input
             id="amount"
+            ref={amountRef}
             type="text"
             inputMode="numeric"
             autoFocus
@@ -144,6 +175,40 @@ export default function ExpenseForm({
         )}
       </div>
 
+      {/* 날짜 — 오늘·어제·그제는 한 번에, 그 밖의 날은 달력으로 */}
+      <div>
+        <label style={labelStyle} htmlFor="date">언제 썼나요?</label>
+        <div style={{ display: 'flex', gap: 7, alignItems: 'stretch' }}>
+          {quickDates.map(q => {
+            const on = date === q.value;
+            return (
+              <button
+                key={q.label}
+                onClick={() => setDate(q.value)}
+                aria-pressed={on}
+                style={{
+                  flexShrink: 0, padding: '0 13px', borderRadius: 8, cursor: 'pointer',
+                  border: `1.5px solid ${on ? '#27ae60' : '#e0e0e0'}`,
+                  background: on ? '#eafaf1' : '#fff',
+                  color: on ? '#1e8449' : '#555',
+                  fontWeight: on ? 700 : 500, fontSize: 13.5,
+                }}
+              >
+                {q.label}
+              </button>
+            );
+          })}
+          <input
+            id="date"
+            type="date"
+            aria-label="날짜 직접 고르기"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            style={{ ...inputStyle, flex: 1, minWidth: 0, padding: '10px 8px', fontSize: 14 }}
+          />
+        </div>
+      </div>
+
       {/* 누가 썼나 */}
       <div>
         <label style={labelStyle}>누가 썼나요?</label>
@@ -167,6 +232,19 @@ export default function ExpenseForm({
             );
           })}
         </div>
+        {/* 이 폰에서 늘 같은 사람이 적는다면 한 번만 정해두면 된다 (이 폰에만 저장) */}
+        {ownerUnset && (
+          <button
+            onClick={() => onSetOwner!(personId)}
+            style={{
+              marginTop: 8, padding: '7px 11px', borderRadius: 8, cursor: 'pointer',
+              border: '1px dashed #cfd8dc', background: '#fafbfc',
+              color: '#607d8b', fontSize: 12,
+            }}
+          >
+            이 폰은 늘 <b>{sorted.find(p => p.id === personId)?.name}</b>(으)로 시작하기
+          </button>
+        )}
       </div>
 
       {/* 카테고리 */}
@@ -209,18 +287,6 @@ export default function ExpenseForm({
         />
       </div>
 
-      {/* 날짜 */}
-      <div>
-        <label style={labelStyle} htmlFor="date">날짜</label>
-        <input
-          id="date"
-          type="date"
-          value={date}
-          onChange={e => setDate(e.target.value)}
-          style={inputStyle}
-        />
-      </div>
-
       {error && (
         <div style={{
           padding: '10px 14px', background: '#fdedec', borderRadius: 8,
@@ -230,27 +296,46 @@ export default function ExpenseForm({
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 10 }}>
+      {savedCount > 0 && (
+        <div style={{ fontSize: 12.5, color: '#1e8449', textAlign: 'center', marginBottom: -8 }}>
+          이 화면에서 {savedCount}건 저장했어요
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8 }}>
         <button
           onClick={onDone}
           style={{
-            flex: 1, padding: 15, background: '#f5f5f5', border: 'none', borderRadius: 10,
-            fontSize: 15, fontWeight: 600, color: '#666', cursor: 'pointer',
+            flex: 1, padding: '15px 4px', background: '#f5f5f5', border: 'none', borderRadius: 10,
+            fontSize: 14.5, fontWeight: 600, color: '#666', cursor: 'pointer',
           }}
         >
-          취소
+          {savedCount > 0 ? '그만 적기' : '취소'}
         </button>
+        {/* 저장하고 이 화면에 남는다 — 여러 건을 몰아 적을 때 */}
+        {!editing && (
+          <button
+            onClick={() => handleSubmit(true)}
+            style={{
+              flex: 1.3, padding: '15px 4px', background: '#fff', borderRadius: 10,
+              border: '1.5px solid #27ae60', color: '#1e8449',
+              fontSize: 14.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            저장 후 하나 더
+          </button>
+        )}
         <button
           ref={saveRef}
-          onClick={handleSubmit}
+          onClick={() => handleSubmit()}
           style={{
-            flex: 2, padding: 15, background: '#27ae60', border: 'none', borderRadius: 10,
-            fontSize: 15, fontWeight: 700, color: '#fff', cursor: 'pointer',
+            flex: 1.6, padding: '15px 4px', background: '#27ae60', border: 'none', borderRadius: 10,
+            fontSize: 14.5, fontWeight: 700, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap',
           }}
         >
           {editing
             ? (amount > 0 ? `${won(amount)}으로 수정` : '수정하기')
-            : (amount > 0 ? `${won(amount)} 저장` : '저장하기')}
+            : (amount > 0 ? `${shortWon(amount)} 저장` : '저장하기')}
         </button>
       </div>
 

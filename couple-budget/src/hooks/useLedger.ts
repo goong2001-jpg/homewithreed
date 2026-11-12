@@ -2,7 +2,7 @@ import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useS
 import {
   CategoryBudget, CollName, DEFAULT_PERSONS, Expense, ExpenseCategory, FixedExpense,
   GiftDirection, GiftEntry, GiftKind, IncomeEntry, MonthKey, Person, RemoteBatch, Syncable,
-  SyncSettings, budgetIdOf,
+  NO_SPEND_CONTENT, SyncSettings, budgetIdOf,
 } from '../types';
 import { KEYS, load, remove, save } from '../utils/storage';
 import { localWinners, mergeById } from '../utils/merge';
@@ -246,6 +246,8 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
   const saveExpense = useCallback((input: {
     id?: string; date: string; amount: number;
     category: ExpenseCategory; content: string; personId: string;
+    /** '이 날은 안 썼어요' 표시 (금액 0원) */
+    noSpend?: boolean;
   }) => {
     const now = Date.now();
     const existing = input.id ? expenses.find(e => e.id === input.id) : undefined;
@@ -260,8 +262,26 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
       // 금액·메모를 고쳐도 목록에서 자리가 바뀌지 않도록 처음 만든 시각을 지킨다
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
+      // 필드가 없는 게 기본이다 — 보통 지출에는 아예 넣지 않는다
+      ...(input.noSpend ? { noSpend: true } : {}),
     };
     commit('expenses', KEYS.expenses, setExpenses, rec);
+  }, [expenses, commit]);
+
+  /**
+   * 입력이 빠진 날들을 한 번에 '안 썼어요'로 표시한다.
+   * 그날 이미 기록(지출이든 표시든)이 있으면 건너뛴다 — 같은 날에 표시가 두 개 쌓이지 않게.
+   */
+  const markNoSpend = useCallback((dates: string[], personId: string) => {
+    const taken = new Set(expenses.filter(e => !e.deleted).map(e => e.date));
+    dates.filter(d => !taken.has(d)).forEach((date, i) => {
+      const now = Date.now();
+      commit<Expense>('expenses', KEYS.expenses, setExpenses, {
+        id: newId(), date, month: monthOf(date), amount: 0,
+        category: '기타', content: NO_SPEND_CONTENT, personId,
+        createdAt: now + i, updatedAt: now, noSpend: true,
+      });
+    });
   }, [expenses, commit]);
 
   const deleteExpense = useCallback(
@@ -479,7 +499,7 @@ export function useLedger(sync: SyncSettings, month: MonthKey) {
     savePerson, deletePerson,
     saveIncome, deleteIncome,
     saveFixed, deleteFixed,
-    saveExpense, deleteExpense,
+    saveExpense, deleteExpense, markNoSpend,
     saveGift, deleteGift,
     copyIncomeFromPrevMonth,
     /** 지난달에 등록된 수입 합계 — 이 달이 비었을 때 '지난달과 같이' 버튼에 쓴다 */

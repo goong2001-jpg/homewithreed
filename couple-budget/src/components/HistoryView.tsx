@@ -3,12 +3,13 @@ import {
   Expense, ExpenseCategory, FixedExpense, GiftEntry, IncomeEntry, MonthBudget, MonthKey,
   Person, SyncStatus,
 } from '../types';
-import { activeFixed, categoryTotals, monthExpenses } from '../utils/budget';
+import { activeFixed, categoryTotals, monthExpenses, noSpendMarks } from '../utils/budget';
 import { dateLabel, won } from '../utils/format';
 import { exportMonthToExcel } from '../utils/excelExport';
 import MonthHeader from './MonthHeader';
 import ExpenseItem from './ExpenseItem';
 import CategoryBreakdown from './CategoryBreakdown';
+import HistoryTabs from './HistoryTabs';
 
 interface Props {
   month: MonthKey;
@@ -30,10 +31,14 @@ interface Props {
   onDeleteExpense: (id: string) => void;
   onPullAll: () => void;
   onGoSettings: () => void;
+  /** 내역 탭 안에서 '큰 지출 TOP5'로 넘어간다 */
+  onSwitch: (v: 'history' | 'top') => void;
 }
 
-function groupByDate(rows: Expense[]): [string, Expense[]][] {
+/** 날짜별로 묶는다. marks = '안 썼어요' 표시 — 지출이 없는 날에도 줄이 생기게 한다 */
+function groupByDate(rows: Expense[], marks: Expense[] = []): [string, Expense[]][] {
   const map = new Map<string, Expense[]>();
+  for (const m of marks) if (!map.has(m.date)) map.set(m.date, []);
   const sorted = [...rows].sort(
     (a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt,
   );
@@ -41,13 +46,13 @@ function groupByDate(rows: Expense[]): [string, Expense[]][] {
     if (!map.has(e.date)) map.set(e.date, []);
     map.get(e.date)!.push(e);
   }
-  return Array.from(map.entries());
+  return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
 }
 
 export default function HistoryView({
   month, budget, persons, incomes, fixed, expenses, gifts, syncStatus, isLive,
   personFilter: filter, onPersonFilterChange: setFilter,
-  onPrev, onNext, onToday, onEditExpense, onDeleteExpense, onPullAll, onGoSettings,
+  onPrev, onNext, onToday, onEditExpense, onDeleteExpense, onPullAll, onGoSettings, onSwitch,
 }: Props) {
   const [category, setCategory] = useState<ExpenseCategory | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -56,7 +61,9 @@ export default function HistoryView({
 
   const byPerson = filter === 'all' ? rows : rows.filter(e => e.personId === filter);
   const shown = category ? byPerson.filter(e => e.category === category) : byPerson;
-  const groups = groupByDate(shown);
+  // '안 썼어요' 표시는 걸러 보지 않을 때만 보여준다 (사람·카테고리와 상관없는 '그날'의 표시라서)
+  const marks = useMemo(() => noSpendMarks(expenses, month), [expenses, month]);
+  const groups = groupByDate(shown, filter === 'all' && !category ? marks : []);
   const shownTotal = shown.reduce((s, e) => s + e.amount, 0);
 
   // 카테고리 집계는 사람 필터까지만 반영한다 —
@@ -128,6 +135,8 @@ export default function HistoryView({
           </button>
         }
       />
+
+      <HistoryTabs active="history" onChange={onSwitch} />
 
       {/* 사람 필터 */}
       <div style={{
@@ -259,6 +268,23 @@ export default function HistoryView({
                 <span>{won(items.reduce((s, e) => s + e.amount, 0))}</span>
               </div>
               <div style={{ background: '#fff' }}>
+                {items.length === 0 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px',
+                    borderBottom: '1px solid #f5f5f5', fontSize: 13.5, color: '#78909c',
+                  }}>
+                    <span style={{ flex: 1 }}>안 쓴 날로 표시했어요</span>
+                    <button
+                      onClick={() => marks.filter(m => m.date === date).forEach(m => onDeleteExpense(m.id))}
+                      style={{
+                        fontSize: 11.5, padding: '4px 10px', borderRadius: 12, cursor: 'pointer',
+                        border: '1px solid #e0e0e0', background: '#fff', color: '#90a4ae',
+                      }}
+                    >
+                      표시 지우기
+                    </button>
+                  </div>
+                )}
                 {items.map(e => (
                   <ExpenseItem
                     key={e.id}

@@ -1,5 +1,7 @@
 import React from 'react';
-import { BudgetStatusRow, MonthBudget, MonthKey, SyncStatus } from '../types';
+import {
+  BudgetStatusRow, DateKey, MonthBudget, MonthKey, RecurringCandidate, SyncStatus,
+} from '../types';
 import { LEVEL_COLOR, LEVEL_LABEL } from '../utils/budget';
 import { shortWon, signedWon, won } from '../utils/format';
 import { WeeklyReport } from '../utils/weekly';
@@ -9,6 +11,8 @@ import StatRow from './StatRow';
 import PersonBars from './PersonBars';
 import BudgetLimits from './BudgetLimits';
 import WeeklyReportCard from './WeeklyReportCard';
+import MissingDaysCard from './MissingDaysCard';
+import RecurringCard from './RecurringCard';
 
 interface Props {
   month: MonthKey;
@@ -30,12 +34,21 @@ interface Props {
   onGoAddIncome: () => void;
   onCopyPrevIncome: () => void;
   onSelectPerson: (personId: string) => void;
+  /** 어제부터 거꾸로 연달아 기록이 없는 날 */
+  missingDays: DateKey[];
+  onFillMissing: (date: DateKey) => void;
+  onMarkNoSpend: () => void;
+  /** 고정지출로 옮기자고 권할 반복 지출 */
+  recurring: RecurringCandidate[];
+  onMoveRecurring: (item: RecurringCandidate) => void;
+  onDismissRecurring: (key: string) => void;
 }
 
 export default function HomeView({
   month, budget, fixedCount, syncStatus, prevMonthIncome, budgetRows, weeklyReport,
   onPrev, onNext, onToday, onGoSettings, onGoAdd, onGoAddIncome,
   onCopyPrevIncome, onSelectPerson,
+  missingDays, onFillMissing, onMarkNoSpend, recurring, onMoveRecurring, onDismissRecurring,
 }: Props) {
   const color = LEVEL_COLOR[budget.level];
   const future = budget.phase === 'future';
@@ -153,7 +166,7 @@ export default function HomeView({
 
           {/* 하루 수입 — 이 앱의 주인공 숫자 */}
           <div style={{
-            background: '#fff', margin: '14px 16px 12px', borderRadius: 12, padding: '18px 16px',
+            background: '#fff', margin: '14px 16px 10px', borderRadius: 12, padding: '18px 16px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.06)', textAlign: 'center',
           }}>
             <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>하루 쓸 수 있는 돈</div>
@@ -167,36 +180,9 @@ export default function HomeView({
             </div>
           </div>
 
-          <StatRow budget={budget} />
-          <PersonBars budget={budget} onSelectPerson={onSelectPerson} />
-          <BudgetLimits rows={budgetRows} onGoSettings={onGoSettings} />
-
-          {/* 일요일·월요일에만 — 주말을 넘기는 동안 한 주를 돌아본다 */}
-          {weeklyReport && budget.phase === 'current' && (
-            <WeeklyReportCard report={weeklyReport} style={{ margin: '0 16px 12px' }} />
-          )}
-
-          <button
-            onClick={onGoSettings}
-            style={{
-              width: 'calc(100% - 32px)', margin: '0 16px 8px',
-              background: '#fff', border: 'none', borderRadius: 12, padding: '14px 16px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.06)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              fontSize: 13, color: '#555',
-            }}
-          >
-            <span>
-              고정지출 {fixedCount}건
-              {budget.totalFixed > 0 && (
-                <span style={{ color: '#aaa' }}> · {won(budget.totalFixed)} (이미 차감됨)</span>
-              )}
-            </span>
-            <span style={{ color: '#bbb' }}>›</span>
-          </button>
-
+          {/* 입력 버튼은 숫자 바로 아래 — 예전엔 화면 맨 아래라 스크롤해야 보였다 */}
           {budget.phase === 'current' && (
-            <div style={{ display: 'flex', gap: 9, margin: '4px 16px 16px' }}>
+            <div style={{ display: 'flex', gap: 9, margin: '0 16px 12px' }}>
               <button
                 onClick={onGoAdd}
                 style={{
@@ -219,6 +205,44 @@ export default function HomeView({
               </button>
             </div>
           )}
+
+          {/* 입력이 빠진 날 — 이번 달을 볼 때만 */}
+          {budget.phase === 'current' && (
+            <MissingDaysCard days={missingDays} onFill={onFillMissing} onMarkNoSpend={onMarkNoSpend} />
+          )}
+
+          <StatRow budget={budget} />
+          <PersonBars budget={budget} onSelectPerson={onSelectPerson} />
+          <BudgetLimits rows={budgetRows} onGoSettings={onGoSettings} />
+
+          {/* 일요일·월요일에만 — 주말을 넘기는 동안 한 주를 돌아본다 */}
+          {weeklyReport && budget.phase === 'current' && (
+            <WeeklyReportCard report={weeklyReport} style={{ margin: '0 16px 12px' }} />
+          )}
+
+          {budget.phase === 'current' && (
+            <RecurringCard items={recurring} onMove={onMoveRecurring} onDismiss={onDismissRecurring} />
+          )}
+
+          <button
+            onClick={onGoSettings}
+            style={{
+              width: 'calc(100% - 32px)', margin: '0 16px 16px',
+              background: '#fff', border: 'none', borderRadius: 12, padding: '14px 16px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              fontSize: 13, color: '#555',
+            }}
+          >
+            <span>
+              고정지출 {fixedCount}건
+              {budget.totalFixed > 0 && (
+                <span style={{ color: '#aaa' }}> · {won(budget.totalFixed)} (이미 차감됨)</span>
+              )}
+            </span>
+            <span style={{ color: '#bbb' }}>›</span>
+          </button>
+
         </>
       )}
     </>
