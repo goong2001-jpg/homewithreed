@@ -10,5 +10,5 @@
 4. **`CHANGELOG.md` 는 손대지 않는다** — 배포 성공 뒤 Actions 가 커밋 메시지로 자동 기록한다. **푸시 전에 `git pull --rebase origin claude/intelligent-cannon-txjx76`** (봇 커밋이 들어와 있을 수 있다).
 5. **흐름** — 기본 브랜치 최신에서 작업 브랜치를 새로 만들기(`git checkout -B <브랜치> origin/claude/intelligent-cannon-txjx76`) → 작업 → `bash couple-budget/dev/check.sh` 전부 ✅ → PR → squash 병합 → 배포·이력 기록 성공 확인(HANDOFF 4-4) → 사용자에게 "폰 새로고침" 안내.
 6. **비밀값** — 저장소는 공개. 사용자의 Firebase projectId·apiKey·우리집 코드, 이메일·실명·아이 이름을 코드·문서·커밋에 쓰지 않는다. 예시는 `wooricip-a1b2c`.
-7. **설계 원칙** — 로컬 우선(네트워크를 기다리지 않음), firebase·xlsx 는 동적 import 로 메인 번들 밖, 돈 계산은 `src/utils/` 순수 함수 + 테스트, 경조사·카테고리 예산은 저금통 계산에 넣지 않음.
+7. **설계 원칙** — 로컬 우선(네트워크를 기다리지 않음), firebase·xlsx 는 동적 import 로 메인 번들 밖, 돈 계산은 `src/utils/` 순수 함수 + 테스트, 경조사는 **낸 돈만** 쓴 돈으로 계산(따로 저장하지 않고 `giftsAsExpenses` 로 만든다), 받은 돈·카테고리 예산은 저금통 계산에 넣지 않음.
 8. **답변** — 한국어 반말, 폰으로 읽으니 결론 먼저 짧게. "만들지는 말고"면 제안만.

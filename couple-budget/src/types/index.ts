@@ -108,6 +108,12 @@ export interface Expense extends Syncable {
    * 옛 기록에는 이 필드가 없다 — 없으면 보통 지출이다.
    */
   noSpend?: boolean;
+  /**
+   * 경조사 장부의 '낸 돈'을 지출처럼 보이게 만든 줄이면 그 경조사 기록의 id (v19).
+   * ⚠️ 화면·계산용으로만 만들어지고 **저장되지 않는다** (utils/gifts.ts giftsAsExpenses).
+   *    고치거나 지울 때는 이 id 로 경조사 기록을 고친다.
+   */
+  giftId?: string;
 }
 
 /** '안 쓴 날' 표시에 넣는 내용 글자 (옛 버전 앱에서는 0원짜리 내역으로 보인다) */

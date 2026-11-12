@@ -1,6 +1,6 @@
 # 인수인계 — 우리집 하루수입 가계부 (couple-budget)
 
-> 마지막 정리: **2026-11-12 · v18** · 이 문서는 다음 작업자(사람이든 다른 AI 모델이든)가
+> 마지막 정리: **2026-11-12 · v19** · 이 문서는 다음 작업자(사람이든 다른 AI 모델이든)가
 > 이 앱을 처음 보고도 안전하게 이어서 고칠 수 있게 쓴 것이다. 작업 전에 끝까지 읽는다.
 
 ---
@@ -67,17 +67,18 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 - 기본 브랜치 이름 `claude/intelligent-cannon-txjx76` — `deploy.yml`·`ci.yml` 이 이 이름으로 걸려 있다
 - `.github/workflows/deploy.yml` 은 **저장소의 모든 앱이 같이 쓴다.** 이 앱 때문에 고칠 때 다른 앱 빌드 단계를 건드리지 않는다. 테스트(`ci.yml`)가 하나라도 깨지면 **모든 앱 배포가 멈춘다**
 - `src/sync/types.ts` 에 firebase import 금지 — firebase 는 `syncClient.ts` 에서만 **동적 import** (메인 번들에 들어가면 동기화 안 쓰는 사람도 수백 KB 를 받는다. `dev/check.sh` 가 검사한다)
-- 경조사(`gifts`)와 카테고리 예산(`budgets`)은 **저금통 계산에 넣지 않는다** — 의도된 설계 (3-3 참고)
+- 경조사(`gifts`) 중 **낸 돈(out)은 쓴 돈**이다 — 저금통에서 빠진다(v19, 사용자 결정). **받은 돈(in)** 과 카테고리 예산(`budgets`)은 저금통 계산에 넣지 않는다 (3-3 참고)
+- 낸 경조사비를 **지출로 따로 저장하지 않는다** — `giftsAsExpenses()` 가 볼 때마다 지출 줄을 만든다(id `gift:…`, `giftId`). 저장하면 두 번 빠지거나 한쪽만 고쳐져 어긋난다. 저장·백업·반복 지출 찾기에는 `ledger.expenses`, 계산·내역에는 `App.tsx` 의 `spendRows`
 - `public/sw.js` (v17, 오프라인 열기) — **화면(index.html)은 항상 네트워크 먼저**라는 규칙을 바꾸지 않는다. 저장본을 먼저 쓰게 바꾸면 "새로고침해도 옛 버전"이 된다. 범위는 이 앱 폴더뿐
 - 앱 안의 Firebase 설정 안내 문구는 사용자가 실제로 4번 막혔던 끝에 맞춘 것이다(3-4). 콘솔 화면을 확인하지 않고 추측으로 바꾸지 않는다
 
 ### 2-3. 버전 올리는 법 · 커밋 메시지 규칙
 
-- **PR(또는 기본 브랜치에 들어가는 변경) 하나 = 버전 하나.** 다음 번호 = `CHANGELOG.md` 맨 위 버전 + 1 (지금 v18 → 다음 **v19**)
+- **PR(또는 기본 브랜치에 들어가는 변경) 하나 = 버전 하나.** 다음 번호 = `CHANGELOG.md` 맨 위 버전 + 1 (지금 v19 → 다음 **v20**)
 - 기본 브랜치에 들어가는 커밋(= squash 병합 커밋)의 메시지:
 
   ```
-  v19: 무엇을 바꿨는지 한 줄 (#PR번호)
+  v20: 무엇을 바꿨는지 한 줄 (#PR번호)
 
   - 바뀐 점 하나
   - 바뀐 점 둘
@@ -102,8 +103,8 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 3. 커밋 (메시지 규칙 2-3) → **푸시 전에** `git pull --rebase origin claude/intelligent-cannon-txjx76`
    (배포 뒤 Actions 봇이 CHANGELOG 커밋을 기본 브랜치에 넣기 때문에, 오래 작업했으면 뒤처져 있다)
 4. `git push -u origin <작업브랜치>` — 원격 작업 브랜치에 **이미 병합된 옛 커밋만** 남아 있어서 거절되면 `--force-with-lease` (병합 안 된 커밋이 있으면 절대 강제 푸시하지 말 것)
-5. GitHub MCP 로 PR 생성: base = `claude/intelligent-cannon-txjx76`, 제목 = `v19: …`
-6. **squash 병합**: `merge_pull_request(merge_method="squash", commit_title="v19: … (#PR번호)", commit_message="- …\n- …")`
+5. GitHub MCP 로 PR 생성: base = `claude/intelligent-cannon-txjx76`, 제목 = `v20: …`
+6. **squash 병합**: `merge_pull_request(merge_method="squash", commit_title="v20: … (#PR번호)", commit_message="- …\n- …")`
    → `commit_title`·`commit_message` 를 **꼭 직접 넣는다.** 안 넣으면 GitHub 기본 제목이 들어가 버전이 빠진다
 7. 배포 성공까지 확인 (4장). 끝나면 사용자에게 "폰에서 새로고침" 안내
 
@@ -165,7 +166,7 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 | `src/sync/syncClient.ts` | firebase 를 만지는 **유일한** 파일. 연결 테스트·오류를 "마법사 몇 단계 탓"으로 번역 |
 | **화면 (탭 순서)** | |
 | `HomeView` · `PiggyGauge` · `piggyShapes` · `StatRow` · `PersonBars` · `BudgetLimits` · `WeeklyReportCard` · `MissingDaysCard` · `RecurringCard` | 🐷 저금통 탭 (순서: 저금통 → 하루 쓸 돈 → 입력 버튼 → 빠진 날 알림 → 나머지) |
-| `AddView` · `ExpenseForm` · `IncomeForm` · `FrequentChips` | ➕ 입력 탭 (지출/수입 전환, 수정 겸용). 지출은 오늘·어제·그제 칩, '저장 후 하나 더'. **세 번째 칸 '경조사'**(v18)는 `GiftForm` 을 끼워 넣은 것 — 경조사 장부에만 쌓이고 저금통과 무관 |
+| `AddView` · `ExpenseForm` · `IncomeForm` · `FrequentChips` | ➕ 입력 탭 (지출/수입 전환, 수정 겸용). 지출은 오늘·어제·그제 칩, '저장 후 하나 더'. **세 번째 칸 '경조사'**(v18)는 `GiftForm` 을 끼워 넣은 것 — 경조사 장부에 쌓인다 |
 | `HistoryView` · `ExpenseItem` · `CategoryBreakdown` · `HistoryTabs` | 📋 내역 탭. '안 쓴 날' 표시도 여기서 보이고 지운다 |
 | `TopSpendView` | 🏆 TOP5 — 탭이 아니라 **내역 탭 안의 전환**(`HistoryTabs`). `View` 값 `'top'` 은 그대로 |
 | `GiftsView` · `GiftForm` | 🧧 경조사 탭 |
@@ -188,7 +189,7 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 | `IncomeEntry` | month, personId, amount, memo | **건별** (급여 1건 + 부업 일당 여러 건) |
 | `FixedExpense` | name, amount, startMonth, endMonth\|null, personId\|null | 매달 반복, 하루 수입 계산 **전에** 뺀다 |
 | `Expense` | date, **month**(비정규화), amount, category, content, personId, createdAt, noSpend? | 카테고리 8종 고정. `noSpend: true` = '안 쓴 날' 표시(0원) |
-| `GiftEntry` | date, month, direction(in/out), amount, kind, counterparty, personId, memo | 경조사·용돈. 저금통과 무관 |
+| `GiftEntry` | date, month, direction(in/out), amount, kind, counterparty, personId, memo | 경조사·용돈. 낸 돈(out)은 저금통에서 빠지고 받은 돈(in)은 장부에만 |
 | `CategoryBudget` | category, monthlyLimit | id = `budget-{카테고리}` |
 | `AppSettings.sync` | enabled, roomCode, firebaseConfigText | 로컬 전용, 클라우드 금지 |
 
@@ -204,7 +205,7 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 - **동기화 범위** — 사람·수입·고정지출·경조사·예산은 **전부**, 지출은 **보고 있는 달만** 구독. 새 폰은 내역 탭 "지난 데이터 모두 불러오기"
 - **자동 1회 올리기** — 연결되면 이 기기 기존 기록을 방에 한 번 올린다(2.5초 뒤, 먼저 받은 스냅샷과 병합 후). 방 코드별로 한 번(`couple_budget_seeded_room`)
 - **둘이 쓰는 세 단계** — ① 혼자(설정 0) ② 파일로 주고받기(서버 0) ③ 본인 Firebase(실시간). **저장소 주인이 남의 데이터를 갖지 않는 구조**가 사용자 요구였다 — 공용 Firebase 를 만들어 주지 말 것
-- **경조사·카테고리 예산은 저금통과 분리** — 축의금이 하루 예산에서 빠지면 "헤프게 썼다"는 신호가 아닌데 저금통이 빨개진다. 상한은 스스로의 약속일 뿐
+- **낸 경조사비는 쓴 돈, 받은 돈은 장부에만** (v19) — 처음엔 "축의금 때문에 저금통이 빨개지면 신호가 틀려진다"고 전부 분리했지만, 사용자가 **경조사비를 따로 떼어 두지 않고 생활비에서 낸다**고 해서 낸 돈만 지출로 넣었다. 이미 적어둔 과거 경조사도 그 달 지출에 들어간다. 받은 돈(아이 용돈 등)은 우리가 쓸 돈이 아니라 계속 뺀다. 카테고리 상한은 스스로의 약속일 뿐 저금통과 무관
 - **안 적은 날 = 안 쓴 날로 계산된다** — 그래서 홈이 "N일째 기록이 없어요"라고 묻는다(v17). 어제부터 거꾸로 **연달아** 빈 날만, 이번 달 안에서만, 첫 기록 이후만 센다. 계산 자체는 그대로다(표시는 0원)
 - **반복 지출 제안** — 같은 내용·금액이 석 달 연속 달마다 딱 한 번이면 고정지출로 옮기자고 권한다. 옮기면 **마지막으로 적은 달의 다음 달부터** 시작(두 번 빠지지 않게)
 
@@ -261,7 +262,7 @@ bash couple-budget/dev/check.sh --quick  # 단위 테스트만 (빌드·브라�
 |---|---|
 | Node 버전 | 22 권장 (CI 와 같음), 18 이상 필수 |
 | 의존성 | `node_modules` 없으면 `npm ci` |
-| 단위 테스트 | `src/**/*.test.ts` — 계산·병합·백업·주간 리포트·경조사 (v17 기준 **203건**) |
+| 단위 테스트 | `src/**/*.test.ts` — 계산·병합·백업·주간 리포트·경조사 (v19 기준 **211건**) |
 | 이력 도구 테스트 | `dev/history.test.mjs` — 임시 git 저장소로 기록·중복 방지·따라잡기 (18건) |
 | 문서 | HANDOFF·CLAUDE·CHANGELOG·README 있음, CHANGELOG 자동 표시 있음 |
 | 배포 빌드 | `CI=true` (경고 = 실패, CI 와 같은 조건) |
@@ -277,7 +278,7 @@ bash couple-budget/dev/check.sh --quick  # 단위 테스트만 (빌드·브라�
 cd <저장소 루트>
 git add -A couple-budget                    # 다른 앱 폴더를 섞지 않는다
 git commit -F - <<'EOF'
-v19: 무엇을 바꿨는지
+v20: 무엇을 바꿨는지
 
 - 바뀐 점
 - 바뀐 점
@@ -287,8 +288,8 @@ git push -u origin <작업브랜치>              # 거절되면 2-4 의 4번
 ```
 
 그다음 GitHub MCP:
-- `create_pull_request(owner="goong2001-jpg", repo="homewithreed", base="claude/intelligent-cannon-txjx76", head="<작업브랜치>", title="v19: …", body=…)`
-- `merge_pull_request(…, pullNumber=N, merge_method="squash", commit_title="v19: … (#N)", commit_message="- …\n- …")`
+- `create_pull_request(owner="goong2001-jpg", repo="homewithreed", base="claude/intelligent-cannon-txjx76", head="<작업브랜치>", title="v20: …", body=…)`
+- `merge_pull_request(…, pullNumber=N, merge_method="squash", commit_title="v20: … (#N)", commit_message="- …\n- …")`
 - 405(충돌)가 나면: 2-4 의 1번처럼 브랜치를 최신에서 다시 만들고 내 커밋만 `cherry-pick` → `--force-with-lease` → 다시 병합
 
 ### 4-4. 배포 성공 확인
@@ -301,7 +302,7 @@ GitHub MCP 로:
 2. `actions_list(method="list_workflow_jobs", resource_id="<run id>")`
    → `test` · `build` · `deploy` · `couple-budget-changelog` 네 개가 모두 success
 3. `get_job_logs(job_id=<couple-budget-changelog 의 id>, return_content=true, tail_lines=40)`
-   → `CHANGELOG: 기록해서 푸시했습니다` 와 `배포 확인됨` + version.json 내용 (`"version": "v19"`)
+   → `CHANGELOG: 기록해서 푸시했습니다` 와 `배포 확인됨` + version.json 내용 (`"version": "v20"`)
 4. 이력 반영 확인
    ```bash
    git fetch origin claude/intelligent-cannon-txjx76
@@ -326,7 +327,8 @@ GitHub MCP 로:
 
 | 버전 | 날짜(KST) | PR | 내용 |
 |---|---|---|---|
-| v18 | 2026-11-12 | — | 입력 탭에서 경조사·용돈 적기 (경조사 장부에 저절로 쌓임, 저금통과는 계속 분리) |
+| v19 | 2026-11-12 | — | 낸 경조사비를 쓴 돈으로 계산 (저금통·내역·TOP5·주간 리포트·Excel). 받은 돈은 그대로 장부에만 |
+| v18 | 2026-11-12 | #62 | 입력 탭에서 경조사·용돈 적기 (경조사 장부에 저절로 쌓임, 저금통과는 계속 분리) |
 | v17 | 2026-11-12 | #61 | 입력 편하게(이 폰 주인·저장 후 하나 더·날짜 칩·저장 알림·입력 버튼 위로), 입력이 빠진 날 알림·'안 썼어요', 반복 지출→고정지출 제안, 버전 표시, 탭 5개(TOP5 는 내역 안), 오프라인 열기 |
 | v16 | 2026-11-12 | #60 | 인수인계 문서(HANDOFF·CLAUDE·CHANGELOG), `dev/` 점검 도구, 배포 후 이력 자동 기록, version.json |
 | v15 | 2026-10-23 | #46 | 카테고리 월 상한·경고, 자주 쓰는 지출 칩, 주간 리포트·카톡 공유, 백업 v2 *(다른 세션)* |
