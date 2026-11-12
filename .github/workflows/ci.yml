@@ -84,7 +84,10 @@ jobs:
 
   # 빌드 없는 정적 앱: 폴더를 띄우고 Playwright 스모크 테스트
   static:
-    runs-on: ubuntu-latest
+    # ubuntu-latest 가 26.04 로 바뀌면서 playwright 1.56.1 이 크로미움 설치를 거부한다
+    # ("Playwright does not support chromium on ubuntu26.04-x64"). 이 작업이 배포 관문이라
+    # 그대로 두면 모든 앱 배포가 막히므로, playwright 를 올리기 전까지 24.04 로 고정한다.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
