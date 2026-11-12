@@ -396,6 +396,12 @@
 #locApp .ihist .hr em{font-style:normal;font-size:12.5px;color:var(--sub);white-space:nowrap}
 #locApp .ihist .hr button{min-height:40px;padding:0 14px;border:1.5px solid #B3412E;border-radius:6px;background:transparent;color:#B3412E;font-weight:700}
 #locApp .ihist .hr.off{opacity:.5}#locApp .ihist .hr.off b{text-decoration:line-through}
+/* v44: 수량 입력 창에서 바로 입고·출고 */
+#locApp .qio{display:flex;gap:8px;margin:2px 0 6px}
+#locApp .qio button{flex:1;min-height:46px;border-radius:6px;font-weight:700;font-size:15px;border:1.5px solid #15803D;background:#15803D;color:#fff}
+#locApp .qio button+button{border-color:#B3412E;background:transparent;color:#B3412E}
+#locApp .qio button:disabled{opacity:.35}
+#locApp .qtip{font-size:12.5px;color:var(--sub);margin:8px 0 2px}
 </style>
 
 <div id="locApp">
@@ -821,8 +827,9 @@ function openIn(key,opts){
   if(!GAS){toast('입고는 재고앱의 위치도에서만 돼요');return}
   if(!stockLoaded){toast('재고 정보를 불러오는 중이에요');return}
   const w=keyIndex()[key],P=E('panelBody');P.dataset.kind='in';
-  const F={mode:opts.newName?'new':'old',id:'',q:'',name:opts.newName||'',cat:'',catNew:false,unit:'',lines:[{boxes:'1',per:''}],perAuto:true,pin:!!opts.newName};
+  const F={mode:opts.newName?'new':'old',id:(opts.id&&ITEMMAP[opts.id])?opts.id:'',q:'',name:opts.newName||'',cat:'',catNew:false,unit:'',lines:[{boxes:'1',per:''}],perAuto:true,pin:!!opts.newName};
   const here=stockAt(key).map(a=>a.id),pinned=w&&w.kind==='slot'?((get(S.sheets[w.si],w.r,w.c).layers[w.i]||{}).p||[]).map(p=>p.id):[];
+  if(F.id){F.lines[0].per=String((ITEMMAP[F.id]||{}).unit||'');F.pin=pinned.includes(F.id)} // 수량 입력 창의 ＋입고에서 품목을 고른 채로 열림 (v44)
   const cats=[...new Set(ITEMS.map(it=>it.cat).filter(Boolean))].sort();
   const norm=v=>String(v||'').replace(/\s+/g,'').toLowerCase();
   const linesTotal=()=>F.lines.reduce((t,l)=>t+(+l.boxes||0)*(+l.per||0),0);
@@ -1309,6 +1316,8 @@ function qCalc(q){let total=0,used=false,bad=false;const parts=[];
 function qItemHTML(q,j,T){const c=qCalc(q),chg=c.used&&!c.bad&&c.total!==q.q0;
   return `<div class="qitem${chg?' chg':''}" data-qi="${j}"><div class="qhead"><span class="nm">${q.pin?'📌 ':''}${esc(q.name)}${q.cat?` <small>${esc(q.cat)}</small>`:''}</span>
     <span class="qnow">지금 <b>${fmtN(q.q0)}</b>개 · 총 ${fmtN(T[q.id]||0)}개</span>${xBtns(q.id)}</div>
+  <div class="qio"><button data-qin="1">＋ 입고 (더하기)</button><button data-qout="1"${q.q0>0?'':' disabled'}>－ 출고 (빼기)</button></div>
+  <div class="qtip">또는 다시 세어서 전체 수량 맞추기 ↓</div>
   ${q.lines.map((l,li)=>`<div class="qline"><input data-qb="${li}" type="number" inputmode="numeric" min="0" value="${esc(l.b)}" placeholder="0" aria-label="박스 수"><span>박스 ×</span>
     <input data-qp="${li}" type="number" inputmode="numeric" min="0" value="${esc(l.p)}" placeholder="박스당" aria-label="박스당 수량"><span>개</span>
     <b class="qsub" data-qs="${li}">${nInt(l.b)&&nInt(l.p)?'= '+fmtN(nInt(l.b)*nInt(l.p)):''}</b>${q.lines.length>1?`<button class="qdel" data-qdel="${li}" aria-label="이 줄 지우기">✕</button>`:''}</div>`).join('')}
@@ -1338,6 +1347,7 @@ function bindQty(P,s,r,c,compact){
     const redraw=focusSel=>{const d=document.createElement('div');d.innerHTML=qItemHTML(q,j,T);const ne=d.firstChild;el.replaceWith(ne);bindItem(ne);
       if(focusSel){const f=ne.querySelector(focusSel);if(f)f.focus()}};
     bindX(el);
+    const qi=el.querySelector('[data-qin]'),qo=el.querySelector('[data-qout]');if(qi)qi.onclick=()=>openIn(q.k,{id:q.id});if(qo)qo.onclick=()=>openOut(q.k,q.id); // 다시 세지 않고 더하기·빼기 (v44)
     el.querySelectorAll('[data-qb]').forEach(i=>i.oninput=()=>{q.lines[+i.dataset.qb].b=i.value;refresh()});
     el.querySelectorAll('[data-qp]').forEach(i=>i.oninput=()=>{q.lines[+i.dataset.qp].p=i.value;refresh()});
     el.querySelector('[data-ql]').oninput=e=>{q.loose=e.target.value;refresh()};

@@ -141,6 +141,13 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
   ok(await pg.locator('#saveBtn').isDisabled() && await pg.locator('#warnLine').isVisible(), '물건이 없는 위치에서는 출고 저장이 막힘');
   await pg.evaluate(() => go('loc'));
 
+  console.log('수량 입력 창에서 바로 입고·출고 (v44)');
+  await pg.evaluate(() => go('loc')); await pg.locator('#locApp .cell[data-k="1,1"]').tap(); await pg.waitForTimeout(200);
+  ok(await pg.locator('#locApp .qitem [data-qin]').count() >= 1 && await pg.locator('#locApp .qitem [data-qout]').first().isEnabled(), '품목마다 ＋입고 · －출고 버튼');
+  await pg.locator('#locApp .qitem [data-qin]').first().tap(); await pg.waitForTimeout(200);
+  ok(await pg.evaluate(() => document.querySelector('#locApp [data-el="panelBody"]').dataset.kind === 'in') && (await pg.locator('#locApp .qin .picked').innerText()).includes('SV7'), '＋입고 → 그 품목이 골라진 입고 창');
+  await pg.locator('#locApp .panel [data-a="close"]').first().tap();
+
   console.log('켤 때 속도 (v36)');
   await pg.evaluate(() => localStorage.setItem('mockDelay', '2500')); await pg.reload(); await pg.waitForTimeout(500);
   ok((await L('status').innerText()).includes('최신 확인 중'), '저장본으로 바로 뜸 (최신 확인 중)');
