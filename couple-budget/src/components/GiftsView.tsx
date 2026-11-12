@@ -107,7 +107,7 @@ export default function GiftsView({
             <br />여기에 적어두면 몇 년이 지나도 찾아볼 수 있어요.
             <br />
             <span style={{ fontSize: 12, color: '#cfd8dc' }}>
-              저금통(하루 쓸 수 있는 돈)에는 들어가지 않습니다.
+              낸 돈은 쓴 돈으로 쳐서 저금통에서 빠지고, 받은 돈은 장부에만 남아요.
             </span>
           </div>
           <div style={{ display: 'flex', gap: 9 }}>
@@ -438,7 +438,7 @@ export default function GiftsView({
             fontSize: 11.5, color: '#c5ced2', textAlign: 'center',
             lineHeight: 1.8, padding: '0 20px 8px',
           }}>
-            줄을 누르면 고칠 수 있어요. 이 장부는 저금통 계산에 들어가지 않아요.
+            줄을 누르면 고칠 수 있어요. 낸 돈은 저금통(쓴 돈)에서 빠지고, 받은 돈은 장부에만 남아요.
           </div>
         </>
       )}

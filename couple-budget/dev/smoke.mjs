@@ -197,8 +197,18 @@ async function main() {
       gifts: JSON.parse(localStorage.getItem('couple_budget_gifts') || '[]').length,
       expenses: JSON.parse(localStorage.getItem('couple_budget_expenses') || '[]').length,
     }));
-    check('입력 탭의 경조사가 경조사 장부에 저절로 쌓인다 (지출은 그대로)',
+    check('입력 탭의 경조사가 경조사 장부에 저절로 쌓인다 (지출 기록은 따로 안 생긴다)',
       gift.gifts === 1 && gift.expenses === 3 && /김철수 결혼/.test(await text()), JSON.stringify(gift));
+
+    // 낸 경조사비는 쓴 돈이다 (v19) — 저금통 누적 지출에 들어가고, 내역에서 누르면 경조사 기록이 열린다
+    await page.getByRole('button', { name: /저금통$/ }).click();
+    await page.waitForTimeout(250);
+    check('낸 경조사비가 이달 누적 지출에 들어간다 (12,000+3,000+1,000+50,000)',
+      /이달 누적 지출[\s\S]{0,40}66,000원/.test(await text()));
+    await page.getByRole('button', { name: /내역$/ }).last().click();
+    await page.getByRole('button', { name: /축의금 · 김철수 결혼 수정/ }).click();
+    await page.waitForTimeout(250);
+    check('내역의 경조사 줄을 누르면 경조사 수정 화면이 열린다', /경조사 수정/.test(await text()));
 
     const wide = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
     check('390px 폭에서 가로 스크롤이 없다', wide);

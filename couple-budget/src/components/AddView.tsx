@@ -22,7 +22,7 @@ interface Props {
   onDeleteExpense: (id: string) => void;
   onSaveIncome: React.ComponentProps<typeof IncomeForm>['onSave'];
   onDeleteIncome: (id: string) => void;
-  /** 경조사·용돈 — 경조사 장부에 쌓인다 (저금통과 무관) */
+  /** 경조사·용돈 — 경조사 장부에 쌓인다 (낸 돈은 저금통에서도 빠진다) */
   onSaveGift: React.ComponentProps<typeof GiftForm>['onSave'];
   /** 이 폰 주인 (없으면 첫 번째 사람) */
   defaultPersonId?: string;
@@ -99,7 +99,7 @@ export default function AddView({
             background: '#fffaf0', border: '1px solid #f5deb3',
             fontSize: 12, color: '#8a6d1a', lineHeight: 1.6,
           }}>
-            여기서 적으면 <b>경조사 탭 장부</b>에 저절로 쌓여요. 하루 쓸 돈(저금통)에서는 빠지지 않아요.
+            여기서 적으면 <b>경조사 탭 장부</b>에 저절로 쌓여요. <b>낸 돈</b>은 쓴 돈으로도 쳐서 저금통에서 빠지고, 받은 돈은 장부에만 남아요.
           </div>
           <GiftForm
             embedded

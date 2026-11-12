@@ -10,6 +10,7 @@ import {
 import { defaultPersonId } from './utils/device';
 import { useDevice } from './hooks/useDevice';
 import { shortWon } from './utils/format';
+import { GIFT_EXPENSE_PREFIX, giftsAsExpenses } from './utils/gifts';
 import { isReportDay, reportAnchor, weeklyReport } from './utils/weekly';
 import { useAppSettings } from './hooks/useAppSettings';
 import { useMonthNav } from './hooks/useMonthNav';
@@ -44,16 +45,23 @@ export default function App() {
   const { month, prev, next, goToToday } = useMonthNav();
   const ledger = useLedger(settings.sync, month);
 
+  // 쓴 돈 = 적은 지출 + 경조사 장부의 '낸 돈' (v19 — 경조사비도 생활비에서 나간다).
+  // 낸 돈은 저장된 지출이 아니라 볼 때마다 만드는 줄이다 → 저장·백업·반복 지출 찾기에는 ledger.expenses 를 쓴다
+  const spendRows = useMemo(
+    () => [...ledger.expenses, ...giftsAsExpenses(ledger.gifts)],
+    [ledger.expenses, ledger.gifts],
+  );
+
   // 모든 돈 계산은 여기서 한 번만 한다 — 아래 컴포넌트들은 계산하지 않는다
   const budget = useMemo(
     () => computeMonthBudget({
       month,
       incomes: ledger.incomes,
       fixed: ledger.fixed,
-      expenses: ledger.expenses,
+      expenses: spendRows,
       persons: ledger.persons,
     }),
-    [month, ledger.incomes, ledger.fixed, ledger.expenses, ledger.persons],
+    [month, ledger.incomes, ledger.fixed, spendRows, ledger.persons],
   );
 
   // 지운 사람은 화면에서 뺀다 (과거 내역 보존을 위해 데이터는 남겨둔다)
@@ -72,9 +80,9 @@ export default function App() {
 
   // ---- 입력이 빠진 날 · 반복 지출 — 탭을 옮길 때마다 '오늘'을 다시 본다 ----
   const missing = useMemo(
-    () => missingDays(ledger.expenses, new Date()),
+    () => missingDays(spendRows, new Date()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ledger.expenses, view],
+    [spendRows, view],
   );
   const recurring = useMemo(() => {
     const dismissed = new Set(device.dismissedRecurring ?? []);
@@ -86,8 +94,8 @@ export default function App() {
 
   // ---- 카테고리별 월 상한 ----
   const budgetRows = useMemo(
-    () => budgetStatus(monthExpenses(ledger.expenses, month), ledger.budgets),
-    [ledger.expenses, ledger.budgets, month],
+    () => budgetStatus(monthExpenses(spendRows, month), ledger.budgets),
+    [spendRows, ledger.budgets, month],
   );
 
   // ---- 자주 쓰는 지출 (최근 90일) ----
@@ -97,19 +105,20 @@ export default function App() {
   const weekly = useMemo(() => {
     const now = new Date();
     const report = weeklyReport(
-      { incomes: ledger.incomes, fixed: ledger.fixed, expenses: ledger.expenses },
+      { incomes: ledger.incomes, fixed: ledger.fixed, expenses: spendRows },
       reportAnchor(now),
     );
     return { report, showOnHome: isReportDay(now) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ledger.incomes, ledger.fixed, ledger.expenses, view]);
+  }, [ledger.incomes, ledger.fixed, spendRows, view]);
 
   // ---- 상한을 넘겼을 때 한 줄 알림 ----
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
 
   /** 저장 전후의 그 카테고리 지출을 비교해 80%·100% 를 '이번에' 넘겼으면 알린다 */
-  const { budgets, expenses, saveExpense } = ledger;
+  const { budgets, saveExpense } = ledger;
+  const expenses = spendRows;
   const saveExpenseWithAlert: typeof saveExpense = useCallback(input => {
     const limitRec = budgets.find(b => b.id === budgetIdOf(input.category));
     const limit = limitRec && alive(limitRec) ? limitRec.monthlyLimit : 0;
@@ -162,6 +171,13 @@ export default function App() {
     });
   }, [saveFixed, dismissRecurring]);
 
+  /** 내역에서 지우기 — 경조사에서 온 줄이면 경조사 기록을 지운다 */
+  const { deleteExpense, deleteGift } = ledger;
+  const deleteSpend = useCallback((id: string) => {
+    if (id.startsWith(GIFT_EXPENSE_PREFIX)) deleteGift(id.slice(GIFT_EXPENSE_PREFIX.length));
+    else deleteExpense(id);
+  }, [deleteExpense, deleteGift]);
+
   /** 입력 화면을 깨끗한 '새로 쓰기' 상태로 연다 */
   function openAdd(mode: AddMode, date?: DateKey) {
     setEditingExpense(null);
@@ -172,6 +188,12 @@ export default function App() {
   }
 
   function editExpense(e: Expense) {
+    // 경조사에서 온 줄은 경조사 기록을 고친다 — 지출로 저장하면 두 번 빠진다
+    if (e.giftId) {
+      const g = ledger.gifts.find(x => x.id === e.giftId);
+      if (g) { setGiftForm({ entry: g, direction: g.direction }); setView('gifts'); }
+      return;
+    }
     setEditingIncome(null);
     setEditingExpense(e);
     setAddMode('expense');
@@ -241,7 +263,8 @@ export default function App() {
               ledger.saveGift(input);
               setToast({
                 key: Date.now(), tone: 'ok',
-                text: `${input.kind} ${shortWon(input.amount)} ${input.direction === 'in' ? '받음' : '냄'} · 경조사 장부에 기록했어요`,
+                text: `${input.kind} ${shortWon(input.amount)} ${input.direction === 'in' ? '받음' : '냄'} · 경조사 장부에 기록했어요`
+                  + (input.direction === 'out' ? ' (쓴 돈에도 들어가요)' : ''),
               });
             }}
             onDone={() => {
@@ -264,7 +287,7 @@ export default function App() {
             persons={activePersons}
             incomes={ledger.incomes}
             fixed={ledger.fixed}
-            expenses={ledger.expenses}
+            expenses={spendRows}
             gifts={ledger.gifts}
             syncStatus={ledger.syncStatus}
             isLive={ledger.isLive}
@@ -272,7 +295,7 @@ export default function App() {
             personFilter={historyPerson}
             onPersonFilterChange={setHistoryPerson}
             onEditExpense={editExpense}
-            onDeleteExpense={ledger.deleteExpense}
+            onDeleteExpense={deleteSpend}
             onPullAll={() => { void ledger.pullAllExpenses(); }}
             onGoSettings={() => setView('settings')}
             onSwitch={setView}
@@ -284,7 +307,7 @@ export default function App() {
             month={month}
             budget={budget}
             persons={activePersons}
-            expenses={ledger.expenses}
+            expenses={spendRows}
             syncStatus={ledger.syncStatus}
             {...nav}
             onEditExpense={editExpense}

@@ -1,5 +1,5 @@
 import {
-  CounterpartyTotal, GiftDirection, GiftEntry, GiftKind, GiftSummary,
+  CounterpartyTotal, Expense, GiftDirection, GiftEntry, GiftKind, GiftSummary,
 } from '../types';
 import { alive } from './budget';
 
@@ -114,4 +114,35 @@ export function groupGiftsByMonth(rows: GiftEntry[]): [string, GiftEntry[]][] {
     map.get(key)!.push(g);
   }
   return Array.from(map.entries());
+}
+
+// ================= 낸 경조사비를 지출로 (v19) =================
+
+/** 경조사에서 만든 지출 줄의 id 앞머리 — 진짜 지출 id(UUID)와 절대 겹치지 않는다 */
+export const GIFT_EXPENSE_PREFIX = 'gift:';
+
+/**
+ * 경조사 장부의 **낸 돈**을 지출 줄로 바꾼다 — 저금통(하루 쓸 돈)에서 빠지게 하려고.
+ *
+ * 사용자 결정(2026-11-12): 경조사비를 따로 떼어 두지 않고 생활비에서 낸다. 그래서 지출이다.
+ *  · **낸 돈(out)만** 넣는다. 받은 돈(in)은 넣지 않는다 — 아이가 받은 용돈은 우리가 쓸 돈이 아니다
+ *  · 카테고리는 '기타', 내용은 '축의금 · 김철수 결혼'
+ *  · 저장하지 않는다. 경조사 기록 하나가 진실이고, 이 줄은 볼 때마다 다시 만든다
+ *    (지출로 따로 저장하면 두 폰에서 두 번 빠지거나, 한쪽만 고쳐져 어긋난다)
+ */
+export function giftsAsExpenses(gifts: GiftEntry[]): Expense[] {
+  return gifts
+    .filter(g => alive(g) && g.direction === 'out' && num(g.amount) > 0)
+    .map(g => ({
+      id: `${GIFT_EXPENSE_PREFIX}${g.id}`,
+      giftId: g.id,
+      date: g.date,
+      month: g.month || g.date.slice(0, 7),
+      amount: num(g.amount),
+      category: '기타' as const,
+      content: [g.kind, (g.counterparty ?? '').trim()].filter(Boolean).join(' · '),
+      personId: g.personId,
+      createdAt: g.createdAt,
+      updatedAt: g.updatedAt,
+    }));
 }

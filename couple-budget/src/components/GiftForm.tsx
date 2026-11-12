@@ -309,8 +309,8 @@ export default function GiftForm({
         <div style={{
           fontSize: 11.5, color: '#c5ced2', textAlign: 'center', lineHeight: 1.8,
         }}>
-          경조사·용돈은 저금통(하루 쓸 수 있는 돈)에 들어가지 않아요.
-          <br />생활비와 섞이지 않게 따로 적어두는 장부입니다.
+          <b>낸 돈</b>은 쓴 돈으로 쳐서 저금통(하루 쓸 수 있는 돈)에서 빠져요.
+          <br /><b>받은 돈</b>은 장부에만 남고 저금통에는 안 들어가요.
         </div>
       </div>
     </div>

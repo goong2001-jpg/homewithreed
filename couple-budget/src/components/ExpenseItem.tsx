@@ -56,7 +56,8 @@ export default function ExpenseItem({ expense, person, onEdit, onDelete }: Props
                 {person.name}
               </span>
             )}
-            <span>{expense.category}</span>
+            {/* 경조사 장부에서 온 줄 — 누르면 경조사 기록을 고친다 */}
+            <span>{expense.giftId ? '경조사 장부' : expense.category}</span>
           </div>
         </div>
 

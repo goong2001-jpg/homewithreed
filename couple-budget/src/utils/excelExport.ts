@@ -2,7 +2,7 @@ import {
   Expense, FixedExpense, GiftEntry, IncomeEntry, MonthBudget, MonthKey, Person,
 } from '../types';
 import { activeFixed, alive, monthExpenses } from './budget';
-import { filterGifts, summarizeGifts } from './gifts';
+import { filterGifts, giftsAsExpenses, summarizeGifts } from './gifts';
 
 /**
  * xlsx는 400KB가 넘는다. 내보내기는 어쩌다 한 번 쓰는 기능이므로
@@ -45,7 +45,8 @@ export async function exportMonthToExcel(
   XLSX.utils.book_append_sheet(wb, wsSummary, '요약');
 
   // 2) 변동지출
-  const rows = monthExpenses(expenses, month)
+  // 낸 경조사비도 지출이다 (v19) — 요약의 지출 합계와 이 시트가 맞아야 한다
+  const rows = monthExpenses([...expenses, ...giftsAsExpenses(gifts)], month)
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt)
     .map(e => ({
