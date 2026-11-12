@@ -19,11 +19,13 @@ interface Props {
   onDelete?: (id: string) => void;
   /** 이 폰 주인 — 새로 쓸 때 기본으로 고를 사람 */
   defaultPersonId?: string;
+  /** 입력 탭 안에 끼워 넣을 때 — 제목 줄은 입력 탭이 그리므로 숨긴다 */
+  embedded?: boolean;
   onDone: () => void;
 }
 
 export default function GiftForm({
-  persons, initial, defaultPersonId, defaultDirection, onSave, onDelete, onDone,
+  persons, initial, defaultPersonId, defaultDirection, embedded, onSave, onDelete, onDone,
 }: Props) {
   const sorted = [...persons].sort((a, b) => a.order - b.order);
   const editing = !!initial;
@@ -104,14 +106,16 @@ export default function GiftForm({
 
   return (
     <div>
-      <div style={{
-        background: '#fff', padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-        position: 'sticky', top: 0, zIndex: 10,
-      }}>
-        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
-          {editing ? '경조사 수정' : '경조사 · 용돈 적기'}
-        </h2>
-      </div>
+      {!embedded && (
+        <div style={{
+          background: '#fff', padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+          position: 'sticky', top: 0, zIndex: 10,
+        }}>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
+            {editing ? '경조사 수정' : '경조사 · 용돈 적기'}
+          </h2>
+        </div>
+      )}
 
       <div style={{ padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* 받았나 냈나 — 이걸 먼저 정해야 나머지 문구가 말이 된다 */}

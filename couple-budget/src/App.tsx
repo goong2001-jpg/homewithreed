@@ -237,10 +237,19 @@ export default function App() {
             onDeleteExpense={ledger.deleteExpense}
             onSaveIncome={ledger.saveIncome}
             onDeleteIncome={ledger.deleteIncome}
+            onSaveGift={input => {
+              ledger.saveGift(input);
+              setToast({
+                key: Date.now(), tone: 'ok',
+                text: `${input.kind} ${shortWon(input.amount)} ${input.direction === 'in' ? '받음' : '냄'} · 경조사 장부에 기록했어요`,
+              });
+            }}
             onDone={() => {
               // 새로 썼으면 홈으로 보내 저금통이 바뀌는 걸 보게 하고,
               // 고친 거면 보고 있던 화면으로 되돌려준다
-              setView(editingExpense ? 'history' : editingIncome ? 'settings' : 'home');
+              // 경조사를 적었으면 장부에 쌓인 걸 바로 보여준다
+              setView(editingExpense ? 'history' : editingIncome ? 'settings'
+                : addMode === 'gift' ? 'gifts' : 'home');
               setEditingExpense(null);
               setEditingIncome(null);
               setAddDate(undefined);

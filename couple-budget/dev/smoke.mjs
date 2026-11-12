@@ -182,9 +182,23 @@ async function main() {
     errors.length = 0;       // 오프라인 동안 실패한 요청(version.json 등)은 오류로 치지 않는다
     await page.reload({ waitUntil: 'networkidle' });
 
-    await page.getByRole('button', { name: /경조사$/ }).click();
+    await page.getByRole('button', { name: /경조사$/ }).last().click();
     await page.waitForTimeout(250);
     check('경조사 탭이 열린다', /받은 돈 적기/.test(await text()));
+
+    // 입력 탭에서 경조사를 적으면 경조사 장부에 쌓이고, 저금통 지출은 그대로다 (v18)
+    await page.getByRole('button', { name: /입력$/ }).last().click();
+    await page.getByRole('button', { name: '경조사', exact: true }).first().click();
+    await page.fill('#gift-amount', '50000');
+    await page.fill('#gift-who', '김철수 결혼');
+    await page.getByRole('button', { name: /기록하기$/ }).click();
+    await page.waitForTimeout(300);
+    const gift = await page.evaluate(() => ({
+      gifts: JSON.parse(localStorage.getItem('couple_budget_gifts') || '[]').length,
+      expenses: JSON.parse(localStorage.getItem('couple_budget_expenses') || '[]').length,
+    }));
+    check('입력 탭의 경조사가 경조사 장부에 저절로 쌓인다 (지출은 그대로)',
+      gift.gifts === 1 && gift.expenses === 3 && /김철수 결혼/.test(await text()), JSON.stringify(gift));
 
     const wide = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
     check('390px 폭에서 가로 스크롤이 없다', wide);

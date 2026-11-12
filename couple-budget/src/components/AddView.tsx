@@ -4,6 +4,7 @@ import {
 } from '../types';
 import ExpenseForm from './ExpenseForm';
 import IncomeForm from './IncomeForm';
+import GiftForm from './GiftForm';
 import FrequentChips from './FrequentChips';
 
 interface Props {
@@ -21,6 +22,8 @@ interface Props {
   onDeleteExpense: (id: string) => void;
   onSaveIncome: React.ComponentProps<typeof IncomeForm>['onSave'];
   onDeleteIncome: (id: string) => void;
+  /** 경조사·용돈 — 경조사 장부에 쌓인다 (저금통과 무관) */
+  onSaveGift: React.ComponentProps<typeof GiftForm>['onSave'];
   /** 이 폰 주인 (없으면 첫 번째 사람) */
   defaultPersonId?: string;
   onSetOwner?: (personId: string) => void;
@@ -38,7 +41,7 @@ interface Props {
 export default function AddView({
   month, persons, budget, mode, onModeChange,
   editingExpense, editingIncome, frequent,
-  onSaveExpense, onDeleteExpense, onSaveIncome, onDeleteIncome,
+  onSaveExpense, onDeleteExpense, onSaveIncome, onDeleteIncome, onSaveGift,
   defaultPersonId, onSetOwner, initialDate, onDone,
 }: Props) {
   const editing = !!(editingExpense || editingIncome);
@@ -48,10 +51,12 @@ export default function AddView({
   const title = editingExpense ? '내역 수정'
     : editingIncome ? '수입 수정'
     : mode === 'income' ? '들어온 돈 입력'
+    : mode === 'gift' ? '경조사 · 용돈 적기'
     : '쓴 돈 입력';
 
   const tab = (m: AddMode, color: string): React.CSSProperties => ({
-    flex: 1, padding: '10px 0', borderRadius: 9, cursor: 'pointer', fontSize: 14,
+    flex: 1, padding: '10px 0', borderRadius: 9, cursor: 'pointer', fontSize: 13.5,
+    whiteSpace: 'nowrap',
     border: 'none',
     background: mode === m ? '#fff' : 'transparent',
     color: mode === m ? color : '#90a4ae',
@@ -79,11 +84,32 @@ export default function AddView({
             <button onClick={() => onModeChange('income')} style={tab('income', '#27ae60')}>
               + 들어온 돈
             </button>
+            {/* 축의금·부의금·용돈 — 여기서 적으면 경조사 장부에 저절로 쌓인다 */}
+            <button onClick={() => onModeChange('gift')} style={tab('gift', '#8e6f00')}>
+              경조사
+            </button>
           </div>
         )}
       </div>
 
-      {mode === 'income' || editingIncome ? (
+      {mode === 'gift' && !editing ? (
+        <>
+          <div style={{
+            margin: '14px 16px 0', padding: '10px 12px', borderRadius: 9,
+            background: '#fffaf0', border: '1px solid #f5deb3',
+            fontSize: 12, color: '#8a6d1a', lineHeight: 1.6,
+          }}>
+            여기서 적으면 <b>경조사 탭 장부</b>에 저절로 쌓여요. 하루 쓸 돈(저금통)에서는 빠지지 않아요.
+          </div>
+          <GiftForm
+            embedded
+            persons={persons}
+            defaultPersonId={defaultPersonId}
+            onSave={onSaveGift}
+            onDone={onDone}
+          />
+        </>
+      ) : mode === 'income' || editingIncome ? (
         <IncomeForm
           month={month}
           persons={persons}
