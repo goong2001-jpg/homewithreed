@@ -11,6 +11,19 @@
 ## 자동 기록 (최신이 위)
 
 <!-- AUTO-CHANGELOG:START -->
+
+### v16 — 인수인계 문서·한 줄 점검 도구·배포 후 이력 자동 기록 추가 (#60)
+`2026-11-12 12:57 KST` · [`b7107fa`](https://github.com/goong2001-jpg/homewithreed/commit/b7107fafcb021be2c73aa997ccb9f0cacddf277e)
+
+- 다른 채팅·다른 모델이 이어받을 수 있게 HANDOFF.md(시작 문구·규칙·구조·함정·배포 확인 방법)와 CLAUDE.md 추가
+- CHANGELOG.md 에 v1~v15 이력 정리. 이제 배포가 성공할 때마다 커밋 메시지가 자동으로 맨 위에 쌓임
+- 배포된 버전을 version.json 주소 하나로 확인할 수 있게 함
+- dev/check.sh 로 테스트·빌드·브라우저 점검을 명령 한 줄로
+- 10월 24일부터 모든 앱 배포를 막고 있던 테스트 서버 문제(Ubuntu 26.04) 해결
+- 앱 기능은 그대로
+
+<!-- sha:b7107fafcb021be2c73aa997ccb9f0cacddf277e -->
+
 <!-- AUTO-CHANGELOG:END -->
 
 ---
