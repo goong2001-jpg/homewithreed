@@ -14,7 +14,7 @@ export default function HistoryTabs({ active, onChange }: Props) {
     flex: 1, padding: '9px 0', borderRadius: 9, cursor: 'pointer', fontSize: 13.5,
     border: 'none',
     background: on ? '#fff' : 'transparent',
-    color: on ? '#2c3e50' : '#90a4ae',
+    color: on ? '#191F28' : '#8B95A1',
     fontWeight: on ? 700 : 500,
     boxShadow: on ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
   });
@@ -22,7 +22,7 @@ export default function HistoryTabs({ active, onChange }: Props) {
   return (
     <div style={{
       display: 'flex', gap: 4, margin: '12px 16px 0', padding: 4,
-      background: '#eceff1', borderRadius: 11,
+      background: '#F2F4F6', borderRadius: 11,
     }}>
       <button onClick={() => onChange('history')} style={tab(active === 'history')} aria-pressed={active === 'history'}>
         전체 내역

@@ -438,15 +438,15 @@ export function computeMonthBudget(input: {
 
 /** 저금통 · 금액 표시 색 */
 export const LEVEL_COLOR: Record<BudgetLevel, string> = {
-  noIncome: '#bdc3c7',
-  여유: '#27ae60',
-  주의: '#f39c12',
-  초과: '#e74c3c',
+  noIncome: '#B0B8C1',
+  여유: '#12B76A',
+  주의: '#F59F00',
+  초과: '#F04452',
 };
 
 export const LEVEL_LABEL: Record<BudgetLevel, string> = {
   noIncome: '수입을 입력해주세요',
-  여유: '😄 여유 있어요',
-  주의: '😬 거의 다 썼어요',
-  초과: '😥 예산을 넘었어요',
+  여유: '여유 있어요',
+  주의: '거의 다 썼어요',
+  초과: '예산을 넘었어요',
 };

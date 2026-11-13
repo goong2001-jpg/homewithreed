@@ -46,35 +46,35 @@ export default function IncomeCard({
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4,
       }}>
-        <h3 style={{ margin: 0, fontSize: 15, color: '#333' }}>{monthLabel(month)} 수입</h3>
+        <h3 style={{ margin: 0, fontSize: 15, color: '#191F28' }}>{monthLabel(month)} 수입</h3>
         {/* 이 달이 비어 있을 때만 — 이미 있는데 또 복사하면 같은 급여가 두 번 들어간다 */}
         {hasPrev && rows.length === 0 && (
           <button
             onClick={onCopyPrev}
             style={{
-              fontSize: 11.5, padding: '5px 10px', border: '1px solid #ddd', borderRadius: 8,
-              background: '#f8f9fa', color: '#607d8b', cursor: 'pointer',
+              fontSize: 11.5, padding: '5px 10px', border: '1px solid #E5E8EB', borderRadius: 12,
+              background: '#F2F4F6', color: '#6B7684', cursor: 'pointer',
             }}
           >
             지난달 복사
           </button>
         )}
       </div>
-      <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#95a5a6', lineHeight: 1.6 }}>
+      <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#8B95A1', lineHeight: 1.6 }}>
         세후 실수령액을 들어온 대로 한 줄씩 넣어주세요. 합계는 앱이 냅니다.
       </p>
 
       {rows.length === 0 ? (
         <div style={{
-          padding: '22px 14px', background: '#fafbfc', borderRadius: 10,
-          textAlign: 'center', fontSize: 13, color: '#b0bec5', lineHeight: 1.7,
+          padding: '22px 14px', background: '#F9FAFB', borderRadius: 14,
+          textAlign: 'center', fontSize: 13, color: '#B0B8C1', lineHeight: 1.7,
         }}>
           아직 이 달 수입이 없어요
           <br />
           <span style={{ fontSize: 12 }}>급여든 부업 일당이든 들어온 대로 더하면 됩니다</span>
         </div>
       ) : (
-        <div style={{ border: '1px solid #f0f0f0', borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ border: '1px solid #F2F4F6', borderRadius: 14, overflow: 'hidden' }}>
           {rows.map((i, idx) => (
             <IncomeRow
               key={i.id}
@@ -91,9 +91,9 @@ export default function IncomeCard({
       <button
         onClick={onAdd}
         style={{
-          width: '100%', marginTop: 10, padding: 13, borderRadius: 10, cursor: 'pointer',
-          background: '#eafaf1', border: 'none',
-          fontSize: 14, fontWeight: 700, color: '#27ae60',
+          width: '100%', marginTop: 10, padding: 13, borderRadius: 14, cursor: 'pointer',
+          background: '#E8F8F0', border: 'none',
+          fontSize: 14, fontWeight: 700, color: '#12B76A',
         }}
       >
         + 수입 더하기
@@ -101,18 +101,18 @@ export default function IncomeCard({
 
       {/* 나눗셈을 앱이 대신 한다 — 숫자가 맞는지 여기서 확인할 수 있게 */}
       <div style={{
-        marginTop: 14, padding: '13px 14px', background: '#f5f7f8', borderRadius: 10,
-        fontSize: 12.5, color: '#607d8b', lineHeight: 1.9,
+        marginTop: 14, padding: '13px 14px', background: '#F2F4F6', borderRadius: 14,
+        fontSize: 12.5, color: '#6B7684', lineHeight: 1.9,
       }}>
         <div>
-          수입 합계 <b style={{ color: '#27ae60' }}>{won(total)}</b>
-          {rows.length > 1 && <span style={{ color: '#aaa' }}> ({rows.length}건)</span>}
+          수입 합계 <b style={{ color: '#12B76A' }}>{won(total)}</b>
+          {rows.length > 1 && <span style={{ color: '#B0B8C1' }}> ({rows.length}건)</span>}
         </div>
         {totalFixed > 0 && <div>− 고정지출 <b>{won(totalFixed)}</b></div>}
         <div>÷ {days}일 ({monthLabel(month)})</div>
         <div style={{
-          marginTop: 6, paddingTop: 8, borderTop: '1px solid #e3e8ea',
-          fontSize: 15, color: '#2c3e50', fontWeight: 700,
+          marginTop: 6, paddingTop: 8, borderTop: '1px solid #E5E8EB',
+          fontSize: 15, color: '#191F28', fontWeight: 700,
         }}>
           = 하루 {won(perDay)}
         </div>
@@ -137,7 +137,7 @@ function IncomeRow({
   return (
     <div style={{
       display: 'flex', alignItems: 'center',
-      borderTop: first ? 'none' : '1px solid #f5f5f5',
+      borderTop: first ? 'none' : '1px solid #F2F4F6',
     }}>
       <button
         onClick={() => onEdit(entry)}
@@ -150,7 +150,7 @@ function IncomeRow({
       >
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{
-            display: 'block', fontSize: 13.5, fontWeight: 600, color: '#2c3e50',
+            display: 'block', fontSize: 13.5, fontWeight: 600, color: '#191F28',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
             {label}
@@ -165,10 +165,10 @@ function IncomeRow({
             </span>
           )}
         </span>
-        <span style={{ fontSize: 14.5, fontWeight: 700, color: '#27ae60', flexShrink: 0 }}>
+        <span style={{ fontSize: 14.5, fontWeight: 700, color: '#12B76A', flexShrink: 0 }}>
           {won(entry.amount)}
         </span>
-        <span style={{ fontSize: 12, color: '#cfd8dc', flexShrink: 0 }}>✎</span>
+        <span style={{ fontSize: 12, color: '#D1D6DB', flexShrink: 0 }}>✎</span>
       </button>
 
       <button
@@ -178,10 +178,10 @@ function IncomeRow({
           setTimeout(() => setConfirming(false), 3000);
         }}
         style={{
-          background: confirming ? '#fdedec' : 'none',
+          background: confirming ? '#FFEEF0' : 'none',
           border: 'none', borderRadius: 6, cursor: 'pointer', flexShrink: 0,
           fontSize: confirming ? 11 : 14,
-          color: confirming ? '#e74c3c' : '#d0d7da',
+          color: confirming ? '#F04452' : '#D1D6DB',
           fontWeight: confirming ? 700 : 400,
           margin: confirming ? '0 8px 0 4px' : 0,
           padding: confirming ? '5px 8px' : '10px 12px',

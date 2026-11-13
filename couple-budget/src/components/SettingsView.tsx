@@ -52,8 +52,8 @@ interface Props {
 }
 
 const cardStyle: React.CSSProperties = {
-  background: '#fff', borderRadius: 12, padding: 18,
-  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+  background: '#fff', borderRadius: 20, padding: 18,
+  boxShadow: 'none',
 };
 
 export default function SettingsView(props: Props) {
@@ -133,12 +133,12 @@ export default function SettingsView(props: Props) {
             }}
           >
             <span>
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#333' }}>📊 주간 리포트 보기</span>
-              <span style={{ display: 'block', fontSize: 12, color: '#95a5a6', marginTop: 3 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#191F28' }}>📊 주간 리포트 보기</span>
+              <span style={{ display: 'block', fontSize: 12, color: '#8B95A1', marginTop: 3 }}>
                 {weekRangeLabel(weeklyReport)} · 카톡으로 공유할 수 있어요
               </span>
             </span>
-            <span style={{ color: '#bbb', fontSize: 18 }}>›</span>
+            <span style={{ color: '#B0B8C1', fontSize: 18 }}>›</span>
           </button>
         )}
 
@@ -176,8 +176,8 @@ export default function SettingsView(props: Props) {
 
         {/* 데이터 */}
         <div style={cardStyle}>
-          <h3 style={{ margin: '0 0 4px', fontSize: 15, color: '#333' }}>데이터</h3>
-          <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#95a5a6', lineHeight: 1.7 }}>
+          <h3 style={{ margin: '0 0 4px', fontSize: 15, color: '#191F28' }}>데이터</h3>
+          <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#8B95A1', lineHeight: 1.7 }}>
             동기화를 켜지 않으면 모든 기록은 이 브라우저에만 저장됩니다.
             브라우저 데이터를 지우면 함께 사라지니 가끔 Excel로 백업해 두세요.
           </p>
@@ -186,8 +186,8 @@ export default function SettingsView(props: Props) {
             onClick={handleExport}
             disabled={exporting}
             style={{
-              width: '100%', padding: 12, background: '#eafaf1', border: 'none', borderRadius: 10,
-              fontSize: 14, fontWeight: 600, color: '#27ae60', cursor: 'pointer',
+              width: '100%', padding: 12, background: '#E8F8F0', border: 'none', borderRadius: 14,
+              fontSize: 14, fontWeight: 600, color: '#12B76A', cursor: 'pointer',
             }}
           >
             {exporting ? '준비 중…' : `${monthLabel(month)} Excel 내보내기`}
@@ -205,10 +205,10 @@ export default function SettingsView(props: Props) {
             }}
             style={{
               width: '100%', marginTop: 9, padding: 12,
-              background: confirmClear ? '#fdedec' : 'none',
-              border: confirmClear ? 'none' : '1px solid #f0f0f0', borderRadius: 10,
+              background: confirmClear ? '#FFEEF0' : 'none',
+              border: confirmClear ? 'none' : '1px solid #F2F4F6', borderRadius: 14,
               fontSize: 12.5, fontWeight: confirmClear ? 700 : 400,
-              color: confirmClear ? '#e74c3c' : '#b0bec5', cursor: 'pointer',
+              color: confirmClear ? '#F04452' : '#B0B8C1', cursor: 'pointer',
             }}
           >
             {confirmClear
@@ -218,7 +218,7 @@ export default function SettingsView(props: Props) {
         </div>
 
         <div style={{
-          fontSize: 11, color: '#c5ced2', textAlign: 'center', lineHeight: 1.8, padding: '0 8px 8px',
+          fontSize: 11, color: '#B0B8C1', textAlign: 'center', lineHeight: 1.8, padding: '0 8px 8px',
         }}>
           하루 수입은 그 달의 실제 일수로 나눕니다.
           <br />같은 수입이라도 6월(30일)과 7월(31일)은 하루 금액이 조금 달라요.

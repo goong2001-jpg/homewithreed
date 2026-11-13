@@ -58,18 +58,18 @@ export default function GiftsView({
 
   const chip = (on: boolean, color: string): React.CSSProperties => ({
     padding: '7px 13px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer',
-    border: `1.5px solid ${on ? color : '#e0e0e0'}`,
+    border: `1.5px solid ${on ? color : '#E5E8EB'}`,
     background: on ? `${color}14` : '#fff',
-    color: on ? color : '#666',
+    color: on ? color : '#4E5968',
     fontWeight: on ? 700 : 400,
     whiteSpace: 'nowrap',
   });
 
   const modeTab = (m: Mode): React.CSSProperties => ({
-    flex: 1, padding: '8px 0', borderRadius: 8, cursor: 'pointer', fontSize: 13,
+    flex: 1, padding: '8px 0', borderRadius: 12, cursor: 'pointer', fontSize: 13,
     border: 'none',
     background: mode === m ? '#fff' : 'transparent',
-    color: mode === m ? '#37474f' : '#90a4ae',
+    color: mode === m ? '#333D4B' : '#8B95A1',
     fontWeight: mode === m ? 700 : 500,
     boxShadow: mode === m ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
   });
@@ -78,18 +78,18 @@ export default function GiftsView({
     <>
       {/* 다른 탭과 달리 달 이동이 없다 — 연도로 본다 */}
       <div style={{
-        background: '#fff', padding: '13px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        background: '#fff', padding: '13px 16px', boxShadow: 'none', borderBottom: '1px solid #F2F4F6',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         position: 'sticky', top: 0, zIndex: 10,
       }}>
-        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#2c3e50' }}>
+        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#191F28' }}>
           경조사 · 용돈
         </h2>
         <button
           onClick={onGoSettings}
           style={{
             fontSize: 11, padding: '5px 9px', border: 'none', borderRadius: 20,
-            background: '#f5f7f8', color: '#90a4ae', cursor: 'pointer', whiteSpace: 'nowrap',
+            background: '#F2F4F6', color: '#8B95A1', cursor: 'pointer', whiteSpace: 'nowrap',
           }}
         >
           {syncStatus === 'live' ? '● 같이 보는 중' : '● 이 기기에만 저장'}
@@ -97,16 +97,16 @@ export default function GiftsView({
       </div>
 
       {empty ? (
-        <div style={{ textAlign: 'center', padding: '54px 24px', color: '#bbb' }}>
+        <div style={{ textAlign: 'center', padding: '54px 24px', color: '#B0B8C1' }}>
           <div style={{ fontSize: 46, marginBottom: 14 }}>🧧</div>
-          <div style={{ fontSize: 15, color: '#78909c', fontWeight: 600, marginBottom: 8 }}>
+          <div style={{ fontSize: 15, color: '#8B95A1', fontWeight: 600, marginBottom: 8 }}>
             아직 기록이 없어요
           </div>
           <div style={{ fontSize: 13, lineHeight: 1.8, marginBottom: 22 }}>
             아이들이 받은 용돈, 우리가 낸 축의금·부의금을
             <br />여기에 적어두면 몇 년이 지나도 찾아볼 수 있어요.
             <br />
-            <span style={{ fontSize: 12, color: '#cfd8dc' }}>
+            <span style={{ fontSize: 12, color: '#D1D6DB' }}>
               낸 돈은 쓴 돈으로 쳐서 저금통에서 빠지고, 받은 돈은 장부에만 남아요.
             </span>
           </div>
@@ -114,8 +114,8 @@ export default function GiftsView({
             <button
               onClick={() => onAdd('in')}
               style={{
-                flex: 1, padding: 14, background: '#27ae60', color: '#fff', border: 'none',
-                borderRadius: 10, fontSize: 14.5, fontWeight: 700, cursor: 'pointer',
+                flex: 1, padding: 14, background: '#12B76A', color: '#fff', border: 'none',
+                borderRadius: 14, fontSize: 14.5, fontWeight: 700, cursor: 'pointer',
               }}
             >
               받은 돈 적기
@@ -123,8 +123,8 @@ export default function GiftsView({
             <button
               onClick={() => onAdd('out')}
               style={{
-                flex: 1, padding: 14, background: '#fff', color: '#e74c3c',
-                border: '1.5px solid #fadbd8', borderRadius: 10,
+                flex: 1, padding: 14, background: '#fff', color: '#F04452',
+                border: '1.5px solid #FFD9DD', borderRadius: 14,
                 fontSize: 14.5, fontWeight: 700, cursor: 'pointer',
               }}
             >
@@ -136,11 +136,11 @@ export default function GiftsView({
         <>
           {/* 연도 */}
           <div style={{ display: 'flex', gap: 7, padding: '12px 16px 4px', overflowX: 'auto' }}>
-            <button onClick={() => setYear('')} style={chip(year === '', '#607d8b')}>
+            <button onClick={() => setYear('')} style={chip(year === '', '#6B7684')}>
               전체
             </button>
             {years.map(y => (
-              <button key={y} onClick={() => setYear(y)} style={chip(year === y, '#607d8b')}>
+              <button key={y} onClick={() => setYear(y)} style={chip(year === y, '#6B7684')}>
                 {y}년
               </button>
             ))}
@@ -148,21 +148,21 @@ export default function GiftsView({
 
           {/* 받은 돈 / 낸 돈 / 차액 */}
           <div style={{
-            background: '#fff', margin: '10px 16px', borderRadius: 12, padding: 16,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+            background: '#fff', margin: '10px 16px', borderRadius: 20, padding: 16,
+            boxShadow: 'none',
           }}>
             <div style={{ display: 'flex' }}>
               <button
                 onClick={() => setDirection(direction === 'in' ? '' : 'in')}
                 style={{
                   flex: 1, textAlign: 'center', background: 'none', cursor: 'pointer',
-                  border: 'none', borderRight: '1px solid #f0f0f0', padding: '2px 0',
+                  border: 'none', borderRight: '1px solid #F2F4F6', padding: '2px 0',
                 }}
               >
-                <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: '#8B95A1', marginBottom: 4 }}>
                   받은 돈 {direction === 'in' && '▾'}
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#27ae60' }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#12B76A' }}>
                   {won(sum.received)}
                 </div>
               </button>
@@ -170,21 +170,21 @@ export default function GiftsView({
                 onClick={() => setDirection(direction === 'out' ? '' : 'out')}
                 style={{
                   flex: 1, textAlign: 'center', background: 'none', cursor: 'pointer',
-                  border: 'none', borderRight: '1px solid #f0f0f0', padding: '2px 0',
+                  border: 'none', borderRight: '1px solid #F2F4F6', padding: '2px 0',
                 }}
               >
-                <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: '#8B95A1', marginBottom: 4 }}>
                   낸 돈 {direction === 'out' && '▾'}
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#e74c3c' }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#F04452' }}>
                   {won(sum.given)}
                 </div>
               </button>
               <div style={{ flex: 1, textAlign: 'center', padding: '2px 0' }}>
-                <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>차액</div>
+                <div style={{ fontSize: 11, color: '#8B95A1', marginBottom: 4 }}>차액</div>
                 <div style={{
                   fontSize: 16, fontWeight: 700,
-                  color: sum.net >= 0 ? '#27ae60' : '#e74c3c',
+                  color: sum.net >= 0 ? '#12B76A' : '#F04452',
                 }}>
                   {sum.net >= 0 ? '+' : '−'}{won(Math.abs(sum.net))}
                 </div>
@@ -194,7 +194,7 @@ export default function GiftsView({
             {/* 아이별 받은 용돈 — '하율이가 올해 얼마 받았나' */}
             {sortedPersons.some(p => (perPerson.get(p.id)?.received ?? 0) > 0) && (
               <div style={{
-                marginTop: 13, paddingTop: 12, borderTop: '1px solid #f0f0f0',
+                marginTop: 13, paddingTop: 12, borderTop: '1px solid #F2F4F6',
                 display: 'flex', flexWrap: 'wrap', gap: 7,
               }}>
                 {sortedPersons.map(p => {
@@ -225,14 +225,14 @@ export default function GiftsView({
               onChange={e => setQ(e.target.value)}
               placeholder="이름으로 찾기 (예: 김철수)"
               style={{
-                width: '100%', padding: '11px 12px 11px 34px', borderRadius: 10,
-                border: '1.5px solid #e0e0e0', fontSize: 14,
+                width: '100%', padding: '11px 12px 11px 34px', borderRadius: 14,
+                border: '1.5px solid #E5E8EB', fontSize: 14,
                 boxSizing: 'border-box', outline: 'none', background: '#fff',
               }}
             />
             <span style={{
               position: 'absolute', left: 27, top: '50%', transform: 'translateY(-50%)',
-              fontSize: 14, color: '#b0bec5', pointerEvents: 'none',
+              fontSize: 14, color: '#B0B8C1', pointerEvents: 'none',
             }}>
               🔍
             </span>
@@ -240,11 +240,11 @@ export default function GiftsView({
 
           {/* 종류 */}
           <div style={{ display: 'flex', gap: 7, padding: '10px 16px 4px', overflowX: 'auto' }}>
-            <button onClick={() => setKind('')} style={chip(kind === '', '#607d8b')}>
+            <button onClick={() => setKind('')} style={chip(kind === '', '#6B7684')}>
               전체 종류
             </button>
             {GIFT_KINDS.map(k => (
-              <button key={k} onClick={() => setKind(kind === k ? '' : k)} style={chip(kind === k, '#607d8b')}>
+              <button key={k} onClick={() => setKind(kind === k ? '' : k)} style={chip(kind === k, '#6B7684')}>
                 {GIFT_KIND_EMOJI[k]} {k}
               </button>
             ))}
@@ -252,14 +252,14 @@ export default function GiftsView({
 
           <div style={{
             display: 'flex', gap: 4, margin: '10px 16px 0', padding: 4,
-            background: '#f1f3f5', borderRadius: 10,
+            background: '#F2F4F6', borderRadius: 14,
           }}>
             <button onClick={() => setMode('list')} style={modeTab('list')}>날짜순</button>
             <button onClick={() => setMode('people')} style={modeTab('people')}>이름별</button>
           </div>
 
           <div style={{
-            padding: '10px 16px 4px', fontSize: 12, color: '#95a5a6',
+            padding: '10px 16px 4px', fontSize: 12, color: '#8B95A1',
             display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
           }}>
             <span>
@@ -269,8 +269,8 @@ export default function GiftsView({
               <button
                 onClick={() => { setYear(''); setDirection(''); setKind(''); setQ(''); }}
                 style={{
-                  fontSize: 11.5, padding: '4px 10px', border: '1px solid #e0e0e0',
-                  borderRadius: 12, background: '#fff', color: '#78909c', cursor: 'pointer',
+                  fontSize: 11.5, padding: '4px 10px', border: '1px solid #E5E8EB',
+                  borderRadius: 20, background: '#fff', color: '#8B95A1', cursor: 'pointer',
                 }}
               >
                 조건 지우기
@@ -279,14 +279,14 @@ export default function GiftsView({
           </div>
 
           {rows.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '44px 20px', color: '#bbb' }}>
+            <div style={{ textAlign: 'center', padding: '44px 20px', color: '#B0B8C1' }}>
               <div style={{ fontSize: 40, marginBottom: 10 }}>🔍</div>
               <div style={{ fontSize: 14.5 }}>조건에 맞는 기록이 없어요</div>
             </div>
           ) : mode === 'people' ? (
             <div style={{
-              background: '#fff', margin: '4px 16px 12px', borderRadius: 12, overflow: 'hidden',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+              background: '#fff', margin: '4px 16px 12px', borderRadius: 20, overflow: 'hidden',
+              boxShadow: 'none',
             }}>
               {people.map((c, i) => (
                 <button
@@ -295,39 +295,39 @@ export default function GiftsView({
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                     padding: '13px 14px', background: 'none', border: 'none',
-                    borderTop: i === 0 ? 'none' : '1px solid #f5f5f5',
+                    borderTop: i === 0 ? 'none' : '1px solid #F2F4F6',
                     textAlign: 'left', cursor: 'pointer', font: 'inherit',
                   }}
                   aria-label={`${c.name} 내역 보기`}
                 >
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{
-                      display: 'block', fontSize: 14.5, fontWeight: 600, color: '#2c3e50',
+                      display: 'block', fontSize: 14.5, fontWeight: 600, color: '#191F28',
                       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     }}>
                       {c.name}
                     </span>
-                    <span style={{ fontSize: 11.5, color: '#95a5a6' }}>
+                    <span style={{ fontSize: 11.5, color: '#8B95A1' }}>
                       {c.count}번 · 마지막 {c.lastDate.replace(/-/g, '.')}
                     </span>
                   </span>
                   <span style={{ textAlign: 'right', flexShrink: 0 }}>
                     {c.received > 0 && (
                       <span style={{
-                        display: 'block', fontSize: 13, fontWeight: 700, color: '#27ae60',
+                        display: 'block', fontSize: 13, fontWeight: 700, color: '#12B76A',
                       }}>
                         받음 {won(c.received)}
                       </span>
                     )}
                     {c.given > 0 && (
                       <span style={{
-                        display: 'block', fontSize: 13, fontWeight: 700, color: '#e74c3c',
+                        display: 'block', fontSize: 13, fontWeight: 700, color: '#F04452',
                       }}>
                         냄 {won(c.given)}
                       </span>
                     )}
                   </span>
-                  <span style={{ fontSize: 12, color: '#cfd8dc', flexShrink: 0 }}>›</span>
+                  <span style={{ fontSize: 12, color: '#D1D6DB', flexShrink: 0 }}>›</span>
                 </button>
               ))}
             </div>
@@ -336,8 +336,8 @@ export default function GiftsView({
               {groups.map(([m, items]) => (
                 <div key={m}>
                   <div style={{
-                    padding: '9px 16px', fontSize: 12, color: '#888', fontWeight: 600,
-                    background: '#f8f9fa', display: 'flex', justifyContent: 'space-between',
+                    padding: '9px 16px', fontSize: 12, color: '#8B95A1', fontWeight: 600,
+                    background: '#F2F4F6', display: 'flex', justifyContent: 'space-between',
                   }}>
                     <span>{monthLabel(m)}</span>
                     <span>{items.length}건</span>
@@ -353,13 +353,13 @@ export default function GiftsView({
                           style={{
                             width: '100%', display: 'flex', alignItems: 'center', gap: 11,
                             padding: '12px 16px', background: 'none', border: 'none',
-                            borderBottom: '1px solid #f5f5f5',
+                            borderBottom: '1px solid #F2F4F6',
                             textAlign: 'left', cursor: 'pointer', font: 'inherit',
                           }}
                           aria-label={`${g.counterparty} 수정`}
                         >
                           <span style={{
-                            width: 36, height: 36, borderRadius: 10, background: '#f5f7f8',
+                            width: 36, height: 36, borderRadius: 14, background: '#F2F4F6',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: 17, flexShrink: 0,
                           }}>
@@ -368,14 +368,14 @@ export default function GiftsView({
 
                           <span style={{ flex: 1, minWidth: 0 }}>
                             <span style={{
-                              display: 'block', fontSize: 14.5, fontWeight: 600, color: '#2c3e50',
+                              display: 'block', fontSize: 14.5, fontWeight: 600, color: '#191F28',
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                             }}>
                               {g.counterparty}
                             </span>
                             <span style={{
                               display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap',
-                              fontSize: 11.5, color: '#95a5a6', marginTop: 2,
+                              fontSize: 11.5, color: '#8B95A1', marginTop: 2,
                             }}>
                               {person && (
                                 <span style={{
@@ -386,11 +386,11 @@ export default function GiftsView({
                                 </span>
                               )}
                               <span>{g.kind}</span>
-                              <span style={{ color: '#cfd8dc' }}>·</span>
+                              <span style={{ color: '#D1D6DB' }}>·</span>
                               <span>{dateLabel(g.date)}</span>
                               {g.memo && (
                                 <>
-                                  <span style={{ color: '#cfd8dc' }}>·</span>
+                                  <span style={{ color: '#D1D6DB' }}>·</span>
                                   <span>{g.memo}</span>
                                 </>
                               )}
@@ -399,7 +399,7 @@ export default function GiftsView({
 
                           <span style={{
                             fontSize: 15, fontWeight: 700, flexShrink: 0,
-                            color: inbound ? '#27ae60' : '#e74c3c',
+                            color: inbound ? '#12B76A' : '#F04452',
                           }}>
                             {inbound ? '+' : '−'}{won(g.amount)}
                           </span>
@@ -416,7 +416,7 @@ export default function GiftsView({
             <button
               onClick={() => onAdd('in')}
               style={{
-                flex: 1, padding: 14, background: '#27ae60', color: '#fff', border: 'none',
+                flex: 1, padding: 14, background: '#12B76A', color: '#fff', border: 'none',
                 borderRadius: 11, fontSize: 14.5, fontWeight: 700, cursor: 'pointer',
               }}
             >
@@ -425,8 +425,8 @@ export default function GiftsView({
             <button
               onClick={() => onAdd('out')}
               style={{
-                flex: 1, padding: 14, background: '#fff', color: '#e74c3c',
-                border: '1.5px solid #fadbd8', borderRadius: 11,
+                flex: 1, padding: 14, background: '#fff', color: '#F04452',
+                border: '1.5px solid #FFD9DD', borderRadius: 11,
                 fontSize: 14.5, fontWeight: 700, cursor: 'pointer',
               }}
             >
@@ -435,7 +435,7 @@ export default function GiftsView({
           </div>
 
           <div style={{
-            fontSize: 11.5, color: '#c5ced2', textAlign: 'center',
+            fontSize: 11.5, color: '#B0B8C1', textAlign: 'center',
             lineHeight: 1.8, padding: '0 20px 8px',
           }}>
             줄을 누르면 고칠 수 있어요. 낸 돈은 저금통(쓴 돈)에서 빠지고, 받은 돈은 장부에만 남아요.

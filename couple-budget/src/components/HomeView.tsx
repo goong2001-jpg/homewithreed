@@ -68,7 +68,7 @@ export default function HomeView({
       {budget.fixedOverIncome && (
         <div style={{
           margin: '12px 16px 0', background: '#fef9e7', border: '1px solid #f7dc6f',
-          borderRadius: 10, padding: '12px 14px', fontSize: 13, color: '#9a7d0a', lineHeight: 1.6,
+          borderRadius: 14, padding: '12px 14px', fontSize: 13, color: '#9a7d0a', lineHeight: 1.6,
         }}>
           ⚠️ 고정지출이 수입보다 <b>{shortWon(Math.abs(budget.spendable))}</b> 많아요.
           하루 쓸 수 있는 돈이 마이너스입니다.
@@ -77,14 +77,14 @@ export default function HomeView({
 
       {!budget.hasIncome ? (
         <div style={{
-          background: '#fff', margin: '16px', borderRadius: 12, padding: '36px 24px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.06)', textAlign: 'center',
+          background: '#fff', margin: '16px', borderRadius: 20, padding: '36px 24px',
+          boxShadow: 'none', textAlign: 'center',
         }}>
           <div style={{ fontSize: 52, marginBottom: 14 }}>🐷</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#2c3e50', marginBottom: 8 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#191F28', marginBottom: 8 }}>
             이 달 수입을 먼저 입력해주세요
           </div>
-          <div style={{ fontSize: 13, color: '#8a959b', lineHeight: 1.7, marginBottom: 20 }}>
+          <div style={{ fontSize: 13, color: '#8B95A1', lineHeight: 1.7, marginBottom: 20 }}>
             월 수입을 넣으면 {budget.daysInMonth}일로 나눠서
             <br />하루에 얼마 쓸 수 있는지 알려드려요.
           </div>
@@ -94,8 +94,8 @@ export default function HomeView({
             <button
               onClick={onCopyPrevIncome}
               style={{
-                width: '100%', padding: 14, background: '#27ae60', color: '#fff', border: 'none',
-                borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 9,
+                width: '100%', padding: 14, background: '#12B76A', color: '#fff', border: 'none',
+                borderRadius: 14, fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 9,
               }}
             >
               지난달과 같이 ({shortWon(prevMonthIncome)})
@@ -106,9 +106,9 @@ export default function HomeView({
             onClick={onGoAddIncome}
             style={{
               width: '100%', padding: 14,
-              background: prevMonthIncome > 0 ? '#f5f7f8' : '#27ae60',
-              color: prevMonthIncome > 0 ? '#607d8b' : '#fff',
-              border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer',
+              background: prevMonthIncome > 0 ? '#F2F4F6' : '#12B76A',
+              color: prevMonthIncome > 0 ? '#6B7684' : '#fff',
+              border: 'none', borderRadius: 14, fontSize: 15, fontWeight: 700, cursor: 'pointer',
             }}
           >
             {prevMonthIncome > 0 ? '직접 입력하기' : '수입 입력하러 가기'}
@@ -116,95 +116,98 @@ export default function HomeView({
         </div>
       ) : (
         <>
-          {/* 저금통 + 가운데 여유돈 오버레이.
-              오버레이를 SVG와 같은 상자에 넣어야 위치가 정확히 맞는다.
-              반투명 알약 배경을 깔면 채움 색이 무엇이든 글자가 읽힌다. */}
-          <div style={{ padding: '16px 16px 2px' }}>
-            <div style={{ position: 'relative', width: '100%', maxWidth: 290, margin: '0 auto' }}>
-              <PiggyGauge budget={budget} />
-
-              <div style={{
-                position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
-              }}>
-                <div style={{
-                  // 저금통이 비어 회색일 때도 흰 글자가 읽히도록 충분히 진하게
-                  background: 'rgba(38,50,56,0.6)',
-                  backdropFilter: 'blur(2px)',
-                  WebkitBackdropFilter: 'blur(2px)',
-                  borderRadius: 14,
-                  padding: '8px 16px 9px',
-                  textAlign: 'center',
-                  maxWidth: '80%',
-                }}>
-                  <div style={{
-                    fontSize: 10, color: 'rgba(255,255,255,0.9)', fontWeight: 700,
-                    letterSpacing: 0.2, marginBottom: 1,
-                  }}>
-                    {future ? '이 달 예상 여유돈' : '지금 여유돈'}
-                  </div>
-                  <div style={{
-                    fontSize: 24, fontWeight: 800, color: '#fff', lineHeight: 1.15,
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {future ? won(budget.spendable) : signedWon(budget.freeCash)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 상태 라벨 */}
-          <div style={{ textAlign: 'center', marginBottom: 4 }}>
-            <span style={{
-              fontSize: 13, fontWeight: 700, color, background: `${color}18`,
-              borderRadius: 20, padding: '5px 14px',
-            }}>
-              {future ? '📅 아직 오지 않은 달이에요' : LEVEL_LABEL[budget.level]}
-            </span>
-          </div>
-
-          {/* 하루 수입 — 이 앱의 주인공 숫자 */}
+          {/* 맨 위 흰 면 — 여유돈 숫자가 주인공이고, 저금통은 오른쪽 위에서 같은 내용을 그림으로 보여준다 */}
           <div style={{
-            background: '#fff', margin: '14px 16px 10px', borderRadius: 12, padding: '18px 16px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)', textAlign: 'center',
+            background: '#fff', padding: '14px 20px 22px', borderRadius: '0 0 24px 24px',
+            position: 'relative', marginBottom: 10,
           }}>
-            <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>하루 쓸 수 있는 돈</div>
-            <div style={{ fontSize: 34, fontWeight: 800, color: '#2c3e50', lineHeight: 1.15 }}>
-              {won(Math.floor(budget.dailyBudget))}
+            <div style={{ position: 'absolute', right: 12, top: 2, width: 122 }}>
+              <PiggyGauge budget={budget} />
             </div>
-            <div style={{ fontSize: 11.5, color: '#aaa', marginTop: 7, lineHeight: 1.6 }}>
+
+            <div style={{ fontSize: 14, color: '#4E5968', fontWeight: 500 }}>
+              {future ? '이 달 예상 여유돈' : '지금 여유돈'}
+            </div>
+            <div style={{
+              fontSize: 34, fontWeight: 800, letterSpacing: -1.2, lineHeight: 1.25, marginTop: 2,
+              color: budget.level === '초과' ? '#F04452' : '#191F28', whiteSpace: 'nowrap',
+              maxWidth: 'calc(100% - 118px)',
+            }}>
+              {future ? won(budget.spendable) : signedWon(budget.freeCash)}
+            </div>
+
+            {/* 하루 수입 — 이 앱의 주인공 숫자 */}
+            <div style={{ fontSize: 14, color: '#4E5968', marginTop: 6 }}>
+              하루 <b style={{ color: '#0E9F5B', fontWeight: 700 }}>{won(Math.floor(budget.dailyBudget))}</b>씩 쓸 수 있어요
+            </div>
+            <div style={{ fontSize: 11.5, color: '#B0B8C1', marginTop: 3 }}>
               수입 {shortWon(budget.totalIncome)}
               {budget.totalFixed > 0 && <> − 고정지출 {shortWon(budget.totalFixed)}</>}
               {' '}÷ {budget.daysInMonth}일
             </div>
-          </div>
 
-          {/* 입력 버튼은 숫자 바로 아래 — 예전엔 화면 맨 아래라 스크롤해야 보였다 */}
-          {budget.phase === 'current' && (
-            <div style={{ display: 'flex', gap: 9, margin: '0 16px 12px' }}>
-              <button
-                onClick={onGoAdd}
-                style={{
-                  flex: 2, padding: 15, background: '#27ae60', color: '#fff', border: 'none',
-                  borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer',
-                }}
-              >
-                오늘 쓴 돈 입력
-              </button>
-              {/* 부업 일당처럼 수시로 들어오는 돈도 한 번에 닿을 수 있어야 한다 */}
-              <button
-                onClick={onGoAddIncome}
-                style={{
-                  flex: 1, padding: 15, background: '#fff', color: '#27ae60',
-                  border: '1.5px solid #d5f0e0', borderRadius: 12,
-                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                }}
-              >
-                + 수입
-              </button>
+            {/* 이번 달 예산 막대 — 저금통 물높이와 같은 숫자다. 검은 선 = 오늘까지 목표 */}
+            <div style={{ marginTop: 18 }}>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                fontSize: 12.5, color: '#8B95A1', fontWeight: 500,
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: color }} />
+                  <span style={{ color, fontWeight: 700 }}>
+                    {future ? '아직 오지 않은 달이에요' : LEVEL_LABEL[budget.level]}
+                  </span>
+                </span>
+                <b style={{ color: '#191F28', fontWeight: 700 }}>
+                  이번 달 예산 {Math.round(budget.fillRatio * 100)}% 남음
+                </b>
+              </div>
+              <div style={{
+                position: 'relative', height: 8, borderRadius: 4, background: '#F2F4F6', marginTop: 8,
+              }}>
+                <div style={{
+                  position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 4, background: color,
+                  width: `${Math.round(budget.fillRatio * 100)}%`, transition: 'width 500ms ease',
+                }} />
+                {budget.phase === 'current' && (
+                  <div style={{
+                    position: 'absolute', top: -4, bottom: -4, width: 2, borderRadius: 1,
+                    background: '#191F28', left: `calc(${Math.round(budget.paceRatio * 100)}% - 1px)`,
+                  }} />
+                )}
+              </div>
+              {budget.phase === 'current' && (
+                <div style={{ fontSize: 11.5, color: '#8B95A1', marginTop: 8 }}>
+                  검은 선이 오늘까지 목표예요 ·{' '}
+                  {budget.fillRatio >= budget.paceRatio ? '목표보다 넉넉해요' : '목표보다 빨리 쓰고 있어요'}
+                </div>
+              )}
             </div>
-          )}
+
+            {budget.phase === 'current' && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+                <button
+                  onClick={onGoAdd}
+                  style={{
+                    flex: 1, height: 54, background: '#12B76A', color: '#fff', border: 'none',
+                    borderRadius: 14, fontSize: 16, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  오늘 쓴 돈 입력
+                </button>
+                {/* 부업 일당처럼 수시로 들어오는 돈도 한 번에 닿을 수 있어야 한다 */}
+                <button
+                  onClick={onGoAddIncome}
+                  style={{
+                    flex: '0 0 96px', height: 54, background: '#F2F4F6', color: '#4E5968',
+                    border: 'none', borderRadius: 14, fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  + 수입
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* 입력이 빠진 날 — 이번 달을 볼 때만 */}
           {budget.phase === 'current' && (
@@ -217,7 +220,7 @@ export default function HomeView({
 
           {/* 일요일·월요일에만 — 주말을 넘기는 동안 한 주를 돌아본다 */}
           {weeklyReport && budget.phase === 'current' && (
-            <WeeklyReportCard report={weeklyReport} style={{ margin: '0 16px 12px' }} />
+            <WeeklyReportCard report={weeklyReport} style={{ margin: '0 12px 10px' }} />
           )}
 
           {budget.phase === 'current' && (
@@ -227,20 +230,20 @@ export default function HomeView({
           <button
             onClick={onGoSettings}
             style={{
-              width: 'calc(100% - 32px)', margin: '0 16px 16px',
-              background: '#fff', border: 'none', borderRadius: 12, padding: '14px 16px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.06)', cursor: 'pointer',
+              width: 'calc(100% - 24px)', margin: '0 12px 16px',
+              background: '#fff', border: 'none', borderRadius: 20, padding: '14px 16px',
+              boxShadow: 'none', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              fontSize: 13, color: '#555',
+              fontSize: 13, color: '#4E5968',
             }}
           >
             <span>
               고정지출 {fixedCount}건
               {budget.totalFixed > 0 && (
-                <span style={{ color: '#aaa' }}> · {won(budget.totalFixed)} (이미 차감됨)</span>
+                <span style={{ color: '#B0B8C1' }}> · {won(budget.totalFixed)} (이미 차감됨)</span>
               )}
             </span>
-            <span style={{ color: '#bbb' }}>›</span>
+            <span style={{ color: '#B0B8C1' }}>›</span>
           </button>
 
         </>

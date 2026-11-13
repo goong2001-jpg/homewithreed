@@ -26,14 +26,14 @@ export default function Toast({ toast, onDone, ms = 3000 }: Props) {
   }, [toast, onDone, ms]);
 
   if (!toast) return null;
-  const color = toast.tone === 'over' ? '#e74c3c' : toast.tone === 'warn' ? '#f39c12' : '#27ae60';
+  const color = toast.tone === 'over' ? '#F04452' : toast.tone === 'warn' ? '#F59F00' : '#12B76A';
 
   return (
     <div
       role="status"
       style={{
         position: 'fixed', left: 16, right: 16, bottom: TAB_BAR_HEIGHT + 14, zIndex: 50,
-        background: '#2c3e50', color: '#fff', borderRadius: 12, padding: '12px 14px',
+        background: '#191F28', color: '#fff', borderRadius: 20, padding: '12px 14px',
         fontSize: 13.5, fontWeight: 600, lineHeight: 1.5,
         boxShadow: '0 6px 20px rgba(0,0,0,0.18)', borderLeft: `5px solid ${color}`,
       }}

@@ -59,7 +59,7 @@ export default function AddView({
     whiteSpace: 'nowrap',
     border: 'none',
     background: mode === m ? '#fff' : 'transparent',
-    color: mode === m ? color : '#90a4ae',
+    color: mode === m ? color : '#8B95A1',
     fontWeight: mode === m ? 700 : 500,
     boxShadow: mode === m ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
   });
@@ -67,7 +67,7 @@ export default function AddView({
   return (
     <div>
       <div style={{
-        background: '#fff', padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+        background: '#fff', padding: '14px 16px', boxShadow: 'none', borderBottom: '1px solid #F2F4F6',
         position: 'sticky', top: 0, zIndex: 10,
       }}>
         <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{title}</h2>
@@ -76,12 +76,12 @@ export default function AddView({
         {!editing && (
           <div style={{
             display: 'flex', gap: 4, marginTop: 12, padding: 4,
-            background: '#f1f3f5', borderRadius: 11,
+            background: '#F2F4F6', borderRadius: 11,
           }}>
-            <button onClick={() => onModeChange('expense')} style={tab('expense', '#e74c3c')}>
+            <button onClick={() => onModeChange('expense')} style={tab('expense', '#F04452')}>
               − 쓴 돈
             </button>
-            <button onClick={() => onModeChange('income')} style={tab('income', '#27ae60')}>
+            <button onClick={() => onModeChange('income')} style={tab('income', '#12B76A')}>
               + 들어온 돈
             </button>
             {/* 축의금·부의금·용돈 — 여기서 적으면 경조사 장부에 저절로 쌓인다 */}

@@ -32,7 +32,7 @@ export default function PiggyGauge({ budget }: Props) {
   const color = LEVEL_COLOR[budget.level];
   const over = budget.hasIncome && budget.freeCash < 0;
   const ratio = budget.fillRatio;
-  const outline = over ? '#e74c3c' : '#cfd8dc';
+  const outline = over ? '#F04452' : '#D1D6DB';
 
   // 채움: 몸통 전체를 덮는 rect를 아래로 밀어 내린다.
   // y/height를 직접 애니메이션하는 것보다 transform 전환이 어디서나 안정적이다.
@@ -65,12 +65,12 @@ export default function PiggyGauge({ budget }: Props) {
       </defs>
 
       {/* 장식(귀·다리·꼬리) — 몸통 뒤에 먼저 깔아서 자연스럽게 붙어 보이게 */}
-      <path d={PIG_EARS} fill={over ? '#fadbd8' : '#e3e8ea'} stroke={outline} strokeWidth="2.4" strokeLinejoin="round" />
-      <path d={PIG_LEGS} fill={over ? '#fadbd8' : '#e3e8ea'} stroke={outline} strokeWidth="2.4" strokeLinejoin="round" />
+      <path d={PIG_EARS} fill={over ? '#FFD9DD' : '#E5E8EB'} stroke={outline} strokeWidth="2.4" strokeLinejoin="round" />
+      <path d={PIG_LEGS} fill={over ? '#FFD9DD' : '#E5E8EB'} stroke={outline} strokeWidth="2.4" strokeLinejoin="round" />
       <path d={PIG_TAIL} fill="none" stroke={outline} strokeWidth="3.4" strokeLinecap="round" />
 
       {/* 1) 빈 저금통 */}
-      <g fill="#eceff1"><FillShape /></g>
+      <g fill="#F2F4F6"><FillShape /></g>
 
       {/* 2) 채워지는 돈 */}
       <g clipPath={`url(#${clipId})`}>
@@ -86,8 +86,8 @@ export default function PiggyGauge({ budget }: Props) {
                가운데 금액과 겹치지 않게 양쪽 끝에만 짧게 그린다. */}
         {showPace && (
           <>
-            <line x1="0" x2="48" y1={paceY} y2={paceY} stroke="#455a64" strokeWidth="2" strokeDasharray="4 3" opacity="0.55" />
-            <line x1={VIEWBOX.w - 48} x2={VIEWBOX.w} y1={paceY} y2={paceY} stroke="#455a64" strokeWidth="2" strokeDasharray="4 3" opacity="0.55" />
+            <line x1="0" x2="48" y1={paceY} y2={paceY} stroke="#4E5968" strokeWidth="2" strokeDasharray="4 3" opacity="0.55" />
+            <line x1={VIEWBOX.w - 48} x2={VIEWBOX.w} y1={paceY} y2={paceY} stroke="#4E5968" strokeWidth="2" strokeDasharray="4 3" opacity="0.55" />
           </>
         )}
       </g>
@@ -104,12 +104,12 @@ export default function PiggyGauge({ budget }: Props) {
 
       {/* 5) 얼굴과 투입구 */}
       <rect x={PIG_SLOT.x} y={PIG_SLOT.y} width={PIG_SLOT.w} height={PIG_SLOT.h} rx={PIG_SLOT.r} fill={outline} />
-      <circle cx={PIG_EYE.cx} cy={PIG_EYE.cy} r={PIG_EYE.r} fill={over ? '#c0392b' : '#546e7a'} />
-      <circle cx={PIG_SNOUT.cx - NOSTRIL_DX} cy={PIG_SNOUT.cy + NOSTRIL_DY} r="2.3" fill={over ? '#c0392b' : '#8fa3ac'} />
-      <circle cx={PIG_SNOUT.cx + NOSTRIL_DX} cy={PIG_SNOUT.cy + NOSTRIL_DY} r="2.3" fill={over ? '#c0392b' : '#8fa3ac'} />
+      <circle cx={PIG_EYE.cx} cy={PIG_EYE.cy} r={PIG_EYE.r} fill={over ? '#D22030' : '#4E5968'} />
+      <circle cx={PIG_SNOUT.cx - NOSTRIL_DX} cy={PIG_SNOUT.cy + NOSTRIL_DY} r="2.3" fill={over ? '#D22030' : '#8fa3ac'} />
+      <circle cx={PIG_SNOUT.cx + NOSTRIL_DX} cy={PIG_SNOUT.cy + NOSTRIL_DY} r="2.3" fill={over ? '#D22030' : '#8fa3ac'} />
 
       {over && (
-        <path d={PIG_CRACK} fill="none" stroke="#e74c3c" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={PIG_CRACK} fill="none" stroke="#F04452" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
       )}
     </svg>
   );

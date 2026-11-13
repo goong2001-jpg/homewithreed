@@ -35,7 +35,7 @@ function text(
   opt: { size: number; weight?: number; color?: string; align?: CanvasTextAlign } ,
 ) {
   ctx.font = `${opt.weight ?? 500} ${opt.size}px ${FONT}`;
-  ctx.fillStyle = opt.color ?? '#2c3e50';
+  ctx.fillStyle = opt.color ?? '#191F28';
   ctx.textAlign = opt.align ?? 'left';
   ctx.textBaseline = 'alphabetic';
   ctx.fillText(s, x, y);
@@ -58,7 +58,7 @@ export function drawWeeklyReport(r: WeeklyReport): HTMLCanvasElement {
   if (!ctx) throw new Error('canvas 를 쓸 수 없는 브라우저예요.');
 
   // 배경 — 앱과 같은 회색 바탕, 흰 카드
-  ctx.fillStyle = '#f8f9fa';
+  ctx.fillStyle = '#F2F4F6';
   ctx.fillRect(0, 0, W, H);
 
   const pad = 72;
@@ -66,18 +66,18 @@ export function drawWeeklyReport(r: WeeklyReport): HTMLCanvasElement {
 
   text(ctx, '🐷 우리집 주간 리포트', pad, y, { size: 56, weight: 800 });
   y += 64;
-  text(ctx, weekRangeLabel(r), pad, y, { size: 34, color: '#8a959b' });
+  text(ctx, weekRangeLabel(r), pad, y, { size: 34, color: '#8B95A1' });
   y += 70;
 
   // 카드 1 — 이번 주 지출 · 예산 대비
   const over = r.hasIncome && r.diff < 0;
-  const accent = !r.hasIncome ? '#95a5a6' : over ? '#e74c3c' : '#27ae60';
+  const accent = !r.hasIncome ? '#8B95A1' : over ? '#F04452' : '#12B76A';
   ctx.fillStyle = '#fff';
   roundRect(ctx, pad, y, W - pad * 2, 300, 28);
   ctx.fill();
-  text(ctx, '이번 주 쓴 돈', pad + 48, y + 72, { size: 30, color: '#888' });
-  text(ctx, won(r.totalSpent), pad + 48, y + 160, { size: 84, weight: 800, color: '#2c3e50' });
-  text(ctx, `${r.count}건`, W - pad - 48, y + 160, { size: 32, color: '#b0bec5', align: 'right' });
+  text(ctx, '이번 주 쓴 돈', pad + 48, y + 72, { size: 30, color: '#8B95A1' });
+  text(ctx, won(r.totalSpent), pad + 48, y + 160, { size: 84, weight: 800, color: '#191F28' });
+  text(ctx, `${r.count}건`, W - pad - 48, y + 160, { size: 32, color: '#B0B8C1', align: 'right' });
   ctx.fillStyle = `${accent}22`;
   roundRect(ctx, pad + 48, y + 198, W - pad * 2 - 96, 66, 33);
   ctx.fill();
@@ -89,7 +89,7 @@ export function drawWeeklyReport(r: WeeklyReport): HTMLCanvasElement {
     ctx.fillStyle = '#fff';
     roundRect(ctx, pad, y, W - pad * 2, 130, 28);
     ctx.fill();
-    text(ctx, '쓸 수 있던 돈', pad + 48, y + 56, { size: 28, color: '#888' });
+    text(ctx, '쓸 수 있던 돈', pad + 48, y + 56, { size: 28, color: '#8B95A1' });
     text(
       ctx,
       `하루 ${won(Math.floor(r.dailyIncome))} × 7일 = ${won(Math.floor(r.weeklyBudget))}`,
@@ -105,16 +105,16 @@ export function drawWeeklyReport(r: WeeklyReport): HTMLCanvasElement {
   ctx.fill();
   text(ctx, '많이 쓴 곳', pad + 48, y + 60, { size: 30, weight: 700 });
   if (!r.topCategories.length) {
-    text(ctx, '이번 주 지출이 없어요', pad + 48, y + 130, { size: 28, color: '#b0bec5' });
+    text(ctx, '이번 주 지출이 없어요', pad + 48, y + 130, { size: 28, color: '#B0B8C1' });
   } else {
     const max = r.topCategories[0].amount || 1;
     r.topCategories.forEach((c, i) => {
       const cy = y + 100 + i * 92;
       text(ctx, `${CATEGORY_EMOJI[c.category]} ${c.category}`, pad + 48, cy + 34, { size: 30, weight: 600 });
-      text(ctx, won(c.amount), W - pad - 48, cy + 34, { size: 30, weight: 700, color: '#e74c3c', align: 'right' });
+      text(ctx, won(c.amount), W - pad - 48, cy + 34, { size: 30, weight: 700, color: '#F04452', align: 'right' });
       const bx = pad + 48;
       const bw = W - pad * 2 - 96;
-      ctx.fillStyle = '#f1f3f5';
+      ctx.fillStyle = '#F2F4F6';
       roundRect(ctx, bx, cy + 50, bw, 16, 8);
       ctx.fill();
       ctx.fillStyle = CATEGORY_COLOR[c.category];
@@ -131,13 +131,13 @@ export function drawWeeklyReport(r: WeeklyReport): HTMLCanvasElement {
   ctx.fill();
   text(ctx, '큰 지출 TOP 3', pad + 48, y + 60, { size: 30, weight: 700 });
   if (!r.topExpenses.length) {
-    text(ctx, '없어요', pad + 48, y + 130, { size: 28, color: '#b0bec5' });
+    text(ctx, '없어요', pad + 48, y + 130, { size: 28, color: '#B0B8C1' });
   } else {
     r.topExpenses.forEach((e, i) => {
       const ey = y + 118 + i * 72;
       ctx.font = `500 28px ${FONT}`;
       const label = clip(ctx, `${i + 1}. ${shortDate(e.date)} ${e.content}`, W - pad * 2 - 96 - 260);
-      text(ctx, label, pad + 48, ey, { size: 28, color: '#455a64' });
+      text(ctx, label, pad + 48, ey, { size: 28, color: '#4E5968' });
       text(ctx, won(e.amount), W - pad - 48, ey, { size: 28, weight: 700, align: 'right' });
     });
   }
@@ -145,13 +145,13 @@ export function drawWeeklyReport(r: WeeklyReport): HTMLCanvasElement {
 
   // 지난주 대비
   const d = r.deltaRatio;
-  const dColor = d === null ? '#8a959b' : d > 0.005 ? '#e74c3c' : d < -0.005 ? '#27ae60' : '#8a959b';
+  const dColor = d === null ? '#8B95A1' : d > 0.005 ? '#F04452' : d < -0.005 ? '#12B76A' : '#8B95A1';
   text(ctx, deltaLabel(r), W / 2, y + 60, { size: 34, weight: 700, color: dColor, align: 'center' });
   if (r.prevTotal > 0) {
-    text(ctx, `지난주 ${won(r.prevTotal)}`, W / 2, y + 108, { size: 26, color: '#b0bec5', align: 'center' });
+    text(ctx, `지난주 ${won(r.prevTotal)}`, W / 2, y + 108, { size: 26, color: '#B0B8C1', align: 'center' });
   }
 
-  text(ctx, '우리집 하루수입 가계부', W / 2, H - 60, { size: 24, color: '#c5ced2', align: 'center' });
+  text(ctx, '우리집 하루수입 가계부', W / 2, H - 60, { size: 24, color: '#B0B8C1', align: 'center' });
   return canvas;
 }
 

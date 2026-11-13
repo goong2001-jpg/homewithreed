@@ -28,8 +28,8 @@ export default function MissingDaysCard({ days, onFill, onMarkNoSpend }: Props) 
 
   return (
     <div style={{
-      margin: '0 16px 12px', background: '#fffaf0', border: '1px solid #f5deb3',
-      borderRadius: 12, padding: '13px 14px',
+      margin: '0 12px 10px', background: '#FFF7E0', border: 'none',
+      borderRadius: 20, padding: '16px 18px',
     }}>
       <div style={{ fontSize: 13.5, fontWeight: 700, color: '#8a6d1a' }}>
         {days.length === 1 ? '어제 기록이 없어요' : `${days.length}일째 기록이 없어요`}
@@ -40,7 +40,7 @@ export default function MissingDaysCard({ days, onFill, onMarkNoSpend }: Props) 
       <div style={{ display: 'flex', gap: 8 }}>
         <button
           onClick={() => onFill(last)}
-          style={{ ...btn, background: '#27ae60', color: '#fff', border: 'none' }}
+          style={{ ...btn, background: '#12B76A', color: '#fff', border: 'none' }}
         >
           쓴 돈 적기
         </button>
