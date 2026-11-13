@@ -14,10 +14,10 @@ const TEXT: Record<SyncStatus, string> = {
 };
 
 const DOT: Record<SyncStatus, string> = {
-  off: '#b0bec5',
-  connecting: '#f39c12',
-  live: '#27ae60',
-  error: '#e74c3c',
+  off: '#B0B8C1',
+  connecting: '#F59F00',
+  live: '#12B76A',
+  error: '#F04452',
 };
 
 export default function SyncBadge({ status, onClick }: Props) {
@@ -28,12 +28,13 @@ export default function SyncBadge({ status, onClick }: Props) {
         display: 'flex',
         alignItems: 'center',
         gap: 5,
-        background: '#f5f7f8',
+        background: '#F2F4F6',
         border: 'none',
-        borderRadius: 20,
-        padding: '5px 10px',
-        fontSize: 11,
-        color: '#607d8b',
+        borderRadius: 8,
+        padding: '6px 10px',
+        fontSize: 12,
+        fontWeight: 500,
+        color: '#6B7684',
         cursor: onClick ? 'pointer' : 'default',
         whiteSpace: 'nowrap',
       }}

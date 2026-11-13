@@ -102,9 +102,9 @@ export default function HistoryView({
 
   const chip = (on: boolean, color: string): React.CSSProperties => ({
     padding: '7px 13px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer',
-    border: `1.5px solid ${on ? color : '#e0e0e0'}`,
+    border: `1.5px solid ${on ? color : '#E5E8EB'}`,
     background: on ? `${color}14` : '#fff',
-    color: on ? color : '#666',
+    color: on ? color : '#4E5968',
     fontWeight: on ? 700 : 400,
     whiteSpace: 'nowrap',
   });
@@ -124,9 +124,9 @@ export default function HistoryView({
             onClick={handleExport}
             disabled={rows.length === 0 || exporting}
             style={{
-              fontSize: 11.5, padding: '6px 10px', border: '1px solid #ddd', borderRadius: 8,
-              background: rows.length === 0 ? '#f5f5f5' : '#eafaf1',
-              color: rows.length === 0 ? '#aaa' : '#27ae60',
+              fontSize: 11.5, padding: '6px 10px', border: '1px solid #E5E8EB', borderRadius: 12,
+              background: rows.length === 0 ? '#F2F4F6' : '#E8F8F0',
+              color: rows.length === 0 ? '#B0B8C1' : '#12B76A',
               cursor: rows.length === 0 ? 'not-allowed' : 'pointer',
               fontWeight: 600, whiteSpace: 'nowrap',
             }}
@@ -145,7 +145,7 @@ export default function HistoryView({
         <button
           ref={filter === 'all' ? activeChipRef : undefined}
           onClick={() => { setFilter('all'); setCategory(null); }}
-          style={chip(filter === 'all', '#27ae60')}
+          style={chip(filter === 'all', '#12B76A')}
         >
           전체 {won(rows.reduce((s, e) => s + e.amount, 0))}
         </button>
@@ -167,8 +167,8 @@ export default function HistoryView({
       {/* 사람을 골랐을 때: 그 사람 수입 · 지출 요약 */}
       {personStat && (
         <div style={{
-          background: '#fff', margin: '12px 16px', borderRadius: 12, padding: 16,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          background: '#fff', margin: '12px 16px', borderRadius: 20, padding: 16,
+          boxShadow: 'none',
         }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12,
@@ -177,26 +177,26 @@ export default function HistoryView({
               width: 10, height: 10, borderRadius: '50%',
               background: personStat.color, flexShrink: 0,
             }} />
-            <h3 style={{ margin: 0, fontSize: 15, color: '#2c3e50' }}>
+            <h3 style={{ margin: 0, fontSize: 15, color: '#191F28' }}>
               {personStat.name}
             </h3>
           </div>
           <div style={{ display: 'flex' }}>
-            <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid #f0f0f0' }}>
-              <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>이달 수입</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#27ae60' }}>
+            <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid #F2F4F6' }}>
+              <div style={{ fontSize: 11, color: '#8B95A1', marginBottom: 4 }}>이달 수입</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#12B76A' }}>
                 {won(personStat.income)}
               </div>
             </div>
-            <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid #f0f0f0' }}>
-              <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>이달 지출</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#e74c3c' }}>
+            <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid #F2F4F6' }}>
+              <div style={{ fontSize: 11, color: '#8B95A1', marginBottom: 4 }}>이달 지출</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#F04452' }}>
                 {won(personStat.expense)}
               </div>
             </div>
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>전체 중</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#2c3e50' }}>
+              <div style={{ fontSize: 11, color: '#8B95A1', marginBottom: 4 }}>전체 중</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#191F28' }}>
                 {Math.round(personStat.ratio * 100)}%
               </div>
             </div>
@@ -217,10 +217,10 @@ export default function HistoryView({
         display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
         padding: '14px 16px 6px',
       }}>
-        <h3 style={{ margin: 0, fontSize: 14, color: '#333' }}>
+        <h3 style={{ margin: 0, fontSize: 14, color: '#191F28' }}>
           이달 쓴 돈
           {category && (
-            <span style={{ fontSize: 12, color: '#e74c3c', fontWeight: 700, marginLeft: 6 }}>
+            <span style={{ fontSize: 12, color: '#F04452', fontWeight: 700, marginLeft: 6 }}>
               {`· ${category}만 보는 중`}
             </span>
           )}
@@ -229,8 +229,8 @@ export default function HistoryView({
           <button
             onClick={() => { setCategory(null); setFilter('all'); }}
             style={{
-              fontSize: 11.5, padding: '4px 10px', border: '1px solid #e0e0e0',
-              borderRadius: 12, background: '#fff', color: '#78909c', cursor: 'pointer',
+              fontSize: 11.5, padding: '4px 10px', border: '1px solid #E5E8EB',
+              borderRadius: 20, background: '#fff', color: '#8B95A1', cursor: 'pointer',
             }}
           >
             전체 보기
@@ -239,7 +239,7 @@ export default function HistoryView({
       </div>
 
       {groups.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '54px 20px', color: '#bbb' }}>
+        <div style={{ textAlign: 'center', padding: '54px 20px', color: '#B0B8C1' }}>
           <div style={{ fontSize: 46, marginBottom: 12 }}>📋</div>
           <div style={{ fontSize: 15 }}>
             {category
@@ -249,11 +249,11 @@ export default function HistoryView({
         </div>
       ) : (
         <div style={{ marginTop: 8 }}>
-          <div style={{ padding: '0 16px 8px', fontSize: 11.5, color: '#b0bec5' }}>
+          <div style={{ padding: '0 16px 8px', fontSize: 11.5, color: '#B0B8C1' }}>
             내역을 누르면 금액·메모를 고칠 수 있어요
           </div>
           {(filter !== 'all' || category) && (
-            <div style={{ padding: '0 16px 8px', fontSize: 12, color: '#95a5a6' }}>
+            <div style={{ padding: '0 16px 8px', fontSize: 12, color: '#8B95A1' }}>
               {[selectedPerson?.name, category].filter(Boolean).join(' · ')}
               {' '}— {shown.length}건 · {won(shownTotal)}
             </div>
@@ -261,8 +261,8 @@ export default function HistoryView({
           {groups.map(([date, items]) => (
             <div key={date}>
               <div style={{
-                padding: '9px 16px', fontSize: 12, color: '#888', fontWeight: 600,
-                background: '#f8f9fa', display: 'flex', justifyContent: 'space-between',
+                padding: '9px 16px', fontSize: 12, color: '#8B95A1', fontWeight: 600,
+                background: '#F2F4F6', display: 'flex', justifyContent: 'space-between',
               }}>
                 <span>{dateLabel(date)}</span>
                 <span>{won(items.reduce((s, e) => s + e.amount, 0))}</span>
@@ -271,14 +271,14 @@ export default function HistoryView({
                 {items.length === 0 && (
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px',
-                    borderBottom: '1px solid #f5f5f5', fontSize: 13.5, color: '#78909c',
+                    borderBottom: '1px solid #F2F4F6', fontSize: 13.5, color: '#8B95A1',
                   }}>
                     <span style={{ flex: 1 }}>안 쓴 날로 표시했어요</span>
                     <button
                       onClick={() => marks.filter(m => m.date === date).forEach(m => onDeleteExpense(m.id))}
                       style={{
-                        fontSize: 11.5, padding: '4px 10px', borderRadius: 12, cursor: 'pointer',
-                        border: '1px solid #e0e0e0', background: '#fff', color: '#90a4ae',
+                        fontSize: 11.5, padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+                        border: '1px solid #E5E8EB', background: '#fff', color: '#8B95A1',
                       }}
                     >
                       표시 지우기
@@ -303,41 +303,41 @@ export default function HistoryView({
       {/* 고정지출 (매달 반복 — 여기서는 보기만) */}
       {activeFixedRows.length > 0 && (
         <div style={{
-          background: '#fff', margin: '12px 16px', borderRadius: 12, overflow: 'hidden',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          background: '#fff', margin: '12px 16px', borderRadius: 20, overflow: 'hidden',
+          boxShadow: 'none',
         }}>
           <div style={{
-            padding: '11px 14px', background: '#fafbfc', borderBottom: '1px solid #f0f0f0',
+            padding: '11px 14px', background: '#F9FAFB', borderBottom: '1px solid #F2F4F6',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#607d8b' }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#6B7684' }}>
               고정지출 · 매달 반복
-              <span style={{ fontWeight: 400, color: '#90a4ae' }}> (위 목록에는 없어요)</span>
+              <span style={{ fontWeight: 400, color: '#8B95A1' }}> (위 목록에는 없어요)</span>
             </span>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#607d8b' }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#6B7684' }}>
               {won(budget.totalFixed)}
             </span>
           </div>
           {activeFixedRows.map(f => (
             <div key={f.id} style={{
               display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 14px', borderBottom: '1px solid #f7f7f7', fontSize: 13.5,
+              padding: '10px 14px', borderBottom: '1px solid #F2F4F6', fontSize: 13.5,
             }}>
-              <span style={{ flex: 1, color: '#2c3e50' }}>{f.name}</span>
+              <span style={{ flex: 1, color: '#191F28' }}>{f.name}</span>
               <span style={{
-                fontSize: 10, color: '#78909c', background: '#eceff1',
+                fontSize: 10, color: '#8B95A1', background: '#F2F4F6',
                 borderRadius: 6, padding: '2px 6px',
               }}>
                 매달
               </span>
-              <span style={{ fontWeight: 700, color: '#607d8b' }}>{won(f.amount)}</span>
+              <span style={{ fontWeight: 700, color: '#6B7684' }}>{won(f.amount)}</span>
             </div>
           ))}
           <button
             onClick={onGoSettings}
             style={{
               width: '100%', padding: '10px', background: 'none', border: 'none',
-              fontSize: 12, color: '#90a4ae', cursor: 'pointer',
+              fontSize: 12, color: '#8B95A1', cursor: 'pointer',
             }}
           >
             설정에서 수정 ›
@@ -350,8 +350,8 @@ export default function HistoryView({
           onClick={onPullAll}
           style={{
             display: 'block', width: 'calc(100% - 32px)', margin: '18px 16px 8px',
-            padding: 13, background: '#fff', border: '1px solid #e0e0e0', borderRadius: 10,
-            fontSize: 13, color: '#607d8b', cursor: 'pointer',
+            padding: 13, background: '#fff', border: '1px solid #E5E8EB', borderRadius: 14,
+            fontSize: 13, color: '#6B7684', cursor: 'pointer',
           }}
         >
           지난 데이터 모두 불러오기

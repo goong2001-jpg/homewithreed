@@ -29,16 +29,16 @@ export default function FixedExpenseCard({
 
   return (
     <div style={cardStyle}>
-      <h3 style={{ margin: '0 0 4px', fontSize: 15, color: '#333' }}>고정지출</h3>
-      <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#95a5a6', lineHeight: 1.6 }}>
+      <h3 style={{ margin: '0 0 4px', fontSize: 15, color: '#191F28' }}>고정지출</h3>
+      <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#8B95A1', lineHeight: 1.6 }}>
         매달 똑같이 나가는 돈이에요. 한 번 등록하면 매달 자동으로 계산되고,
         <b> 하루 수입을 계산할 때 먼저 빠집니다.</b>
       </p>
 
       {rows.length === 0 && !editing && (
         <div style={{
-          padding: '18px 14px', background: '#fafbfc', borderRadius: 10,
-          fontSize: 13, color: '#b0bec5', textAlign: 'center',
+          padding: '18px 14px', background: '#F9FAFB', borderRadius: 14,
+          fontSize: 13, color: '#B0B8C1', textAlign: 'center',
         }}>
           등록된 고정지출이 없어요
         </div>
@@ -47,21 +47,21 @@ export default function FixedExpenseCard({
       {rows.map(f => (
         <div key={f.id} style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          padding: '11px 0', borderBottom: '1px solid #f5f5f5',
+          padding: '11px 0', borderBottom: '1px solid #F2F4F6',
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#2c3e50' }}>{f.name}</div>
-            <div style={{ fontSize: 11, color: '#a0aeb5', marginTop: 2 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#191F28' }}>{f.name}</div>
+            <div style={{ fontSize: 11, color: '#8B95A1', marginTop: 2 }}>
               {monthLabel(f.startMonth)}부터 {f.endMonth ? `${monthLabel(f.endMonth)}까지` : '계속'}
               {f.personId && ` · ${nameOf(f.personId)}`}
             </div>
           </div>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#607d8b' }}>{won(f.amount)}</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#6B7684' }}>{won(f.amount)}</span>
           <button
             onClick={() => setEditing(f)}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: 12, color: '#90a4ae', padding: '4px 6px',
+              fontSize: 12, color: '#8B95A1', padding: '4px 6px',
             }}
           >
             수정
@@ -72,7 +72,7 @@ export default function FixedExpenseCard({
       {rows.length > 0 && (
         <div style={{
           display: 'flex', justifyContent: 'space-between',
-          paddingTop: 12, fontSize: 13.5, fontWeight: 700, color: '#2c3e50',
+          paddingTop: 12, fontSize: 13.5, fontWeight: 700, color: '#191F28',
         }}>
           <span>{monthLabel(month)} 합계</span>
           <span>{won(total)}</span>
@@ -93,9 +93,9 @@ export default function FixedExpenseCard({
         <button
           onClick={() => setEditing('new')}
           style={{
-            marginTop: 14, width: '100%', padding: 12, background: '#f8f9fa',
-            border: '1.5px dashed #cfd8dc', borderRadius: 10,
-            fontSize: 14, fontWeight: 600, color: '#607d8b', cursor: 'pointer',
+            marginTop: 14, width: '100%', padding: 12, background: '#F2F4F6',
+            border: '1.5px dashed #D1D6DB', borderRadius: 14,
+            fontSize: 14, fontWeight: 600, color: '#6B7684', cursor: 'pointer',
           }}
         >
           + 고정지출 추가
@@ -126,11 +126,11 @@ function FixedForm({
   const [error, setError] = useState('');
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 12px', border: '1.5px solid #e0e0e0',
-    borderRadius: 8, fontSize: 14, boxSizing: 'border-box', outline: 'none',
+    width: '100%', padding: '10px 12px', border: '1.5px solid #E5E8EB',
+    borderRadius: 12, fontSize: 14, boxSizing: 'border-box', outline: 'none',
   };
   const labelStyle: React.CSSProperties = {
-    fontSize: 12, fontWeight: 600, color: '#607d8b', marginBottom: 5, display: 'block',
+    fontSize: 12, fontWeight: 600, color: '#6B7684', marginBottom: 5, display: 'block',
   };
 
   function submit() {
@@ -150,8 +150,8 @@ function FixedForm({
 
   return (
     <div style={{
-      marginTop: 14, padding: 14, background: '#fafbfc',
-      border: '1px solid #eceff1', borderRadius: 10,
+      marginTop: 14, padding: 14, background: '#F9FAFB',
+      border: '1px solid #F2F4F6', borderRadius: 14,
       display: 'flex', flexDirection: 'column', gap: 12,
     }}>
       <div>
@@ -171,7 +171,7 @@ function FixedForm({
                 onClick={() => setName(s)}
                 style={{
                   fontSize: 11.5, padding: '5px 10px', borderRadius: 14,
-                  border: '1px solid #e0e0e0', background: '#fff', color: '#78909c', cursor: 'pointer',
+                  border: '1px solid #E5E8EB', background: '#fff', color: '#8B95A1', cursor: 'pointer',
                 }}
               >
                 {s}
@@ -208,7 +208,7 @@ function FixedForm({
           {ongoing ? (
             <button
               onClick={() => setOngoing(false)}
-              style={{ ...inputStyle, textAlign: 'left', color: '#90a4ae', cursor: 'pointer', background: '#fff' }}
+              style={{ ...inputStyle, textAlign: 'left', color: '#8B95A1', cursor: 'pointer', background: '#fff' }}
             >
               계속 (눌러서 지정)
             </button>
@@ -223,8 +223,8 @@ function FixedForm({
               <button
                 onClick={() => setOngoing(true)}
                 style={{
-                  border: '1.5px solid #e0e0e0', borderRadius: 8, background: '#fff',
-                  color: '#90a4ae', cursor: 'pointer', fontSize: 12, padding: '0 8px', flexShrink: 0,
+                  border: '1.5px solid #E5E8EB', borderRadius: 12, background: '#fff',
+                  color: '#8B95A1', cursor: 'pointer', fontSize: 12, padding: '0 8px', flexShrink: 0,
                 }}
                 aria-label="종료월 지정 해제"
               >
@@ -238,7 +238,7 @@ function FixedForm({
       <div>
         <label style={labelStyle}>누가 부담하나요?</label>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {[{ id: null, name: '공동', color: '#607d8b' }, ...persons].map(p => {
+          {[{ id: null, name: '공동', color: '#6B7684' }, ...persons].map(p => {
             const on = personId === p.id;
             return (
               <button
@@ -246,9 +246,9 @@ function FixedForm({
                 onClick={() => setPersonId(p.id)}
                 style={{
                   padding: '8px 13px', borderRadius: 18, fontSize: 12.5, cursor: 'pointer',
-                  border: `1.5px solid ${on ? p.color : '#e0e0e0'}`,
+                  border: `1.5px solid ${on ? p.color : '#E5E8EB'}`,
                   background: on ? `${p.color}14` : '#fff',
-                  color: on ? p.color : '#666',
+                  color: on ? p.color : '#4E5968',
                   fontWeight: on ? 700 : 400,
                 }}
               >
@@ -260,7 +260,7 @@ function FixedForm({
       </div>
 
       {error && (
-        <div style={{ fontSize: 12.5, color: '#e74c3c', background: '#fdedec', borderRadius: 8, padding: '9px 12px' }}>
+        <div style={{ fontSize: 12.5, color: '#F04452', background: '#FFEEF0', borderRadius: 12, padding: '9px 12px' }}>
           {error}
         </div>
       )}
@@ -270,8 +270,8 @@ function FixedForm({
           <button
             onClick={() => onDelete(initial.id)}
             style={{
-              padding: '12px 14px', background: '#fdedec', border: 'none', borderRadius: 8,
-              fontSize: 13, fontWeight: 600, color: '#e74c3c', cursor: 'pointer',
+              padding: '12px 14px', background: '#FFEEF0', border: 'none', borderRadius: 12,
+              fontSize: 13, fontWeight: 600, color: '#F04452', cursor: 'pointer',
             }}
           >
             삭제
@@ -280,8 +280,8 @@ function FixedForm({
         <button
           onClick={onCancel}
           style={{
-            flex: 1, padding: 12, background: '#f0f0f0', border: 'none', borderRadius: 8,
-            fontSize: 13.5, fontWeight: 600, color: '#666', cursor: 'pointer',
+            flex: 1, padding: 12, background: '#F2F4F6', border: 'none', borderRadius: 12,
+            fontSize: 13.5, fontWeight: 600, color: '#4E5968', cursor: 'pointer',
           }}
         >
           취소
@@ -289,7 +289,7 @@ function FixedForm({
         <button
           onClick={submit}
           style={{
-            flex: 1.6, padding: 12, background: '#27ae60', border: 'none', borderRadius: 8,
+            flex: 1.6, padding: 12, background: '#12B76A', border: 'none', borderRadius: 12,
             fontSize: 13.5, fontWeight: 700, color: '#fff', cursor: 'pointer',
           }}
         >

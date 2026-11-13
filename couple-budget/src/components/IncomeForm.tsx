@@ -51,11 +51,11 @@ export default function IncomeForm({
   const dailyAfter = dailyBudgetOf(budget.spendable + delta, budget.month);
 
   const labelStyle: React.CSSProperties = {
-    fontSize: 13, fontWeight: 600, color: '#555', marginBottom: 7, display: 'block',
+    fontSize: 13, fontWeight: 600, color: '#4E5968', marginBottom: 7, display: 'block',
   };
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '11px 12px', border: '1.5px solid #e0e0e0',
-    borderRadius: 8, fontSize: 15, boxSizing: 'border-box', outline: 'none',
+    width: '100%', padding: '11px 12px', border: '1.5px solid #E5E8EB',
+    borderRadius: 12, fontSize: 15, boxSizing: 'border-box', outline: 'none',
   };
 
   function handleSubmit() {
@@ -99,22 +99,22 @@ export default function IncomeForm({
             style={{
               ...inputStyle,
               fontSize: 30, fontWeight: 800, textAlign: 'right',
-              padding: '14px 44px 14px 14px', color: '#27ae60',
+              padding: '14px 44px 14px 14px', color: '#12B76A',
             }}
           />
           <span style={{
             position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)',
-            fontSize: 18, fontWeight: 700, color: '#bbb', pointerEvents: 'none',
+            fontSize: 18, fontWeight: 700, color: '#B0B8C1', pointerEvents: 'none',
           }}>
             원
           </span>
         </div>
 
         {editing && (
-          <div style={{ marginTop: 8, fontSize: 12, color: '#95a5a6' }}>
+          <div style={{ marginTop: 8, fontSize: 12, color: '#8B95A1' }}>
             원래 금액 {won(initial!.amount)}
             {delta !== 0 && (
-              <b style={{ color: delta > 0 ? '#27ae60' : '#e74c3c', marginLeft: 6 }}>
+              <b style={{ color: delta > 0 ? '#12B76A' : '#F04452', marginLeft: 6 }}>
                 {delta > 0 ? '+' : '−'}{won(Math.abs(delta))}
               </b>
             )}
@@ -124,13 +124,13 @@ export default function IncomeForm({
         {/* 나눗셈은 앱이 한다 */}
         {delta !== 0 && sameMonth && (
           <div style={{
-            marginTop: 9, fontSize: 12.5, color: '#7f8c8d', background: '#f5f7f8',
-            borderRadius: 8, padding: '9px 12px', lineHeight: 1.6,
+            marginTop: 9, fontSize: 12.5, color: '#8B95A1', background: '#F2F4F6',
+            borderRadius: 12, padding: '9px 12px', lineHeight: 1.6,
           }}>
             저장하면 하루 쓸 수 있는 돈{' '}
             {won(Math.floor(budget.dailyBudget))} →{' '}
-            <b style={{ color: '#27ae60' }}>{won(Math.floor(dailyAfter))}</b>
-            <div style={{ fontSize: 11, color: '#aaa', marginTop: 3 }}>
+            <b style={{ color: '#12B76A' }}>{won(Math.floor(dailyAfter))}</b>
+            <div style={{ fontSize: 11, color: '#B0B8C1', marginTop: 3 }}>
               {won(Math.abs(delta))} ÷ {budget.daysInMonth}일
             </div>
           </div>
@@ -148,10 +148,10 @@ export default function IncomeForm({
                 key={p.id}
                 onClick={() => setPersonId(p.id)}
                 style={{
-                  flex: 1, minWidth: 90, padding: '12px 10px', borderRadius: 10,
-                  border: `2px solid ${on ? p.color : '#e0e0e0'}`,
+                  flex: 1, minWidth: 90, padding: '12px 10px', borderRadius: 14,
+                  border: `2px solid ${on ? p.color : '#E5E8EB'}`,
                   background: on ? `${p.color}14` : '#fff',
-                  color: on ? p.color : '#666',
+                  color: on ? p.color : '#4E5968',
                   fontWeight: on ? 700 : 500, fontSize: 15, cursor: 'pointer',
                 }}
               >
@@ -174,9 +174,9 @@ export default function IncomeForm({
                 onClick={() => setMemo(on ? '' : m)}
                 style={{
                   padding: '9px 15px', borderRadius: 20,
-                  border: `1.5px solid ${on ? '#27ae60' : '#e0e0e0'}`,
-                  background: on ? '#eafaf1' : '#fff',
-                  color: on ? '#1e8449' : '#555',
+                  border: `1.5px solid ${on ? '#12B76A' : '#E5E8EB'}`,
+                  background: on ? '#E8F8F0' : '#fff',
+                  color: on ? '#0E9F5B' : '#4E5968',
                   fontWeight: on ? 700 : 400, cursor: 'pointer', fontSize: 13,
                 }}
               >
@@ -206,7 +206,7 @@ export default function IncomeForm({
           style={inputStyle}
         />
         {!sameMonth && (
-          <div style={{ marginTop: 7, fontSize: 12, color: '#f39c12', lineHeight: 1.6 }}>
+          <div style={{ marginTop: 7, fontSize: 12, color: '#F59F00', lineHeight: 1.6 }}>
             지금 보고 있는 달({monthLabel(budget.month)})이 아니라{' '}
             {monthLabel(targetMonth)} 수입으로 저장됩니다.
           </div>
@@ -214,7 +214,7 @@ export default function IncomeForm({
       </div>
 
       {error && (
-        <div style={{ padding: '10px 14px', background: '#fdedec', borderRadius: 8, color: '#e74c3c', fontSize: 14 }}>
+        <div style={{ padding: '10px 14px', background: '#FFEEF0', borderRadius: 12, color: '#F04452', fontSize: 14 }}>
           {error}
         </div>
       )}
@@ -223,8 +223,8 @@ export default function IncomeForm({
         <button
           onClick={onDone}
           style={{
-            flex: 1, padding: 15, background: '#f5f5f5', border: 'none', borderRadius: 10,
-            fontSize: 15, fontWeight: 600, color: '#666', cursor: 'pointer',
+            flex: 1, padding: 15, background: '#F2F4F6', border: 'none', borderRadius: 14,
+            fontSize: 15, fontWeight: 600, color: '#4E5968', cursor: 'pointer',
           }}
         >
           취소
@@ -232,7 +232,7 @@ export default function IncomeForm({
         <button
           onClick={handleSubmit}
           style={{
-            flex: 2, padding: 15, background: '#27ae60', border: 'none', borderRadius: 10,
+            flex: 2, padding: 15, background: '#12B76A', border: 'none', borderRadius: 14,
             fontSize: 15, fontWeight: 700, color: '#fff', cursor: 'pointer',
           }}
         >
@@ -246,10 +246,10 @@ export default function IncomeForm({
         <button
           onClick={handleDelete}
           style={{
-            width: '100%', padding: 13, borderRadius: 10, cursor: 'pointer',
-            border: `1px solid ${confirmDelete ? '#e74c3c' : '#eceff1'}`,
-            background: confirmDelete ? '#fdedec' : '#fff',
-            color: confirmDelete ? '#e74c3c' : '#78909c',
+            width: '100%', padding: 13, borderRadius: 14, cursor: 'pointer',
+            border: `1px solid ${confirmDelete ? '#F04452' : '#F2F4F6'}`,
+            background: confirmDelete ? '#FFEEF0' : '#fff',
+            color: confirmDelete ? '#F04452' : '#8B95A1',
             fontSize: 13.5, fontWeight: confirmDelete ? 700 : 500,
           }}
         >

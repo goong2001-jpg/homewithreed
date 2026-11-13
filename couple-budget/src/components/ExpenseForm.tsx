@@ -73,11 +73,11 @@ export default function ExpenseForm({
   const afterFree = budget.freeCash - delta;
 
   const labelStyle: React.CSSProperties = {
-    fontSize: 13, fontWeight: 600, color: '#555', marginBottom: 7, display: 'block',
+    fontSize: 13, fontWeight: 600, color: '#4E5968', marginBottom: 7, display: 'block',
   };
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '11px 12px', border: '1.5px solid #e0e0e0',
-    borderRadius: 8, fontSize: 15, boxSizing: 'border-box', outline: 'none',
+    width: '100%', padding: '11px 12px', border: '1.5px solid #E5E8EB',
+    borderRadius: 12, fontSize: 15, boxSizing: 'border-box', outline: 'none',
   };
 
   /** again = 저장하고 이 화면에 남아 다음 건을 적는다 (저녁에 몰아 적을 때) */
@@ -142,22 +142,22 @@ export default function ExpenseForm({
             style={{
               ...inputStyle,
               fontSize: 30, fontWeight: 800, textAlign: 'right',
-              padding: '14px 44px 14px 14px', color: '#e74c3c',
+              padding: '14px 44px 14px 14px', color: '#191F28',
             }}
           />
           <span style={{
             position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)',
-            fontSize: 18, fontWeight: 700, color: '#bbb', pointerEvents: 'none',
+            fontSize: 18, fontWeight: 700, color: '#B0B8C1', pointerEvents: 'none',
           }}>
             원
           </span>
         </div>
 
         {editing && (
-          <div style={{ marginTop: 8, fontSize: 12, color: '#95a5a6' }}>
+          <div style={{ marginTop: 8, fontSize: 12, color: '#8B95A1' }}>
             원래 금액 {won(initial!.amount)}
             {delta !== 0 && (
-              <b style={{ color: delta > 0 ? '#e74c3c' : '#27ae60', marginLeft: 6 }}>
+              <b style={{ color: delta > 0 ? '#F04452' : '#12B76A', marginLeft: 6 }}>
                 {delta > 0 ? '+' : '−'}{won(Math.abs(delta))}
               </b>
             )}
@@ -166,11 +166,11 @@ export default function ExpenseForm({
 
         {amount > 0 && budget.hasIncome && delta !== 0 && (
           <div style={{
-            marginTop: 9, fontSize: 12.5, color: '#7f8c8d', background: '#f5f7f8',
-            borderRadius: 8, padding: '9px 12px', lineHeight: 1.6,
+            marginTop: 9, fontSize: 12.5, color: '#8B95A1', background: '#F2F4F6',
+            borderRadius: 12, padding: '9px 12px', lineHeight: 1.6,
           }}>
             저장하면 여유돈 {signedWon(budget.freeCash)} →{' '}
-            <b style={{ color: afterFree < 0 ? '#e74c3c' : '#27ae60' }}>{signedWon(afterFree)}</b>
+            <b style={{ color: afterFree < 0 ? '#F04452' : '#12B76A' }}>{signedWon(afterFree)}</b>
           </div>
         )}
       </div>
@@ -187,10 +187,10 @@ export default function ExpenseForm({
                 onClick={() => setDate(q.value)}
                 aria-pressed={on}
                 style={{
-                  flexShrink: 0, padding: '0 13px', borderRadius: 8, cursor: 'pointer',
-                  border: `1.5px solid ${on ? '#27ae60' : '#e0e0e0'}`,
-                  background: on ? '#eafaf1' : '#fff',
-                  color: on ? '#1e8449' : '#555',
+                  flexShrink: 0, padding: '0 13px', borderRadius: 12, cursor: 'pointer',
+                  border: `1.5px solid ${on ? '#12B76A' : '#E5E8EB'}`,
+                  background: on ? '#E8F8F0' : '#fff',
+                  color: on ? '#0E9F5B' : '#4E5968',
                   fontWeight: on ? 700 : 500, fontSize: 13.5,
                 }}
               >
@@ -220,10 +220,10 @@ export default function ExpenseForm({
                 key={p.id}
                 onClick={() => setPersonId(p.id)}
                 style={{
-                  flex: 1, minWidth: 90, padding: '12px 10px', borderRadius: 10,
-                  border: `2px solid ${on ? p.color : '#e0e0e0'}`,
+                  flex: 1, minWidth: 90, padding: '12px 10px', borderRadius: 14,
+                  border: `2px solid ${on ? p.color : '#E5E8EB'}`,
                   background: on ? `${p.color}14` : '#fff',
-                  color: on ? p.color : '#666',
+                  color: on ? p.color : '#4E5968',
                   fontWeight: on ? 700 : 500, fontSize: 15, cursor: 'pointer',
                 }}
               >
@@ -237,9 +237,9 @@ export default function ExpenseForm({
           <button
             onClick={() => onSetOwner!(personId)}
             style={{
-              marginTop: 8, padding: '7px 11px', borderRadius: 8, cursor: 'pointer',
-              border: '1px dashed #cfd8dc', background: '#fafbfc',
-              color: '#607d8b', fontSize: 12,
+              marginTop: 8, padding: '7px 11px', borderRadius: 12, cursor: 'pointer',
+              border: '1px dashed #D1D6DB', background: '#F9FAFB',
+              color: '#6B7684', fontSize: 12,
             }}
           >
             이 폰은 늘 <b>{sorted.find(p => p.id === personId)?.name}</b>(으)로 시작하기
@@ -259,9 +259,9 @@ export default function ExpenseForm({
                 onClick={() => setCategory(c)}
                 style={{
                   padding: '9px 14px', borderRadius: 20,
-                  border: `1.5px solid ${on ? '#27ae60' : '#e0e0e0'}`,
-                  background: on ? '#eafaf1' : '#fff',
-                  color: on ? '#1e8449' : '#555',
+                  border: `1.5px solid ${on ? '#12B76A' : '#E5E8EB'}`,
+                  background: on ? '#E8F8F0' : '#fff',
+                  color: on ? '#0E9F5B' : '#4E5968',
                   fontWeight: on ? 700 : 400, cursor: 'pointer', fontSize: 13,
                 }}
               >
@@ -275,7 +275,7 @@ export default function ExpenseForm({
       {/* 내용 */}
       <div>
         <label style={labelStyle} htmlFor="content">
-          내용 <span style={{ color: '#bbb', fontWeight: 400 }}>(선택)</span>
+          내용 <span style={{ color: '#B0B8C1', fontWeight: 400 }}>(선택)</span>
         </label>
         <input
           id="content"
@@ -289,15 +289,15 @@ export default function ExpenseForm({
 
       {error && (
         <div style={{
-          padding: '10px 14px', background: '#fdedec', borderRadius: 8,
-          color: '#e74c3c', fontSize: 14,
+          padding: '10px 14px', background: '#FFEEF0', borderRadius: 12,
+          color: '#F04452', fontSize: 14,
         }}>
           {error}
         </div>
       )}
 
       {savedCount > 0 && (
-        <div style={{ fontSize: 12.5, color: '#1e8449', textAlign: 'center', marginBottom: -8 }}>
+        <div style={{ fontSize: 12.5, color: '#0E9F5B', textAlign: 'center', marginBottom: -8 }}>
           이 화면에서 {savedCount}건 저장했어요
         </div>
       )}
@@ -306,8 +306,8 @@ export default function ExpenseForm({
         <button
           onClick={onDone}
           style={{
-            flex: 1, padding: '15px 4px', background: '#f5f5f5', border: 'none', borderRadius: 10,
-            fontSize: 14.5, fontWeight: 600, color: '#666', cursor: 'pointer',
+            flex: 1, padding: '15px 4px', background: '#F2F4F6', border: 'none', borderRadius: 14,
+            fontSize: 14.5, fontWeight: 600, color: '#4E5968', cursor: 'pointer',
           }}
         >
           {savedCount > 0 ? '그만 적기' : '취소'}
@@ -317,8 +317,8 @@ export default function ExpenseForm({
           <button
             onClick={() => handleSubmit(true)}
             style={{
-              flex: 1.3, padding: '15px 4px', background: '#fff', borderRadius: 10,
-              border: '1.5px solid #27ae60', color: '#1e8449',
+              flex: 1.3, padding: '15px 4px', background: '#fff', borderRadius: 14,
+              border: '1.5px solid #12B76A', color: '#0E9F5B',
               fontSize: 14.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
             }}
           >
@@ -329,7 +329,7 @@ export default function ExpenseForm({
           ref={saveRef}
           onClick={() => handleSubmit()}
           style={{
-            flex: 1.6, padding: '15px 4px', background: '#27ae60', border: 'none', borderRadius: 10,
+            flex: 1.6, padding: '15px 4px', background: '#12B76A', border: 'none', borderRadius: 14,
             fontSize: 14.5, fontWeight: 700, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap',
           }}
         >
@@ -344,10 +344,10 @@ export default function ExpenseForm({
         <button
           onClick={handleDelete}
           style={{
-            width: '100%', padding: 13, borderRadius: 10, cursor: 'pointer',
-            border: `1px solid ${confirmDelete ? '#e74c3c' : '#eceff1'}`,
-            background: confirmDelete ? '#fdedec' : '#fff',
-            color: confirmDelete ? '#e74c3c' : '#78909c',
+            width: '100%', padding: 13, borderRadius: 14, cursor: 'pointer',
+            border: `1px solid ${confirmDelete ? '#F04452' : '#F2F4F6'}`,
+            background: confirmDelete ? '#FFEEF0' : '#fff',
+            color: confirmDelete ? '#F04452' : '#8B95A1',
             fontSize: 13.5, fontWeight: confirmDelete ? 700 : 500,
           }}
         >

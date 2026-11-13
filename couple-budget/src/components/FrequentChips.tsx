@@ -16,9 +16,9 @@ export default function FrequentChips({ items, onPick }: Props) {
 
   return (
     <div style={{ padding: '14px 0 0' }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: '#78909c', padding: '0 16px', marginBottom: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#8B95A1', padding: '0 16px', marginBottom: 8 }}>
         자주 쓰는 지출
-        <span style={{ fontWeight: 400, color: '#b0bec5', marginLeft: 6 }}>누르면 채워져요 · 저장은 한 번 더</span>
+        <span style={{ fontWeight: 400, color: '#B0B8C1', marginLeft: 6 }}>누르면 채워져요 · 저장은 한 번 더</span>
       </div>
       <div style={{
         display: 'flex', gap: 8, overflowX: 'auto', padding: '0 16px 4px',
@@ -30,7 +30,7 @@ export default function FrequentChips({ items, onPick }: Props) {
             onClick={() => onPick(it)}
             style={{
               flexShrink: 0, padding: '8px 12px', borderRadius: 18, cursor: 'pointer',
-              border: '1.5px solid #d5f0e0', background: '#fff', color: '#2c3e50',
+              border: '1.5px solid #CFF1E0', background: '#fff', color: '#191F28',
               fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
             }}
           >
@@ -38,8 +38,8 @@ export default function FrequentChips({ items, onPick }: Props) {
             <span style={{ fontWeight: 600, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {it.content || it.category}
             </span>
-            <span style={{ color: '#e74c3c', fontWeight: 700 }}>{shortWon(it.amount)}</span>
-            <span style={{ fontSize: 10.5, color: '#b0bec5' }}>{it.count}회</span>
+            <span style={{ color: '#191F28', fontWeight: 700 }}>{shortWon(it.amount)}</span>
+            <span style={{ fontSize: 10.5, color: '#B0B8C1' }}>{it.count}회</span>
           </button>
         ))}
       </div>

@@ -48,14 +48,14 @@ export default function GiftForm({
 
   const amount = parseAmountInput(amountText);
   const inbound = direction === 'in';
-  const tone = inbound ? '#27ae60' : '#e74c3c';
+  const tone = inbound ? '#12B76A' : '#F04452';
 
   const labelStyle: React.CSSProperties = {
-    fontSize: 13, fontWeight: 600, color: '#555', marginBottom: 7, display: 'block',
+    fontSize: 13, fontWeight: 600, color: '#4E5968', marginBottom: 7, display: 'block',
   };
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '11px 12px', border: '1.5px solid #e0e0e0',
-    borderRadius: 8, fontSize: 15, boxSizing: 'border-box', outline: 'none',
+    width: '100%', padding: '11px 12px', border: '1.5px solid #E5E8EB',
+    borderRadius: 12, fontSize: 15, boxSizing: 'border-box', outline: 'none',
   };
 
   /** 종류를 고르면 방향도 같이 맞춰준다 — 부의금인데 '받음'으로 남아있으면 틀린 기록이 된다 */
@@ -99,7 +99,7 @@ export default function GiftForm({
     flex: 1, padding: '11px 0', borderRadius: 9, cursor: 'pointer', fontSize: 14.5,
     border: 'none',
     background: direction === d ? '#fff' : 'transparent',
-    color: direction === d ? color : '#90a4ae',
+    color: direction === d ? color : '#8B95A1',
     fontWeight: direction === d ? 700 : 500,
     boxShadow: direction === d ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
   });
@@ -108,7 +108,7 @@ export default function GiftForm({
     <div>
       {!embedded && (
         <div style={{
-          background: '#fff', padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+          background: '#fff', padding: '14px 16px', boxShadow: 'none', borderBottom: '1px solid #F2F4F6',
           position: 'sticky', top: 0, zIndex: 10,
         }}>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
@@ -120,12 +120,12 @@ export default function GiftForm({
       <div style={{ padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* 받았나 냈나 — 이걸 먼저 정해야 나머지 문구가 말이 된다 */}
         <div style={{
-          display: 'flex', gap: 4, padding: 4, background: '#f1f3f5', borderRadius: 11,
+          display: 'flex', gap: 4, padding: 4, background: '#F2F4F6', borderRadius: 11,
         }}>
-          <button onClick={() => setDirection('in')} style={dirTab('in', '#27ae60')}>
+          <button onClick={() => setDirection('in')} style={dirTab('in', '#12B76A')}>
             받았어요
           </button>
-          <button onClick={() => setDirection('out')} style={dirTab('out', '#e74c3c')}>
+          <button onClick={() => setDirection('out')} style={dirTab('out', '#F04452')}>
             냈어요
           </button>
         </div>
@@ -150,13 +150,13 @@ export default function GiftForm({
             />
             <span style={{
               position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)',
-              fontSize: 18, fontWeight: 700, color: '#bbb', pointerEvents: 'none',
+              fontSize: 18, fontWeight: 700, color: '#B0B8C1', pointerEvents: 'none',
             }}>
               원
             </span>
           </div>
           {editing && (
-            <div style={{ marginTop: 8, fontSize: 12, color: '#95a5a6' }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: '#8B95A1' }}>
               원래 금액 {won(initial!.amount)}
             </div>
           )}
@@ -174,9 +174,9 @@ export default function GiftForm({
                   onClick={() => pickKind(k)}
                   style={{
                     padding: '9px 14px', borderRadius: 20,
-                    border: `1.5px solid ${on ? '#607d8b' : '#e0e0e0'}`,
-                    background: on ? '#eceff1' : '#fff',
-                    color: on ? '#37474f' : '#555',
+                    border: `1.5px solid ${on ? '#6B7684' : '#E5E8EB'}`,
+                    background: on ? '#F2F4F6' : '#fff',
+                    color: on ? '#333D4B' : '#4E5968',
                     fontWeight: on ? 700 : 400, cursor: 'pointer', fontSize: 13,
                   }}
                 >
@@ -200,7 +200,7 @@ export default function GiftForm({
             placeholder={inbound ? '예: 외할머니' : '예: 김철수 결혼'}
             style={inputStyle}
           />
-          <div style={{ marginTop: 6, fontSize: 11.5, color: '#b0bec5', lineHeight: 1.6 }}>
+          <div style={{ marginTop: 6, fontSize: 11.5, color: '#B0B8C1', lineHeight: 1.6 }}>
             이름을 적어두면 나중에 검색해서 "그때 얼마 했더라"를 바로 찾을 수 있어요.
           </div>
         </div>
@@ -218,10 +218,10 @@ export default function GiftForm({
                   key={p.id}
                   onClick={() => setPersonId(p.id)}
                   style={{
-                    flex: 1, minWidth: 90, padding: '12px 10px', borderRadius: 10,
-                    border: `2px solid ${on ? p.color : '#e0e0e0'}`,
+                    flex: 1, minWidth: 90, padding: '12px 10px', borderRadius: 14,
+                    border: `2px solid ${on ? p.color : '#E5E8EB'}`,
                     background: on ? `${p.color}14` : '#fff',
-                    color: on ? p.color : '#666',
+                    color: on ? p.color : '#4E5968',
                     fontWeight: on ? 700 : 500, fontSize: 15, cursor: 'pointer',
                   }}
                 >
@@ -247,7 +247,7 @@ export default function GiftForm({
         {/* 메모 */}
         <div>
           <label style={labelStyle} htmlFor="gift-memo">
-            메모 <span style={{ color: '#bbb', fontWeight: 400 }}>(선택)</span>
+            메모 <span style={{ color: '#B0B8C1', fontWeight: 400 }}>(선택)</span>
           </label>
           <input
             id="gift-memo"
@@ -261,8 +261,8 @@ export default function GiftForm({
 
         {error && (
           <div style={{
-            padding: '10px 14px', background: '#fdedec', borderRadius: 8,
-            color: '#e74c3c', fontSize: 14,
+            padding: '10px 14px', background: '#FFEEF0', borderRadius: 12,
+            color: '#F04452', fontSize: 14,
           }}>
             {error}
           </div>
@@ -272,8 +272,8 @@ export default function GiftForm({
           <button
             onClick={onDone}
             style={{
-              flex: 1, padding: 15, background: '#f5f5f5', border: 'none', borderRadius: 10,
-              fontSize: 15, fontWeight: 600, color: '#666', cursor: 'pointer',
+              flex: 1, padding: 15, background: '#F2F4F6', border: 'none', borderRadius: 14,
+              fontSize: 15, fontWeight: 600, color: '#4E5968', cursor: 'pointer',
             }}
           >
             취소
@@ -281,7 +281,7 @@ export default function GiftForm({
           <button
             onClick={handleSubmit}
             style={{
-              flex: 2, padding: 15, background: '#27ae60', border: 'none', borderRadius: 10,
+              flex: 2, padding: 15, background: '#12B76A', border: 'none', borderRadius: 14,
               fontSize: 15, fontWeight: 700, color: '#fff', cursor: 'pointer',
             }}
           >
@@ -295,10 +295,10 @@ export default function GiftForm({
           <button
             onClick={handleDelete}
             style={{
-              width: '100%', padding: 13, borderRadius: 10, cursor: 'pointer',
-              border: `1px solid ${confirmDelete ? '#e74c3c' : '#eceff1'}`,
-              background: confirmDelete ? '#fdedec' : '#fff',
-              color: confirmDelete ? '#e74c3c' : '#78909c',
+              width: '100%', padding: 13, borderRadius: 14, cursor: 'pointer',
+              border: `1px solid ${confirmDelete ? '#F04452' : '#F2F4F6'}`,
+              background: confirmDelete ? '#FFEEF0' : '#fff',
+              color: confirmDelete ? '#F04452' : '#8B95A1',
               fontSize: 13.5, fontWeight: confirmDelete ? 700 : 500,
             }}
           >
@@ -307,7 +307,7 @@ export default function GiftForm({
         )}
 
         <div style={{
-          fontSize: 11.5, color: '#c5ced2', textAlign: 'center', lineHeight: 1.8,
+          fontSize: 11.5, color: '#B0B8C1', textAlign: 'center', lineHeight: 1.8,
         }}>
           <b>낸 돈</b>은 쓴 돈으로 쳐서 저금통(하루 쓸 수 있는 돈)에서 빠져요.
           <br /><b>받은 돈</b>은 장부에만 남고 저금통에는 안 들어가요.

@@ -55,9 +55,9 @@ export default function TopSpendView({
 
   const chip = (on: boolean, color: string): React.CSSProperties => ({
     padding: '7px 13px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer',
-    border: `1.5px solid ${on ? color : '#e0e0e0'}`,
+    border: `1.5px solid ${on ? color : '#E5E8EB'}`,
     background: on ? `${color}14` : '#fff',
-    color: on ? color : '#666',
+    color: on ? color : '#4E5968',
     fontWeight: on ? 700 : 400,
     whiteSpace: 'nowrap',
   });
@@ -79,7 +79,7 @@ export default function TopSpendView({
       <div style={{ display: 'flex', gap: 7, padding: '12px 16px 4px', overflowX: 'auto' }}>
         <button
           onClick={() => { setPersonFilter('all'); setLimit(5); }}
-          style={chip(personFilter === 'all', '#27ae60')}
+          style={chip(personFilter === 'all', '#12B76A')}
         >
           전체
         </button>
@@ -95,7 +95,7 @@ export default function TopSpendView({
       </div>
 
       {rows.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '54px 20px', color: '#bbb' }}>
+        <div style={{ textAlign: 'center', padding: '54px 20px', color: '#B0B8C1' }}>
           <div style={{ fontSize: 46, marginBottom: 12 }}>🏆</div>
           <div style={{ fontSize: 15 }}>
             {personFilter === 'all' ? '이달의 지출 내역이 없습니다' : '이 사람의 지출이 없습니다'}
@@ -105,30 +105,30 @@ export default function TopSpendView({
         <>
           {/* TOP N 이 이 달 지출에서 얼마를 차지하는지 — 한 줄로 요약 */}
           <div style={{
-            background: '#fff', margin: '12px 16px', borderRadius: 12, padding: 16,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+            background: '#fff', margin: '12px 16px', borderRadius: 20, padding: 16,
+            boxShadow: 'none',
           }}>
-            <div style={{ fontSize: 12, color: '#888', marginBottom: 5 }}>
+            <div style={{ fontSize: 12, color: '#8B95A1', marginBottom: 5 }}>
               큰 지출 {rows.length}건이 이 달 지출에서 차지하는 비중
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 30, fontWeight: 800, color: '#2c3e50', lineHeight: 1.1 }}>
+              <span style={{ fontSize: 30, fontWeight: 800, color: '#191F28', lineHeight: 1.1 }}>
                 {Math.round(share * 100)}%
               </span>
-              <span style={{ fontSize: 12.5, color: '#95a5a6' }}>
+              <span style={{ fontSize: 12.5, color: '#8B95A1' }}>
                 {won(topTotal)} / {won(scopeTotal)}
               </span>
             </div>
-            <div style={{ background: '#f1f3f5', borderRadius: 99, height: 9, overflow: 'hidden' }}>
+            <div style={{ background: '#F2F4F6', borderRadius: 99, height: 9, overflow: 'hidden' }}>
               <div style={{
                 width: `${Math.round(share * 100)}%`, height: '100%',
-                background: '#e74c3c', borderRadius: 99, transition: 'width 500ms ease',
+                background: '#12B76A', borderRadius: 99, transition: 'width 500ms ease',
               }} />
             </div>
             {budget.hasIncome && biggest > 0 && (
-              <div style={{ fontSize: 11.5, color: '#b0bec5', marginTop: 9, lineHeight: 1.6 }}>
+              <div style={{ fontSize: 11.5, color: '#B0B8C1', marginTop: 9, lineHeight: 1.6 }}>
                 1위 {shortWon(biggest)}이면 하루 쓸 수 있는 돈으로{' '}
-                <b style={{ color: '#95a5a6' }}>
+                <b style={{ color: '#8B95A1' }}>
                   {(biggest / Math.max(1, budget.dailyBudget)).toFixed(1)}일치
                 </b>
                 예요.
@@ -137,8 +137,8 @@ export default function TopSpendView({
           </div>
 
           <div style={{
-            background: '#fff', margin: '0 16px 12px', borderRadius: 12, overflow: 'hidden',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+            background: '#fff', margin: '0 16px 12px', borderRadius: 20, overflow: 'hidden',
+            boxShadow: 'none',
           }}>
             {rows.map((e, i) => {
               const person = personOf(e.personId);
@@ -149,7 +149,7 @@ export default function TopSpendView({
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: 11,
                     padding: '13px 14px', background: 'none', border: 'none',
-                    borderTop: i === 0 ? 'none' : '1px solid #f5f5f5',
+                    borderTop: i === 0 ? 'none' : '1px solid #F2F4F6',
                     textAlign: 'left', cursor: 'pointer', font: 'inherit',
                   }}
                   aria-label={`${i + 1}위 ${e.content} 수정`}
@@ -157,21 +157,21 @@ export default function TopSpendView({
                   <span style={{
                     width: 26, textAlign: 'center', flexShrink: 0,
                     fontSize: i < 3 ? 18 : 13,
-                    fontWeight: 700, color: '#b0bec5',
+                    fontWeight: 700, color: '#B0B8C1',
                   }}>
                     {MEDAL[i] ?? i + 1}
                   </span>
 
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{
-                      display: 'block', fontSize: 14.5, fontWeight: 600, color: '#2c3e50',
+                      display: 'block', fontSize: 14.5, fontWeight: 600, color: '#191F28',
                       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     }}>
                       {e.content}
                     </span>
                     <span style={{
                       display: 'flex', alignItems: 'center', gap: 5,
-                      fontSize: 11.5, color: '#95a5a6', marginTop: 3,
+                      fontSize: 11.5, color: '#8B95A1', marginTop: 3,
                     }}>
                       {person && (
                         <span style={{
@@ -182,24 +182,24 @@ export default function TopSpendView({
                         </span>
                       )}
                       <span>{CATEGORY_EMOJI[e.category]} {e.category}</span>
-                      <span style={{ color: '#cfd8dc' }}>·</span>
+                      <span style={{ color: '#D1D6DB' }}>·</span>
                       <span>{dateLabel(e.date)}</span>
                     </span>
                     {/* 1위 대비 막대 — 1위가 얼마나 압도적인지 한눈에 보인다 */}
                     <span style={{
-                      display: 'block', background: '#f1f3f5', borderRadius: 99,
+                      display: 'block', background: '#F2F4F6', borderRadius: 99,
                       height: 5, overflow: 'hidden', marginTop: 7,
                     }}>
                       <span style={{
                         display: 'block',
                         width: `${biggest > 0 ? Math.round((e.amount / biggest) * 100) : 0}%`,
-                        height: '100%', background: '#e74c3c', borderRadius: 99,
+                        height: '100%', background: '#12B76A', borderRadius: 99,
                       }} />
                     </span>
                   </span>
 
                   <span style={{
-                    fontSize: 15, fontWeight: 700, color: '#e74c3c', flexShrink: 0,
+                    fontSize: 15, fontWeight: 700, color: '#191F28', flexShrink: 0,
                   }}>
                     {won(e.amount)}
                   </span>
@@ -214,8 +214,8 @@ export default function TopSpendView({
               onClick={() => setLimit(l => l + 5)}
               style={{
                 display: 'block', width: 'calc(100% - 32px)', margin: '0 16px 8px',
-                padding: 13, background: '#fff', border: '1px solid #e0e0e0', borderRadius: 10,
-                fontSize: 13, color: '#607d8b', cursor: 'pointer',
+                padding: 13, background: '#fff', border: '1px solid #E5E8EB', borderRadius: 14,
+                fontSize: 13, color: '#6B7684', cursor: 'pointer',
               }}
             >
               {rows.length + 1}위부터 더 보기 (남은 {all.length - rows.length}건)
@@ -227,7 +227,7 @@ export default function TopSpendView({
               style={{
                 display: 'block', width: 'calc(100% - 32px)', margin: '0 16px 8px',
                 padding: 11, background: 'none', border: 'none',
-                fontSize: 12.5, color: '#b0bec5', cursor: 'pointer',
+                fontSize: 12.5, color: '#B0B8C1', cursor: 'pointer',
               }}
             >
               TOP 5만 보기
@@ -235,7 +235,7 @@ export default function TopSpendView({
           )}
 
           <div style={{
-            fontSize: 11.5, color: '#c5ced2', textAlign: 'center',
+            fontSize: 11.5, color: '#B0B8C1', textAlign: 'center',
             lineHeight: 1.8, padding: '4px 20px 8px',
           }}>
             내역을 누르면 금액·메모를 고칠 수 있어요

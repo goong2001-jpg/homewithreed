@@ -10,8 +10,8 @@ interface Props {
 
 /** 상한 대비 색 — 80% 부터 주황, 100% 부터 빨강, 그 전엔 카테고리 색 */
 export function limitColor(row: BudgetStatusRow): string {
-  if (row.ratio >= 1) return '#e74c3c';
-  if (row.ratio >= BUDGET_WARN_RATIO) return '#f39c12';
+  if (row.ratio >= 1) return '#F04452';
+  if (row.ratio >= BUDGET_WARN_RATIO) return '#F59F00';
   return CATEGORY_COLOR[row.category];
 }
 
@@ -30,14 +30,14 @@ export default function BudgetLimits({ rows, onGoSettings }: Props) {
 
   return (
     <div style={{
-      background: '#fff', margin: '0 16px 12px', borderRadius: 12, padding: '14px 16px 12px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+      background: '#fff', margin: '0 12px 10px', borderRadius: 20, padding: '14px 16px 12px',
+      boxShadow: 'none',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-        <h3 style={{ margin: 0, fontSize: 14, color: '#333' }}>카테고리 예산</h3>
+        <h3 style={{ margin: 0, fontSize: 14, color: '#191F28' }}>카테고리 예산</h3>
         <button
           onClick={onGoSettings}
-          style={{ background: 'none', border: 'none', fontSize: 11, color: '#90a4ae', cursor: 'pointer', padding: 0 }}
+          style={{ background: 'none', border: 'none', fontSize: 11, color: '#8B95A1', cursor: 'pointer', padding: 0 }}
         >
           고치기 ›
         </button>
@@ -52,14 +52,14 @@ export default function BudgetLimits({ rows, onGoSettings }: Props) {
               display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
               marginBottom: 4, fontSize: 12.5,
             }}>
-              <span style={{ color: warn ? color : '#2c3e50', fontWeight: warn ? 700 : 500 }}>
+              <span style={{ color: warn ? color : '#191F28', fontWeight: warn ? 700 : 500 }}>
                 {CATEGORY_EMOJI[r.category]} {limitLabel(r)}
               </span>
               {!warn && (
-                <span style={{ fontSize: 11, color: '#b0bec5' }}>{Math.round(r.ratio * 100)}%</span>
+                <span style={{ fontSize: 11, color: '#B0B8C1' }}>{Math.round(r.ratio * 100)}%</span>
               )}
             </div>
-            <div style={{ background: '#f1f3f5', borderRadius: 99, height: 5, overflow: 'hidden' }}>
+            <div style={{ background: '#F2F4F6', borderRadius: 99, height: 5, overflow: 'hidden' }}>
               <div style={{
                 width: `${Math.min(100, Math.max(1, Math.round(r.ratio * 100)))}%`,
                 height: '100%', background: color, borderRadius: 99,

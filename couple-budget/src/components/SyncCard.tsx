@@ -129,31 +129,31 @@ export default function SyncCard({
   // ---------------------------------------------------------------- 스타일
 
   const label: React.CSSProperties = {
-    fontSize: 12.5, fontWeight: 700, color: '#455a64', marginBottom: 6, display: 'block',
+    fontSize: 12.5, fontWeight: 700, color: '#4E5968', marginBottom: 6, display: 'block',
   };
   const input: React.CSSProperties = {
-    width: '100%', padding: '11px 12px', border: '1.5px solid #e0e0e0',
-    borderRadius: 8, fontSize: 14, boxSizing: 'border-box', outline: 'none',
+    width: '100%', padding: '11px 12px', border: '1.5px solid #E5E8EB',
+    borderRadius: 12, fontSize: 14, boxSizing: 'border-box', outline: 'none',
   };
   const hint: React.CSSProperties = {
-    fontSize: 11.5, color: '#90a4ae', marginTop: 6, lineHeight: 1.6,
+    fontSize: 11.5, color: '#8B95A1', marginTop: 6, lineHeight: 1.6,
   };
   const primary: React.CSSProperties = {
-    padding: '13px 16px', background: '#27ae60', color: '#fff', border: 'none',
-    borderRadius: 10, fontSize: 14.5, fontWeight: 700, cursor: 'pointer',
+    padding: '13px 16px', background: '#12B76A', color: '#fff', border: 'none',
+    borderRadius: 14, fontSize: 14.5, fontWeight: 700, cursor: 'pointer',
   };
   const ghost: React.CSSProperties = {
-    padding: '13px 16px', background: '#f2f5f6', color: '#607d8b', border: 'none',
-    borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+    padding: '13px 16px', background: '#F2F4F6', color: '#6B7684', border: 'none',
+    borderRadius: 14, fontSize: 14, fontWeight: 600, cursor: 'pointer',
   };
   const linkBtn: React.CSSProperties = {
     display: 'block', width: '100%', textAlign: 'center', padding: 13,
-    background: '#e8f5ee', color: '#1e8449', borderRadius: 10, fontSize: 14,
+    background: '#E8F8F0', color: '#0E9F5B', borderRadius: 14, fontSize: 14,
     fontWeight: 700, textDecoration: 'none', marginBottom: 12,
   };
   const callout: React.CSSProperties = {
-    fontSize: 12.5, color: '#546e7a', background: '#f5f7f8',
-    borderRadius: 10, padding: '12px 13px', lineHeight: 1.8,
+    fontSize: 12.5, color: '#4E5968', background: '#F2F4F6',
+    borderRadius: 14, padding: '12px 13px', lineHeight: 1.8,
   };
 
   // ---------------------------------------------------------------- 상태 배지
@@ -161,9 +161,9 @@ export default function SyncCard({
   const statusBox = (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 8, padding: '11px 13px',
-      background: status === 'live' ? '#eafaf1' : status === 'error' ? '#fdedec' : '#f5f7f8',
-      borderRadius: 10, marginBottom: 14, fontSize: 13,
-      color: status === 'live' ? '#1e8449' : status === 'error' ? '#c0392b' : '#607d8b',
+      background: status === 'live' ? '#E8F8F0' : status === 'error' ? '#FFEEF0' : '#F2F4F6',
+      borderRadius: 14, marginBottom: 14, fontSize: 13,
+      color: status === 'live' ? '#0E9F5B' : status === 'error' ? '#D22030' : '#6B7684',
     }}>
       <span style={{ fontSize: 15 }}>
         {status === 'live' ? '✅' : status === 'error' ? '⚠️' : status === 'connecting' ? '⏳' : '📱'}
@@ -200,7 +200,7 @@ export default function SyncCard({
         return (
           <div style={callout}>
             왼쪽 사이드바에서 <b>Firestore</b> 를 찾아 누르세요.<br />
-            <span style={{ color: '#78909c' }}>
+            <span style={{ color: '#8B95A1' }}>
               · <b>프로젝트 바로가기</b> 아래에 있거나<br />
               · <b>제품 카테고리 → 데이터베이스 및 스토리지 → Firestore</b>
             </span>
@@ -208,7 +208,7 @@ export default function SyncCard({
             들어가면 <b>데이터베이스 만들기</b> 버튼이 있어요.<br />
             • 위치는 <b>asia-northeast3 (서울)</b><br />
             • <b>프로덕션 모드에서 시작</b> 선택 → 만들기<br />
-            <span style={{ color: '#90a4ae' }}>
+            <span style={{ color: '#8B95A1' }}>
               (지금은 아무나 못 들어오게 잠긴 상태예요. 다음 단계에서 우리만 쓸 수 있게 엽니다)
             </span>
           </div>
@@ -226,7 +226,7 @@ export default function SyncCard({
             {/* 실제로 자주 나는 실수 — 콘솔이 방금 보여준 firebaseConfig 를 여기 붙여넣는다 */}
             <div style={{
               fontSize: 12, color: '#9a7d0a', background: '#fef9e7',
-              border: '1px solid #f7dc6f', borderRadius: 10,
+              border: '1px solid #f7dc6f', borderRadius: 14,
               padding: '11px 12px', marginBottom: 12, lineHeight: 1.7,
             }}>
               ⚠️ 여기 넣는 건 <b>아래 규칙</b>입니다.
@@ -238,13 +238,13 @@ export default function SyncCard({
             </div>
             <button
               onClick={() => copy(RULES, 'rules')}
-              style={{ ...primary, width: '100%', marginBottom: 10, background: copied === 'rules' ? '#1e8449' : '#27ae60' }}
+              style={{ ...primary, width: '100%', marginBottom: 10, background: copied === 'rules' ? '#0E9F5B' : '#12B76A' }}
             >
               {copied === 'rules' ? '복사됐어요!' : '규칙 복사하기'}
             </button>
             <pre style={{
               margin: 0, padding: 12, background: '#263238', color: '#b2ccd6',
-              borderRadius: 8, fontSize: 10.5, lineHeight: 1.6, overflowX: 'auto',
+              borderRadius: 12, fontSize: 10.5, lineHeight: 1.6, overflowX: 'auto',
             }}>
               {RULES}
             </pre>
@@ -268,7 +268,7 @@ export default function SyncCard({
               <b> firebaseConfig = {'{ … }'}</b> 코드를 <b>복사 아이콘(⧉)</b> 으로
               통째로 복사해 아래에 붙여넣으세요.
               <br />
-              <span style={{ color: '#90a4ae' }}>
+              <span style={{ color: '#8B95A1' }}>
                 (<b>apiKey</b> 가 들어있는 그 덩어리입니다. 3단계의 보안 규칙과는 다른 것이에요)
               </span>
             </div>
@@ -291,7 +291,7 @@ export default function SyncCard({
           <>
             <div style={{ ...callout, marginBottom: 14 }}>
               둘 다 <b>⚙️ → 프로젝트 설정 → 일반</b> 한 화면에 있습니다.<br />
-              <span style={{ color: '#78909c' }}>
+              <span style={{ color: '#8B95A1' }}>
                 · <b>프로젝트 ID</b> — 맨 위 <b>내 프로젝트</b> 카드<br />
                 · <b>웹 API 키</b> — 아래쪽 <b>SDK 설정 및 구성</b> 코드에서 <b>apiKey:</b> 뒤 따옴표 안
               </span>
@@ -349,7 +349,7 @@ export default function SyncCard({
                 autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 style={{
                   ...input, fontFamily: 'ui-monospace, Menlo, monospace', letterSpacing: 0.5,
-                  borderColor: codeInput && !codeOk ? '#e74c3c' : '#e0e0e0',
+                  borderColor: codeInput && !codeOk ? '#F04452' : '#E5E8EB',
                 }}
               />
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -362,12 +362,12 @@ export default function SyncCard({
                 <button
                   onClick={() => copy(codeInput, 'code')}
                   disabled={!codeInput}
-                  style={{ ...ghost, flex: 1, padding: 10, fontSize: 12.5, color: copied === 'code' ? '#27ae60' : '#607d8b' }}
+                  style={{ ...ghost, flex: 1, padding: 10, fontSize: 12.5, color: copied === 'code' ? '#12B76A' : '#6B7684' }}
                 >
                   {copied === 'code' ? '복사됐어요' : '복사'}
                 </button>
               </div>
-              <div style={{ ...hint, color: '#9a7d0a', background: '#fef9e7', borderRadius: 8, padding: '9px 11px', marginTop: 9 }}>
+              <div style={{ ...hint, color: '#9a7d0a', background: '#fef9e7', borderRadius: 12, padding: '9px 11px', marginTop: 9 }}>
                 🔒 <b>이 코드가 비밀번호입니다.</b> 카톡으로 보내지 말고 배우자 폰에 직접 입력해 주세요.
               </div>
             </div>
@@ -382,8 +382,8 @@ export default function SyncCard({
 
             {testOk && (
               <div style={{
-                marginTop: 14, padding: '14px 14px', background: '#eafaf1',
-                borderRadius: 10, fontSize: 13, color: '#1e8449', lineHeight: 1.8,
+                marginTop: 14, padding: '14px 14px', background: '#E8F8F0',
+                borderRadius: 14, fontSize: 13, color: '#0E9F5B', lineHeight: 1.8,
               }}>
                 <b>✅ 연결됐어요!</b>
                 <div style={{ marginTop: 10, color: '#2c6e49' }}>
@@ -395,13 +395,13 @@ export default function SyncCard({
                     const cfg = currentConfig();
                     if (cfg.ok) copy(JSON.stringify(cfg.config), 'cfg');
                   }}
-                  style={{ ...ghost, width: '100%', marginTop: 12, background: '#fff', color: copied === 'cfg' ? '#27ae60' : '#1e8449' }}
+                  style={{ ...ghost, width: '100%', marginTop: 12, background: '#fff', color: copied === 'cfg' ? '#12B76A' : '#0E9F5B' }}
                 >
                   {copied === 'cfg' ? '복사됐어요' : '설정 복사 (카톡으로 보내도 안전)'}
                 </button>
                 <button
                   onClick={() => { const n = onUploadAll(); setNote(`${n}건을 올렸어요.`); }}
-                  style={{ ...ghost, width: '100%', marginTop: 8, background: '#fff', color: '#1e8449' }}
+                  style={{ ...ghost, width: '100%', marginTop: 8, background: '#fff', color: '#0E9F5B' }}
                 >
                   지금까지 기록 올리기 ({counts.persons + counts.incomes + counts.fixed + counts.expenses}건)
                 </button>
@@ -417,8 +417,8 @@ export default function SyncCard({
   return (
     <div style={cardStyle}>
       <div ref={topRef} style={{ scrollMarginTop: 64 }} />
-      <h3 style={{ margin: '0 0 4px', fontSize: 15, color: '#333' }}>둘이서 같이 쓰기</h3>
-      <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#95a5a6', lineHeight: 1.7 }}>
+      <h3 style={{ margin: '0 0 4px', fontSize: 15, color: '#191F28' }}>둘이서 같이 쓰기</h3>
+      <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#8B95A1', lineHeight: 1.7 }}>
         설정하지 않아도 앱은 잘 돌아가요. 다만 기록이 <b>이 기기에만</b> 저장됩니다.
         구글 Firebase(무료)를 연결하면 두 사람 폰이 같은 가계부를 실시간으로 봅니다.
       </p>
@@ -440,13 +440,13 @@ export default function SyncCard({
                   {' '}({counts.persons + counts.incomes + counts.fixed + counts.expenses}건)
                 </span>
               </button>
-              <p style={{ margin: '0 0 12px', fontSize: 11.5, color: '#90a4ae', lineHeight: 1.7 }}>
+              <p style={{ margin: '0 0 12px', fontSize: 11.5, color: '#8B95A1', lineHeight: 1.7 }}>
                 평소엔 자동으로 오갑니다. 상대 폰에 뭔가 빠져 보일 때만 눌러주세요.
               </p>
               {note && (
                 <div style={{
-                  fontSize: 12.5, color: '#1e8449', background: '#eafaf1',
-                  borderRadius: 8, padding: '10px 12px', marginBottom: 12,
+                  fontSize: 12.5, color: '#0E9F5B', background: '#E8F8F0',
+                  borderRadius: 12, padding: '10px 12px', marginBottom: 12,
                 }}>
                   {note}
                 </div>
@@ -471,22 +471,22 @@ export default function SyncCard({
                 key={i}
                 style={{
                   flex: 1, height: 4, borderRadius: 2,
-                  background: i + 1 <= step ? '#27ae60' : '#e4e9eb',
+                  background: i + 1 <= step ? '#12B76A' : '#E5E8EB',
                   transition: 'background 250ms ease',
                 }}
               />
             ))}
           </div>
-          <div style={{ fontSize: 12, color: '#90a4ae', marginBottom: 12 }}>
-            {step} / {TOTAL} · <b style={{ color: '#455a64' }}>{STEP_TITLES[step - 1]}</b>
+          <div style={{ fontSize: 12, color: '#8B95A1', marginBottom: 12 }}>
+            {step} / {TOTAL} · <b style={{ color: '#4E5968' }}>{STEP_TITLES[step - 1]}</b>
           </div>
 
           <div style={{ marginBottom: 14 }}>{stepBody()}</div>
 
           {note && (
             <div style={{
-              fontSize: 12.5, color: '#c0392b', background: '#fdedec',
-              borderRadius: 8, padding: '11px 12px', marginBottom: 12, lineHeight: 1.7,
+              fontSize: 12.5, color: '#D22030', background: '#FFEEF0',
+              borderRadius: 12, padding: '11px 12px', marginBottom: 12, lineHeight: 1.7,
             }}>
               {note}
             </div>
@@ -514,7 +514,7 @@ export default function SyncCard({
               onClick={turnOff}
               style={{
                 width: '100%', marginTop: 10, padding: 11, background: 'none',
-                border: 'none', fontSize: 12.5, color: '#b0bec5', cursor: 'pointer',
+                border: 'none', fontSize: 12.5, color: '#B0B8C1', cursor: 'pointer',
               }}
             >
               동기화 끄기

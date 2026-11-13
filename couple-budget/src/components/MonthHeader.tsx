@@ -20,15 +20,15 @@ export default function MonthHeader({
 }: Props) {
   const arrow: React.CSSProperties = {
     background: 'none', border: 'none', fontSize: 22, cursor: 'pointer',
-    padding: '2px 6px', color: '#555', lineHeight: 1,
+    padding: '2px 6px', color: '#4E5968', lineHeight: 1,
   };
 
   return (
     <div
       style={{
         background: '#fff',
-        padding: '12px 14px',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+        padding: '12px 14px 10px',
+        boxShadow: 'none',
         position: 'sticky',
         top: 0,
         zIndex: 10,
@@ -40,21 +40,21 @@ export default function MonthHeader({
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
         <button onClick={onPrev} style={arrow} aria-label="이전 달">‹</button>
-        <span style={{ fontSize: 17, fontWeight: 700, whiteSpace: 'nowrap' }}>{monthLabel(month)}</span>
+        <span style={{ fontSize: 18, fontWeight: 700, whiteSpace: 'nowrap', color: '#191F28' }}>{monthLabel(month)}</span>
         <button onClick={onNext} style={arrow} aria-label="다음 달">›</button>
 
         {phase === 'future' && (
           <span style={{
             fontSize: 10, fontWeight: 700, color: '#8e6f00', background: '#fff8e1',
-            border: '1px solid #ffe082', borderRadius: 10, padding: '2px 7px', whiteSpace: 'nowrap',
+            border: '1px solid #ffe082', borderRadius: 14, padding: '2px 7px', whiteSpace: 'nowrap',
           }}>
             예정
           </span>
         )}
         {phase === 'past' && (
           <span style={{
-            fontSize: 10, fontWeight: 700, color: '#546e7a', background: '#eceff1',
-            border: '1px solid #cfd8dc', borderRadius: 10, padding: '2px 7px', whiteSpace: 'nowrap',
+            fontSize: 10, fontWeight: 700, color: '#4E5968', background: '#F2F4F6',
+            border: '1px solid #D1D6DB', borderRadius: 14, padding: '2px 7px', whiteSpace: 'nowrap',
           }}>
             마감
           </span>
@@ -63,8 +63,8 @@ export default function MonthHeader({
           <button
             onClick={onToday}
             style={{
-              fontSize: 11, padding: '4px 9px', border: '1px solid #ddd', borderRadius: 12,
-              background: '#f5f5f5', color: '#666', cursor: 'pointer', whiteSpace: 'nowrap',
+              fontSize: 11, padding: '4px 9px', border: '1px solid #E5E8EB', borderRadius: 20,
+              background: '#F2F4F6', color: '#4E5968', cursor: 'pointer', whiteSpace: 'nowrap',
             }}
           >
             이번달

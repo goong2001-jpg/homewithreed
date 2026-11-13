@@ -140,8 +140,8 @@ export default function App() {
           key: Date.now(),
           tone: kind,
           text: kind === 'over'
-            ? `🚨 ${input.category} 예산 ${shortWon(limit)}을 넘었어요 (${shortWon(after)})`
-            : `⚠️ ${input.category} 예산의 80%를 썼어요 (${shortWon(limit)} 중 ${shortWon(after)})`,
+            ? `${input.category} 예산 ${shortWon(limit)}을 넘었어요 (${shortWon(after)})`
+            : `${input.category} 예산의 80%를 썼어요 (${shortWon(limit)} 중 ${shortWon(after)})`,
         });
       }
     }
@@ -209,7 +209,7 @@ export default function App() {
 
   return (
     <>
-      <div style={{ minHeight: '100vh', background: '#f8f9fa', paddingBottom: TAB_BAR_HEIGHT + 16 }}>
+      <div style={{ minHeight: '100vh', background: '#F2F4F6', paddingBottom: TAB_BAR_HEIGHT + 16 }}>
         {view === 'home' && (
           <HomeView
             month={month}

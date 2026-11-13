@@ -1,6 +1,6 @@
 # 인수인계 — 우리집 하루수입 가계부 (couple-budget)
 
-> 마지막 정리: **2026-11-12 · v19** · 이 문서는 다음 작업자(사람이든 다른 AI 모델이든)가
+> 마지막 정리: **2026-11-13 · v20** · 이 문서는 다음 작업자(사람이든 다른 AI 모델이든)가
 > 이 앱을 처음 보고도 안전하게 이어서 고칠 수 있게 쓴 것이다. 작업 전에 끝까지 읽는다.
 
 ---
@@ -74,11 +74,11 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 
 ### 2-3. 버전 올리는 법 · 커밋 메시지 규칙
 
-- **PR(또는 기본 브랜치에 들어가는 변경) 하나 = 버전 하나.** 다음 번호 = `CHANGELOG.md` 맨 위 버전 + 1 (지금 v19 → 다음 **v20**)
+- **PR(또는 기본 브랜치에 들어가는 변경) 하나 = 버전 하나.** 다음 번호 = `CHANGELOG.md` 맨 위 버전 + 1 (지금 v20 → 다음 **v21**)
 - 기본 브랜치에 들어가는 커밋(= squash 병합 커밋)의 메시지:
 
   ```
-  v20: 무엇을 바꿨는지 한 줄 (#PR번호)
+  v21: 무엇을 바꿨는지 한 줄 (#PR번호)
 
   - 바뀐 점 하나
   - 바뀐 점 둘
@@ -103,8 +103,8 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 3. 커밋 (메시지 규칙 2-3) → **푸시 전에** `git pull --rebase origin claude/intelligent-cannon-txjx76`
    (배포 뒤 Actions 봇이 CHANGELOG 커밋을 기본 브랜치에 넣기 때문에, 오래 작업했으면 뒤처져 있다)
 4. `git push -u origin <작업브랜치>` — 원격 작업 브랜치에 **이미 병합된 옛 커밋만** 남아 있어서 거절되면 `--force-with-lease` (병합 안 된 커밋이 있으면 절대 강제 푸시하지 말 것)
-5. GitHub MCP 로 PR 생성: base = `claude/intelligent-cannon-txjx76`, 제목 = `v20: …`
-6. **squash 병합**: `merge_pull_request(merge_method="squash", commit_title="v20: … (#PR번호)", commit_message="- …\n- …")`
+5. GitHub MCP 로 PR 생성: base = `claude/intelligent-cannon-txjx76`, 제목 = `v21: …`
+6. **squash 병합**: `merge_pull_request(merge_method="squash", commit_title="v21: … (#PR번호)", commit_message="- …\n- …")`
    → `commit_title`·`commit_message` 를 **꼭 직접 넣는다.** 안 넣으면 GitHub 기본 제목이 들어가 버전이 빠진다
 7. 배포 성공까지 확인 (4장). 끝나면 사용자에게 "폰에서 새로고침" 안내
 
@@ -209,6 +209,23 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 - **안 적은 날 = 안 쓴 날로 계산된다** — 그래서 홈이 "N일째 기록이 없어요"라고 묻는다(v17). 어제부터 거꾸로 **연달아** 빈 날만, 이번 달 안에서만, 첫 기록 이후만 센다. 계산 자체는 그대로다(표시는 0원)
 - **반복 지출 제안** — 같은 내용·금액이 석 달 연속 달마다 딱 한 번이면 고정지출로 옮기자고 권한다. 옮기면 **마지막으로 적은 달의 다음 달부터** 시작(두 번 빠지지 않게)
 
+### 3-3b. 화면 디자인 규칙 (v20 — 사용자가 시안 두 개 중 고른 것)
+
+스타일은 컴포넌트마다 인라인 `style` 로 들어 있다(공용 테마 파일 없음). 새 화면을 만들 때 아래 값을 그대로 쓴다.
+
+| 쓰임 | 값 |
+|---|---|
+| 바탕 / 흰 면 | `#F2F4F6` / `#fff` — 카드는 **그림자 없이** 흰 면, 모서리 20 (버튼 14, 입력칸 12) |
+| 글자 | 제목·숫자 `#191F28` · 본문 `#4E5968` · 보조 `#8B95A1` · 흐림 `#B0B8C1` |
+| 선 | `#E5E8EB` (입력칸 테두리) · `#F2F4F6` (구분선) |
+| 브랜드 초록 | `#12B76A` (버튼·막대) · 진한 `#0E9F5B` (글자) · 옅은 `#E8F8F0` |
+| 경고 | 빨강 `#F04452` · 주황 `#F59F00` — **경고·초과·삭제에만** 쓴다. 보통 지출 금액은 먹색이다 |
+| 숫자 | 단위(원·일)는 숫자보다 작게. `font-feature-settings: 'tnum'` (index.css) |
+| 아이콘 | 아래 탭은 채운 SVG (`TabBar.tsx` 의 `ICONS`). 꾸밈 이모지는 쓰지 않는다. 카테고리·경조사 종류 이모지는 **기록을 구분하는 표시**라 남겼다 |
+| 홈 맨 위 | 여유돈 숫자가 주인공, 저금통은 오른쪽 위에 작게, 예산 막대(검은 선 = 오늘까지 목표)가 저금통 물높이와 같은 값을 보여준다 |
+
+사람 색(`PERSON_COLORS`)·카테고리 색(`CATEGORY_COLOR`)은 **저장된 값/구분용**이라 바꾸지 않았다. 금지: 보라·파랑 그라디언트, 이모지 남발, 똑같은 둥근 카드 반복.
+
 ### 3-4. 지금까지 겪은 함정·버그와 해결법
 
 | 증상 | 원인 | 해결 / 교훈 |
@@ -278,7 +295,7 @@ bash couple-budget/dev/check.sh --quick  # 단위 테스트만 (빌드·브라�
 cd <저장소 루트>
 git add -A couple-budget                    # 다른 앱 폴더를 섞지 않는다
 git commit -F - <<'EOF'
-v20: 무엇을 바꿨는지
+v21: 무엇을 바꿨는지
 
 - 바뀐 점
 - 바뀐 점
@@ -288,8 +305,8 @@ git push -u origin <작업브랜치>              # 거절되면 2-4 의 4번
 ```
 
 그다음 GitHub MCP:
-- `create_pull_request(owner="goong2001-jpg", repo="homewithreed", base="claude/intelligent-cannon-txjx76", head="<작업브랜치>", title="v20: …", body=…)`
-- `merge_pull_request(…, pullNumber=N, merge_method="squash", commit_title="v20: … (#N)", commit_message="- …\n- …")`
+- `create_pull_request(owner="goong2001-jpg", repo="homewithreed", base="claude/intelligent-cannon-txjx76", head="<작업브랜치>", title="v21: …", body=…)`
+- `merge_pull_request(…, pullNumber=N, merge_method="squash", commit_title="v21: … (#N)", commit_message="- …\n- …")`
 - 405(충돌)가 나면: 2-4 의 1번처럼 브랜치를 최신에서 다시 만들고 내 커밋만 `cherry-pick` → `--force-with-lease` → 다시 병합
 
 ### 4-4. 배포 성공 확인
@@ -302,7 +319,7 @@ GitHub MCP 로:
 2. `actions_list(method="list_workflow_jobs", resource_id="<run id>")`
    → `test` · `build` · `deploy` · `couple-budget-changelog` 네 개가 모두 success
 3. `get_job_logs(job_id=<couple-budget-changelog 의 id>, return_content=true, tail_lines=40)`
-   → `CHANGELOG: 기록해서 푸시했습니다` 와 `배포 확인됨` + version.json 내용 (`"version": "v20"`)
+   → `CHANGELOG: 기록해서 푸시했습니다` 와 `배포 확인됨` + version.json 내용 (`"version": "v21"`)
 4. 이력 반영 확인
    ```bash
    git fetch origin claude/intelligent-cannon-txjx76
@@ -327,7 +344,8 @@ GitHub MCP 로:
 
 | 버전 | 날짜(KST) | PR | 내용 |
 |---|---|---|---|
-| v19 | 2026-11-12 | — | 낸 경조사비를 쓴 돈으로 계산 (저금통·내역·TOP5·주간 리포트·Excel). 받은 돈은 그대로 장부에만 |
+| v20 | 2026-11-13 | — | 화면 디자인 전체 새로 입힘 (사용자가 고른 '시안 2' — 금융앱 느낌). 기능·계산·데이터는 그대로 |
+| v19 | 2026-11-13 | #63 | 낸 경조사비를 쓴 돈으로 계산 (저금통·내역·TOP5·주간 리포트·Excel). 받은 돈은 그대로 장부에만 |
 | v18 | 2026-11-12 | #62 | 입력 탭에서 경조사·용돈 적기 (경조사 장부에 저절로 쌓임, 저금통과는 계속 분리) |
 | v17 | 2026-11-12 | #61 | 입력 편하게(이 폰 주인·저장 후 하나 더·날짜 칩·저장 알림·입력 버튼 위로), 입력이 빠진 날 알림·'안 썼어요', 반복 지출→고정지출 제안, 버전 표시, 탭 5개(TOP5 는 내역 안), 오프라인 열기 |
 | v16 | 2026-11-12 | #60 | 인수인계 문서(HANDOFF·CLAUDE·CHANGELOG), `dev/` 점검 도구, 배포 후 이력 자동 기록, version.json |
@@ -357,6 +375,8 @@ GitHub MCP 로:
 2. **중간에 빈 날** — 지금 알림은 어제부터 거꾸로 *연달아* 빈 날만 본다. 어제는 적고 그제를 빼먹은 경우는 안 알려준다 (일부러 단순하게 시작. 사용자 반응 보고 넓힐지 결정)
 3. **수입·경조사에도 '저장 후 하나 더'** — 지출에만 넣었다
 4. v17 반응 확인 — 탭 5개·홈 순서가 불편하다고 하면 되돌리기 쉽다 (`TabBar.tsx` 의 `TABS`, `HomeView.tsx` 순서)
+5. **카테고리·경조사 이모지를 선 아이콘으로** — v20 에서 탭·상태 이모지만 뺐다. 목록의 이모지는 남아 있다 (아이콘 14종을 그려야 함)
+6. **(저장소 공용) 헌터 마을 스모크의 "절전 중에도 사냥 진행"이 가끔 실패**해서 v19 배포가 한 번 막혔다. 다시 돌리면 통과한다 (`actions_run_trigger` `rerun_failed_jobs`). 다른 앱이라 손대지 않았다
 
 그 밖에:
 - **주소에서 `goong2001` 숨기기** — 사용자가 아이디 노출을 꺼렸다. Cloudflare Pages 로 옮기는 안을 여러 번 제안했고 **사용자 결정 대기 중**. 옮기면 홈 화면 아이콘 주소가 바뀌니 두 폰 다시 추가해야 함

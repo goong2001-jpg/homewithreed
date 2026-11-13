@@ -99,15 +99,15 @@ export default function ExchangeCard({
   }
 
   const btn: React.CSSProperties = {
-    width: '100%', padding: 13, border: 'none', borderRadius: 10,
+    width: '100%', padding: 13, border: 'none', borderRadius: 14,
     fontSize: 14.5, fontWeight: 700, cursor: busy ? 'wait' : 'pointer',
     opacity: busy ? 0.6 : 1,
   };
 
   return (
     <div style={cardStyle}>
-      <h3 style={{ margin: '0 0 4px', fontSize: 15, color: '#333' }}>파일로 주고받기</h3>
-      <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#95a5a6', lineHeight: 1.7 }}>
+      <h3 style={{ margin: '0 0 4px', fontSize: 15, color: '#191F28' }}>파일로 주고받기</h3>
+      <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#8B95A1', lineHeight: 1.7 }}>
         Firebase 설정 없이 부부 기록을 합치는 방법이에요.
         한쪽에서 <b>내보내기</b> → 카톡으로 전송 → 상대가 <b>가져오기</b>.
         서버를 거치지 않아 <b>두 사람 폰에만</b> 남습니다.
@@ -116,7 +116,7 @@ export default function ExchangeCard({
       <button
         onClick={handleExport}
         disabled={busy}
-        style={{ ...btn, background: '#27ae60', color: '#fff' }}
+        style={{ ...btn, background: '#12B76A', color: '#fff' }}
       >
         내보내기 (배우자에게 보낼 파일 만들기)
       </button>
@@ -124,7 +124,7 @@ export default function ExchangeCard({
       <button
         onClick={() => fileRef.current?.click()}
         disabled={busy}
-        style={{ ...btn, background: '#f2f5f6', color: '#455a64', marginTop: 9 }}
+        style={{ ...btn, background: '#F2F4F6', color: '#4E5968', marginTop: 9 }}
       >
         가져오기 (배우자가 보낸 파일 합치기)
       </button>
@@ -142,17 +142,17 @@ export default function ExchangeCard({
 
       {note && (
         <div style={{
-          marginTop: 12, padding: '11px 12px', borderRadius: 8, fontSize: 12.5, lineHeight: 1.7,
-          background: tone === 'ok' ? '#eafaf1' : tone === 'err' ? '#fdedec' : '#eceff1',
-          color: tone === 'ok' ? '#1e8449' : tone === 'err' ? '#c0392b' : '#455a64',
+          marginTop: 12, padding: '11px 12px', borderRadius: 12, fontSize: 12.5, lineHeight: 1.7,
+          background: tone === 'ok' ? '#E8F8F0' : tone === 'err' ? '#FFEEF0' : '#F2F4F6',
+          color: tone === 'ok' ? '#0E9F5B' : tone === 'err' ? '#D22030' : '#4E5968',
         }}>
           {note}
         </div>
       )}
 
       <div style={{
-        marginTop: 12, fontSize: 11.5, color: '#90a4ae', lineHeight: 1.8,
-        background: '#fafbfc', borderRadius: 8, padding: '10px 12px',
+        marginTop: 12, fontSize: 11.5, color: '#8B95A1', lineHeight: 1.8,
+        background: '#F9FAFB', borderRadius: 12, padding: '10px 12px',
       }}>
         <b>덮어쓰지 않고 합칩니다.</b> 각자 넣은 지출은 둘 다 남고,
         같은 항목을 고쳤으면 나중에 고친 게 남습니다.

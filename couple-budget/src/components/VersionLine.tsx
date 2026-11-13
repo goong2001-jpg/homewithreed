@@ -21,7 +21,7 @@ export default function VersionLine() {
 
   if (!info?.version) return null;
   return (
-    <div style={{ fontSize: 11, color: '#b0bec5', textAlign: 'center', paddingBottom: 8 }}>
+    <div style={{ fontSize: 11, color: '#B0B8C1', textAlign: 'center', paddingBottom: 8 }}>
       버전 {info.version}
       {info.committedAtKst ? ` · ${info.committedAtKst}` : ''}
     </div>

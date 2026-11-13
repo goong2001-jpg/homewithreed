@@ -175,7 +175,7 @@ async function main() {
     try {
       await page.reload({ waitUntil: 'load', timeout: 15000 });
       await page.waitForSelector('nav button', { timeout: 8000 });
-      offlineOk = /하루 쓸 수 있는 돈/.test(await text());
+      offlineOk = /지금 여유돈/.test(await text());
     } catch {}
     await page.context().setOffline(false);
     check('신호가 없어도 앱이 열리고 기록이 보인다', offlineOk);
