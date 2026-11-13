@@ -101,6 +101,9 @@ export const TRADE_COST = 1;
  */
 export const MAX_COUPONS_PER_DAY = 8;
 
+/** 3문제를 틀리지 않고 한 번에 다 맞히면 받는 쿠폰 수 (틀렸다가 다시 맞히면 1장) */
+export const COUPONS_FOR_PERFECT = 2;
+
 const DEFAULT: WordProgress = {
   date: '', learned: 0, phase: 'learn', round: 0, attempt: 0, results: [], queue: FRESH_QUEUE(),
   rewardedDate: '', rewardedRounds: [], totalLearned: 0, coupons: {}, history: [],
@@ -236,23 +239,33 @@ export function useWordProgress() {
     update({ learned: 0, phase: 'learn', attempt: progress.attempt + 1, results: [], queue: FRESH_QUEUE() });
   }, [progress.attempt, update]);
 
-  /** 쿠폰 받기 — 회차마다 한 장씩, 하루 최대 MAX_COUPONS_PER_DAY 장 */
-  const earnCoupon = useCallback((id: CouponId): boolean => {
+  /**
+   * 쿠폰 받기 — 회차마다 한 번 (3문제를 한 번에 다 맞히면 두 장).
+   * 하루 최대 MAX_COUPONS_PER_DAY 장이라 남은 만큼만 담고, 담은 장수를 돌려준다.
+   * rewardedRounds 에는 쿠폰 한 장마다 회차 번호를 하나씩 적는다 (길이 = 오늘 받은 장수).
+   */
+  const earnCoupon = useCallback((ids: CouponId[]): number => {
     const today = todayKey();
     const rounds = progress.rewardedDate === today ? progress.rewardedRounds : [];
-    if (rounds.includes(progress.round)) return false;      // 이 회차는 이미 받음
-    if (rounds.length >= MAX_COUPONS_PER_DAY) return false;  // 오늘치 다 받음
+    if (rounds.includes(progress.round)) return 0;      // 이 회차는 이미 받음
+    const given = ids.slice(0, Math.max(0, MAX_COUPONS_PER_DAY - rounds.length));
+    if (!given.length) return 0;                         // 오늘치 다 받음
+    const coupons = { ...progress.coupons };
+    for (const id of given) coupons[id] = (coupons[id] ?? 0) + 1;
     const next: WordProgress = {
       ...progress,
       rewardedDate: today,
-      rewardedRounds: [...rounds, progress.round],
+      rewardedRounds: [...rounds, ...given.map(() => progress.round)],
       // 화면은 그대로 둔다. 여기서 'done'으로 바꾸면 방금 뽑은 쿠폰이
       // 곧바로 사라져서 아이가 무엇을 받았는지 볼 수 없다.
-      coupons: { ...progress.coupons, [id]: (progress.coupons[id] ?? 0) + 1 },
-      history: [{ id, type: 'earn' as const, at: today }, ...progress.history].slice(0, 60),
+      coupons,
+      history: [
+        ...given.map(id => ({ id, type: 'earn' as const, at: today })),
+        ...progress.history,
+      ].slice(0, 60),
     };
     save(next);
-    return true;
+    return given.length;
   }, [progress, save]);
 
   /** 같은 쿠폰 TRADE_COST 장을 내고 다른 쿠폰 한 장을 받는다 */

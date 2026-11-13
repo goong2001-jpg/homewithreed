@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { wordsForDay, questionsForDay, WORDS_PER_DAY, TEST_COUNT } from '../words/dailySet';
 import { WORD_BANK, Word } from '../words/wordBank';
 import { drawCoupon, CouponKind, COUPONS } from '../words/coupons';
-import { useWordProgress } from '../hooks/useWordProgress';
+import { useWordProgress, COUPONS_FOR_PERFECT } from '../hooks/useWordProgress';
 import { useGameState } from '../hooks/useGameState';
 import { useMissions } from '../hooks/useMissions';
 import { useStreak } from '../hooks/useStreak';
@@ -67,7 +67,8 @@ export default function WordScreen() {
   const [picked, setPicked] = useState<string | null>(null);
   const [showWallet, setShowWallet] = useState(false);
   const [showShop, setShowShop] = useState(false);
-  const [drawn, setDrawn] = useState<CouponKind | null>(null);
+  // 뽑은 쿠폰 (한 번에 다 맞히면 두 장)
+  const [drawn, setDrawn] = useState<CouponKind[]>([]);
   const roundRef = useRef(progress.round);
   const [drawing, setDrawing] = useState(false);
   const [happy, setHappy] = useState(false);
@@ -109,7 +110,7 @@ export default function WordScreen() {
   useEffect(() => {
     if (roundRef.current !== progress.round) {
       roundRef.current = progress.round;
-      setDrawn(null);
+      setDrawn([]);
       // 새 소리 단계로 넘어갔으면 소리 카드부터 보여준다
       if (plan.unitDay === 0) setIntroOpen(true);
     }
@@ -194,27 +195,31 @@ export default function WordScreen() {
   }, [progress.phase, testFinished, completeSet]);
   const allCorrect = testFinished;
 
+  // 3문제를 한 번에 다 맞히면 두 장, 틀렸다가 다시 맞히면 한 장 (오늘 남은 만큼만)
+  const couponCount = Math.min(wrongCount === 0 ? COUPONS_FOR_PERFECT : 1, couponsLeftToday);
+
   // 다 맞히면 쿠폰 뽑기
   const handleDraw = useCallback(() => {
-    if (drawing) return;
+    if (drawing || couponCount <= 0) return;
     setDrawing(true);
     playClick();
     let spins = 0;
     const spin = () => {
       spins++;
-      setDrawn(COUPONS[spins % COUPONS.length]);
+      // 두 장이면 서로 다른 그림이 돌아가게 한 칸씩 어긋나게 보여준다
+      setDrawn(Array.from({ length: couponCount }, (_, i) => COUPONS[(spins + i * 2) % COUPONS.length]));
       if (spins < 14) setTimeout(spin, 90 + spins * 12);
       else {
-        const prize = drawCoupon();
-        setDrawn(prize);
-        earnCoupon(prize.id);
+        const prizes = Array.from({ length: couponCount }, () => drawCoupon());
+        setDrawn(prizes);
+        earnCoupon(prizes.map(p => p.id));
         playStreak();
         setDrawing(false);
         setTimeout(() => rewardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
       }
     };
     spin();
-  }, [drawing, earnCoupon]);
+  }, [drawing, earnCoupon, couponCount]);
 
   const card: React.CSSProperties = {
     background: 'white', borderRadius: 24, padding: '22px 20px',
@@ -292,6 +297,7 @@ export default function WordScreen() {
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 5 }}>
           <span>
             {progress.phase === 'learn' ? `오늘의 단어 ${progress.learned + 1} / ${WORDS_PER_DAY}`
+              : progress.phase === 'test' && progress.queue.length === 0 ? `문제 다 풀었어! (${TEST_COUNT} / ${TEST_COUNT})`
               : progress.phase === 'test' ? (isRetryQ ? `틀린 단어 다시! (${solved} / ${TEST_COUNT} 맞힘)` : `문제 ${qIndex + 1} / ${TEST_COUNT}`)
               : '오늘 공부 끝! 🎉'}
           </span>
@@ -498,12 +504,16 @@ export default function WordScreen() {
                       ? `한 번 더 하면 쿠폰을 또 받을 수 있어요! (오늘 ${couponsLeftToday}장 남음)`
                       : '오늘 받을 수 있는 쿠폰을 다 받았어요 😊')
                   : couponsLeftToday > 0
-                    ? `쿠폰을 뽑을 수 있어요! (오늘 ${couponsLeftToday}장 남음)`
+                    ? (wrongCount === 0
+                        ? (couponCount > 1
+                            ? `한 번에 다 맞혀서 쿠폰 ${couponCount}장! (오늘 ${couponsLeftToday}장 남음)`
+                            : `쿠폰을 뽑을 수 있어요! (오늘 마지막 1장)`)
+                        : `쿠폰 1장을 뽑을 수 있어요! 다음엔 한 번에 다 맞히면 ${COUPONS_FOR_PERFECT}장! (오늘 ${couponsLeftToday}장 남음)`)
                     : '오늘 받을 수 있는 쿠폰을 다 받았어요 😊')
               : '다시 도전하면 쿠폰을 받을 수 있어요!'}
           </div>
 
-          {allCorrect && !rewardedThisRound && couponsLeftToday > 0 && !drawn && (
+          {allCorrect && !rewardedThisRound && couponsLeftToday > 0 && drawn.length === 0 && (
             <button
               onClick={handleDraw}
               style={{
@@ -512,29 +522,35 @@ export default function WordScreen() {
                 fontSize: 18, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
                 boxShadow: '0 6px 20px rgba(246,211,101,0.7)',
               }}
-            >🎁 쿠폰 뽑기!</button>
+            >🎁 쿠폰 {couponCount > 1 ? `${couponCount}장 ` : ''}뽑기!</button>
           )}
 
-          {drawn && (
-            <div ref={rewardRef} style={{
-              background: drawn.color, borderRadius: 20, padding: '20px 16px',
-              border: '3px dashed rgba(255,255,255,0.9)',
-              animation: drawing ? 'none' : 'fadeIn 0.4s ease',
-            }}>
-              <div style={{ fontSize: 52 }}>{drawn.emoji}</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: '#3b2f4a', marginTop: 4 }}>
-                {drawn.name}
+          {drawn.length > 0 && (
+            <div ref={rewardRef} style={{ animation: drawing ? 'none' : 'fadeIn 0.4s ease' }}>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {drawn.map((c, i) => (
+                  <div key={i} style={{
+                    flex: 1, background: c.color, borderRadius: 20,
+                    padding: drawn.length > 1 ? '16px 6px' : '20px 16px',
+                    border: '3px dashed rgba(255,255,255,0.9)',
+                  }}>
+                    <div style={{ fontSize: drawn.length > 1 ? 44 : 52 }}>{c.emoji}</div>
+                    <div style={{ fontSize: drawn.length > 1 ? 16 : 20, fontWeight: 900, color: '#3b2f4a', marginTop: 4 }}>
+                      {c.name}
+                    </div>
+                  </div>
+                ))}
               </div>
               {!drawing && (
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#5b4a6a', marginTop: 6 }}>
-                  🎟️ 쿠폰 지갑에 담았어요!
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#5b4a6a', marginTop: 8 }}>
+                  🎟️ 쿠폰 {drawn.length > 1 ? `${drawn.length}장을 ` : ''}지갑에 담았어요!
                 </div>
               )}
             </div>
           )}
 
 
-          {allCorrect && !drawing && (rewardedThisRound || drawn || couponsLeftToday === 0) && (
+          {allCorrect && !drawing && (rewardedThisRound || drawn.length > 0 || couponsLeftToday === 0) && (
             <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
               <button
                 onClick={() => { setShowWallet(true); playClick(); }}

@@ -63,3 +63,31 @@ describe('useWordProgress — 간격 반복', () => {
     expect(p.todayReview).toEqual(['sun']);
   });
 });
+
+describe('useWordProgress — 쿠폰', () => {
+  it('한 회차에 두 장을 받을 수 있고, 같은 회차는 다시 받지 못한다', () => {
+    const { result } = renderHook(() => useWordProgress());
+    let given = 0;
+    act(() => { given = result.current.earnCoupon(['tv', 'roblox']); });
+    expect(given).toBe(2);
+    expect(result.current.progress.coupons).toEqual({ tv: 1, roblox: 1 });
+    expect(result.current.couponsToday).toBe(2);
+    expect(result.current.rewardedThisRound).toBe(true);
+    act(() => { given = result.current.earnCoupon(['tv']); });
+    expect(given).toBe(0);
+    expect(result.current.progress.coupons.tv).toBe(1);
+  });
+
+  it('하루 최대 장수를 넘으면 남은 만큼만 준다', () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      date: todayKey(), round: 7, rewardedDate: todayKey(), rewardedRounds: [0, 0, 1, 1, 2, 2, 3],
+    }));
+    const { result } = renderHook(() => useWordProgress());
+    expect(result.current.couponsLeftToday).toBe(1);
+    let given = 0;
+    act(() => { given = result.current.earnCoupon(['tv', 'playground']); });
+    expect(given).toBe(1);
+    expect(result.current.progress.coupons).toEqual({ tv: 1 });
+    expect(result.current.couponsLeftToday).toBe(0);
+  });
+});
