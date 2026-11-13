@@ -5,6 +5,14 @@ import {
 import { daysAgoKey, todayKey } from '../utils/budget';
 import { formatAmountInput, parseAmountInput, shortWon, signedWon, won } from '../utils/format';
 
+/**
+ * 칸을 미리 채우는 값 — '자주 쓰는 지출' 칩과 '문자 붙여넣기'가 같이 쓴다.
+ * 없는 값은 화면에 있던 것을 그대로 둔다 (붙여넣기는 사람을 모르고, 카테고리도 모를 수 있다).
+ */
+export type FormPreset =
+  Pick<FrequentExpense, 'amount' | 'content'>
+  & { category?: ExpenseCategory; personId?: string; date?: string };
+
 interface Props {
   persons: Person[];
   budget: MonthBudget;
@@ -14,7 +22,7 @@ interface Props {
    * '자주 쓰는 지출' 칩을 눌렀을 때 — 칸만 채우고 저장 버튼에 초점을 준다.
    * seq 는 같은 칩을 두 번 눌러도 다시 채워지게 하는 일련번호.
    */
-  preset?: { item: FrequentExpense; seq: number };
+  preset?: { item: FormPreset; seq: number };
   /** 이 폰 주인 — 새로 쓸 때 '누가' 의 기본값 (없으면 첫 번째 사람) */
   defaultPersonId?: string;
   /** 고른 사람을 이 폰 주인으로 기억시킨다 */
@@ -57,10 +65,10 @@ export default function ExpenseForm({
     if (!preset) return;
     const it = preset.item;
     setAmountText(formatAmountInput(String(it.amount)));
-    setCategory(it.category);
+    if (it.category) setCategory(it.category);
     setContent(it.content);
-    if (persons.some(p => p.id === it.personId)) setPersonId(it.personId);
-    setDate(todayKey());
+    if (it.personId && persons.some(p => p.id === it.personId)) setPersonId(it.personId);
+    setDate(it.date ?? todayKey());
     setError('');
     saveRef.current?.focus();
     // persons 는 초점 대상이 아니라 일부러 뺀다 — 칩을 눌렀을 때만 돈다

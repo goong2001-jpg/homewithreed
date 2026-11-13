@@ -210,6 +210,21 @@ async function main() {
     await page.waitForTimeout(250);
     check('내역의 경조사 줄을 누르면 경조사 수정 화면이 열린다', /경조사 수정/.test(await text()));
 
+    // 카드 문자 붙여넣기 — 칸만 채우고 저장은 하지 않는다 (v21)
+    await page.getByRole('button', { name: /입력$/ }).last().click();
+    await page.getByRole('button', { name: /붙여넣어서 채우기/ }).click();
+    await page.fill('#paste-sms', '[토스뱅크] 체크카드 국내 결제\n홍*동님의 예시카드 카드\n15,030원 결제 | 크린토피아 서울역점\n잔액 144,816원');
+    await page.getByRole('button', { name: '채우기', exact: true }).click();
+    await page.waitForTimeout(250);
+    const pasted = {
+      amount: await page.inputValue('#amount'),
+      content: await page.inputValue('#content'),
+      stored: await page.evaluate(() => JSON.parse(localStorage.getItem('couple_budget_expenses') || '[]').length),
+    };
+    check('카드 문자를 붙여넣으면 금액·가게가 채워진다 (저장은 아직 안 됨)',
+      pasted.amount === '15,030' && pasted.content === '크린토피아 서울역점' && pasted.stored === 3,
+      JSON.stringify(pasted));
+
     const wide = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
     check('390px 폭에서 가로 스크롤이 없다', wide);
 

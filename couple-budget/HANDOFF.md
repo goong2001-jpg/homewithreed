@@ -1,6 +1,6 @@
 # 인수인계 — 우리집 하루수입 가계부 (couple-budget)
 
-> 마지막 정리: **2026-11-13 · v20** · 이 문서는 다음 작업자(사람이든 다른 AI 모델이든)가
+> 마지막 정리: **2026-11-13 · v21** · 이 문서는 다음 작업자(사람이든 다른 AI 모델이든)가
 > 이 앱을 처음 보고도 안전하게 이어서 고칠 수 있게 쓴 것이다. 작업 전에 끝까지 읽는다.
 
 ---
@@ -74,11 +74,11 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 
 ### 2-3. 버전 올리는 법 · 커밋 메시지 규칙
 
-- **PR(또는 기본 브랜치에 들어가는 변경) 하나 = 버전 하나.** 다음 번호 = `CHANGELOG.md` 맨 위 버전 + 1 (지금 v20 → 다음 **v21**)
+- **PR(또는 기본 브랜치에 들어가는 변경) 하나 = 버전 하나.** 다음 번호 = `CHANGELOG.md` 맨 위 버전 + 1 (지금 v21 → 다음 **v22**)
 - 기본 브랜치에 들어가는 커밋(= squash 병합 커밋)의 메시지:
 
   ```
-  v21: 무엇을 바꿨는지 한 줄 (#PR번호)
+  v22: 무엇을 바꿨는지 한 줄 (#PR번호)
 
   - 바뀐 점 하나
   - 바뀐 점 둘
@@ -103,8 +103,8 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 3. 커밋 (메시지 규칙 2-3) → **푸시 전에** `git pull --rebase origin claude/intelligent-cannon-txjx76`
    (배포 뒤 Actions 봇이 CHANGELOG 커밋을 기본 브랜치에 넣기 때문에, 오래 작업했으면 뒤처져 있다)
 4. `git push -u origin <작업브랜치>` — 원격 작업 브랜치에 **이미 병합된 옛 커밋만** 남아 있어서 거절되면 `--force-with-lease` (병합 안 된 커밋이 있으면 절대 강제 푸시하지 말 것)
-5. GitHub MCP 로 PR 생성: base = `claude/intelligent-cannon-txjx76`, 제목 = `v21: …`
-6. **squash 병합**: `merge_pull_request(merge_method="squash", commit_title="v21: … (#PR번호)", commit_message="- …\n- …")`
+5. GitHub MCP 로 PR 생성: base = `claude/intelligent-cannon-txjx76`, 제목 = `v22: …`
+6. **squash 병합**: `merge_pull_request(merge_method="squash", commit_title="v22: … (#PR번호)", commit_message="- …\n- …")`
    → `commit_title`·`commit_message` 를 **꼭 직접 넣는다.** 안 넣으면 GitHub 기본 제목이 들어가 버전이 빠진다
 7. 배포 성공까지 확인 (4장). 끝나면 사용자에게 "폰에서 새로고침" 안내
 
@@ -156,6 +156,7 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 | `src/utils/merge.ts` | id 기준 last-write-wins 병합, 로컬 승자 되밀기, Firestore undefined 제거 |
 | `src/utils/backup.ts` | 파일로 주고받기 형식(v2) 만들기·읽기·요약 |
 | `src/utils/roomCode.ts` | Firebase 설정 붙여넣기 파싱, 우리집 코드 생성·검사 |
+| `src/utils/smsParse.ts` | 카드 문자·알림에서 금액·가게·날짜를 뽑고 카테고리를 짐작 (v21). **외부로 보내지 않고 저장도 안 한다.** 새 카드 형식은 여기 규칙 + 테스트에 추가 |
 | `src/utils/format.ts` | 원 표시, 날짜 라벨, 금액 입력 콤마 |
 | `src/utils/storage.ts` | localStorage 키 목록 + 안전한 load/save |
 | `src/utils/excelExport.ts` | Excel 내보내기 (xlsx 동적 import) |
@@ -166,7 +167,7 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 | `src/sync/syncClient.ts` | firebase 를 만지는 **유일한** 파일. 연결 테스트·오류를 "마법사 몇 단계 탓"으로 번역 |
 | **화면 (탭 순서)** | |
 | `HomeView` · `PiggyGauge` · `piggyShapes` · `StatRow` · `PersonBars` · `BudgetLimits` · `WeeklyReportCard` · `MissingDaysCard` · `RecurringCard` | 🐷 저금통 탭 (순서: 저금통 → 하루 쓸 돈 → 입력 버튼 → 빠진 날 알림 → 나머지) |
-| `AddView` · `ExpenseForm` · `IncomeForm` · `FrequentChips` | ➕ 입력 탭 (지출/수입 전환, 수정 겸용). 지출은 오늘·어제·그제 칩, '저장 후 하나 더'. **세 번째 칸 '경조사'**(v18)는 `GiftForm` 을 끼워 넣은 것 — 경조사 장부에 쌓인다 |
+| `AddView` · `ExpenseForm` · `IncomeForm` · `FrequentChips` · `PasteBox` | ➕ 입력 탭 (지출/수입 전환, 수정 겸용). 지출은 오늘·어제·그제 칩, '저장 후 하나 더'. **세 번째 칸 '경조사'**(v18)는 `GiftForm` 을 끼워 넣은 것 — 경조사 장부에 쌓인다 |
 | `HistoryView` · `ExpenseItem` · `CategoryBreakdown` · `HistoryTabs` | 📋 내역 탭. '안 쓴 날' 표시도 여기서 보이고 지운다 |
 | `TopSpendView` | 🏆 TOP5 — 탭이 아니라 **내역 탭 안의 전환**(`HistoryTabs`). `View` 값 `'top'` 은 그대로 |
 | `GiftsView` · `GiftForm` | 🧧 경조사 탭 |
@@ -279,7 +280,7 @@ bash couple-budget/dev/check.sh --quick  # 단위 테스트만 (빌드·브라�
 |---|---|
 | Node 버전 | 22 권장 (CI 와 같음), 18 이상 필수 |
 | 의존성 | `node_modules` 없으면 `npm ci` |
-| 단위 테스트 | `src/**/*.test.ts` — 계산·병합·백업·주간 리포트·경조사 (v19 기준 **211건**) |
+| 단위 테스트 | `src/**/*.test.ts` — 계산·병합·백업·주간 리포트·경조사 (v21 기준 **225건**) |
 | 이력 도구 테스트 | `dev/history.test.mjs` — 임시 git 저장소로 기록·중복 방지·따라잡기 (18건) |
 | 문서 | HANDOFF·CLAUDE·CHANGELOG·README 있음, CHANGELOG 자동 표시 있음 |
 | 배포 빌드 | `CI=true` (경고 = 실패, CI 와 같은 조건) |
@@ -295,7 +296,7 @@ bash couple-budget/dev/check.sh --quick  # 단위 테스트만 (빌드·브라�
 cd <저장소 루트>
 git add -A couple-budget                    # 다른 앱 폴더를 섞지 않는다
 git commit -F - <<'EOF'
-v21: 무엇을 바꿨는지
+v22: 무엇을 바꿨는지
 
 - 바뀐 점
 - 바뀐 점
@@ -305,8 +306,8 @@ git push -u origin <작업브랜치>              # 거절되면 2-4 의 4번
 ```
 
 그다음 GitHub MCP:
-- `create_pull_request(owner="goong2001-jpg", repo="homewithreed", base="claude/intelligent-cannon-txjx76", head="<작업브랜치>", title="v21: …", body=…)`
-- `merge_pull_request(…, pullNumber=N, merge_method="squash", commit_title="v21: … (#N)", commit_message="- …\n- …")`
+- `create_pull_request(owner="goong2001-jpg", repo="homewithreed", base="claude/intelligent-cannon-txjx76", head="<작업브랜치>", title="v22: …", body=…)`
+- `merge_pull_request(…, pullNumber=N, merge_method="squash", commit_title="v22: … (#N)", commit_message="- …\n- …")`
 - 405(충돌)가 나면: 2-4 의 1번처럼 브랜치를 최신에서 다시 만들고 내 커밋만 `cherry-pick` → `--force-with-lease` → 다시 병합
 
 ### 4-4. 배포 성공 확인
@@ -319,7 +320,7 @@ GitHub MCP 로:
 2. `actions_list(method="list_workflow_jobs", resource_id="<run id>")`
    → `test` · `build` · `deploy` · `couple-budget-changelog` 네 개가 모두 success
 3. `get_job_logs(job_id=<couple-budget-changelog 의 id>, return_content=true, tail_lines=40)`
-   → `CHANGELOG: 기록해서 푸시했습니다` 와 `배포 확인됨` + version.json 내용 (`"version": "v21"`)
+   → `CHANGELOG: 기록해서 푸시했습니다` 와 `배포 확인됨` + version.json 내용 (`"version": "v22"`)
 4. 이력 반영 확인
    ```bash
    git fetch origin claude/intelligent-cannon-txjx76
@@ -344,7 +345,8 @@ GitHub MCP 로:
 
 | 버전 | 날짜(KST) | PR | 내용 |
 |---|---|---|---|
-| v20 | 2026-11-13 | — | 화면 디자인 전체 새로 입힘 (사용자가 고른 '시안 2' — 금융앱 느낌). 기능·계산·데이터는 그대로 |
+| v21 | 2026-11-13 | — | 카드 문자·알림 붙여넣기로 지출 칸 채우기 (이 폰 안에서만 해석, 외부 API 없음). 직접 입력은 그대로 |
+| v20 | 2026-11-13 | #64 | 화면 디자인 전체 새로 입힘 (사용자가 고른 '시안 2' — 금융앱 느낌). 기능·계산·데이터는 그대로 |
 | v19 | 2026-11-13 | #63 | 낸 경조사비를 쓴 돈으로 계산 (저금통·내역·TOP5·주간 리포트·Excel). 받은 돈은 그대로 장부에만 |
 | v18 | 2026-11-12 | #62 | 입력 탭에서 경조사·용돈 적기 (경조사 장부에 저절로 쌓임, 저금통과는 계속 분리) |
 | v17 | 2026-11-12 | #61 | 입력 편하게(이 폰 주인·저장 후 하나 더·날짜 칩·저장 알림·입력 버튼 위로), 입력이 빠진 날 알림·'안 썼어요', 반복 지출→고정지출 제안, 버전 표시, 탭 5개(TOP5 는 내역 안), 오프라인 열기 |
@@ -371,7 +373,7 @@ GitHub MCP 로:
 
 아직 안 한 것:
 
-1. **카드 문자 공유로 반자동 입력** — manifest `share_target` (안드로이드만, 아이폰 불가). 한 명만 쓰게 되면 손해라 보류
+1. **카드 문자 붙여넣기 넓히기** — v21 에서 붙여넣기는 됐다(사용자가 쓰는 두 형식: 항목이 한 줄씩 오는 카드 문자, 토스뱅크 한 줄형). 다른 카드 문자가 안 맞으면 `smsParse.ts` 에 규칙 추가. 사람은 못 알아낸다(이름이 가려져 옴) → 이 폰 주인으로 채운다. 여러 건 한 번에 붙여넣기는 안 됨. 공유 메뉴로 바로 받기(`share_target`)는 안드로이드만 돼서 보류
 2. **중간에 빈 날** — 지금 알림은 어제부터 거꾸로 *연달아* 빈 날만 본다. 어제는 적고 그제를 빼먹은 경우는 안 알려준다 (일부러 단순하게 시작. 사용자 반응 보고 넓힐지 결정)
 3. **수입·경조사에도 '저장 후 하나 더'** — 지출에만 넣었다
 4. v17 반응 확인 — 탭 5개·홈 순서가 불편하다고 하면 되돌리기 쉽다 (`TabBar.tsx` 의 `TABS`, `HomeView.tsx` 순서)
