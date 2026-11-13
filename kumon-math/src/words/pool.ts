@@ -35,3 +35,16 @@ export const FINDABLE = [
   'apple', 'banana', 'egg', 'milk', 'water', 'robot', 'puzzle', 'balloon', 'umbrella',
   'glasses', 'scissors', 'ruler', 'pen', 'shirt', 'pants', 'television', 'computer',
 ];
+
+/**
+ * 자주 틀리는 단어 — 특별 훈련에 쓴다. 많이 틀린 순서대로.
+ * 두 번 넘게 틀린 단어가 세 개가 안 되면 한 번 틀린 단어까지 넣는다.
+ */
+export function toughWords(srs: Record<string, { wrong: number; box: number }>, min = 3): Word[] {
+  const byWrong = Object.entries(srs)
+    .filter(([, e]) => e.wrong > 0)
+    .sort((a, b) => b[1].wrong - a[1].wrong || a[1].box - b[1].box);
+  const often = byWrong.filter(([, e]) => e.wrong >= 2);
+  const ids = (often.length >= min ? often : byWrong).map(([en]) => en);
+  return ids.map(en => WORD_BANK.find(w => w.en === en)).filter((w): w is Word => !!w);
+}

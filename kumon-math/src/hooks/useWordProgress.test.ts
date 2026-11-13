@@ -99,3 +99,47 @@ describe('useWordProgress — 쿠폰', () => {
     expect(result.current.couponsToday).toBe(15);
   });
 });
+
+describe('useWordProgress — 저금통', () => {
+  it('쿠폰을 저금통에 넣고, 모은 쿠폰으로 큰 보상을 받는다', () => {
+    localStorage.setItem(KEY, JSON.stringify({ date: todayKey(), coupons: { tv: 2, roblox: 1 } }));
+    const { result } = renderHook(() => useWordProgress());
+    act(() => { result.current.saveToPiggy('tv'); });
+    act(() => { result.current.saveToPiggy('tv'); });
+    act(() => { result.current.saveToPiggy('roblox'); });
+    expect(result.current.progress.piggy).toBe(3);
+    expect(result.current.progress.coupons).toEqual({ tv: 0, roblox: 0 });
+    // 없는 쿠폰은 넣지 못한다
+    let ok = true;
+    act(() => { ok = result.current.saveToPiggy('tv'); });
+    expect(ok).toBe(false);
+    // 모자라면 못 받고, 충분하면 받는다
+    act(() => { ok = result.current.buyBigReward('영화 보기', 5); });
+    expect(ok).toBe(false);
+    act(() => { ok = result.current.buyBigReward('영화 보기', 3); });
+    expect(ok).toBe(true);
+    expect(result.current.progress.piggy).toBe(0);
+    expect(result.current.progress.history[0]).toMatchObject({ type: 'big', label: '영화 보기', cost: 3 });
+  });
+});
+
+describe('useWordProgress — 졸업 시험', () => {
+  it('한 단계를 다 배우면 졸업 시험이 생기고, 통과하면 졸업장이 된다', () => {
+    // 1단계의 마지막(세 번째) 묶음을 끝내는 순간
+    localStorage.setItem(KEY, JSON.stringify({ date: todayKey(), unit: 0, unitDays: 2, round: 0 }));
+    const { result } = renderHook(() => useWordProgress());
+    act(() => result.current.completeSet());
+    expect(result.current.progress.unit).toBe(1);
+    expect(result.current.progress.pendingGrad).toEqual([0]);
+    act(() => result.current.passGrad(0));
+    expect(result.current.progress.pendingGrad).toEqual([]);
+    expect(result.current.progress.graduated[0]).toBe(todayKey());
+  });
+
+  it('단계 중간의 묶음을 끝냈을 때는 졸업 시험이 생기지 않는다', () => {
+    localStorage.setItem(KEY, JSON.stringify({ date: todayKey(), unit: 0, unitDays: 0, round: 0 }));
+    const { result } = renderHook(() => useWordProgress());
+    act(() => result.current.completeSet());
+    expect(result.current.progress.pendingGrad).toEqual([]);
+  });
+});

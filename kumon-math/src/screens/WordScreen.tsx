@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { wordsForDay, questionsForDay, WORDS_PER_DAY, TEST_COUNT } from '../words/dailySet';
 import { WORD_BANK, Word } from '../words/wordBank';
 import { drawCoupon, CouponKind, COUPONS } from '../words/coupons';
@@ -19,13 +19,42 @@ import { playCorrect, playWrong, playStreak, playClick } from '../utils/sounds';
 import { SoundIntro, UnitPicker, ColoredWord } from '../components/SoundIntro';
 import { UNITS } from '../words/units';
 import FairyBubble from '../components/FairyBubble';
+import ParentGate from '../components/ParentGate';
+import WeeklyCard from '../components/WeeklyCard';
+import GradTest, { GRAD_STARS } from '../components/GradTest';
+import { useSettings } from '../hooks/useSettings';
+import { logConfusion, readLog, sumDays, weekOf } from '../words/log';
+import { addDays, isoToday, weekIndex } from '../words/dates';
+
+// 엄마·아빠 메뉴는 열 때만 내려받는다
+const ParentScreen = lazy(() => import('../components/ParentScreen'));
+
+const WEEKLY_KEY = 'word_weekly';
+
+/** 새 주에 처음 열었고 지난주에 공부한 날이 있으면 지난주의 날짜를 돌려준다 (칭찬 카드용) */
+function weeklyCardDate(): string | null {
+  const today = isoToday();
+  try {
+    const shown = localStorage.getItem(WEEKLY_KEY);
+    const thisWeek = String(weekIndex(today));
+    if (shown === thisWeek) return null;
+    localStorage.setItem(WEEKLY_KEY, thisWeek);
+    const lastWeek = addDays(today, -7);
+    return sumDays(weekOf(readLog(), lastWeek).map(d => d.log)).studyDays > 0 ? lastWeek : null;
+  } catch { return null; }
+}
 
 export default function WordScreen() {
   const {
     progress, learnNext, answer, earnCoupon, useCoupon, tradeCoupon,
     practiceAgain, totalCoupons, rewardedThisRound, couponsLeftToday,
-    completeSet, chooseUnit,
+    completeSet, chooseUnit, saveToPiggy, buyBigReward, passGrad,
   } = useWordProgress();
+  const { settings, change: changeSettings } = useSettings();
+  // 엄마·아빠 메뉴: 'gate' = 확인 중, 'open' = 열림
+  const [parent, setParent] = useState<'gate' | 'open' | null>(null);
+  const [weeklyDate, setWeeklyDate] = useState<string | null>(weeklyCardDate);
+  const [gradUnit, setGradUnit] = useState<number | null>(null);
   const { gameState, items, buyItem, equipItem, addPoints, recordCorrect } = useGameState();
   const { missions, bump, reward, closeCelebration, allDone, needsReward } = useMissions();
   const { streak, markActive } = useStreak();
@@ -157,6 +186,7 @@ export default function WordScreen() {
     if (correct) { playCorrect(); setHappy(true); recordCorrect(2); bump('quiz'); }
     else {
       playWrong();
+      logConfusion(question.word.en, en);   // 헷갈린 짝으로 적어 둔다
       // 정답을 소리로도 들려줘서 머리에 남게 한다
       setTimeout(() => speakWord(question.word.en), 500);
     }
@@ -288,6 +318,19 @@ export default function WordScreen() {
 
       {/* 오늘 미션 3개 — 다 하면 "오늘 끝" */}
       <MissionCard missions={missions} />
+
+      {/* 소리 단계를 다 배웠으면 졸업 시험 — 문제를 푸는 동안에는 감춘다 */}
+      {progress.pendingGrad.length > 0 && (progress.phase !== 'test' || testFinished) && (
+        <button
+          onClick={() => { setGradUnit(progress.pendingGrad[0]); playClick(); }}
+          style={{
+            width: '100%', maxWidth: 380, marginBottom: 12, padding: '12px 14px', borderRadius: 16, border: 'none',
+            background: 'linear-gradient(135deg,#f6d365,#fda085)', color: '#5b3a1a',
+            fontSize: 15, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
+            boxShadow: '0 4px 14px rgba(246,211,101,0.6)',
+          }}
+        >🎓 {progress.pendingGrad[0] + 1}단계를 다 배웠어! 졸업 시험 보기 →</button>
+      )}
 
       {/* 오늘 진행 */}
       <div style={{
@@ -634,6 +677,37 @@ export default function WordScreen() {
         </div>
       )}
 
+      {/* 엄마·아빠 메뉴 — 곱셈 문제를 맞혀야 열린다 */}
+      <button
+        onClick={() => { setParent('gate'); playClick(); }}
+        style={{
+          marginTop: 22, border: 'none', background: 'rgba(255,255,255,0.6)', borderRadius: 12,
+          padding: '8px 14px', color: '#8a7a9a', fontSize: 13, fontWeight: 800,
+          cursor: 'pointer', fontFamily: 'inherit',
+        }}
+      >👪 엄마·아빠 메뉴 🔒</button>
+      {parent === 'gate' && (
+        <ParentGate title="엄마·아빠 메뉴" onPass={() => setParent('open')} onCancel={() => setParent(null)} />
+      )}
+      {parent === 'open' && (
+        <Suspense fallback={null}>
+          <ParentScreen progress={progress} streak={streak} settings={settings}
+            onChange={changeSettings} onClose={() => setParent(null)} />
+        </Suspense>
+      )}
+
+      {/* 주간 칭찬 카드 — 새 주에 처음 열면 지난주 것을 한 번 보여준다 (오늘 미션 축하와 겹치지 않게) */}
+      {weeklyDate && !celebrating && (
+        <WeeklyCard log={readLog()} date={weeklyDate} name={settings.childName}
+          title="지난주 칭찬 카드" onClose={() => setWeeklyDate(null)} />
+      )}
+
+      {gradUnit !== null && (
+        <GradTest unit={gradUnit} name={settings.childName} today={isoToday()}
+          onPass={() => { passGrad(gradUnit); addPoints(GRAD_STARS); }}
+          onClose={() => setGradUnit(null)} />
+      )}
+
       {celebrating && <MissionCelebration onClose={closeCelebration} />}
 
       {showUnits && (
@@ -648,8 +722,13 @@ export default function WordScreen() {
         <CouponWallet
           coupons={progress.coupons}
           history={progress.history}
+          piggy={progress.piggy}
+          bigRewards={settings.bigRewards}
+          approveUse={settings.approveUse}
           onUse={useCoupon}
           onTrade={tradeCoupon}
+          onSave={saveToPiggy}
+          onBuyBig={buyBigReward}
           onClose={() => setShowWallet(false)}
         />
       )}

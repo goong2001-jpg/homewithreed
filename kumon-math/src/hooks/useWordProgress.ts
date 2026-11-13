@@ -2,7 +2,8 @@ import { useCallback, useState } from 'react';
 import { CouponId } from '../words/coupons';
 import { todayKey, TEST_COUNT, MAX_MISSED_PER_DAY, DayPlan, reviewForDay } from '../words/dailySet';
 import { UNITS, SETS_PER_UNIT } from '../words/units';
-import { SrsMap, applyResult, seenEntry, migrateSrs } from '../words/srs';
+import { SrsMap, applyResult, seenEntry, migrateSrs, MAX_BOX } from '../words/srs';
+import { logDay } from '../words/log';
 
 const FRESH_QUEUE = () => Array.from({ length: TEST_COUNT }, (_, i) => i);
 
@@ -12,13 +13,18 @@ export type Phase = 'learn' | 'test' | 'done';
 
 export interface CouponEvent {
   id: CouponId;
-  /** 'earn' = 받음, 'use' = 사용함, 'trade' = 다른 쿠폰 두 장과 바꿔서 받음 */
-  type: 'earn' | 'use' | 'trade';
+  /**
+   * 'earn' = 받음, 'use' = 사용함, 'trade' = 다른 쿠폰과 바꿔서 받음,
+   * 'save' = 저금통에 넣음, 'big' = 저금통으로 큰 보상을 받음 (label 에 보상 이름)
+   */
+  type: 'earn' | 'use' | 'trade' | 'save' | 'big';
   at: string;
   /** trade 일 때 내준 쿠폰 */
   from?: CouponId;
-  /** trade 일 때 내준 장수 (예전 기록은 2장이었다) */
+  /** trade 일 때 내준 장수 (예전 기록은 2장이었다), big 일 때 저금통에서 낸 장수 */
   cost?: number;
+  /** big 일 때 받은 큰 보상 이름 */
+  label?: string;
 }
 
 export interface WordProgress {
@@ -86,6 +92,12 @@ export interface WordProgress {
   yesterdayLearned: number;
   /** 오늘이 시작될 때의 totalLearned — 하루에 몇 개 봤는지 세는 기준 */
   dayStartLearned: number;
+  /** 저금통에 모은 쿠폰 수 — 모아서 큰 보상으로 바꾼다 */
+  piggy: number;
+  /** 다 배워서 졸업 시험을 볼 수 있는 소리 단계들 */
+  pendingGrad: number[];
+  /** 졸업 시험에 통과한 단계와 날짜 */
+  graduated: Record<number, string>;
 }
 
 /** 오답 노트에 이만큼 오래 남은 단어는 정리한다 */
@@ -121,6 +133,9 @@ const DEFAULT: WordProgress = {
   yesterdayMissed: [],
   yesterdayLearned: 0,
   dayStartLearned: 0,
+  piggy: 0,
+  pendingGrad: [],
+  graduated: {},
 };
 
 function daysAgo(dateKey: string): number {
@@ -197,6 +212,8 @@ export function useWordProgress() {
   const learnNext = useCallback((perDay: number, en?: string) => {
     setProgress(prev => {
       const learned = Math.min(prev.learned + 1, perDay);
+      logDay('cards');
+      if (en && !prev.srs[en]) logDay('newWords');
       const next: WordProgress = {
         ...prev,
         seen: en ? { ...prev.seen, [en]: (prev.seen[en] ?? 0) + 1 } : prev.seen,
@@ -223,6 +240,10 @@ export function useWordProgress() {
       const known = correct && firstTry ? { ...prev.known, [en]: (prev.known[en] ?? 0) + 1 } : prev.known;
       // 간격 반복 상자: 처음 푸는 답만 반영한다 (틀린 문제를 바로 다시 맞힌 건 올리지 않는다)
       const srs = firstTry ? { ...prev.srs, [en]: applyResult(prev.srs[en], correct, today) } : prev.srs;
+      if (firstTry) {
+        logDay(correct ? 'right' : 'wrong');
+        if (srs[en].box === MAX_BOX && (prev.srs[en]?.box ?? 0) < MAX_BOX) logDay('mastered');
+      }
       const todayCorrect = correct && firstTry && !prev.todayCorrect.includes(en)
         ? [...prev.todayCorrect, en] : prev.todayCorrect;
       const next = { ...prev, results: [...prev.results, correct], queue, missed, known, srs, todayCorrect };
@@ -267,6 +288,7 @@ export function useWordProgress() {
       ].slice(0, 60),
     };
     save(next);
+    logDay('earned', given.length);
     return given.length;
   }, [progress, save]);
 
@@ -297,8 +319,47 @@ export function useWordProgress() {
       history: [{ id, type: 'use' as const, at: todayKey() }, ...progress.history].slice(0, 60),
     };
     save(next);
+    logDay('used');
     return true;
   }, [progress, save]);
+
+  /** 쿠폰 한 장을 저금통에 넣는다 (500원 쿠폰은 넣을 수 없다 — 화면에서 막는다) */
+  const saveToPiggy = useCallback((id: CouponId): boolean => {
+    const have = progress.coupons[id] ?? 0;
+    if (have <= 0) return false;
+    save({
+      ...progress,
+      coupons: { ...progress.coupons, [id]: have - 1 },
+      piggy: progress.piggy + 1,
+      history: [{ id, type: 'save' as const, at: todayKey() }, ...progress.history].slice(0, 60),
+    });
+    return true;
+  }, [progress, save]);
+
+  /** 저금통에서 cost 장을 내고 큰 보상을 받는다 */
+  const buyBigReward = useCallback((label: string, cost: number): boolean => {
+    if (!(cost > 0) || progress.piggy < cost) return false;
+    save({
+      ...progress,
+      piggy: progress.piggy - cost,
+      history: [{ id: 'playground' as CouponId, type: 'big' as const, label, cost, at: todayKey() }, ...progress.history].slice(0, 60),
+    });
+    logDay('used', cost);
+    return true;
+  }, [progress, save]);
+
+  /** 졸업 시험 통과 — 그 단계를 졸업 목록에 적는다 */
+  const passGrad = useCallback((unit: number) => {
+    setProgress(prev => {
+      const next = {
+        ...prev,
+        pendingGrad: prev.pendingGrad.filter(u => u !== unit),
+        graduated: { ...prev.graduated, [unit]: todayKey() },
+      };
+      try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
 
   /**
    * 문제 묶음 하나를 끝냈을 때 — 단계 진도를 한 칸 올린다.
@@ -309,8 +370,13 @@ export function useWordProgress() {
       const done = `${todayKey()}:${prev.round}`;
       if (prev.unitDoneDate === done) return prev;
       let unit = prev.unit, unitDays = prev.unitDays + 1;
-      if (unitDays >= SETS_PER_UNIT) { unit = (unit + 1) % UNITS.length; unitDays = 0; }
-      const next = { ...prev, unit, unitDays, unitDoneDate: done };
+      let pendingGrad = prev.pendingGrad;
+      if (unitDays >= SETS_PER_UNIT) {
+        // 한 단계를 다 배웠다 — 졸업 시험을 볼 수 있게 적어 둔다
+        if (!prev.graduated[prev.unit] && !pendingGrad.includes(prev.unit)) pendingGrad = [...pendingGrad, prev.unit];
+        unit = (unit + 1) % UNITS.length; unitDays = 0;
+      }
+      const next = { ...prev, unit, unitDays, unitDoneDate: done, pendingGrad };
       try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
       return next;
     });
@@ -352,7 +418,7 @@ export function useWordProgress() {
 
   return {
     progress, learnNext, answer, retryTest, earnCoupon, useCoupon, tradeCoupon,
-    completeSet, chooseUnit,
+    completeSet, chooseUnit, saveToPiggy, buyBigReward, passGrad,
     finishWithoutCoupon, practiceAgain, totalCoupons,
     rewardedThisRound, couponsToday, couponsLeftToday, update,
   };
