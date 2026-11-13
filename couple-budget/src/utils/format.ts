@@ -12,23 +12,25 @@ export function signedWon(n: number): string {
   return `${r < 0 ? '−' : '+'}${Math.abs(r).toLocaleString('ko-KR')}원`;
 }
 
-/** 큰 금액을 짧게: 3,200,000 → 320만원 */
+/**
+ * 큰 금액을 짧게: 3,200,000 → 320만원, 12,000 → 1.2만원
+ *
+ * ⚠️ **절대 반올림하지 않는다.** 짧게 써도 값이 그대로일 때만 줄이고, 아니면 원 단위까지 다 쓴다.
+ *    (v21 까지는 23,500 을 "2.4만원"으로 보여줘서 올려 저장된 것처럼 보였다 — 저장값은 맞았지만 화면이 틀렸다)
+ *  · 천 원 단위로 떨어지지 않으면 → 23,500원
+ *  · 억: 천만 원 단위로 떨어질 때만 → 1.5억원, 아니면 만 단위 → 12,345만원
+ */
 export function shortWon(n: number): string {
   const abs = Math.abs(Math.round(n));
   const sign = n < 0 ? '−' : '';
-  if (abs >= 100_000_000) {
-    const eok = abs / 100_000_000;
-    return `${sign}${trimZero(eok)}억원`;
+  if (abs % 1_000 !== 0 || abs < 10_000) {
+    return `${sign}${abs.toLocaleString('ko-KR')}원`;
   }
-  if (abs >= 10_000) {
-    const man = abs / 10_000;
-    return `${sign}${trimZero(man)}만원`;
+  if (abs >= 100_000_000 && abs % 10_000_000 === 0) {
+    return `${sign}${(abs / 100_000_000).toLocaleString('ko-KR')}억원`;
   }
-  return `${sign}${abs.toLocaleString('ko-KR')}원`;
-}
-
-function trimZero(n: number): string {
-  return String(Math.round(n * 10) / 10);
+  // 천 원 단위로 떨어지므로 만으로 나누면 소수 한 자리까지만 나온다 — 버리는 값이 없다
+  return `${sign}${(abs / 10_000).toLocaleString('ko-KR')}만원`;
 }
 
 /** '2026-07' → '2026년 7월' */
