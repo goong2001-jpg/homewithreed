@@ -1,6 +1,6 @@
 # 인수인계 — 우리집 하루수입 가계부 (couple-budget)
 
-> 마지막 정리: **2026-11-13 · v21** · 이 문서는 다음 작업자(사람이든 다른 AI 모델이든)가
+> 마지막 정리: **2026-11-13 · v22** · 이 문서는 다음 작업자(사람이든 다른 AI 모델이든)가
 > 이 앱을 처음 보고도 안전하게 이어서 고칠 수 있게 쓴 것이다. 작업 전에 끝까지 읽는다.
 
 ---
@@ -74,11 +74,11 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 
 ### 2-3. 버전 올리는 법 · 커밋 메시지 규칙
 
-- **PR(또는 기본 브랜치에 들어가는 변경) 하나 = 버전 하나.** 다음 번호 = `CHANGELOG.md` 맨 위 버전 + 1 (지금 v21 → 다음 **v22**)
+- **PR(또는 기본 브랜치에 들어가는 변경) 하나 = 버전 하나.** 다음 번호 = `CHANGELOG.md` 맨 위 버전 + 1 (지금 v22 → 다음 **v23**)
 - 기본 브랜치에 들어가는 커밋(= squash 병합 커밋)의 메시지:
 
   ```
-  v22: 무엇을 바꿨는지 한 줄 (#PR번호)
+  v23: 무엇을 바꿨는지 한 줄 (#PR번호)
 
   - 바뀐 점 하나
   - 바뀐 점 둘
@@ -103,8 +103,8 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 3. 커밋 (메시지 규칙 2-3) → **푸시 전에** `git pull --rebase origin claude/intelligent-cannon-txjx76`
    (배포 뒤 Actions 봇이 CHANGELOG 커밋을 기본 브랜치에 넣기 때문에, 오래 작업했으면 뒤처져 있다)
 4. `git push -u origin <작업브랜치>` — 원격 작업 브랜치에 **이미 병합된 옛 커밋만** 남아 있어서 거절되면 `--force-with-lease` (병합 안 된 커밋이 있으면 절대 강제 푸시하지 말 것)
-5. GitHub MCP 로 PR 생성: base = `claude/intelligent-cannon-txjx76`, 제목 = `v22: …`
-6. **squash 병합**: `merge_pull_request(merge_method="squash", commit_title="v22: … (#PR번호)", commit_message="- …\n- …")`
+5. GitHub MCP 로 PR 생성: base = `claude/intelligent-cannon-txjx76`, 제목 = `v23: …`
+6. **squash 병합**: `merge_pull_request(merge_method="squash", commit_title="v23: … (#PR번호)", commit_message="- …\n- …")`
    → `commit_title`·`commit_message` 를 **꼭 직접 넣는다.** 안 넣으면 GitHub 기본 제목이 들어가 버전이 빠진다
 7. 배포 성공까지 확인 (4장). 끝나면 사용자에게 "폰에서 새로고침" 안내
 
@@ -238,6 +238,7 @@ homewithreed 저장소의 couple-budget(우리집 하루수입 가계부) 작업
 | 와이프 폰에서 추가한 자녀가 남편 폰에 안 보임 (v7) | 사람 목록이 설정 안에 있어 동기화 대상이 아니었음 | `persons` 컬렉션 + `loadPersons()` 이사(`updatedAt: 0`) |
 | "기록 올리기 버튼이 없어" (v8) | 연결 테스트 직후에만 보였음 | 연결 중엔 상시 노출 + 자동 1회 올리기 |
 | "카테고리 눌러도 안 보여" (v10) | 동작은 했는데 고정지출 15줄 아래로 결과가 밀림 | 고정지출을 맨 아래로. **"안 된다" = 화면 밖일 수 있다** |
+| "23,500원을 넣었는데 24,000원으로 올려 저장된다" (v22) | 저장은 맞았다. `shortWon()` 이 소수 한 자리로 **반올림**해서 저장 버튼·저장 알림·자주 쓰는 지출 칩에 "2.4만원"으로 보였다 (v17 에서 저장 버튼에 `shortWon` 을 쓰면서 눈에 띔) | `shortWon` 은 값이 그대로일 때만 줄이고 아니면 원 단위까지 다 쓴다. **돈 표시는 반올림 금지** — `format.test.ts` 가 지킨다 |
 | 금액만 고쳐도 순서가 튐 (v11) | 수정 때 `createdAt` 을 지금으로 덮음 | `existing?.createdAt ?? now` (수입·고정지출도) |
 | 지난달 복사로 급여가 두 번 (v12) | 수입이 건별이 된 뒤 사람별 덮어쓰기 전제가 깨짐 | 이 달 수입이 하나라도 있으면 복사 안 함·버튼 숨김 |
 | Firebase 안내대로 했는데 막힘 (4번) | 닉네임 칸 설명 부족 / 개편된 콘솔 메뉴 경로 / 규칙 자리에 설정 붙여넣기(`Unexpected '{'`) / "웹 API 키" 항목이 콘솔에 없음 | 앱 마법사·README 를 실제 화면 기준으로 고침. **콘솔 안내는 추측 금지** |
@@ -280,7 +281,7 @@ bash couple-budget/dev/check.sh --quick  # 단위 테스트만 (빌드·브라�
 |---|---|
 | Node 버전 | 22 권장 (CI 와 같음), 18 이상 필수 |
 | 의존성 | `node_modules` 없으면 `npm ci` |
-| 단위 테스트 | `src/**/*.test.ts` — 계산·병합·백업·주간 리포트·경조사 (v21 기준 **225건**) |
+| 단위 테스트 | `src/**/*.test.ts` — 계산·병합·백업·주간 리포트·경조사 (v22 기준 **233건**) |
 | 이력 도구 테스트 | `dev/history.test.mjs` — 임시 git 저장소로 기록·중복 방지·따라잡기 (18건) |
 | 문서 | HANDOFF·CLAUDE·CHANGELOG·README 있음, CHANGELOG 자동 표시 있음 |
 | 배포 빌드 | `CI=true` (경고 = 실패, CI 와 같은 조건) |
@@ -296,7 +297,7 @@ bash couple-budget/dev/check.sh --quick  # 단위 테스트만 (빌드·브라�
 cd <저장소 루트>
 git add -A couple-budget                    # 다른 앱 폴더를 섞지 않는다
 git commit -F - <<'EOF'
-v22: 무엇을 바꿨는지
+v23: 무엇을 바꿨는지
 
 - 바뀐 점
 - 바뀐 점
@@ -306,8 +307,8 @@ git push -u origin <작업브랜치>              # 거절되면 2-4 의 4번
 ```
 
 그다음 GitHub MCP:
-- `create_pull_request(owner="goong2001-jpg", repo="homewithreed", base="claude/intelligent-cannon-txjx76", head="<작업브랜치>", title="v22: …", body=…)`
-- `merge_pull_request(…, pullNumber=N, merge_method="squash", commit_title="v22: … (#N)", commit_message="- …\n- …")`
+- `create_pull_request(owner="goong2001-jpg", repo="homewithreed", base="claude/intelligent-cannon-txjx76", head="<작업브랜치>", title="v23: …", body=…)`
+- `merge_pull_request(…, pullNumber=N, merge_method="squash", commit_title="v23: … (#N)", commit_message="- …\n- …")`
 - 405(충돌)가 나면: 2-4 의 1번처럼 브랜치를 최신에서 다시 만들고 내 커밋만 `cherry-pick` → `--force-with-lease` → 다시 병합
 
 ### 4-4. 배포 성공 확인
@@ -320,7 +321,7 @@ GitHub MCP 로:
 2. `actions_list(method="list_workflow_jobs", resource_id="<run id>")`
    → `test` · `build` · `deploy` · `couple-budget-changelog` 네 개가 모두 success
 3. `get_job_logs(job_id=<couple-budget-changelog 의 id>, return_content=true, tail_lines=40)`
-   → `CHANGELOG: 기록해서 푸시했습니다` 와 `배포 확인됨` + version.json 내용 (`"version": "v22"`)
+   → `CHANGELOG: 기록해서 푸시했습니다` 와 `배포 확인됨` + version.json 내용 (`"version": "v23"`)
 4. 이력 반영 확인
    ```bash
    git fetch origin claude/intelligent-cannon-txjx76
@@ -345,7 +346,8 @@ GitHub MCP 로:
 
 | 버전 | 날짜(KST) | PR | 내용 |
 |---|---|---|---|
-| v21 | 2026-11-13 | — | 카드 문자·알림 붙여넣기로 지출 칸 채우기 (이 폰 안에서만 해석, 외부 API 없음). 직접 입력은 그대로 |
+| v22 | 2026-11-13 | — | 금액이 올림돼 보이던 것 고침 (23,500원이 "2.4만원"으로 보였음 — 저장값은 원래 맞았다) |
+| v21 | 2026-11-13 | #65 | 카드 문자·알림 붙여넣기로 지출 칸 채우기 (이 폰 안에서만 해석, 외부 API 없음). 직접 입력은 그대로 |
 | v20 | 2026-11-13 | #64 | 화면 디자인 전체 새로 입힘 (사용자가 고른 '시안 2' — 금융앱 느낌). 기능·계산·데이터는 그대로 |
 | v19 | 2026-11-13 | #63 | 낸 경조사비를 쓴 돈으로 계산 (저금통·내역·TOP5·주간 리포트·Excel). 받은 돈은 그대로 장부에만 |
 | v18 | 2026-11-12 | #62 | 입력 탭에서 경조사·용돈 적기 (경조사 장부에 저절로 쌓임, 저금통과는 계속 분리) |
