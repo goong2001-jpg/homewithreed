@@ -255,6 +255,7 @@ export default function App() {
             editingExpense={editingExpense ?? undefined}
             editingIncome={editingIncome ?? undefined}
             frequent={frequent}
+            expenseHistory={ledger.expenses}
             onSaveExpense={saveExpenseWithAlert}
             onDeleteExpense={ledger.deleteExpense}
             onSaveIncome={ledger.saveIncome}
