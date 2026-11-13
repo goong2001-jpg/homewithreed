@@ -78,16 +78,24 @@ describe('useWordProgress — 쿠폰', () => {
     expect(result.current.progress.coupons.tv).toBe(1);
   });
 
-  it('하루 최대 장수를 넘으면 남은 만큼만 준다', () => {
+  it('하루에 8번까지 뽑을 수 있다 — 장수가 아니라 횟수로 센다', () => {
+    // 7번 뽑아 13장을 받은 상태: 한 번 더 뽑을 수 있고 두 장을 다 받는다
     localStorage.setItem(KEY, JSON.stringify({
-      date: todayKey(), round: 7, rewardedDate: todayKey(), rewardedRounds: [0, 0, 1, 1, 2, 2, 3],
+      date: todayKey(), round: 7, rewardedDate: todayKey(),
+      rewardedRounds: [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6],
     }));
-    const { result } = renderHook(() => useWordProgress());
+    const { result, rerender } = renderHook(() => useWordProgress());
     expect(result.current.couponsLeftToday).toBe(1);
     let given = 0;
     act(() => { given = result.current.earnCoupon(['tv', 'playground']); });
-    expect(given).toBe(1);
-    expect(result.current.progress.coupons).toEqual({ tv: 1 });
+    expect(given).toBe(2);
+    expect(result.current.progress.coupons).toEqual({ tv: 1, playground: 1 });
     expect(result.current.couponsLeftToday).toBe(0);
+    // 9번째 회차는 받지 못한다
+    act(() => result.current.update({ round: 8 }));
+    rerender();
+    act(() => { given = result.current.earnCoupon(['tv']); });
+    expect(given).toBe(0);
+    expect(result.current.couponsToday).toBe(15);
   });
 });

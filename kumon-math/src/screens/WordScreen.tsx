@@ -195,8 +195,8 @@ export default function WordScreen() {
   }, [progress.phase, testFinished, completeSet]);
   const allCorrect = testFinished;
 
-  // 3문제를 한 번에 다 맞히면 두 장, 틀렸다가 다시 맞히면 한 장 (오늘 남은 만큼만)
-  const couponCount = Math.min(wrongCount === 0 ? COUPONS_FOR_PERFECT : 1, couponsLeftToday);
+  // 3문제를 한 번에 다 맞히면 두 장, 틀렸다가 다시 맞히면 한 장
+  const couponCount = couponsLeftToday > 0 ? (wrongCount === 0 ? COUPONS_FOR_PERFECT : 1) : 0;
 
   // 다 맞히면 쿠폰 뽑기
   const handleDraw = useCallback(() => {
@@ -501,14 +501,12 @@ export default function WordScreen() {
             {allCorrect
               ? (rewardedThisRound
                   ? (couponsLeftToday > 0
-                      ? `한 번 더 하면 쿠폰을 또 받을 수 있어요! (오늘 ${couponsLeftToday}장 남음)`
+                      ? `한 번 더 하면 쿠폰을 또 받을 수 있어요! (오늘 ${couponsLeftToday}번 남음)`
                       : '오늘 받을 수 있는 쿠폰을 다 받았어요 😊')
                   : couponsLeftToday > 0
                     ? (wrongCount === 0
-                        ? (couponCount > 1
-                            ? `한 번에 다 맞혀서 쿠폰 ${couponCount}장! (오늘 ${couponsLeftToday}장 남음)`
-                            : `쿠폰을 뽑을 수 있어요! (오늘 마지막 1장)`)
-                        : `쿠폰 1장을 뽑을 수 있어요! 다음엔 한 번에 다 맞히면 ${COUPONS_FOR_PERFECT}장! (오늘 ${couponsLeftToday}장 남음)`)
+                        ? `한 번에 다 맞혀서 쿠폰 ${couponCount}장! (오늘 ${couponsLeftToday}번 남음)`
+                        : `쿠폰 1장을 뽑을 수 있어요! 다음엔 한 번에 다 맞히면 ${COUPONS_FOR_PERFECT}장! (오늘 ${couponsLeftToday}번 남음)`)
                     : '오늘 받을 수 있는 쿠폰을 다 받았어요 😊')
               : '다시 도전하면 쿠폰을 받을 수 있어요!'}
           </div>

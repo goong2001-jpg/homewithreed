@@ -95,11 +95,11 @@ const MISSED_KEEP_DAYS = 14;
 export const TRADE_COST = 1;
 
 /**
- * 하루에 받을 수 있는 쿠폰 수.
- * 쿠폰 때문에 더 하고 싶어 하는 만큼, 하루 여덟 번까지 열어 둔다.
+ * 하루에 쿠폰을 뽑을 수 있는 횟수 (장수가 아니라 회차 수).
+ * 한 번에 다 맞히면 두 장이므로 하루 최대 8번 × 2장 = 16장까지 받을 수 있다.
  * (숫자만 바꾸면 늘리거나 줄일 수 있다)
  */
-export const MAX_COUPONS_PER_DAY = 8;
+export const MAX_COUPON_ROUNDS_PER_DAY = 8;
 
 /** 3문제를 틀리지 않고 한 번에 다 맞히면 받는 쿠폰 수 (틀렸다가 다시 맞히면 1장) */
 export const COUPONS_FOR_PERFECT = 2;
@@ -241,15 +241,17 @@ export function useWordProgress() {
 
   /**
    * 쿠폰 받기 — 회차마다 한 번 (3문제를 한 번에 다 맞히면 두 장).
-   * 하루 최대 MAX_COUPONS_PER_DAY 장이라 남은 만큼만 담고, 담은 장수를 돌려준다.
-   * rewardedRounds 에는 쿠폰 한 장마다 회차 번호를 하나씩 적는다 (길이 = 오늘 받은 장수).
+   * 하루에 MAX_COUPON_ROUNDS_PER_DAY 번까지 뽑을 수 있고, 담은 장수를 돌려준다.
+   * rewardedRounds 에는 쿠폰 한 장마다 회차 번호를 하나씩 적는다
+   * (길이 = 오늘 받은 장수, 서로 다른 번호의 수 = 오늘 뽑은 횟수).
    */
   const earnCoupon = useCallback((ids: CouponId[]): number => {
     const today = todayKey();
     const rounds = progress.rewardedDate === today ? progress.rewardedRounds : [];
     if (rounds.includes(progress.round)) return 0;      // 이 회차는 이미 받음
-    const given = ids.slice(0, Math.max(0, MAX_COUPONS_PER_DAY - rounds.length));
-    if (!given.length) return 0;                         // 오늘치 다 받음
+    if (new Set(rounds).size >= MAX_COUPON_ROUNDS_PER_DAY) return 0; // 오늘치 다 뽑음
+    const given = ids;
+    if (!given.length) return 0;
     const coupons = { ...progress.coupons };
     for (const id of given) coupons[id] = (coupons[id] ?? 0) + 1;
     const next: WordProgress = {
@@ -345,7 +347,8 @@ export function useWordProgress() {
   const rewardedThisRound = roundsToday.includes(progress.round);
   /** 오늘 받은 쿠폰 수 / 남은 수 */
   const couponsToday = roundsToday.length;
-  const couponsLeftToday = Math.max(0, MAX_COUPONS_PER_DAY - couponsToday);
+  /** 오늘 쿠폰을 더 뽑을 수 있는 횟수 */
+  const couponsLeftToday = Math.max(0, MAX_COUPON_ROUNDS_PER_DAY - new Set(roundsToday).size);
 
   return {
     progress, learnNext, answer, retryTest, earnCoupon, useCoupon, tradeCoupon,
