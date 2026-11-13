@@ -4,7 +4,7 @@
  */
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const D = path.join(__dirname, '..');
-function sheet(rows) { return { rows, getLastRow() { return this.rows.length }, getRange(r, c, nr, nc) { const self = this; return {
+function sheet(rows) { return { rows, appendRow(r) { this.rows.push(r) }, getLastRow() { return this.rows.length }, getRange(r, c, nr, nc) { const self = this; return {
   getValues() { return self.rows.slice(r - 1, r - 1 + nr).map(x => { const a = x.slice(c - 1, c - 1 + nc); while (a.length < nc) a.push(''); return a }) },
   setValues(v) { v.forEach((row, i) => { self.rows[r - 1 + i] = row.slice() }) } } } } }
 const master = sheet([['ID', '품명', '분류', '단위', '안전'], ['SV7||기판', 'SV7', '기판', 100, 0], ['SV7||완포', 'SV7', '완포', 0, 0]]);
@@ -57,4 +57,17 @@ ok(Object.values(st).every(s => s.total === 0 && s.boxes === 0), '전체 초기�
 { const idx = fs.readFileSync(path.join(D, 'Index.html'), 'utf8'), tags = idx.match(/<\?[\s\S]*?\?>/g) || [], open = (idx.match(/<\?/g) || []).length;
   ok(open === 1 && tags.length === 1 && /^<\?!=\s*locInclude\(\)\s*\?>$/.test(tags[0]), 'Index.html 에 <? ?> 는 locInclude 하나뿐 (템플릿 오류 방지)');
   ok(!/<\?/.test(fs.readFileSync(path.join(D, 'Location.html'), 'utf8').replace(/<\?!=[^?]*\?>/g, '')) || true, 'Location.html 은 그대로 끼워 넣음(include) — 검사 생략'); }
+
+// v45: 위치도에서 새 품목을 수량 0으로 등록 (거래로그엔 아무것도 안 남음), 기존 품목은 수량 필요
+{ const n0 = log.rows.length;
+  const r45 = R('locQuickIn', { loc: '1층 A1', lines: [], newItem: { name: 'NEW0', cat: '기판' } });
+  ok(r45.created && r45.item.id === 'NEW0||기판' && r45.item.total === 0 && log.rows.length === n0, '새 품목 수량 0 등록 (기록 없음)');
+  ok(R('locQuickIn', { loc: '1층 A1', lines: [], newItem: { name: 'NEW0', cat: '기판' } }).created === false, '같은 품명+분류면 새로 안 만듦');
+  throws(() => R('locQuickIn', { loc: '1층 A1', lines: [], id: 'SV7||기판' }), '기존 품목은 수량 0 입고 거절');
+  // v45: 마이너스·연결 안 된 재고 0으로 정리 (locSetQty qty 0)
+  R('save', { id: 'SV7||완포', name: 'SV7', cat: '완포', type: '입고', loc: 'A동1층', lines: [{ boxes: 1, per: 10 }] });
+  log.rows.push([new Date(), 'SV7||완포', 'SV7', '완포', 'A동1층', '출고', '', '', 501, -501, '', '', '']);
+  ok(R('computeStock_')['SV7||완포'].locs['A동1층'] === -491, '마이너스 -491 만들어 둠');
+  R('locSetQty', { rows: [{ id: 'SV7||완포', loc: 'A동1층', qty: 0, note: '마이너스·연결 안 된 재고 정리' }] });
+  ok(R('computeStock_')['SV7||완포'].locs['A동1층'] === 0 && /-491→0/.test(log.rows[log.rows.length - 1][11]), '0으로 정리 (조정 +491, 메모 -491→0)'); }
 console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과'); process.exit(fail ? 1 : 0);

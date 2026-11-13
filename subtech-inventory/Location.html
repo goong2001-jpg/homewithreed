@@ -253,6 +253,7 @@
 #locApp .srow:first-of-type{border-top:0}
 #locApp .srow .nm{flex:1;min-width:0;word-break:keep-all}
 #locApp .srow .nm small{color:var(--sub);margin-left:4px}
+#locApp .srow button.zero{border-color:#B3412E;color:#B3412E;font-weight:700}
 #locApp .srow b{font-variant-numeric:tabular-nums;white-space:nowrap}
 #locApp .srow button,#locApp .sk .in{padding:5px 9px;border:1.5px solid var(--ink);border-radius:4px;background:transparent;font-size:13px;white-space:nowrap}
 #locApp .sk .in{margin-top:6px;background:var(--ink);color:var(--paper);font-weight:700}
@@ -579,9 +580,20 @@ function openApp(p){
   window.open(APP+(qs?(APP.indexOf('?')<0?'?':'&')+qs:''),'_top');
 }
 function stockRows(list,loc){const T=totals();return list.length?list.map(a=>`<div class="srow"><span class="nm" data-item="${esc(a.id)}">${esc(a.name)}${a.cat?`<small>${esc(a.cat)}</small>`:''}</span><b>${fmtN(a.qty)}${T[a.id]!==a.qty?`<small style="font-weight:400;color:var(--sub)"> (총 ${fmtN(T[a.id])})</small>`:''}</b>`+
-  `<button data-go="출고" data-id="${esc(a.id)}" data-loc="${esc(loc)}">출고</button><button data-mvid="${esc(a.id)}" data-loc="${esc(loc)}">이동</button></div>`).join('')
+  (a.qty>0?`<button data-go="출고" data-id="${esc(a.id)}" data-loc="${esc(loc)}">출고</button>`:'')+`<button data-mvid="${esc(a.id)}" data-loc="${esc(loc)}">이동</button>`+
+  (a.qty<0||!isSlotKey(loc)?`<button class="zero" data-zero="${esc(a.id)}" data-loc="${esc(loc)}">0으로 정리</button>`:'')+`</div>`).join('')
   :'<p class="none">재고 없음</p>'}
-function bindGo(P){P.querySelectorAll('[data-in]').forEach(b=>b.onclick=()=>openIn(b.dataset.in));P.querySelectorAll('[data-item]').forEach(b=>b.onclick=()=>openItem(b.dataset.item));P.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{if(GAS&&b.dataset.go==='출고'){openOut(b.dataset.loc,b.dataset.id);return}openApp({item:b.dataset.id,loc:b.dataset.loc,mode:b.dataset.go})});
+/** 위치 이름이 위치도의 보관칸이면 true (아니면 칸 미지정·연결 안 된 재고) */
+function isSlotKey(k){const w=keyIndex()[k];return !!(w&&w.kind==='slot')}
+/** 그 위치의 그 품목 수량을 0으로 ('조정' 줄 — 이력 남음). 마이너스·연결 안 된 재고 정리용 */
+function zeroStock(id,loc,P){const a=stockAt(loc).find(x=>x.id===id);if(!a)return;const it=ITEMMAP[id]||{name:a.name,cat:a.cat};
+  if(!confirm(`${it.name}${it.cat?'('+it.cat+')':''} · ${loc}\n지금 ${fmtN(a.qty)}개를 0개로 정리할까요?\n(지우지 않고 '조정'으로 기록돼서 이력에 남아요. 총수량이 ${a.qty<0?'+':'-'}${fmtN(Math.abs(a.qty))}개 바뀌어요)`))return;
+  GAS.withSuccessHandler(res=>{(res.items||[]).forEach(x=>{upsertItem(x);if(host())host().itemUpserted(x)});renderGrid();renderStockBar();
+    toast(`${it.name} ${loc} → 0개로 정리했어요`);const k=P.dataset.kind;
+    if(k==='orph'){orphanLocs().length?openOrphans():closePanel()}else if(k==='loose'){stockAt(String(sh().name||'').trim()).length?openLoose():closePanel()}else if(k==='cell'&&cur)drawCell()})
+  .withFailureHandler(e=>toast((e&&e.message)||'정리하지 못했어요'))
+  .locSetQty({rows:[{id,loc,qty:0,note:'마이너스·연결 안 된 재고 정리'}],staff:lastStaff()})}
+function bindGo(P){P.querySelectorAll('[data-zero]').forEach(b=>b.onclick=()=>zeroStock(b.dataset.zero,b.dataset.loc,P));P.querySelectorAll('[data-in]').forEach(b=>b.onclick=()=>openIn(b.dataset.in));P.querySelectorAll('[data-item]').forEach(b=>b.onclick=()=>openItem(b.dataset.item));P.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{if(GAS&&b.dataset.go==='출고'){openOut(b.dataset.loc,b.dataset.id);return}openApp({item:b.dataset.id,loc:b.dataset.loc,mode:b.dataset.go})});
   P.querySelectorAll('[data-mvid]').forEach(b=>b.onclick=()=>{const a=stockAt(b.dataset.loc).find(x=>x.id===b.dataset.mvid);if(!a)return;
     startMove({label:a.name+' '+fmtN(a.qty)+'개',parts:[{from:b.dataset.loc,layer:null,items:[a]}],src:P.dataset.kind==='cell'&&cur?{si:S.cur,r:cur.r,c:cur.c}:null})});
   P.querySelectorAll('[data-mvloc]').forEach(b=>b.onclick=()=>{const l=b.dataset.mvloc;
@@ -600,7 +612,7 @@ function openLoose(){const nm=String(sh().name||'').trim(),P=E('panelBody');P.da
   P.querySelector('[data-a="close"]').onclick=closePanel;bindGo(P);openPanel()}
 function openOrphans(){const P=E('panelBody'),o=orphanLocs();P.dataset.kind='orph';
   P.innerHTML=`<div class="ph"><h2>연결 안 된 재고</h2><button class="x" data-a="close">닫기</button></div>
-  <p class="note">위치 이름이 어느 시트·칸과도 맞지 않는 재고예요. 시트 이름을 그 위치 이름(예: A동1층)으로 바꾸면 그 시트의 "칸 미지정"으로 붙고, <b>이동</b>으로 칸에 옮길 수도 있어요.</p>
+  <p class="note">위치 이름이 어느 시트·칸과도 맞지 않는 재고예요. 실제 있는 칸으로 <b>이동</b>하거나, 잘못 생긴 숫자(특히 <b>마이너스</b>)면 <b>0으로 정리</b>를 누르세요 (지우지 않고 '조정'으로 기록).</p>
   ${o.map(k=>`<div class="sk"><h3>${esc(k)}<small>${fmtN(sum(STK[k]))}개</small></h3>${stockRows(STK[k],k)}${STK[k].length>1?`<button class="mv" data-mvloc="${esc(k)}">⇄ 전체 이동</button>`:''}</div>`).join('')}`;
   P.querySelector('[data-a="close"]').onclick=closePanel;bindGo(P);openPanel()}
 
@@ -854,7 +866,8 @@ function openIn(key,opts){
       <div class="sum">합계 <span data-f="sum">${fmtN(total)}</span>개 <small style="font-size:13px;font-weight:400;color:var(--sub)" data-f="boxsum">${linesBoxes()?'(박스 '+fmtN(linesBoxes())+'개)':''}</small></div>
       <label class="f">담당자<select data-f="staff">${staff.map(v=>`<option${v===st?' selected':''}>${esc(v)}</option>`).join('')}</select></label>
       ${w&&w.kind==='slot'?`<label class="chk"><input type="checkbox" data-f="pin"${F.pin?' checked':''}> 📌 이 칸에 지정 (재고가 0이 돼도 칸에 이름이 보임)</label>`:''}
-      <div class="acts"><button data-a="save" style="background:var(--ink);color:var(--paper);font-weight:700">＋ 입고 저장</button></div>`:''}</div>`;
+      ${F.mode==='new'?'<p class="note" style="margin:6px 0 0">수량을 비워두면 <b>수량 0으로 품목만 등록</b>돼요 (📌 이 칸에 지정).</p>':''}
+      <div class="acts"><button data-a="save" style="background:var(--ink);color:var(--paper);font-weight:700">${F.mode==='new'?'＋ 등록 · 입고 저장':'＋ 입고 저장'}</button></div>`:''}</div>`;
     P.querySelector('[data-a="close"]').onclick=closePanel;
     P.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{F.mode=b.dataset.m;if(F.mode==='new'&&!F.name)F.name=F.q;F.pin=F.mode==='new'||pinned.includes(F.id);draw()});
     const on=(f,fn)=>{const el=P.querySelector(`[data-f="${f}"]`);if(el)el.oninput=fn};
@@ -891,20 +904,22 @@ function openIn(key,opts){
     const total=linesTotal();
     if(F.mode==='new'&&!F.name.trim()){toast('품명을 입력하세요');return}
     if(F.mode==='old'&&!F.id){toast('품목을 고르세요');return}
-    if(!(total>0)){toast('박스 수와 박스당 수량을 입력하세요');return}
-    if(F.lines.some(l=>(l.boxes!==''||l.per!=='')&&!((+l.boxes||0)*(+l.per||0)>0))){toast('줄마다 박스 수와 박스당 수량을 둘 다 넣거나, 빈 줄은 ✕로 지워주세요');return}
+    const zeroNew=F.mode==='new'&&!(total>0); // 새 품목은 수량 0이어도 등록만 (v45)
+    if(!zeroNew&&!(total>0)){toast('박스 수와 박스당 수량을 입력하세요');return}
+    if(!zeroNew&&F.lines.some(l=>(l.boxes!==''||l.per!=='')&&!((+l.boxes||0)*(+l.per||0)>0))){toast('줄마다 박스 수와 박스당 수량을 둘 다 넣거나, 빈 줄은 ✕로 지워주세요');return}
     const ss=P.querySelector('[data-f="staff"]'),staff=ss?ss.value:'';try{if(staff)localStorage.setItem('subtek-staff',staff)}catch(e){}
     btn.disabled=true;btn.textContent='저장 중…';
-    const req={loc:key,lines:F.lines.map(l=>({boxes:+l.boxes||0,per:+l.per||0})).filter(l=>l.boxes*l.per>0),staff:staff,memo:'위치도에서 입고'};
+    const req={loc:key,lines:zeroNew?[]:F.lines.map(l=>({boxes:+l.boxes||0,per:+l.per||0})).filter(l=>l.boxes*l.per>0),staff:staff,memo:'위치도에서 입고'};
     if(F.mode==='new')req.newItem={name:F.name.trim(),cat:F.cat.trim(),unit:+F.unit||''};else req.id=F.id;
     GAS.withSuccessHandler(res=>{
       const it=res.item;upsertItem(it);
       if(F.pin&&w&&w.kind==='slot'){const L=ensure(S.sheets[w.si],w.r,w.c).layers[w.i];L.p=uniqP((L.p||[]).concat({id:it.id,name:it.name}));save()}
-      const wasX=isOut(it.id)&&!STALE;if(wasX)setOut(it.id,false);
+      const wasX=!zeroNew&&isOut(it.id)&&!STALE;if(wasX)setOut(it.id,false);
       if(host())host().itemUpserted(it);
       closePanel();if(w&&w.kind==='slot')flashCell(w.si,w.r,w.c);else render();
-      toast(`${it.name} ${fmtN(total)}개 입고했어요`+(res.created?' (새 품목 등록)':'')+(wasX?' · 재고X 해제':''));
-    }).withFailureHandler(e=>{btn.disabled=false;btn.textContent='＋ 입고 저장';toast((e&&e.message)||'입고하지 못했어요')}).locQuickIn(req);
+      toast(zeroNew?`${it.name}${it.cat?'('+it.cat+')':''} ${res.created?'등록했어요 (수량 0)':'이미 있는 품목이에요 — 칸에 지정만 했어요'}`
+        :`${it.name} ${fmtN(total)}개 입고했어요`+(res.created?' (새 품목 등록)':'')+(wasX?' · 재고X 해제':''));
+    }).withFailureHandler(e=>{btn.disabled=false;btn.textContent=F.mode==='new'?'＋ 등록 · 입고 저장':'＋ 입고 저장';toast((e&&e.message)||'입고하지 못했어요')}).locQuickIn(req);
   };
   draw();openPanel();
   const first=P.querySelector(F.mode==='new'?'[data-lp="0"]':'[data-f="q"]');if(first)setTimeout(()=>first.focus(),50);

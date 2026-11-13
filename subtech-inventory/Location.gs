@@ -298,7 +298,7 @@ function locQuickIn(p) {
   const loc = String(p.loc || '').trim();
   if (!loc) throw new Error('입고할 칸을 고르세요.');
   const lines = (p.lines || []).map(l => ({ boxes: Number(l.boxes) || 0, per: Number(l.per) || 0 })).filter(l => l.boxes * l.per > 0);
-  if (!lines.length) throw new Error('수량을 입력하세요.');
+  if (!lines.length && !p.newItem) throw new Error('수량을 입력하세요.'); // 새 품목은 수량 0이어도 등록만 (v45)
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
@@ -317,8 +317,9 @@ function locQuickIn(p) {
       it = info[p.id];
       if (!it) throw new Error('품목을 찾을 수 없어요. 새로고침 후 다시 해주세요.');
     }
-    save({ id: it.id, name: it.name, cat: it.cat, type: '입고', loc: loc, lines: lines,
-           staff: p.staff || '', memo: p.memo || '위치도에서 입고', images: [] });
+    if (lines.length)
+      save({ id: it.id, name: it.name, cat: it.cat, type: '입고', loc: loc, lines: lines,
+             staff: p.staff || '', memo: p.memo || '위치도에서 입고', images: [] });
     const s = computeStock_()[it.id] || { total: 0, boxes: 0, locs: {} };
     return { item: { id: it.id, name: it.name, cat: it.cat, unit: it.unit, safe: it.safe || 0,
                      total: s.total, boxes: s.boxes || 0, locs: s.locs }, created: created };
