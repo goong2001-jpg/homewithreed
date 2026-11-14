@@ -10,6 +10,8 @@ import PiggyGauge from './PiggyGauge';
 import StatRow from './StatRow';
 import PersonBars from './PersonBars';
 import BudgetLimits from './BudgetLimits';
+import InsightsCard from './InsightsCard';
+import { Insight } from '../utils/insights';
 import WeeklyReportCard from './WeeklyReportCard';
 import MissingDaysCard from './MissingDaysCard';
 import RecurringCard from './RecurringCard';
@@ -38,6 +40,8 @@ interface Props {
   missingDays: DateKey[];
   onFillMissing: (date: DateKey) => void;
   onMarkNoSpend: () => void;
+  /** 살펴볼 점 (utils/insights.ts) — 없으면 빈 배열 */
+  insights: Insight[];
   /** 고정지출로 옮기자고 권할 반복 지출 */
   recurring: RecurringCandidate[];
   onMoveRecurring: (item: RecurringCandidate) => void;
@@ -48,7 +52,7 @@ export default function HomeView({
   month, budget, fixedCount, syncStatus, prevMonthIncome, budgetRows, weeklyReport,
   onPrev, onNext, onToday, onGoSettings, onGoAdd, onGoAddIncome,
   onCopyPrevIncome, onSelectPerson,
-  missingDays, onFillMissing, onMarkNoSpend, recurring, onMoveRecurring, onDismissRecurring,
+  missingDays, onFillMissing, onMarkNoSpend, insights, recurring, onMoveRecurring, onDismissRecurring,
 }: Props) {
   const color = LEVEL_COLOR[budget.level];
   const future = budget.phase === 'future';
@@ -215,6 +219,8 @@ export default function HomeView({
           )}
 
           <StatRow budget={budget} />
+          {/* 살펴볼 점 — 숫자 바로 아래. 어디를 줄이면 좋을지 기록으로 짚어준다 */}
+          <InsightsCard items={insights} />
           <PersonBars budget={budget} onSelectPerson={onSelectPerson} />
           <BudgetLimits rows={budgetRows} onGoSettings={onGoSettings} />
 
