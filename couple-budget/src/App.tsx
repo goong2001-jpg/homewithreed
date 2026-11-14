@@ -8,6 +8,7 @@ import {
   monthExpenses, monthOf, recurringCandidates, thisMonth,
 } from './utils/budget';
 import { defaultPersonId } from './utils/device';
+import { computeInsights } from './utils/insights';
 import { useDevice } from './hooks/useDevice';
 import { shortWon } from './utils/format';
 import { GIFT_EXPENSE_PREFIX, giftsAsExpenses } from './utils/gifts';
@@ -84,6 +85,12 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [spendRows, view],
   );
+  // ---- 살펴볼 점 — 어디를 줄이면 좋을지 (낸 경조사비 포함) ----
+  const insights = useMemo(
+    () => computeInsights({ budget, expenses: spendRows, fixed: ledger.fixed }),
+    [budget, spendRows, ledger.fixed],
+  );
+
   const recurring = useMemo(() => {
     const dismissed = new Set(device.dismissedRecurring ?? []);
     return recurringCandidates(ledger.expenses, ledger.fixed, new Date(), 6)
@@ -231,6 +238,7 @@ export default function App() {
               ledger.markNoSpend(missing, ownerId);
               setToast({ key: Date.now(), tone: 'ok', text: `${missing.length}일을 안 쓴 날로 표시했어요` });
             }}
+            insights={insights}
             recurring={recurring}
             onMoveRecurring={moveRecurring}
             onDismissRecurring={dismissRecurring}

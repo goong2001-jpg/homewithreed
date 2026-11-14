@@ -225,6 +225,11 @@ async function main() {
       pasted.amount === '15,030' && pasted.content === '크린토피아 서울역점' && pasted.stored === 3,
       JSON.stringify(pasted));
 
+    // 살펴볼 점 — 기록이 있으면 저금통 화면에 뜬다 (v23)
+    await page.getByRole('button', { name: /저금통$/ }).click();
+    await page.waitForTimeout(250);
+    check('저금통 화면에 살펴볼 점이 뜬다', /살펴볼 점/.test(await text()));
+
     const wide = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
     check('390px 폭에서 가로 스크롤이 없다', wide);
 
