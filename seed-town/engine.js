@@ -112,8 +112,9 @@
       hold: {},            // 가게 id → { shares 씨앗 수, put 넣은 동전, since 처음 심은 계절, fruit 자라는 열매(0~1), ripe 익은 열매 }
       world: newWorld(D, seed),
       news: null, lastNews: [], badges: {}, wishes: {},
-      stats: { harvest: 0, news: 0, rumor: 0, seen: 0, buyBad: 0, lost: 0, line: 0, informed: 0, cheap: 0, reasoned: 0, quiz: 0 },
+      stats: { harvest: 0, news: 0, rumor: 0, seen: 0, buyBad: 0, lost: 0, line: 0, informed: 0, cheap: 0, reasoned: 0, quiz: 0, real: 0, pred: 0 },
       looked: {},          // 가게 id → 성적표를 본 계절 (새싹: 보고 나서 심기)
+      real: [],            // 세계: 실제 회사 { name, periods: [{ label, quarter, unit, v }], pred, reviews }
       journal: [],         // 숲: 투자일지 { t, id, act, n, price, why }
       history: [],         // 계절마다 마을 보물
       day: '', turnsToday: 0, log: []   // log: 날짜별 플레이 기록 { d, turns, self }
@@ -125,9 +126,10 @@
   // 예전 저장분에 새 칸을 채운다
   function upgrade(P, D) {
     var st = P.stats;
-    ['line', 'informed', 'cheap', 'reasoned', 'quiz'].forEach(function (k) { if (st[k] === undefined) st[k] = 0; });
+    ['line', 'informed', 'cheap', 'reasoned', 'quiz', 'real', 'pred'].forEach(function (k) { if (st[k] === undefined) st[k] = 0; });
     if (!P.looked) P.looked = {};
     if (!P.journal) P.journal = [];
+    if (!P.real) P.real = [];
     if (!P.met) P.met = {};
     for (var id in P.world.shops) if (!P.world.shops[id].shares) P.world.shops[id].shares = D.RULES.shares;
     return P;
@@ -359,7 +361,91 @@
   }
   function scoreQuiz(P, right) { if (right) { P.stats.quiz++; P.stars++; } }
 
+  /* ---------- 세계: 실제 재무제표 ---------- */
+  // "1,234" "(1,234)" "△1,234" "-1,234" → 숫자. 못 읽으면 null
+  function toNum(t) {
+    if (t === undefined || t === null) return null;
+    t = String(t).trim();
+    if (!t) return null;
+    var neg = /^[(△▲\-−]/.test(t) || /\)$/.test(t), n = parseFloat(t.replace(/[^\d.]/g, ''));
+    return isNaN(n) ? null : (neg ? -n : n);
+  }
+  // 붙여넣은 글에서 항목 이름 뒤의 첫 숫자를 찾는다 (보통 그 줄의 맨 앞 숫자가 이번 기간)
+  function parseStatement(text, D) {
+    var out = {}, lines = String(text || '').replace(/\(주\s?\d+\)|주\d+\)/g, '').split(/\n/);
+    D.REAL_FIELDS.forEach(function (f) {
+      var re = new RegExp('(?:' + f.find + ')[^\\d\\n]*?([(△▲\\-−]?\\s?\\d[\\d,.]*\\)?)');
+      for (var i = 0; i < lines.length; i++) {
+        var m = lines[i].replace(/\s+/g, ' ').match(re);
+        if (m) { var n = toNum(m[1]); if (n !== null) { out[f.id] = n; break; } }
+      }
+    });
+    return out;
+  }
+  function has(x) { return x !== undefined && x !== null; }
+  function div2(a, b) { return has(a) && has(b) && b !== 0 ? a / b : null; }
+  // 숫자 → 비율과 점검표. o.unit 금액 단위(원=1), o.quarter 분기 자료면 1년치로 환산(×4)
+  function analyze(v, o) {
+    o = o || {};
+    var u = o.unit || 1, k = o.quarter ? 4 : 1;
+    var op = has(v.op) ? v.op : (has(v.sales) && has(v.cogs) && has(v.sga) ? v.sales - v.cogs - v.sga : null);
+    var eps = has(v.net) ? div2(v.net * u * k, v.shares) : null, bps = has(v.equity) ? div2(v.equity * u, v.shares) : null;
+    var r = {
+      op: op, opm: div2(op, v.sales), npm: div2(v.net, v.sales),
+      roe: v.equity > 0 && has(v.net) ? v.net * k / v.equity : null,
+      debtRatio: v.equity > 0 ? div2(v.debt, v.equity) : null,
+      eps: eps, bps: bps,
+      per: eps > 0 && v.price ? v.price / eps : null,
+      pbr: bps > 0 && v.price ? v.price / bps : null,
+      payout: v.net > 0 ? div2(v.div, v.net) : null,
+      yield: has(v.div) && v.shares && v.price ? v.div * u * k / v.shares / v.price : null,
+      cashQ: v.net > 0 ? div2(v.cfo, v.net) : null
+    };
+    function ck(label, st, text) { return { label: label, state: st, text: text }; }   // ok 통과 / warn 주의 / na 자료 없음
+    function p(x) { return Math.round(x * 100) + '%'; }
+    r.checks = [
+      !has(v.net) ? ck('① 흑자인가', 'na', '순이익을 넣어 주세요.') : v.net > 0 ? ck('① 흑자인가', 'ok', '순이익이 플러스입니다' + (r.npm !== null ? ' (순이익률 ' + p(r.npm) + ').' : '.')) : ck('① 흑자인가', 'warn', '순손실입니다. 한 번뿐인 일인지, 계속되는지 봅니다.'),
+      !(v.equity > 0) ? ck('② 빚이 감당할 만한가', has(v.equity) ? 'warn' : 'na', has(v.equity) ? '자본이 0 이하입니다(자본잠식).' : '부채총계와 자본총계를 넣어 주세요.') : r.debtRatio === null ? ck('② 빚이 감당할 만한가', 'na', '부채총계를 넣어 주세요.') : r.debtRatio <= 1 ? ck('② 빚이 감당할 만한가', 'ok', '부채비율 ' + p(r.debtRatio) + ' — 빚이 주인 몫보다 적습니다.') : ck('② 빚이 감당할 만한가', 'warn', '부채비율 ' + p(r.debtRatio) + ' — 빚이 주인 몫보다 많습니다. 업종(금융·건설 등)에 따라 보통 수준이 다릅니다.'),
+      !has(v.cfo) ? ck('③ 장사로 현금이 들어오는가', 'na', '영업활동현금흐름을 넣어 주세요.') : v.cfo > 0 && (!(v.net > 0) || v.cfo >= v.net * 0.8) ? ck('③ 장사로 현금이 들어오는가', 'ok', '영업활동현금흐름이 플러스이고 순이익과 비슷하거나 많습니다.') : ck('③ 장사로 현금이 들어오는가', 'warn', v.cfo <= 0 ? '영업활동현금흐름이 마이너스입니다. 이익이 나도 현금이 안 들어오는 상태입니다.' : '현금이 순이익보다 꽤 적게 들어왔습니다. 외상(매출채권)·재고가 늘었는지 봅니다.'),
+      r.per === null || r.pbr === null ? ck('그레이엄의 눈: 싸게 사는가', 'na', '주가·발행주식수·순이익·자본총계가 모두 있어야 계산됩니다(적자면 PER 없음).') : r.per * r.pbr <= 22.5 ? ck('그레이엄의 눈: 싸게 사는가', 'ok', 'PER ' + r.per.toFixed(1) + ' × PBR ' + r.pbr.toFixed(2) + ' = ' + (r.per * r.pbr).toFixed(1) + ' (22.5 이하).') : ck('그레이엄의 눈: 싸게 사는가', 'warn', 'PER ' + r.per.toFixed(1) + ' × PBR ' + r.pbr.toFixed(2) + ' = ' + (r.per * r.pbr).toFixed(1) + ' (22.5 초과). 성장 기대가 값에 들어 있다는 뜻일 수 있습니다.'),
+      r.roe === null ? ck('버핏의 눈: 주인 돈으로 잘 버는가', 'na', '순이익과 자본총계를 넣어 주세요.') : r.roe >= 0.15 ? ck('버핏의 눈: 주인 돈으로 잘 버는가', 'ok', 'ROE ' + p(r.roe) + ' (15% 이상). 여러 해 이어지는지가 중요합니다.') : ck('버핏의 눈: 주인 돈으로 잘 버는가', 'warn', 'ROE ' + p(r.roe) + ' (15% 미만).')
+    ];
+    return r;
+  }
+  function pick3(right, a, b, at) { var o = [a, b]; o.splice(at, 0, right); return { options: o, answer: at }; }
+  // 실제 숫자로 문제 3개 (넣은 숫자만으로 풀 수 있는 것만)
+  function makeRealQuiz(v, rot) {
+    var qs = [];
+    function pct(x) { return Math.round(x * 100); }
+    function add(q, val, why) { var x = pick3(val + '%', (val + 8) + '%', (val - 6) + '%', (rot + qs.length) % 3); qs.push({ q: q, options: x.options, answer: x.answer, why: why + ' = ' + val + '%' }); }
+    if (has(v.net) && v.sales) add('순이익률(순이익 ÷ 매출액)은 얼마에 가장 가까운가요?', pct(v.net / v.sales), '순이익 ' + v.net + ' ÷ 매출액 ' + v.sales);
+    if (has(v.debt) && v.equity > 0) add('부채비율(부채총계 ÷ 자본총계)은 얼마에 가장 가까운가요?', pct(v.debt / v.equity), '부채총계 ' + v.debt + ' ÷ 자본총계 ' + v.equity);
+    var op = has(v.op) ? v.op : (has(v.cogs) && has(v.sga) ? v.sales - v.cogs - v.sga : null);
+    if (op !== null && v.sales) add('영업이익률(영업이익 ÷ 매출액)은 얼마에 가장 가까운가요?', pct(op / v.sales), '영업이익 ' + op + ' ÷ 매출액 ' + v.sales);
+    else if (v.net > 0 && has(v.div)) add('배당성향(배당금총액 ÷ 순이익)은 얼마에 가장 가까운가요?', pct(v.div / v.net), '배당금총액 ' + v.div + ' ÷ 순이익 ' + v.net);
+    return qs;
+  }
+  // 회사에 기간 하나를 넣는다. 그 회사에 걸어 둔 예측이 있으면 채점해서 돌려준다.
+  function saveReal(P, D, idx, name, period) {
+    var co = P.real[idx], review = null;
+    if (!co) { co = { name: name, periods: [], pred: null, reviews: [] }; P.real.push(co); idx = P.real.length - 1; }
+    if (name) co.name = name;
+    var prev = co.periods[co.periods.length - 1];
+    co.periods.push(period);
+    if (co.pred && prev && has(prev.v.net) && has(period.v.net) && prev.v.net !== 0) {
+      var ch = (period.v.net - prev.v.net) / Math.abs(prev.v.net), truth = ch > 0.05 ? 'good' : ch < -0.05 ? 'bad' : 'unknown';
+      review = { guess: co.pred.guess, why: co.pred.why, truth: truth, ch: ch, right: co.pred.guess === truth, from: prev.label, to: period.label };
+      co.reviews.push(review); co.pred = null;
+      if (review.right) { P.stats.pred++; P.stars++; }
+    }
+    P.stats.real = P.real.length;
+    checkBadges(P, D, null);
+    return { idx: idx, review: review };
+  }
+  function predictReal(P, idx, g, why) { if (P.real[idx]) P.real[idx].pred = { guess: g, why: String(why || '').slice(0, 120) }; }
+
   return {
+    toNum: toNum, parseStatement: parseStatement, analyze: analyze, makeRealQuiz: makeRealQuiz, saveReal: saveReal, predictReal: predictReal,
     upgrade: upgrade, stageIdx: stageIdx, ratios: ratios, guessLine: guessLine, answerOf: answerOf, lineOf: lineOf,
     makeQuiz: makeQuiz, scoreQuiz: scoreQuiz, shopDef: shopDef,
     newWorld: newWorld, newPlayer: newPlayer, step: step, level: level,

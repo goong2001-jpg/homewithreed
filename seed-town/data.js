@@ -148,6 +148,8 @@
     { id: 'margin', type: 'stat', stat: 'cheap', n: 3, stage: 'tree', name: '싸게 사기', text: '평소 값보다 20% 넘게 쌀 때 세 번 샀어요.', mentor: 'graham', talk: '값이 싸진 이유가 잠깐의 일인지, 가게가 정말 나빠진 건지 어떻게 구별할까?' },
     { id: 'why5', type: 'stat', stat: 'reasoned', n: 5, stage: 'forest', name: '이유 있는 투자', text: '이유를 적고 사기를 다섯 번 했어요.', mentor: 'munger', talk: '이유를 한 줄로 적을 수 없는 투자는 하지 않는다.' },
     { id: 'read9', type: 'stat', stat: 'quiz', n: 9, stage: 'forest', name: '공시 읽기', text: '공시 읽기 문제를 아홉 개 맞혔어요.' },
+    { id: 'real3', type: 'stat', stat: 'real', n: 3, stage: 'world', name: '세계로', text: '실제 회사 세 곳의 재무제표를 넣고 읽었어요.', talk: '세 회사 중 빚이 가장 적은 곳은 어디였나?' },
+    { id: 'pred3', type: 'stat', stat: 'pred', n: 3, stage: 'world', name: '복기하는 투자자', text: '다음 실적 예측을 세 번 맞혔어요.', talk: '맞힌 예측은 이유도 맞았나, 운이었나?' },
     { id: 'year3', type: 'year', n: 3, name: '세 해', text: '마을에서 3년을 보냈어요.', talk: '처음보다 마을 보물이 얼마나 늘었어?' },
     { id: 'w50', type: 'wealth', n: 50, name: '보물 50', text: '마을 보물이 50개가 됐어요.' },
     { id: 'w100', type: 'wealth', n: 100, name: '보물 100', text: '마을 보물이 100개가 됐어요.' }
@@ -180,8 +182,29 @@
     { id: 'seed', name: '씨앗', age: '5~7세', open: true, shows: '가게 그림 · 동전 · 열매' },
     { id: 'sprout', name: '새싹', age: '초등', open: true, shows: '가격 · 뉴스 카드 · 가게 성적표 3줄' },
     { id: 'tree', name: '나무', age: '청소년', open: true, shows: '재무제표 3표 · 공시 카드 · PER·ROE' },
-    { id: 'forest', name: '숲', age: '성인', open: true, shows: '공시 원문 읽기 · 투자일지 · 복기' }
+    { id: 'forest', name: '숲', age: '성인', open: true, shows: '공시 원문 읽기 · 투자일지 · 복기' },
+    { id: 'world', name: '세계', age: '실전', open: true, shows: '실제 회사 재무제표 넣기 · 비율·점검 · 문제 · 다음 실적 예측과 복기' }
   ];
+
+  /* 세계 단계: 실제 재무제표에서 읽어 올 칸. find 는 붙여넣은 글에서 그 항목을 찾는 정규식(문자열).
+   * need: 꼭 있어야 하는 칸. money: 금액 단위(원·백만원·억원)를 따르는 칸. */
+  var REAL_FIELDS = [
+    { id: 'sales', label: '매출액', need: true, money: true, find: '매출액|영업수익|매출(?!원가|총|채권)' },
+    { id: 'cogs', label: '매출원가', money: true, find: '매출원가' },
+    { id: 'sga', label: '판매비와관리비', money: true, find: '판매비와\\s?관리비|판매관리비|판관비' },
+    { id: 'op', label: '영업이익', money: true, find: '영업이익(?!률)|영업손익' },
+    { id: 'interest', label: '이자비용', money: true, find: '이자비용|금융비용' },
+    { id: 'net', label: '당기순이익', need: true, money: true, find: '당기순이익|분기순이익|반기순이익|당기순손익|순이익(?!률)' },
+    { id: 'cash', label: '현금및현금성자산', money: true, find: '현금\\s?및\\s?현금성\\s?자산' },
+    { id: 'assets', label: '자산총계', money: true, find: '자산\\s?총계' },
+    { id: 'debt', label: '부채총계', need: true, money: true, find: '부채\\s?총계' },
+    { id: 'equity', label: '자본총계', need: true, money: true, find: '(?<!부채와|부채및|부채 및 |부채와 )자본\\s?총계' },
+    { id: 'cfo', label: '영업활동현금흐름', money: true, find: '영업활동[^\\d\\n]{0,12}현금흐름' },
+    { id: 'div', label: '배당금총액', money: true, find: '현금배당금총액|배당금총액|배당금' },
+    { id: 'shares', label: '발행주식수 (주)', find: '발행주식총수|발행주식수|발행한 주식의 총수|주식수' },
+    { id: 'price', label: '주가 (원)', find: '주가|종가' }
+  ];
+  var REAL_UNITS = [{ v: 1, name: '원' }, { v: 1e6, name: '백만원' }, { v: 1e8, name: '억원' }];
 
   var TEXT = {
     intro: ['가게에 동전을 심으면 나도 그 가게 주인이 돼요.', '가게가 잘되면 나무에 열매가 열려요.', '계절이 지나가길 기다려 보세요.'],
@@ -191,5 +214,5 @@
     night: '오늘은 여기까지예요. 나무는 밤에도 자라요. 내일 또 만나요.'
   };
 
-  return { RULES: RULES, SEASONS: SEASONS, SHOPS: SHOPS, NEWS: NEWS, BADGES: BADGES, WISHES: WISHES, MENTORS: MENTORS, STAGES: STAGES, TEXT: TEXT };
+  return { RULES: RULES, SEASONS: SEASONS, SHOPS: SHOPS, NEWS: NEWS, BADGES: BADGES, WISHES: WISHES, MENTORS: MENTORS, STAGES: STAGES, TEXT: TEXT, REAL_FIELDS: REAL_FIELDS, REAL_UNITS: REAL_UNITS };
 });

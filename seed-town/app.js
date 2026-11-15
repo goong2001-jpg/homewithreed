@@ -210,7 +210,8 @@
     h += '<footer class="foot">' + (can
       ? '<button class="go" data-act="next">' + nx.name + '으로 가기</button>'
       : '<button class="go rest" data-act="night">오늘은 여기까지</button>') +
-      (si() >= 3 ? '<button class="link" data-act="journal">투자일지 · 복기 (' + p.journal.length + ')</button>' : '') + '</footer>';
+      (si() >= 3 ? '<button class="link" data-act="journal">투자일지 · 복기 (' + p.journal.length + ')</button>' : '') +
+      (si() >= 4 ? '<button class="go alt world" data-act="real">실제 회사 책장 (' + p.real.length + ')</button>' : '') + '</footer>';
     app.innerHTML = h;
     if (!can) return showNight();
     if (p.news && p.news.guess === null) showNews();
@@ -436,6 +437,81 @@
     openSheet(h);
   }
 
+  /* ---------- 세계: 실제 회사 재무제표 ---------- */
+  var realIdx = -1, realQ = null;
+  function unitName(u) { var n = '원'; D.REAL_UNITS.forEach(function (x) { if (x.v === u) n = x.name; }); return n; }
+  function showReal() {
+    var p = P(), h = '<h2>실제 회사 책장</h2><p class="desc">진짜 회사의 재무제표 숫자를 넣으면 비율과 점검표, 문제가 그 숫자에 맞춰 만들어집니다. 숫자는 이 기기에만 저장됩니다. 공부용이며 어떤 회사를 사라는 뜻이 아닙니다.</p>';
+    if (!p.real.length) h += '<p class="note">아직 넣은 회사가 없습니다. 전자공시(DART)의 사업보고서·분기보고서나 증권 앱의 재무제표 화면에서 숫자를 복사해 오세요.</p>';
+    p.real.forEach(function (co, i) {
+      var pd = co.periods[co.periods.length - 1], r = E.analyze(pd.v, pd);
+      h += '<button class="realrow" data-act="realOpen" data-id="' + i + '"><b>' + esc(co.name) + '</b><small>' + esc(pd.label) + ' · 기간 ' + co.periods.length + '개' + (co.pred ? ' · 예측 걸어 둠' : '') + '</small><span>순이익률 ' + pctText(r.npm) + ' · 부채비율 ' + pctText(r.debtRatio) + ' · ROE ' + pctText(r.roe) + '</span></button>';
+    });
+    h += '<button class="go" data-act="realNew">새 회사 넣기</button><button class="link" data-act="close2">닫기</button>';
+    openSheet(h);
+  }
+  function showRealForm(idx) {
+    var p = P(), co = p.real[idx], last = co ? co.periods[co.periods.length - 1] : null;
+    realIdx = idx;
+    var h = '<h2>' + (co ? esc(co.name) + ' — 다음 기간 넣기' : '새 회사 넣기') + '</h2>';
+    h += '<label class="fl">회사 이름<input id="rName" maxlength="20" value="' + (co ? esc(co.name) : '') + '"></label>';
+    h += '<label class="fl">기간 (예: 2025년, 2026년 1분기)<input id="rLabel" maxlength="20"></label>';
+    h += '<div class="frow"><label class="fl">자료 종류<select id="rQ"><option value="0">1년치(사업보고서)</option><option value="1"' + (last && last.quarter ? ' selected' : '') + '>분기(3개월)</option></select></label>' +
+      '<label class="fl">금액 단위<select id="rUnit">' + D.REAL_UNITS.map(function (u) { return '<option value="' + u.v + '"' + ((last ? last.unit : 1e8) === u.v ? ' selected' : '') + '>' + u.name + '</option>'; }).join('') + '</select></label></div>';
+    h += '<label class="fl">재무제표 글 붙여넣기 (선택)<textarea id="rPaste" placeholder="예)\n매출액 1,200\n영업이익 150\n당기순이익 110\n부채총계 400\n자본총계 800"></textarea></label>' +
+      '<button class="link" data-act="realParse">붙여넣은 글에서 숫자 찾기</button><p class="desc" id="rMsg">아래 칸에 직접 적어도 됩니다. * 표시는 꼭 필요합니다. 손실은 -를 붙입니다.</p><div class="fgrid">';
+    D.REAL_FIELDS.forEach(function (f) { h += '<label class="fl">' + f.label + (f.need ? ' *' : '') + '<input id="rf_' + f.id + '" inputmode="decimal"></label>'; });
+    h += '</div><button class="go" data-act="realSave">저장하고 분석 보기</button><button class="link" data-act="real">취소</button>';
+    openSheet(h);
+  }
+  function readRealForm() {
+    var v = {};
+    D.REAL_FIELDS.forEach(function (f) { var n = E.toNum($('rf_' + f.id).value); if (n !== null) v[f.id] = n; });
+    return v;
+  }
+  function showRealDetail(idx, review) {
+    var p = P(), co = p.real[idx];
+    if (!co) return showReal();
+    realIdx = idx;
+    var pd = co.periods[co.periods.length - 1], prev = co.periods[co.periods.length - 2], v = pd.v, r = E.analyze(v, pd), un = unitName(pd.unit);
+    function row(k, x, cls) { return '<tr class="' + (cls || '') + '"><td>' + k + '</td><td>' + num(x) + '</td></tr>'; }
+    var h = '<h2>' + esc(co.name) + '</h2><p class="tag">' + esc(pd.label) + ' · ' + (pd.quarter ? '분기 자료(비율은 1년치로 환산)' : '1년치 자료') + ' · 단위 ' + un + '</p>';
+    if (review) h += '<div class="answer ' + (review.right ? 'right' : 'wrong') + '"><div><b>지난 예측 복기</b> — ' + esc(review.from) + ' → ' + esc(review.to) + ' 순이익 ' + (review.ch >= 0 ? '+' : '') + Math.round(review.ch * 100) + '%. 예측은 "' + { good: '늘어난다', bad: '줄어든다', unknown: '비슷하다' }[review.guess] + '" ' + (review.right ? '— 맞혔습니다. ' + starSvg(18) : '— 빗나갔습니다.') + (review.why ? '<br><small>적어 둔 이유: ' + esc(review.why) + '</small>' : '') + '</div></div>';
+    if (prev && prev.v.sales && prev.v.net) h += '<p class="note">앞 기간(' + esc(prev.label) + ') 대비 매출 ' + pctText((v.sales - prev.v.sales) / Math.abs(prev.v.sales)) + ', 순이익 ' + pctText((v.net - prev.v.net) / Math.abs(prev.v.net)) + ' 변화</p>';
+    h += '<h3>점검표</h3><ul class="checks">' + r.checks.map(function (c) { return '<li class="' + c.state + '"><b>' + c.label + '</b><em>' + { ok: '통과', warn: '주의', na: '자료 없음' }[c.state] + '</em><span>' + esc(c.text) + '</span></li>'; }).join('') + '</ul>';
+    h += '<div class="ratios"><span>영업이익률 <b>' + pctText(r.opm) + '</b></span><span>순이익률 <b>' + pctText(r.npm) + '</b></span><span>ROE <b>' + pctText(r.roe) + '</b></span><span>부채비율 <b>' + pctText(r.debtRatio) + '</b></span><span>PER <b>' + (r.per === null ? '-' : num(r.per) + '배') + '</b></span><span>PBR <b>' + (r.pbr === null ? '-' : num(r.pbr) + '배') + '</b></span><span>배당성향 <b>' + pctText(r.payout) + '</b></span><span>배당수익률 <b>' + (r.yield === null ? '-' : (r.yield * 100).toFixed(1) + '%') + '</b></span></div>';
+    h += '<h3>넣은 숫자</h3><table class="fs">' + D.REAL_FIELDS.map(function (f) { return v[f.id] === undefined ? '' : row(f.label, v[f.id]); }).join('') + (r.op !== null && v.op === undefined ? row('영업이익 (계산)', r.op, 'sum') : '') + '</table>';
+    h += '<p class="desc">점검표의 기준(그레이엄 PER×PBR 22.5, ROE 15%)은 책에서 흔히 인용되는 참고 기준입니다. 업종·시기마다 다르니 같은 업종 회사끼리 견주어 보세요.</p>';
+    h += '<button class="go" data-act="realQuiz">이 숫자로 문제 풀기</button>';
+    h += '<div class="predict"><h3>다음 기간 순이익은?</h3>' + (co.pred ? '<p class="note">예측을 걸어 두었습니다: "' + { good: '늘어난다', bad: '줄어든다', unknown: '비슷하다' }[co.pred.guess] + '"' + (co.pred.why ? ' — ' + esc(co.pred.why) : '') + '. 다음 기간 숫자를 넣으면 채점됩니다.</p>' : '<input id="rWhy" class="why" maxlength="120" placeholder="그렇게 보는 이유 한 줄"><div class="guess"><button data-act="realPred" data-id="good"><b class="big">늘어난다</b><span>5% 넘게</span></button><button data-act="realPred" data-id="unknown"><b class="big">비슷하다</b><span>±5% 안</span></button><button data-act="realPred" data-id="bad"><b class="big">줄어든다</b><span>5% 넘게</span></button></div>') + '</div>';
+    h += '<button class="link" data-act="realAdd">다음 기간 숫자 넣기</button><button class="link" data-act="real">책장으로</button><button class="link danger" data-act="realDel">이 회사 지우기</button>';
+    openSheet(h);
+  }
+  function showRealQuiz() {
+    var p = P(), co = p.real[realIdx], pd = co.periods[co.periods.length - 1];
+    realQ = { questions: E.makeRealQuiz(pd.v, p.world.turn % 3), picked: {}, done: pd.quizDone };
+    var h = '<h2>' + esc(co.name) + ' 문제</h2><p class="tag">' + esc(pd.label) + ' · 단위 ' + unitName(pd.unit) + '</p><table class="fs">' + D.REAL_FIELDS.map(function (f) { return pd.v[f.id] === undefined ? '' : '<tr><td>' + f.label + '</td><td>' + num(pd.v[f.id]) + '</td></tr>'; }).join('') + '</table>';
+    if (!realQ.questions.length) h += '<p class="note">문제를 만들 숫자가 모자랍니다.</p>';
+    if (realQ.done) h += '<p class="note">이 기간 문제는 이미 채점했습니다. 다시 풀어 볼 수는 있어요.</p>';
+    realQ.questions.forEach(function (q, i) { h += '<div class="q" id="rq' + i + '"><p><b>문제 ' + (i + 1) + '.</b> ' + esc(q.q) + '</p>' + q.options.map(function (o, j) { return '<button data-act="realAns" data-q="' + i + '" data-o="' + j + '">' + esc(o) + '</button>'; }).join('') + '<p class="why2" hidden></p></div>'; });
+    h += '<button class="go" data-act="realOpen" data-id="' + realIdx + '">돌아가기</button>';
+    openSheet(h);
+  }
+  function answerReal(b) {
+    var p = P(), i = Number(b.dataset.q), o = Number(b.dataset.o), q = realQ.questions[i], box = $('rq' + i);
+    if (realQ.picked[i] !== undefined) return;
+    realQ.picked[i] = o;
+    var right = o === q.answer;
+    box.querySelectorAll('button').forEach(function (x, j) { x.disabled = true; if (j === q.answer) x.classList.add('ok'); else if (j === o) x.classList.add('no'); });
+    var w = box.querySelector('.why2'); w.hidden = false; w.textContent = (right ? '맞았습니다. ' : '아쉽습니다. ') + q.why;
+    if (!realQ.done) {
+      E.scoreQuiz(p, right);
+      if (Object.keys(realQ.picked).length === realQ.questions.length) { var pds = p.real[realIdx].periods; pds[pds.length - 1].quizDone = 1; E.checkBadges(p, D, null); }
+      save();
+    }
+    if (right) beep(700, 0.1); else beep(240, 0.15);
+  }
+
   /* ---------- 어른 메뉴 ---------- */
   var gate = null;
   function showGate() {
@@ -517,6 +593,31 @@
     if (act === 'quiz') return showQuiz(openShopId);
     if (act === 'ans') return answerQuiz(b);
     if (act === 'journal') return showJournal();
+    if (act === 'real') return showReal();
+    if (act === 'realNew') return showRealForm(-1);
+    if (act === 'realAdd') return showRealForm(realIdx);
+    if (act === 'realOpen') return showRealDetail(Number(id));
+    if (act === 'realQuiz') return showRealQuiz();
+    if (act === 'realAns') return answerReal(b);
+    if (act === 'realParse') {
+      var found = E.parseStatement($('rPaste').value, D), cnt = 0;
+      D.REAL_FIELDS.forEach(function (f) { if (found[f.id] !== undefined) { $('rf_' + f.id).value = found[f.id]; cnt++; } });
+      $('rMsg').textContent = cnt ? cnt + '개 항목을 찾아 아래 칸에 넣었습니다. 원문과 맞는지 꼭 확인하세요(특히 단위와 기간).' : '찾은 항목이 없습니다. "매출액 1,200"처럼 항목 이름과 숫자가 한 줄에 있어야 합니다.';
+      return;
+    }
+    if (act === 'realSave') {
+      var v = readRealForm(), miss = D.REAL_FIELDS.filter(function (f) { return f.need && v[f.id] === undefined; }).map(function (f) { return f.label; });
+      var nm = $('rName').value.trim(), lb = $('rLabel').value.trim();
+      if (!nm || !lb || miss.length) { $('rMsg').textContent = '빠진 것: ' + [nm ? '' : '회사 이름', lb ? '' : '기간'].concat(miss).filter(Boolean).join(', '); $('rMsg').classList.add('danger'); return; }
+      var res = E.saveReal(p, D, realIdx, nm, { label: lb, quarter: $('rQ').value === '1', unit: Number($('rUnit').value), v: v });
+      save(); render();
+      return showRealDetail(res.idx, res.review);
+    }
+    if (act === 'realPred') { E.predictReal(p, realIdx, id, $('rWhy') ? $('rWhy').value : ''); save(); return showRealDetail(realIdx); }
+    if (act === 'realDel') {
+      if (b.dataset.sure) { p.real.splice(realIdx, 1); p.stats.real = p.real.length; save(); render(); return showReal(); }
+      b.dataset.sure = '1'; b.textContent = '정말 지울까요? 한 번 더 누르면 지워집니다'; return;
+    }
     if (act === 'stage') { p.stage = id; save(); render(); return showParent(); }
     if (act === 'pick') {
       var n = E.harvest(p, id);
