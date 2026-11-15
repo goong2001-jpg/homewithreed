@@ -94,6 +94,14 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   E.predictReal(W1, 0, 'good', '매출이 늘어서');
   const rr = E.saveReal(W1, D, 0, '', { label: '2기', unit: 1e8, v: Object.assign({}, rv, { net: 140 }) });
   check('예측 → 다음 기간을 넣으면 복기', rr.review && rr.review.right && W1.stats.pred === 1 && W1.real[0].periods.length === 2 && W1.real[0].pred === null);
+  // ---- v4: 이름별 단계, 어른은 하루 제한 없음 ----
+  const Dad = E.newPlayer('아빠', D, 21), Kid = E.newPlayer('구름', D, 22);
+  check('아빠는 세계, 구름이는 씨앗 단계로 시작', Dad.stage === 'world' && Kid.stage === 'seed');
+  for (let i = 0; i < 12; i++) { E.guess(Dad, 'good'); E.nextTurn(Dad, D); }
+  check('어른 단계는 하루 제한 없음', E.canPlay(Dad, D) && E.dayLimit(Dad, D) === 0 && E.dayLimit(Kid, D) === 4);
+  const oldDad = E.newPlayer('아빠', D, 23); oldDad.stage = 'seed'; delete oldDad.stagePicked; E.upgrade(oldDad, D);
+  const chose = E.newPlayer('아빠', D, 24); chose.stage = 'seed'; chose.stagePicked = 1; E.upgrade(chose, D);
+  check('씨앗에 머물던 아빠 저장분은 세계로, 직접 고른 단계는 그대로', oldDad.stage === 'world' && chose.stage === 'seed');
   // 예전 저장분
   const old = E.newPlayer('o', D, 16); delete old.journal; delete old.looked; delete old.stats.quiz; delete old.world.shops.bread.shares;
   E.upgrade(old, D); E.guess(old, 'good'); E.nextTurn(old, D);
@@ -230,6 +238,15 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   await p.click('[data-act=close2]');
   if (process.env.SHOT) { await p.click('[data-act=shop][data-id=bread]'); await p.screenshot({ path: process.env.SHOT.replace('.png', '-shop.png'), fullPage: false }); await p.click('[data-act=close]'); }
   if (process.env.SHOT) { await p.screenshot({ path: process.env.SHOT }); }
+  // ---- v4: 아빠로 시작하면 내용이 다르고 끊기지 않음 ----
+  await ev(() => { window.__st.S.cur = null; window.__st.render(); });
+  check('고르는 화면에 단계가 보임', (await p.textContent('[data-act=who][data-id="아빠"]')).includes('세계') && (await p.textContent('[data-act=who][data-id="열매"]')).includes('씨앗'));
+  await p.click('[data-act=who][data-id="아빠"]');
+  check('아빠 처음 화면: 세계 단계가 골라져 있고 제한 없음 안내', (await p.textContent('.stagepick .on')).includes('세계') && (await p.textContent('.pickpage .desc')).includes('제한 없음'));
+  await p.click('[data-act=introOk]');
+  for (let i = 0; i < 6; i++) { await p.click('[data-act=guess]'); await p.click('[data-act=line]', { timeout: 500 }).catch(() => {}); await p.click('[data-act=next]'); await p.click('[data-act=resultOk]'); }
+  check('아빠는 6계절을 넘겨도 "오늘은 여기까지"가 안 뜸', (await p.locator('.go.rest').count()) === 0 && await ev(() => window.__st.P().world.turn === 6) && (await p.locator('.px').count()) >= 5);
+  if (process.env.SHOT) { await p.click('[data-act=guess]'); await p.click('[data-act=line]', { timeout: 500 }).catch(() => {}); await p.screenshot({ path: process.env.SHOT.replace('.png', '-dad.png') }); }
   check('오류 없음', errors.length === 0, errors.join(' | '));
   await browser.close();
   console.log(fail.length ? '\n실패 ' + fail.length + '개: ' + fail.join(', ') : '\n모두 통과');

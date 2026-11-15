@@ -213,3 +213,8 @@ table.fs tr.sum td { font-weight: 800; border-bottom: 2.5px solid var(--line); }
 .predict { border-top: 2px solid rgba(90, 70, 50, .3); margin-top: 14px; padding-top: 10px; }
 .predict .guess { margin-top: 8px; }
 .predict .guess .big { font-size: 18px; }
+
+/* 처음 화면의 단계 고르기 */
+.stagepick.row { grid-template-columns: repeat(5, 1fr); gap: 5px; margin-bottom: 4px; }
+.stagepick.row button { text-align: center; padding: 8px 2px; }
+.stagepick.row small { font-size: 11px; }
