@@ -301,6 +301,7 @@
     var got = [], W = P.world, n = Object.keys(P.hold).length, now = wealth(P);
     D.BADGES.forEach(function (b) {
       if (P.badges[b.id] !== undefined) return;
+      if (b.stage && cardStage(b, D) > stageIdx(P, D)) return;   // 그 단계가 돼야 받는다
       var ok = false;
       if (b.type === 'first') ok = n >= 1;
       else if (b.type === 'shops') ok = n >= b.n;

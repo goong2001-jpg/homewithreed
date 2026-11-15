@@ -13,7 +13,25 @@
     return { v: 1, cur: null, players: {}, opt: { voice: true, sound: true } };
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+  Object.keys(S.players).forEach(function (n) { E.upgrade(S.players[n], D); });
   function P() { return S.cur ? S.players[S.cur] : null; }
+  function si() { var p = P(); return p ? E.stageIdx(p, D) : 0; }   // 0 씨앗 1 새싹 2 나무 3 숲
+  // 나무 단계부터는 실제 말을 쓴다
+  function T(k) { return (si() >= 2 ? { seed: '주식', price: '주가', fruit: '배당', plant: '사기', pull: '팔기' } : { seed: '씨앗', price: '씨앗 값', fruit: '열매', plant: '심기', pull: '꺼내기' })[k]; }
+  function num(x) { return x === undefined || x === null ? '-' : (Math.round(x * 100) / 100).toLocaleString('ko-KR'); }
+  function pctText(x) { return x === null || x === undefined ? '-' : Math.round(x * 100) + '%'; }
+  function arrow(c) { var h = c.hist, n = h.length; if (n < 2) return ''; var d = h[n - 1].price - h[n - 2].price; return d > 0.005 ? '<i class="up">▲</i>' : d < -0.005 ? '<i class="dn">▼</i>' : ''; }
+  // 값 그래프 (최근 16계절)
+  function spark(c) {
+    var v = c.hist.slice(-16).map(function (h) { return h.price; });
+    if (v.length < 2) return '';
+    var mx = Math.max.apply(null, v), mn = Math.min.apply(null, v), w = 220, hgt = 54, pts = v.map(function (y, i) {
+      return (6 + i * (w - 12) / (v.length - 1)).toFixed(1) + ',' + (hgt - 6 - (mx > mn ? (y - mn) / (mx - mn) : 0.5) * (hgt - 14)).toFixed(1);
+    });
+    var last = pts[pts.length - 1].split(',');
+    return '<svg class="spark" viewBox="0 0 ' + w + ' ' + hgt + '" aria-hidden="true"><polyline points="' + pts.join(' ') + '" fill="none" stroke="#7a9e5a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><circle cx="' + last[0] + '" cy="' + last[1] + '" r="4" fill="#e08a3c" stroke="' + INK + '" stroke-width="1.5"/></svg>' +
+      '<p class="sparkcap">가장 낮을 때 ' + num(mn) + ' · 가장 높을 때 ' + num(mx) + '</p>';
+  }
   function today() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function shopDef(id) { for (var i = 0; i < D.SHOPS.length; i++) if (D.SHOPS[i].id === id) return D.SHOPS[i]; }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -168,7 +186,7 @@
     if (!p.introDone) return renderIntro();
     var se = seasonOf(p), w = E.wealth(p), nw = nextWish(p);
     document.body.style.background = se.sky;
-    var h = '<header class="top"><div class="when"><b>' + yearOf(p) + '년째</b> ' + se.name + '</div>' +
+    var h = '<header class="top"><div class="when"><b>' + yearOf(p) + '년째</b> ' + se.name + (si() ? ' <small class="stg">' + D.STAGES[si()].name + '</small>' : '') + '</div>' +
       '<div class="purse" id="purse">' + coinSvg(24) + '<b id="coinN">' + p.coins + '</b></div>' +
       '<div class="purse">' + starSvg(22) + '<b>' + p.stars + '</b></div>' +
       '<button class="gear" data-act="parent" aria-label="어른 메뉴">어른</button></header>';
@@ -182,6 +200,7 @@
         '<span class="nm">' + esc(def.name) + '</span>' +
         (c.closed > 0 ? '<span class="mine shut">문 닫음</span>' : hd ? '<span class="mine">' + coinSvg(15) + hd.put + ' → <b>' + v + '</b></span>' : '<span class="mine none">빈 자리</span>') +
         '</button>' +
+        (si() >= 1 && !c.closed ? '<span class="px">' + T('price') + ' ' + num(c.price) + arrow(c) + '</span>' : '') +
         (c.hist.length && !c.closed ? '<span class="mood">' + faceSvg(c.mood, 26) + '</span>' : '') +
         (hd && hd.ripe ? '<button class="pick" data-act="pick" data-id="' + def.id + '">' + fruitSvg(22) + '<b>' + hd.ripe + '</b> 따기</button>' : '') +
         '</div>';
@@ -190,7 +209,8 @@
     var can = E.canPlay(p, D), nx = D.SEASONS[(p.world.turn + 1) % 4];
     h += '<footer class="foot">' + (can
       ? '<button class="go" data-act="next">' + nx.name + '으로 가기</button>'
-      : '<button class="go rest" data-act="night">오늘은 여기까지</button>') + '</footer>';
+      : '<button class="go rest" data-act="night">오늘은 여기까지</button>') +
+      (si() >= 3 ? '<button class="link" data-act="journal">투자일지 · 복기 (' + p.journal.length + ')</button>' : '') + '</footer>';
     app.innerHTML = h;
     if (!can) return showNight();
     if (p.news && p.news.guess === null) showNews();
@@ -239,16 +259,24 @@
     var p = P(), card = E.newsCard(p, D);
     if (!card) return;
     var def = card.shop === 'all' ? null : shopDef(card.shop);
-    var h = '<h2>오늘의 소식</h2>';
+    var h = '<h2>' + (card.kind === 'disc' ? '오늘의 공시' : '오늘의 소식') + '</h2>';
+    if (card.title) h += '<p class="doctitle">' + esc(card.title) + '</p>';
     h += def ? '<div class="newsart">' + shopSvg(def, p.world.shops[def.id], null, 0, true) + '</div><p class="tag">' + esc(def.name) + '</p>' : '<p class="tag">마을 전체</p>';
     h += '<p class="newstext">' + esc(card.text) + '</p>';
     h += '<button class="link" data-act="read" data-text="' + esc(card.text) + '">들려줘</button>';
     h += '<p class="ask">가게에 어떤 소식일까요?</p><div class="guess">' +
       '<button data-act="guess" data-id="good">' + faceSvg('good', 46) + '<span>좋은 소식</span></button>' +
       '<button data-act="guess" data-id="bad">' + faceSvg('bad', 46) + '<span>나쁜 소식</span></button>' +
-      (p.world.turn >= D.RULES.rumorFrom ? '<button data-act="guess" data-id="unknown">' + faceSvg('unknown', 46) + '<span>아직 몰라요</span></button>' : '') + '</div>';
+      (p.world.turn >= D.RULES.rumorFrom || si() >= 2 ? '<button data-act="guess" data-id="unknown">' + faceSvg('unknown', 46) + '<span>아직 몰라요</span></button>' : '') + '</div>';
     openSheet(h, true);
     say(card.text);
+  }
+  // 새싹부터: 성적표의 어느 줄이 바뀔까
+  function showLine() {
+    var card = E.newsCard(P(), D);
+    openSheet('<h2>하나 더!</h2><p class="newstext">' + esc(card.text) + '</p><p class="ask">가게 성적표의 어느 줄이 바뀔까요?</p><div class="guess">' +
+      '<button data-act="line" data-id="sales"><b class="big">번 돈</b><span>손님이 늘거나 줄어요</span></button>' +
+      '<button data-act="line" data-id="cost"><b class="big">쓴 돈</b><span>만드는 데 드는 돈이 달라져요</span></button></div>', true);
   }
 
   function showShop(id) {
@@ -261,14 +289,33 @@
     }
     h += '<p class="desc">' + esc(def.desc) + '</p>';
     if (c.hist.length) h += '<p class="moodline">' + faceSvg(c.mood, 28) + ' 지난 계절: ' + D.TEXT.mood[c.mood] + '</p>';
+    if (si() >= 1) {
+      p.looked[id] = p.world.turn; save();
+      h += '<p class="pxline">' + T('price') + ' <b>' + num(c.price) + '</b> ' + arrow(c) + '</p>' + spark(c);
+      var l = c.hist[c.hist.length - 1];
+      if (l) {
+        var top = Math.max(l.sales, l.cost, 1);
+        h += '<div class="report"><h3>지난 계절 성적표</h3>' +
+          '<p><span>번 돈</span><i style="width:' + Math.round(l.sales / top * 60) + '%"></i><b>' + num(l.sales) + '</b></p>' +
+          '<p><span>쓴 돈</span><i class="c" style="width:' + Math.round(l.cost / top * 60) + '%"></i><b>' + num(l.cost) + '</b></p>' +
+          '<p class="sum"><span>남은 돈</span><b class="' + (l.profit < 0 ? 'neg' : '') + '">' + num(l.profit) + '</b><em>' + (l.profit < 0 ? '손해를 봤어요' : '이 중 ' + num(l.div) + ' 을 주인들에게 나눠 줬어요') + '</em></p></div>';
+      }
+    }
+    if (si() >= 2 && c.hist.length) {
+      var r = E.ratios(def, c, D);
+      h += '<div class="ratios"><span>PER <b>' + (r.per === null ? '적자' : num(r.per) + '배') + '</b></span><span>ROE <b>' + pctText(r.roe) + '</b></span><span>부채비율 <b>' + pctText(r.debtRatio) + '</b></span><span>배당수익률 <b>' + pctText(r.yield) + '</b></span></div>' +
+        '<button class="link" data-act="fs">재무제표 3표 보기</button>' + (si() >= 3 ? '<button class="link" data-act="quiz">분기보고서 읽고 문제 풀기</button>' : '');
+    }
     h += hd
       ? '<p class="mybox">내가 넣은 동전 <b>' + hd.put + '</b>개 → 지금 <b>' + v + '</b>개' + (hd.ripe ? ' · 익은 열매 <b>' + hd.ripe + '</b>개' : '') + '</p>'
       : '<p class="mybox">아직 씨앗을 심지 않았어요.</p>';
     h += '<p class="have">내 동전 ' + coinSvg(18) + ' <b>' + p.coins + '</b></p><div class="acts">';
-    h += '<button class="go" data-act="plant" data-n="1"' + (p.coins < 1 ? ' disabled' : '') + '>동전 1개 심기</button>';
-    if (p.coins >= 5) h += '<button class="go alt" data-act="plant" data-n="5">5개 심기</button>';
+    h += '<button class="go" data-act="plant" data-n="1"' + (p.coins < 1 ? ' disabled' : '') + '>동전 1개 ' + T('plant') + '</button>';
+    if (p.coins >= 5) h += '<button class="go alt" data-act="plant" data-n="5">5개 ' + T('plant') + '</button>';
     h += '</div>';
-    if (hd) h += '<button class="link" data-act="pull">모두 꺼내기 (' + (v + hd.ripe) + '개 돌려받기)</button>';
+    if (si() >= 3) h += '<input id="why" class="why" maxlength="120" placeholder="왜 사나요 / 왜 파나요? (적으면 투자일지에 남아요)" aria-label="이유">';
+    if (hd && si() >= 1 && v >= 2) h += '<button class="link" data-act="pull" data-half="1">절반만 ' + T('pull') + '</button>';
+    if (hd) h += '<button class="link" data-act="pull">모두 ' + T('pull') + ' (' + (v + hd.ripe) + '개 돌려받기)</button>';
     h += '<button class="link" data-act="close">닫기</button>';
     openSheet(h);
   }
@@ -276,11 +323,14 @@
   function showResult(out, from) {
     var p = P(), h = '<h2>' + from.name + '이 지났어요</h2>';
     if (out.news) {
-      var n = out.news, label = { good: '좋은 소식', bad: '나쁜 소식', unknown: '아직 모르는 소문' }[n.answer];
+      var n = out.news, label = { good: '좋은 소식', bad: '나쁜 소식', unknown: n.card.kind === 'disc' ? '이것만으로는 알 수 없는 공시' : '아직 모르는 소문' }[n.answer];
       h += '<div class="answer ' + (n.right ? 'right' : 'wrong') + '">' + faceSvg(n.answer, 34) +
         '<div><b>' + label + '이었어요.</b> ' + (n.right ? '맞혔어요! ' + starSvg(18) : '다음엔 맞힐 수 있어요.') +
-        '<br><small>' + esc(n.card.kind === 'rumor' ? (n.real ? '이번 소문은 진짜가 됐어요. 하지만 소문은 틀릴 때도 많아요.' : '이번 소문은 사실이 아니었어요.') : n.card.after) + '</small></div></div>';
+        '<br><small>' + esc(n.card.kind === 'rumor' ? (n.real ? '이번 소문은 진짜가 됐어요. 하지만 소문은 틀릴 때도 많아요.' : '이번 소문은 사실이 아니었어요.') : n.card.after || '') + '</small></div></div>';
     }
+    if (out.news && out.news.line) h += '<p class="note">성적표에서 바뀐 줄은 <b>' + (out.news.line.answer === 'cost' ? '쓴 돈' : '번 돈') + '</b>. ' + (out.news.line.right ? '맞혔어요! ' + starSvg(16) : '다음엔 맞힐 수 있어요.') + '</p>';
+    if (out.news && out.news.card.explain) h += '<p class="note explain">' + esc(out.news.card.explain) + '</p>';
+    if (out.news && out.news.card.note) h += '<p class="note explain">' + esc(out.news.card.note) + '</p>';
     h += '<ul class="rows">';
     D.SHOPS.forEach(function (def) {
       var o = out.shops[def.id], mine = p.hold[def.id];
@@ -315,6 +365,75 @@
     }
     h += '<button class="go" data-act="close2">마을 구경하기</button><button class="link" data-act="who0">다른 사람이 하기</button>';
     openSheet(h, true);
+  }
+
+  /* ---------- 나무: 재무제표 3표 ---------- */
+  function showStatements(id) {
+    var p = P(), def = shopDef(id), c = p.world.shops[id], l = c.hist[c.hist.length - 1];
+    if (!l) return;
+    var as = l.assets === undefined ? c.assets : l.assets, eq = l.cash + as - l.debt;
+    var fin = (l.borrow || 0) - (l.repay || 0) - l.div, old = l.vc === undefined;
+    function row(k, v, cls) { return '<tr class="' + (cls || '') + '"><td>' + k + '</td><td>' + num(v) + '</td></tr>'; }
+    var h = '<h2>' + esc(def.name) + ' 재무제표</h2><p class="desc">지난 계절(분기) 기준. 숫자는 가게가 실제로 굴린 장부입니다.</p>';
+    h += '<h3>손익계산서 — 얼마 벌고 얼마 남겼나</h3><table class="fs">' + row('매출', l.sales) + row('매출원가 (팔 때마다 드는 돈)', old ? undefined : -l.vc) + row('판매관리비 (가만히 있어도 나가는 돈)', old ? undefined : -l.fx) + row('이자비용', old ? undefined : -l.it) + row('순이익', l.profit, 'sum') + '</table>';
+    h += '<h3>재무상태표 — 지금 가진 것과 갚을 것</h3><table class="fs">' + row('현금', l.cash) + row('설비자산 (가게·기계)', as) + row('자산총계', l.cash + as, 'sum') + row('부채 (빚)', l.debt) + row('자본 (주인 몫)', eq) + row('부채와 자본 총계', l.debt + eq, 'sum') + '</table>';
+    h += '<h3>현금흐름표 — 현금이 어디서 와서 어디로 갔나</h3><table class="fs">' + row('영업활동 (장사로 번 현금)', l.profit) + row('투자활동 (가게를 키우는 데 쓴 현금)', old ? undefined : -l.inv) + row('재무활동 (빌린 돈 − 갚은 돈 − 배당)', old ? undefined : fin) + row('현금 증감', old ? undefined : l.profit - l.inv + fin, 'sum') + '</table>';
+    h += '<p class="desc">읽는 순서: ① 순이익이 흑자인가 ② 부채가 자본보다 큰가 ③ 영업활동 현금이 플러스인가. 주식 수 ' + num(l.shares || c.shares) + '주.</p>';
+    h += '<button class="go" data-act="shop" data-id="' + id + '">돌아가기</button>';
+    openSheet(h);
+  }
+
+  /* ---------- 숲: 공시 원문 읽기 ---------- */
+  var quiz = null;
+  function showQuiz(id) {
+    var p = P();
+    p.quizDone = p.quizDone || {};
+    quiz = E.makeQuiz(p, D, id);
+    if (!quiz) return;
+    quiz.done = p.quizDone[id] === p.world.turn; quiz.picked = {};
+    var l = quiz.row, as = l.assets === undefined ? p.world.shops[id].assets : l.assets;
+    function tbl(rows) { return '<table>' + rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + num(r[1]) + '</td></tr>'; }).join('') + '</table>'; }
+    var h = '<h2>공시 읽기</h2><div class="doc"><p class="dochead">분 기 보 고 서 (요약)</p><p>회사명: ' + esc(quiz.name) + ' · 업종: ' + esc(quiz.kind) + '<br>보고 기간: ' + (Math.floor(l.t / 4) + 1) + '년째 ' + D.SEASONS[l.t % 4].name + ' (단위: 동전)</p>' +
+      '<p class="docsec">Ⅰ. 요약 손익</p>' + tbl([['매출액', l.sales], ['매출원가', l.vc], ['판매비와관리비', l.fx], ['이자비용', l.it], ['분기순이익', l.profit]]) +
+      '<p class="docsec">Ⅱ. 요약 재무상태</p>' + tbl([['현금및현금성자산', l.cash], ['유형자산', as], ['부채총계', l.debt], ['자본총계', quiz.equity]]) +
+      '<p class="docsec">Ⅲ. 배당에 관한 사항</p>' + tbl([['현금배당금총액', l.div], ['발행주식총수', l.shares]]) +
+      '<p class="docfoot">※ 실제 전자공시(DART) 분기보고서의 짜임을 본떠 가게 장부에서 만든 연습용 문서입니다.</p></div>';
+    if (quiz.done) h += '<p class="note">이 가게의 이번 계절 문제는 이미 풀었어요. 다음 계절에 새 보고서가 나옵니다.</p>';
+    quiz.questions.forEach(function (q, i) {
+      h += '<div class="q" id="q' + i + '"><p><b>문제 ' + (i + 1) + '.</b> ' + esc(q.q) + '</p>' + q.options.map(function (o, j) { return '<button data-act="ans" data-q="' + i + '" data-o="' + j + '">' + esc(o) + '</button>'; }).join('') + '<p class="why2" hidden></p></div>';
+    });
+    h += '<button class="go" data-act="shop" data-id="' + id + '">돌아가기</button>';
+    openSheet(h);
+  }
+  function answerQuiz(b) {
+    var p = P(), i = Number(b.dataset.q), o = Number(b.dataset.o), q = quiz.questions[i], box = $('q' + i);
+    if (quiz.picked[i] !== undefined) return;
+    quiz.picked[i] = o;
+    var right = o === q.answer;
+    box.querySelectorAll('button').forEach(function (x, j) { x.disabled = true; if (j === q.answer) x.classList.add('ok'); else if (j === o) x.classList.add('no'); });
+    var w = box.querySelector('.why2'); w.hidden = false; w.textContent = (right ? '맞았습니다. ' : '아쉽습니다. ') + q.why;
+    if (!quiz.done) {
+      E.scoreQuiz(p, right);
+      if (Object.keys(quiz.picked).length === quiz.questions.length) { p.quizDone[quiz.id] = p.world.turn; E.checkBadges(p, D, null); }
+      save();
+    }
+    if (right) beep(700, 0.1); else beep(240, 0.15);
+  }
+
+  /* ---------- 숲: 투자일지와 복기 ---------- */
+  function showJournal() {
+    var p = P(), h = '<h2>투자일지 · 복기</h2><p class="desc">살 때·팔 때 적은 이유입니다. 4계절이 지나면 그 판단이 지금까지 맞았는지 표시됩니다. 값이 올랐는지보다 <b>적어 둔 이유가 맞았는지</b>를 봅니다.</p>';
+    if (!p.journal.length) h += '<p class="note">아직 적은 일지가 없습니다. 가게 창에서 이유를 적고 사거나 팔아 보세요.</p>';
+    p.journal.slice().reverse().forEach(function (j) {
+      var c = p.world.shops[j.id], def = shopDef(j.id), now = c.price, ch = (now - j.price) / j.price, age = p.world.turn - j.t;
+      var good = j.act === 'buy' ? ch > 0 : ch < 0;
+      h += '<div class="jr"><p><b>' + (Math.floor(j.t / 4) + 1) + '년째 ' + D.SEASONS[j.t % 4].name + '</b> · ' + esc(def.name) + ' ' + (j.act === 'buy' ? '매수' : '매도') + ' ' + j.n + '개</p>' +
+        '<p class="jwhy">"' + esc(j.why) + '"</p>' +
+        '<p class="jres">그때 주가 ' + num(j.price) + ' → 지금 ' + num(now) + ' (' + (ch >= 0 ? '+' : '') + Math.round(ch * 100) + '%) · ' +
+        (c.closed > 0 ? '가게가 문을 닫음' : age < 4 ? '복기까지 ' + (4 - age) + '계절 남음' : '<b class="' + (good ? 'ok' : 'no') + '">' + (good ? '지금까지는 맞은 판단' : '지금까지는 빗나간 판단') + '</b>') + '</p></div>';
+    });
+    h += '<button class="go" data-act="close2">닫기</button>';
+    openSheet(h);
   }
 
   /* ---------- 어른 메뉴 ---------- */
@@ -352,9 +471,9 @@
     });
     h += '</table></div></section>';
     // 단계
-    h += '<section><h3>단계</h3><ul class="stages">';
-    D.STAGES.forEach(function (s) { h += '<li class="' + (s.open ? 'on' : '') + '"><b>' + s.name + '</b> ' + s.age + ' — ' + s.shows + (s.open ? '' : ' (준비 중)') + '</li>'; });
-    h += '</ul></section>';
+    h += '<section><h3>단계 고르기</h3><p class="desc">같은 마을을 보되 단계가 오를수록 더 많은 숫자가 열립니다. 바꿔도 마을과 기록은 그대로입니다.</p><div class="stagepick">';
+    D.STAGES.forEach(function (s) { h += '<button data-act="stage" data-id="' + s.id + '" class="' + (p.stage === s.id ? 'on' : '') + '"' + (s.open ? '' : ' disabled') + '><b>' + s.name + '</b> ' + s.age + '<small>' + s.shows + '</small></button>'; });
+    h += '</div></section>';
     // 설정
     h += '<section><h3>설정</h3><div class="sets">' +
       '<button data-act="opt" data-id="voice">읽어 주기 ' + (S.opt.voice ? '켜짐' : '꺼짐') + '</button>' +
@@ -387,17 +506,25 @@
     if (!p) return;
 
     if (act === 'guess') {
-      E.guess(p, id); save(); beep(520, 0.1); closeSheet(true);
+      E.guess(p, id); save(); beep(520, 0.1);
+      if (si() >= 1 && E.lineOf(E.newsCard(p, D))) return showLine();
+      closeSheet(true);
       return;
     }
+    if (act === 'line') { E.guessLine(p, id); save(); beep(520, 0.1); return closeSheet(true); }
     if (act === 'shop') return showShop(id);
+    if (act === 'fs') return showStatements(openShopId);
+    if (act === 'quiz') return showQuiz(openShopId);
+    if (act === 'ans') return answerQuiz(b);
+    if (act === 'journal') return showJournal();
+    if (act === 'stage') { p.stage = id; save(); render(); return showParent(); }
     if (act === 'pick') {
       var n = E.harvest(p, id);
       if (n) { save(); chime(); render(); bump(); }
       return;
     }
     if (act === 'plant') {
-      if (E.invest(p, D, openShopId, Number(b.dataset.n))) {
+      if (E.invest(p, D, openShopId, Number(b.dataset.n), $('why') ? $('why').value : '')) {
         var got = E.checkBadges(p, D, null);
         save(); beep(440, 0.1); var keep = openShopId; render(); showShop(keep);
         if (got.length) { chime(); say(got[0].name + ' 배지를 받았어요. ' + got[0].text); }
@@ -405,8 +532,8 @@
       return;
     }
     if (act === 'pull') {
-      if (b.dataset.sure) { E.withdraw(p, openShopId); save(); beep(330, 0.15); render(); bump(); }
-      else { b.dataset.sure = '1'; b.textContent = '정말 꺼낼까요? 나무가 없어져요. 한 번 더 누르면 꺼내요.'; b.classList.add('danger'); }
+      if (b.dataset.sure) { E.withdraw(p, openShopId, !!b.dataset.half, $('why') ? $('why').value : ''); save(); beep(330, 0.15); render(); bump(); }
+      else { b.dataset.sure = '1'; b.textContent = b.dataset.half ? '절반을 꺼낼까요? 한 번 더 누르면 꺼내요.' : '정말 꺼낼까요? 나무가 없어져요. 한 번 더 누르면 꺼내요.'; b.classList.add('danger'); }
       return;
     }
     if (act === 'next') {
