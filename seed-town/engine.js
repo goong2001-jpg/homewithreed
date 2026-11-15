@@ -142,7 +142,7 @@
 
   function valueOf(P, id) {
     var h = P.hold[id];
-    return h ? Math.floor(h.shares * P.world.shops[id].price + 1e-9) : 0;
+    return h ? Math.round(h.shares * P.world.shops[id].price) : 0;   // 반올림: 아주 작은 오르내림이 동전 1개로 과장돼 보이지 않게
   }
   function wealth(P) {
     var w = P.coins;
@@ -278,12 +278,16 @@
         out.news.line = { guess: P.news.line, answer: lineOf(card), right: lr };
       }
     }
-    var rep = step(W, D), anyBad = false;
+    var pre = {}, fruitsBefore = 0;
+    for (var hid in P.hold) { pre[hid] = valueOf(P, hid); fruitsBefore += P.hold[hid].ripe; }
+    var rep = step(W, D), anyBad = false, shopGain = 0;
     D.SHOPS.forEach(function (def) {
       var r = rep[def.id], h = P.hold[def.id], o = out.shops[def.id] = { mood: r.mood, closed: !!r.closed, got: 0 };
       if (r.reopened) out.reopened.push(def.id);
+      if (h) { o.mine = true; o.before = pre[def.id]; o.after = 0; }
       if (r.closedNow) {
         out.closed.push(def.id); o.closed = true;
+        if (h) shopGain -= pre[def.id];
         if (h) { P.stats.lost += h.put; delete P.hold[def.id]; }
         return;
       }
@@ -291,9 +295,13 @@
       if (r.mood === 'bad') anyBad = true;
       h.fruit += h.shares * r.dps;
       while (h.fruit >= 1) { h.fruit -= 1; h.ripe++; o.got++; out.fruits++; }
+      o.after = valueOf(P, def.id);
+      shopGain += o.after - o.before + o.got;
     });
     P.coins += D.RULES.allowance;
     var now = wealth(P);
+    // 내 선택의 결과: 가게에서 생긴(줄어든) 동전, 그리고 '그냥 뒀다면' 가졌을 동전과 견주기
+    out.mine = { held: Object.keys(pre).length, shopGain: shopGain, allowance: D.RULES.allowance, idle: D.RULES.startCoins + D.RULES.allowance * W.turn, wealth: now };
     P.history.push(now);
     if (P.history.length > 200) P.history.shift();
     out.storm = anyBad && Object.keys(P.hold).length >= 2 && now - D.RULES.allowance > before;

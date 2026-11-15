@@ -10,7 +10,7 @@
     startCoins: 12,     // 처음 가진 동전
     allowance: 2,       // 계절마다 받는 심부름 동전
     turnsPerDay: 4,     // 하루에 넘길 수 있는 계절 수 (4 = 하루에 1년). 아래 표에 없는 단계에 쓴다
-    turnsByStage: { seed: 4, sprout: 8, tree: 0, forest: 0, world: 0 },   // 단계별 하루 제한. 0 = 제한 없음(청소년·어른은 흐름이 끊기지 않게)
+    turnsByStage: { seed: 0, sprout: 0, tree: 0, forest: 0, world: 0 },   // 단계별 하루 제한. 0 = 제한 없음. 지금은 모든 단계가 제한 없음(다시 걸려면 숫자만 넣는다)
     profileStage: { '구름': 'seed', '열매': 'seed', '아빠': 'world', '엄마': 'world' },   // 처음 시작할 때의 단계. 어른 메뉴에서 바꿀 수 있다
     shares: 50,         // 가게 하나의 전체 씨앗(주식) 수. 작을수록 열매가 자주 열린다
     welcomeFruit: 0.75,  // 가게에 처음 심을 때 열매가 이만큼 자란 채로 시작한다(가게마다 한 번). 첫날 열매를 보게 하려는 것
@@ -208,14 +208,54 @@
   ];
   var REAL_UNITS = [{ v: 1, name: '원' }, { v: 1e6, name: '백만원' }, { v: 1e8, name: '억원' }];
 
+  /* 길잡이(튜토리얼). 씨앗·새싹 단계에서 처음 한 번, 한 걸음씩 알려 준다.
+   * where 어느 화면에 뜨는지(news 소식 창 / town 마을 / shop 가게 창 / result 계절 결과 창)
+   * next 무엇을 하면 다음 걸음으로 가는지(guess 소식 고르기 / openShop 가게 열기 / plant 심기 / closeShop 가게 닫기 / nextTurn 계절 넘기기 / resultOk 결과 확인 / tap "다음" 누르기)
+   * target 반짝이게 할 곳(CSS 선택자) */
+  var TUTORIAL = [
+    { where: 'news', next: 'guess', text: '가게에 소식이 왔어요. 잘 듣고, 가게한테 좋은 일이면 웃는 얼굴을, 나쁜 일이면 우는 얼굴을 눌러요.' },
+    { where: 'town', next: 'openShop', target: '[data-act=shop][data-id=bread]', text: '잘했어요! 여기는 가게가 여섯 개 있는 마을이에요. 위에 있는 노란 동그라미가 내 동전이에요. 이제 반짝이는 빵집을 눌러 보세요.' },
+    { where: 'shop', next: 'plant', target: '[data-act=plant][data-n="1"]', text: '동전을 가게에 심으면 나도 이 가게의 주인이 돼요. "동전 1개 심기"를 눌러 보세요.' },
+    { where: 'shop', next: 'closeShop', target: '.sheetbody [data-act=close]', text: '가게 옆에 내 새싹이 났어요! 가게가 돈을 잘 벌면 새싹이 자라서 나무가 되고 열매가 열려요. 더 심어도 돼요. 다 했으면 "닫기"를 눌러요.' },
+    { where: 'town', next: 'nextTurn', target: '[data-act=next]', text: '다른 가게에도 심어 보세요. 여러 가게에 나눠 심으면 한 가게가 힘들어도 괜찮아요. 다 심었으면 아래 큰 단추를 눌러요. 계절이 지나가요.' },
+    { where: 'result', next: 'resultOk', text: '계절이 지났어요. 웃는 얼굴은 손님이 많았던 가게, 우는 얼굴은 힘들었던 가게예요. 그리고 계절마다 심부름 동전을 받아요.' },
+    { where: 'news', next: 'guess', text: '새 소식이 왔어요. 계절마다 소식이 하나씩 와요. 이번에도 잘 듣고 골라 보세요.' },
+    { where: 'town', next: 'tap', target: '.mine:not(.none)', text: '가게 밑의 숫자를 보세요. 앞의 숫자는 내가 심은 동전, 뒤의 숫자는 지금 값이에요. 가게가 잘되면 뒤의 숫자가 커지고, 힘들면 작아져요.' },
+    { where: 'town', next: 'tap', target: '.goal', text: '마을 보물은 내 동전과 내 나무를 모두 더한 거예요. 보물이 늘어나면 마을에 꽃밭과 그네가 생겨요.' },
+    { where: 'town', next: 'tap', target: '.help', text: '이제 혼자 할 수 있어요! 서두르지 않아도 돼요. 기다리면 나무가 자라요. 모르는 게 있으면 위에 있는 물음표를 눌러요.' }
+  ];
+  /* 물음표(?) 도움말. icon: coin 동전 / tree 나무 / fruit 열매 / good·bad 얼굴 / none */
+  var HELP = [
+    { icon: 'coin', title: '동전', text: '내 돈이에요. 가게에 심을 수 있어요. 계절이 지날 때마다 심부름 동전을 받아요.' },
+    { icon: 'tree', title: '새싹과 나무', text: '가게에 동전을 심으면 가게 옆에 새싹이 나요. 내가 그 가게의 주인이라는 표시예요. 가게가 잘되면 새싹이 나무로 자라요.' },
+    { icon: 'fruit', title: '열매', text: '가게가 번 돈을 주인들에게 나눠 주는 거예요. 열매가 익으면 "따기"를 눌러요. 딴 열매는 동전이 돼요.' },
+    { icon: 'good', title: '웃는 얼굴', text: '지난 계절에 손님이 많았던 가게예요.' },
+    { icon: 'bad', title: '우는 얼굴', text: '지난 계절에 힘들었던 가게예요. 힘든 계절이 지나면 다시 좋아지기도 해요.' },
+    { icon: 'none', title: '가게 밑의 숫자', text: '"2 → 3"은 내가 심은 동전 2개가 지금 3개가 됐다는 뜻이에요.' },
+    { icon: 'none', title: '소식과 소문', text: '소식은 정말로 있었던 일이에요. "~라는 소문이 있어요"는 아직 아무도 모르는 이야기예요. 소문이 나오면 "아직 몰라요"를 골라요.' },
+    { icon: 'none', title: '나눠 심기', text: '힘든 일이 계속되면 가게가 문을 닫을 수도 있어요. 그러면 거기 심은 씨앗도 사라져요. 그래서 여러 가게에 나눠 심어요.' },
+    { icon: 'none', title: '꺼내기', text: '심은 동전은 가게를 눌러서 다시 꺼낼 수 있어요. 그런데 오래 기다릴수록 나무가 크게 자라요.' },
+    { icon: 'none', title: '마을 보물', text: '내 동전과 내 나무를 모두 더한 숫자예요. 보물이 늘면 마을에 새로운 것이 생겨요.' }
+  ];
+
   var TEXT = {
     introAdult: ['가게(회사)에 동전을 넣으면 그 회사의 주주가 됩니다.', '가게 창에서 성적표·재무제표·공시를 읽고, 이유를 적고 사고팝니다.', '하루 제한 없이 계절을 넘길 수 있습니다. 단계는 어른 메뉴에서 바꿉니다.'],
     intro: ['가게에 동전을 심으면 나도 그 가게 주인이 돼요.', '가게가 잘되면 나무에 열매가 열려요.', '계절이 지나가길 기다려 보세요.'],
+    // 씨앗·새싹 단계에서 늘 보이는 "왜 할까요?" 한 줄
+    why: {
+      news: '소식을 들으면 그 가게가 잘될지 힘들지 미리 생각해 볼 수 있어요. 잘될 것 같은 가게에 심을지 정해 봐요.',
+      plant: '동전은 그냥 두면 그대로예요. 가게에 심으면 가게가 번 돈을 열매로 나눠 받고, 가게가 커지면 내 나무도 같이 커져요.'
+    },
+    // 씨앗·새싹 단계에서 늘 보이는 "왜 할까요?" 한 줄
+    why: {
+      news: '소식을 들으면 그 가게가 잘될지 힘들지 미리 생각해 볼 수 있어요. 잘될 것 같은 가게에 심을지 정해 봐요.',
+      plant: '동전은 그냥 두면 그대로예요. 가게에 심으면 가게가 번 돈을 열매로 나눠 받고, 가게가 커지면 내 나무도 같이 커져요.'
+    },
     mood: { good: '손님이 많았어요', ok: '보통이었어요', bad: '힘들었어요' },
     closed: '가게가 문을 닫았어요. 심은 씨앗도 사라졌어요. 그래서 여러 가게에 나눠 심는 거예요.',
     reopened: '빈자리에 새 가게가 문을 열었어요.',
     night: '오늘은 여기까지예요. 나무는 밤에도 자라요. 내일 또 만나요.'
   };
 
-  return { RULES: RULES, SEASONS: SEASONS, SHOPS: SHOPS, NEWS: NEWS, BADGES: BADGES, WISHES: WISHES, MENTORS: MENTORS, STAGES: STAGES, TEXT: TEXT, REAL_FIELDS: REAL_FIELDS, REAL_UNITS: REAL_UNITS };
+  return { RULES: RULES, SEASONS: SEASONS, SHOPS: SHOPS, NEWS: NEWS, BADGES: BADGES, WISHES: WISHES, MENTORS: MENTORS, STAGES: STAGES, TEXT: TEXT, TUTORIAL: TUTORIAL, HELP: HELP, REAL_FIELDS: REAL_FIELDS, REAL_UNITS: REAL_UNITS };
 });

@@ -13,7 +13,33 @@
     return { v: 1, cur: null, players: {}, opt: { voice: true, sound: true } };
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
-  Object.keys(S.players).forEach(function (n) { E.upgrade(S.players[n], D); });
+  Object.keys(S.players).forEach(function (n) { var pl = E.upgrade(S.players[n], D); if (pl.tut === undefined) pl.tut = E.stageIdx(pl, D) <= 1 ? 0 : 'done'; });
+
+  /* ---------- 길잡이(튜토리얼) ---------- */
+  var saidTut = -1;
+  function tutStep() { var p = P(); return p && typeof p.tut === 'number' && p.tut < D.TUTORIAL.length ? D.TUTORIAL[p.tut] : null; }
+  function coachHtml(text, btn) {
+    return '<div class="coach">' + faceSvg('good', 38) + '<div><p>' + esc(text) + '</p><span>' + (btn || '') + '<button class="skip" data-act="tutSkip">설명 그만 보기</button></span></div></div>';
+  }
+  // 그 화면에 지금 걸음이 있으면 말풍선을 돌려준다
+  function tutIn(where) { var st = tutStep(); return st && st.where === where ? coachHtml(st.text, st.next === 'tap' ? '<button class="ok" data-act="tutNext">다음</button>' : '') : ''; }
+  function tutText(where) { var st = tutStep(); return st && st.where === where ? st.text + ' ' : ''; }
+  // 반짝임 표시 + 읽어 주기 (소식 창은 소식 글과 함께 읽으므로 여기서 읽지 않는다)
+  function tutMark() {
+    var st = tutStep(), p = P();
+    if (!st) return;
+    if (st.target) { var el = document.querySelector(st.target); if (el) { el.classList.add('hl'); if (st.where === 'town' && el.scrollIntoView && el.getBoundingClientRect().bottom > window.innerHeight - 90) el.scrollIntoView({ block: 'center' }); } }
+    if (st.where !== 'news' && saidTut !== p.tut && document.querySelector('.coach')) { saidTut = p.tut; say(st.text); }
+  }
+  // 아이가 무언가를 했을 때: 지금 걸음(또는 조금 뒤 걸음)이 기다리던 일이면 넘어간다
+  function tutEvent(ev) {
+    var p = P();
+    if (!p || typeof p.tut !== 'number') return false;
+    for (var i = p.tut; i < Math.min(D.TUTORIAL.length, p.tut + 3); i++) {
+      if (D.TUTORIAL[i].next === ev) { p.tut = i + 1 >= D.TUTORIAL.length ? 'done' : i + 1; save(); return true; }
+    }
+    return false;
+  }
   function P() { return S.cur ? S.players[S.cur] : null; }
   function si() { var p = P(); return p ? E.stageIdx(p, D) : 0; }   // 0 씨앗 1 새싹 2 나무 3 숲
   // 나무 단계부터는 실제 말을 쓴다
@@ -186,10 +212,13 @@
     if (!p.introDone) return renderIntro();
     var se = seasonOf(p), w = E.wealth(p), nw = nextWish(p);
     document.body.style.background = se.sky;
-    var h = '<header class="top"><div class="when"><b>' + yearOf(p) + '년째</b> ' + se.name + (si() ? ' <small class="stg">' + D.STAGES[si()].name + '</small>' : '') + '</div>' +
+    var h = '<header class="top"><div class="when"><button class="me" data-act="who0" aria-label="다른 사람으로 바꾸기">' + esc(p.name) + ' <i>바꾸기</i></button><b>' + yearOf(p) + '년째</b> ' + se.name + (si() ? ' <small class="stg">' + D.STAGES[si()].name + '</small>' : '') + '</div>' +
       '<div class="purse" id="purse">' + coinSvg(24) + '<b id="coinN">' + p.coins + '</b></div>' +
       '<div class="purse">' + starSvg(22) + '<b>' + p.stars + '</b></div>' +
-      '<button class="gear" data-act="parent" aria-label="어른 메뉴">어른</button></header>';
+      (si() <= 1 ? '<button class="help" data-act="help" aria-label="도움말">?</button>' : '') + '<button class="gear" data-act="parent" aria-label="어른 메뉴">어른</button></header>';
+    // 길잡이 말풍선은 맨 위에 둔다(아래에 두면 화면 밖으로 밀려 안 보인다)
+    var ripe = Object.keys(p.hold).some(function (k) { return p.hold[k].ripe > 0; });
+    h += tutIn('town') || (ripe && !p.tipFruit && si() <= 1 ? coachHtml('열매가 익었어요! 나무 위의 "따기"를 누르면 동전이 돼요. 열매는 가게가 번 돈을 주인에게 나눠 주는 거예요.', '<button class="ok" data-act="tipOk">알겠어요</button>') : '');
     h += '<div class="sky">' + skySvg(p, se) + '</div>';
     h += '<div class="goal"><span>마을 보물 <b>' + w + '</b></span>' +
       (nw ? '<span class="bar"><i style="width:' + Math.min(100, Math.round(w / nw.at * 100)) + '%"></i></span><span>' + nw.at + '개면 <b>' + nw.name + '</b></span>' : '<span>소원을 모두 이뤘어요</span>') + '</div>';
@@ -213,6 +242,7 @@
       (si() >= 3 ? '<button class="link" data-act="journal">투자일지 · 복기 (' + p.journal.length + ')</button>' : '') +
       (si() >= 4 ? '<button class="go alt world" data-act="real">실제 회사 책장 (' + p.real.length + ')</button>' : '') + '</footer>';
     app.innerHTML = h;
+    tutMark();
     if (!can) return showNight();
     if (p.news && p.news.guess === null) showNews();
   }
@@ -233,7 +263,11 @@
     $('newWho').addEventListener('submit', function (e) { e.preventDefault(); var v = $('whoName').value.trim(); if (v) pick(v); });
   }
   function pick(name) {
-    if (!S.players[name]) S.players[name] = E.newPlayer(name, D, (Date.now() % 2147483647) | 0);
+    if (!S.players[name]) {
+      var np = S.players[name] = E.newPlayer(name, D, (Date.now() % 2147483647) | 0);
+      np.tut = E.stageIdx(np, D) <= 1 ? 0 : 'done';
+      np.news = { id: D.NEWS[0].id, guess: null };   // 첫 소식은 늘 쉬운 것(빵집 새 오븐)으로
+    }
     S.cur = name; save(); render();
   }
 
@@ -254,6 +288,7 @@
   function openSheet(html, lock) {
     sheetBody.innerHTML = html; sheet.hidden = false; sheet.dataset.lock = lock ? '1' : '';
     sheetBody.scrollTop = 0;
+    tutMark();
   }
   function closeSheet(force) {
     if (!force && sheet.dataset.lock) return;
@@ -265,17 +300,18 @@
     var p = P(), card = E.newsCard(p, D);
     if (!card) return;
     var def = card.shop === 'all' ? null : shopDef(card.shop);
-    var h = '<h2>' + (card.kind === 'disc' ? '오늘의 공시' : '오늘의 소식') + '</h2>';
+    var h = tutIn('news') + '<h2>' + (card.kind === 'disc' ? '오늘의 공시' : '오늘의 소식') + '</h2>';
     if (card.title) h += '<p class="doctitle">' + esc(card.title) + '</p>';
     h += def ? '<div class="newsart">' + shopSvg(def, p.world.shops[def.id], null, 0, true) + '</div><p class="tag">' + esc(def.name) + '</p>' : '<p class="tag">마을 전체</p>';
     h += '<p class="newstext">' + esc(card.text) + '</p>';
     h += '<button class="link" data-act="read" data-text="' + esc(card.text) + '">들려줘</button>';
+    if (si() <= 1) h += '<p class="whyline"><b>왜 소식을 볼까요?</b> ' + D.TEXT.why.news + '</p>';
     h += '<p class="ask">가게에 어떤 소식일까요?</p><div class="guess">' +
       '<button data-act="guess" data-id="good">' + faceSvg('good', 46) + '<span>좋은 소식</span></button>' +
       '<button data-act="guess" data-id="bad">' + faceSvg('bad', 46) + '<span>나쁜 소식</span></button>' +
       (p.world.turn >= D.RULES.rumorFrom || si() >= 2 ? '<button data-act="guess" data-id="unknown">' + faceSvg('unknown', 46) + '<span>아직 몰라요</span></button>' : '') + '</div>';
     openSheet(h, true);
-    say(card.text);
+    say(tutText('news') + card.text);
   }
   // 새싹부터: 성적표의 어느 줄이 바뀔까
   function showLine() {
@@ -288,12 +324,13 @@
   function showShop(id) {
     var p = P(), def = shopDef(id), c = p.world.shops[id], hd = p.hold[id], v = E.valueOf(p, id);
     openShopId = id;
-    var h = '<h2>' + esc(def.name) + '</h2><div class="newsart">' + shopSvg(def, c, hd, v, true) + '</div>';
+    var h = tutIn('shop') + '<h2>' + esc(def.name) + '</h2><div class="newsart">' + shopSvg(def, c, hd, v, true) + '</div>';
     if (c.closed > 0) {
       h += '<p class="newstext">문을 닫았어요. 조금 기다리면 새 가게가 와요.</p><button class="go" data-act="close">알겠어요</button>';
       return openSheet(h);
     }
     h += '<p class="desc">' + esc(def.desc) + '</p>';
+    if (si() <= 1) h += '<p class="whyline"><b>왜 심을까요?</b> ' + D.TEXT.why.plant + '</p>';
     if (c.hist.length) h += '<p class="moodline">' + faceSvg(c.mood, 28) + ' 지난 계절: ' + D.TEXT.mood[c.mood] + '</p>';
     if (si() >= 1) {
       p.looked[id] = p.world.turn; save();
@@ -327,7 +364,11 @@
   }
 
   function showResult(out, from) {
-    var p = P(), h = '<h2>' + from.name + '이 지났어요</h2>';
+    var p = P(), h = tutIn('result') + '<h2>' + from.name + '이 지났어요</h2>';
+    if (p.world.turn % 4 === 0) {   // 한 해가 끝날 때마다 보물이 얼마나 늘었는지
+      var hist = p.history, was = hist.length >= 5 ? hist[hist.length - 5] : D.RULES.startCoins;
+      h += '<p class="prize"><b>' + (p.world.turn / 4) + '년이 지났어요.</b> 마을 보물 ' + was + ' → <b>' + hist[hist.length - 1] + '</b></p>';
+    }
     if (out.news) {
       var n = out.news, label = { good: '좋은 소식', bad: '나쁜 소식', unknown: n.card.kind === 'disc' ? '이것만으로는 알 수 없는 공시' : '아직 모르는 소문' }[n.answer];
       h += '<div class="answer ' + (n.right ? 'right' : 'wrong') + '">' + faceSvg(n.answer, 34) +
@@ -338,23 +379,38 @@
     if (out.news && out.news.card.explain) h += '<p class="note explain">' + esc(out.news.card.explain) + '</p>';
     if (out.news && out.news.card.note) h += '<p class="note explain">' + esc(out.news.card.note) + '</p>';
     h += '<ul class="rows">';
-    D.SHOPS.forEach(function (def) {
-      var o = out.shops[def.id], mine = p.hold[def.id];
-      if (out.closed.indexOf(def.id) >= 0) { h += '<li class="shut">' + faceSvg('bad', 26) + '<span>' + esc(def.name) + '</span><em>문을 닫았어요</em></li>'; return; }
+    var newsShop = out.news ? out.news.card.shop : null;
+    D.SHOPS.slice().sort(function (a, b) { return (out.shops[b.id].mine ? 1 : 0) - (out.shops[a.id].mine ? 1 : 0); }).forEach(function (def) {
+      var o = out.shops[def.id], mine = o.mine;
+      if (out.closed.indexOf(def.id) >= 0) { h += '<li class="shut">' + faceSvg('bad', 26) + '<span>' + esc(def.name) + '</span><em>문을 닫았어요' + (mine ? ' · 심은 동전 ' + o.before + '개가 사라졌어요' : '') + '</em></li>'; return; }
       if (out.reopened.indexOf(def.id) >= 0) { h += '<li>' + faceSvg('ok', 26) + '<span>' + esc(def.name) + '</span><em>새로 문을 열었어요</em></li>'; return; }
       if (o.closed) return;
-      h += '<li' + (mine ? ' class="mine"' : '') + '>' + faceSvg(o.mood, 26) + '<span>' + esc(def.name) + '</span><em>' + D.TEXT.mood[o.mood] + '</em>' +
-        (o.got ? '<i>' + fruitSvg(18) + '+' + o.got + '</i>' : '') + '</li>';
+      var dv = mine ? o.after - o.before : 0, because = (newsShop === def.id || newsShop === 'all') && o.mood !== 'ok' ? ' (소식 때문이에요)' : '';
+      h += '<li' + (mine ? ' class="mine"' : '') + '>' + faceSvg(o.mood, 26) + '<span>' + esc(def.name) + '</span><em>' + D.TEXT.mood[o.mood] + because + '</em>' +
+        (mine ? '<u>내 나무 ' + coinSvg(15) + o.before + ' → <b>' + o.after + '</b>' + (dv > 0 ? ' <i class="up">▲' + dv + '</i>' : dv < 0 ? ' <i class="dn">▼' + (-dv) + '</i>' : ' 그대로') + (o.got ? ' · ' + fruitSvg(16) + '열매 +' + o.got : '') + '</u>' : '') + '</li>';
     });
     h += '</ul>';
     if (out.closed.length) h += '<p class="note">' + D.TEXT.closed + '</p>';
+    var m = out.mine, resLine = '';
+    if (m) {
+      var top = Math.max(m.idle, m.wealth, 1), diff = m.wealth - m.idle;
+      resLine = !m.held ? '아직 아무 가게에도 심지 않았어요. 그냥 둔 동전은 늘지 않아요. 가게를 눌러 심어 보세요.'
+        : m.shopGain > 0 ? '내가 심은 가게에서 동전이 ' + m.shopGain + '개 생겼어요.'
+        : m.shopGain < 0 ? '내가 심은 가게에서 동전이 ' + (-m.shopGain) + '개 줄었어요. 힘든 계절도 있어요. 기다리면 다시 자라기도 해요.'
+        : '이번 계절엔 그대로예요. 나무는 천천히 자라요.';
+      h += '<div class="myres"><h3>내 선택의 결과</h3><p>' + resLine + '</p>' +
+        '<p class="cmp"><span>그냥 뒀다면</span><i class="idle" style="width:' + Math.round(m.idle / top * 55) + '%"></i><b>' + m.idle + '</b></p>' +
+        '<p class="cmp"><span>심은 지금</span><i style="width:' + Math.round(m.wealth / top * 55) + '%"></i><b>' + m.wealth + '</b></p>' +
+        '<p class="cmpsum">' + (diff > 0 ? '가게에 심어서 지금까지 <b>' + diff + '개</b> 더 생겼어요.' : diff < 0 ? '지금은 그냥 뒀을 때보다 ' + (-diff) + '개 적어요. 나무가 자라려면 시간이 걸려요.' : '아직은 그냥 뒀을 때와 같아요.') + '</p></div>';
+    }
     h += '<p class="note">심부름 동전 ' + coinSvg(16) + ' +' + D.RULES.allowance + '</p>';
     out.wishes.forEach(function (w) { h += '<p class="prize">마을에 <b>' + w.name + '</b>이(가) 생겼어요!</p>'; });
     out.badges.forEach(function (b) { h += '<p class="prize">' + starSvg(20) + ' <b>' + esc(b.name) + '</b> 배지 — ' + esc(b.text) + '</p>'; });
     h += '<button class="go" data-act="resultOk">확인</button>';
     openSheet(h, true);
     if (out.badges.length || out.wishes.length || (out.news && out.news.right)) chime();
-    var line = out.closed.length ? D.TEXT.closed : out.badges.length ? out.badges[0].name + ' 배지를 받았어요. ' + out.badges[0].text : out.fruits ? '열매가 ' + out.fruits + '개 열렸어요.' : '';
+    var line = out.closed.length ? D.TEXT.closed : out.badges.length ? out.badges[0].name + ' 배지를 받았어요. ' + out.badges[0].text : (out.fruits ? '열매가 ' + out.fruits + '개 열렸어요. ' : '') + (si() <= 1 ? resLine : '');
+    if (tutText('result')) line = '';   // 길잡이가 읽는 중이면 겹치지 않게
     if (line) say(line);
   }
 
@@ -439,6 +495,19 @@
         (c.closed > 0 ? '가게가 문을 닫음' : age < 4 ? '복기까지 ' + (4 - age) + '계절 남음' : '<b class="' + (good ? 'ok' : 'no') + '">' + (good ? '지금까지는 맞은 판단' : '지금까지는 빗나간 판단') + '</b>') + '</p></div>';
     });
     h += '<button class="go" data-act="close2">닫기</button>';
+    openSheet(h);
+  }
+
+  /* ---------- 도움말 (?) ---------- */
+  function showHelp() {
+    var all = D.HELP.map(function (x) { return x.title + '. ' + x.text; }).join(' ');
+    var h = '<h2>이건 뭐예요?</h2><ul class="helps">';
+    D.HELP.forEach(function (x) {
+      var ic = x.icon === 'coin' ? coinSvg(34) : x.icon === 'fruit' ? fruitSvg(34) : x.icon === 'good' || x.icon === 'bad' ? faceSvg(x.icon, 34)
+        : x.icon === 'tree' ? '<svg class="ic" width="34" height="34" viewBox="112 78 56 46"><g filter="url(#cr)">' + treeSvg(2, { ripe: 0, fruit: 0 }, 140, 120) + '</g></svg>' : '<i class="dot"></i>';
+      h += '<li>' + ic + '<div><b>' + esc(x.title) + '</b><p>' + esc(x.text) + '</p></div><button class="rd" data-act="read" data-text="' + esc(x.title + '. ' + x.text) + '">들려줘</button></li>';
+    });
+    h += '</ul><button class="go" data-act="tutRestart">처음부터 다시 배우기</button><button class="link" data-act="read" data-text="' + esc(all) + '">모두 들려줘</button><button class="link" data-act="close">닫기</button>';
     openSheet(h);
   }
 
@@ -581,7 +650,12 @@
     if (act === 'read') return say(b.dataset.text);
     if (act === 'introOk') { p.introDone = 1; p.stagePicked = 1; save(); return render(); }
     if (act === 'stage0') { p.stage = id; p.stagePicked = 1; save(); return render(); }
-    if (act === 'close') return closeSheet(true);
+    if (act === 'close') { var wasShop = openShopId; closeSheet(true); if (wasShop && tutEvent('closeShop')) render(); return; }
+    if (act === 'tutNext') { tutEvent('tap'); return render(); }
+    if (act === 'tutSkip') { if (p) { p.tut = 'done'; p.tipFruit = 1; save(); } var b0 = document.querySelectorAll('.coach'); for (var ci = 0; ci < b0.length; ci++) b0[ci].remove(); var h0 = document.querySelectorAll('.hl'); for (var hi = 0; hi < h0.length; hi++) h0[hi].classList.remove('hl'); return; }
+    if (act === 'tipOk') { p.tipFruit = 1; save(); return render(); }
+    if (act === 'help') return showHelp();
+    if (act === 'tutRestart') { p.tut = 0; p.tipFruit = 0; saidTut = -1; save(); return render(); }
     if (act === 'close2') { closeSheet(true); return; }
     if (act === 'night') return showNight();
     if (act === 'parent') return showGate();
@@ -591,10 +665,11 @@
       E.guess(p, id); save(); beep(520, 0.1);
       if (si() >= 1 && E.lineOf(E.newsCard(p, D))) return showLine();
       closeSheet(true);
+      if (tutEvent('guess')) render();
       return;
     }
-    if (act === 'line') { E.guessLine(p, id); save(); beep(520, 0.1); return closeSheet(true); }
-    if (act === 'shop') return showShop(id);
+    if (act === 'line') { E.guessLine(p, id); save(); beep(520, 0.1); closeSheet(true); if (tutEvent('guess')) render(); return; }
+    if (act === 'shop') { tutEvent('openShop'); return showShop(id); }
     if (act === 'fs') return showStatements(openShopId);
     if (act === 'quiz') return showQuiz(openShopId);
     if (act === 'ans') return answerQuiz(b);
@@ -633,7 +708,7 @@
     if (act === 'plant') {
       if (E.invest(p, D, openShopId, Number(b.dataset.n), $('why') ? $('why').value : '')) {
         var got = E.checkBadges(p, D, null);
-        save(); beep(440, 0.1); var keep = openShopId; render(); showShop(keep);
+        tutEvent('plant'); save(); beep(440, 0.1); var keep = openShopId; render(); showShop(keep);
         if (got.length) { chime(); say(got[0].name + ' 배지를 받았어요. ' + got[0].text); }
       }
       return;
@@ -647,11 +722,11 @@
       if (!E.canPlay(p, D)) return showNight();
       if (p.news && p.news.guess === null) return showNews();
       var from = seasonOf(p), day = E.touchDay(p, today());
-      lastReport = E.nextTurn(p, D); day.turns++; save();
+      lastReport = E.nextTurn(p, D); day.turns++; tutEvent('nextTurn'); save();
       render(); showResult(lastReport, from);
       return;
     }
-    if (act === 'resultOk') { closeSheet(true); return render(); }
+    if (act === 'resultOk') { tutEvent('resultOk'); closeSheet(true); return render(); }
 
     // 어른 메뉴
     if (act === 'self') { p.log.forEach(function (l) { if (l.d === id) l.self = !l.self; }); save(); return showParent(); }
