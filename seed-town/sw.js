@@ -1,7 +1,7 @@
 /* 앱 껍데기만 캐시합니다. 게임 기록은 localStorage 에 있어서 오프라인에서도 됩니다.
  * 온라인이면 항상 서버에서 새로 받아서 index.html·app.js·data.js 버전이 섞이지 않게 한다. */
-var CACHE = 'hwr-seedtown-v1';
-var SHELL = ['./', './index.html', './style.css?v=1', './data.js?v=1', './engine.js?v=1', './app.js?v=1', './manifest.json', './icon.svg'];
+var CACHE = 'hwr-seedtown-v2';
+var SHELL = ['./', './index.html', './style.css?v=2', './data.js?v=2', './engine.js?v=2', './app.js?v=2', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));

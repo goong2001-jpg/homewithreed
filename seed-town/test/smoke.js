@@ -46,6 +46,44 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('하루 4계절까지', !E.canPlay(R, D));
   E.touchDay(R, '2026-01-02');
   check('다음 날 다시 열림', E.canPlay(R, D) && R.log.length === 2);
+
+  // ---- v2: 단계 ----
+  const S1 = E.newPlayer('s', D, 11);
+  const seedOnly = () => { for (let i = 0; i < 60; i++) { const c = E.newsCard(S1, D); if (c.stage) return false; E.guess(S1, 'good'); E.nextTurn(S1, D); } return true; };
+  check('씨앗 단계에는 공시·위기 카드가 안 나옴', seedOnly());
+  const T1 = E.newPlayer('tr', D, 12); T1.stage = 'tree';
+  let disc = 0, crisis = 0;
+  for (let i = 0; i < 120; i++) { const c = E.newsCard(T1, D); if (c.kind === 'disc') disc++; if (c.note) crisis++; E.guess(T1, E.answerOf(c)); E.nextTurn(T1, D); }
+  check('나무 단계에는 공시·위기 카드가 나옴', disc > 0 && crisis > 0, 'disc ' + disc + ' crisis ' + crisis);
+  check('공시를 다 맞히면 전부 별', T1.stats.news + T1.stats.rumor === T1.stats.seen);
+  // 유상증자: 주식 수가 늘고 값이 내려간다
+  const U = E.newPlayer('u', D, 13); U.stage = 'tree';
+  for (let i = 0; i < 4; i++) { E.guess(U, 'good'); E.nextTurn(U, D); }
+  const sh0 = U.world.shops.toy.shares; U.news = { id: 'd_raise1', guess: 'bad' };
+  const o2 = E.nextTurn(U, D);
+  check('유상증자: 주식 수 25% 증가, 정답은 나쁜 소식', Math.abs(U.world.shops.toy.shares - sh0 * 1.25) < 1e-9 && o2.news.right);
+  // 장부: 현금 증감 = 영업 − 투자 + 재무
+  const ok = D.SHOPS.every(sd => { const h = U.world.shops[sd.id].hist; if (h.length < 2) return true; const a = h[h.length - 2], b = h[h.length - 1]; return Math.abs((b.cash - a.cash) - (b.profit - b.inv + b.borrow - b.repay - b.div)) < 0.05 || sd.id === 'toy'; });
+  check('현금흐름표가 장부와 맞음', ok);
+  // 새싹: 줄 맞히기
+  const L = E.newPlayer('l', D, 14); L.stage = 'sprout'; L.news = { id: 'bread2', guess: 'bad' }; E.guessLine(L, 'cost');
+  const o3 = E.nextTurn(L, D);
+  check('새싹: "쓴 돈" 줄 맞히면 별 2개', o3.news.line.right && L.stats.line === 1 && L.stars === 2);
+  // 절반 꺼내기
+  E.invest(L, D, 'book', 6); const got = E.withdraw(L, 'book', true);
+  check('절반 꺼내기', got === 3 && L.hold.book && E.valueOf(L, 'book') === 3);
+  // 숲: 일지·문제
+  const F = E.newPlayer('f', D, 15); F.stage = 'forest';
+  E.invest(F, D, 'bread', 2, '꾸준해서'); E.invest(F, D, 'ice', 2, '');
+  check('이유를 적어야 일지에 남음', F.journal.length === 1 && F.stats.reasoned === 1);
+  check('장부가 없으면 문제도 없음', E.makeQuiz(F, D, 'bread') === null);
+  E.guess(F, 'good'); E.nextTurn(F, D);
+  const qz = E.makeQuiz(F, D, 'bread');
+  check('공시 읽기 문제 3개, 보기 3개씩·정답이 계산과 맞음', qz.questions.length === 3 && qz.questions.every(q => q.options.length === 3 && new Set(q.options).size === 3) && qz.questions[0].options[qz.questions[0].answer] === Math.round(qz.row.profit / qz.row.sales * 100) + '%');
+  // 예전 저장분
+  const old = E.newPlayer('o', D, 16); delete old.journal; delete old.looked; delete old.stats.quiz; delete old.world.shops.bread.shares;
+  E.upgrade(old, D); E.guess(old, 'good'); E.nextTurn(old, D);
+  check('v1 저장분도 그대로 이어짐', old.world.turn === 1 && old.world.shops.bread.shares === D.RULES.shares);
 })();
 
 // ---- 화면 ----
@@ -114,7 +152,44 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   // 소문은 8계절부터
   await ev(() => { const g = window.__st, P = g.P(); while (P.world.turn < 9) { g.E.guess(P, 'good'); g.E.nextTurn(P, g.D); } P.turnsToday = 0; g.render(); });
   check('나중엔 "아직 몰라요"가 생김', (await p.locator('[data-act=guess]').count()) === 3);
-  if (process.env.SHOT) { await p.click('[data-act=guess][data-id=good]'); await p.screenshot({ path: process.env.SHOT }); }
+  await p.click('[data-act=guess][data-id=good]');
+  await p.click('[data-act=line]', { timeout: 800 }).catch(() => {});
+  // ---- v2: 단계별 화면 ----
+  const setStage = async id => { await ev(() => { const P = window.__st.P(); P.turnsToday = 0; }); await p.evaluate(s => { window.__st.P().stage = s; window.__st.render(); }, id); await p.click('[data-act=guess]', { timeout: 800 }).catch(() => {}); await p.click('[data-act=line]', { timeout: 800 }).catch(() => {}); };
+  check('씨앗 단계 가게 창에는 성적표가 없음', await (async () => { await p.click('[data-act=shop][data-id=bread]'); const n = await p.locator('.report').count(); await p.click('[data-act=close]'); return n === 0; })());
+  await setStage('sprout');
+  check('새싹: 마을에 씨앗 값이 보임', (await p.locator('.px').count()) >= 5);
+  await p.click('[data-act=shop][data-id=bread]');
+  check('새싹: 성적표 3줄과 값 그래프', (await p.locator('.report p').count()) === 3 && (await p.locator('.spark').count()) === 1 && (await p.locator('.ratios').count()) === 0);
+  await p.click('[data-act=close]');
+  await setStage('tree');
+  await p.click('[data-act=shop][data-id=bread]');
+  check('나무: 비율 4개', (await p.locator('.ratios span').count()) === 4 && (await p.locator('[data-act=quiz]').count()) === 0);
+  await p.click('[data-act=fs]');
+  check('나무: 재무제표 3표', (await p.locator('table.fs').count()) === 3);
+  if (process.env.SHOT) await p.screenshot({ path: process.env.SHOT.replace('.png', '-fs.png') });
+  await p.click('.sheetbody .go');
+  await p.click('[data-act=close]');
+  await setStage('forest');
+  await p.click('[data-act=shop][data-id=bread]');
+  await p.fill('#why', '꾸준히 이익이 나서');
+  await p.click('[data-act=plant][data-n="1"]');
+  check('숲: 이유를 적고 사면 일지에 남음', await ev(() => window.__st.P().journal.length === 1));
+  await p.click('[data-act=quiz]');
+  check('숲: 분기보고서와 문제 3개', (await p.locator('.doc table').count()) === 3 && (await p.locator('.q').count()) === 3);
+  const st0 = await ev(() => window.__st.P().stars);
+  for (let i = 0; i < 3; i++) { const a = await p.evaluate(i => window.__st.E.makeQuiz(window.__st.P(), window.__st.D, 'bread').questions[i].answer, i); await p.click(`[data-act=ans][data-q="${i}"][data-o="${a}"]`); }
+  check('숲: 다 맞히면 별 3개', await ev(() => window.__st.P().stars) === st0 + 3 && (await p.locator('.q button.ok').count()) === 3);
+  if (process.env.SHOT) await p.screenshot({ path: process.env.SHOT.replace('.png', '-quiz.png') });
+  await p.click('.sheetbody .go'); await p.click('[data-act=quiz]');
+  for (let i = 0; i < 3; i++) await p.click(`[data-act=ans][data-q="${i}"][data-o="0"]`);
+  check('숲: 같은 계절에 다시 풀어도 별이 안 늘어남', await ev(() => window.__st.P().stars) === st0 + 3);
+  await p.click('.sheetbody .go'); await p.click('[data-act=close]');
+  await p.click('[data-act=journal]');
+  check('숲: 투자일지 창', (await p.locator('.jr').count()) === 1);
+  await p.click('[data-act=close2]');
+  if (process.env.SHOT) { await p.click('[data-act=shop][data-id=bread]'); await p.screenshot({ path: process.env.SHOT.replace('.png', '-shop.png'), fullPage: false }); await p.click('[data-act=close]'); }
+  if (process.env.SHOT) { await p.screenshot({ path: process.env.SHOT }); }
   check('오류 없음', errors.length === 0, errors.join(' | '));
   await browser.close();
   console.log(fail.length ? '\n실패 ' + fail.length + '개: ' + fail.join(', ') : '\n모두 통과');

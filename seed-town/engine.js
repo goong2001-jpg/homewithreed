@@ -336,8 +336,8 @@
     var equity = round2(l.cash + (l.assets || c.assets) - l.debt), rot = P.world.turn % 3, qs = [];
     function pct(x) { return Math.round(x * 100); }
     function opts(right, a, b) {       // 정답 자리를 계절마다 돌린다
-      var o = [a, b]; o.splice(rot % 3, 0, right);
-      return { options: o, answer: rot % 3 };
+      var at = (rot + qs.length) % 3, o = [a, b]; o.splice(at, 0, right);   // 문제마다 정답 자리가 다르다
+      return { options: o, answer: at };
     }
     var m = pct(l.profit / l.sales), q1 = opts(m + '%', (m + 9) + '%', (m - 7) + '%');
     qs.push({ q: '이번 분기 순이익률(순이익 ÷ 매출)은 얼마에 가장 가까운가요?', options: q1.options, answer: q1.answer,
