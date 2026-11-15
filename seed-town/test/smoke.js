@@ -80,6 +80,20 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   E.guess(F, 'good'); E.nextTurn(F, D);
   const qz = E.makeQuiz(F, D, 'bread');
   check('공시 읽기 문제 3개, 보기 3개씩·정답이 계산과 맞음', qz.questions.length === 3 && qz.questions.every(q => q.options.length === 3 && new Set(q.options).size === 3) && qz.questions[0].options[qz.questions[0].answer] === Math.round(qz.row.profit / qz.row.sales * 100) + '%');
+  // ---- v3: 세계 (실제 재무제표) ----
+  const txt = '요약재무정보 (단위: 억원)\n매출액 1,200 1,050\n매출원가 700 640\n판매비와관리비 350 300\n영업이익(주1) 150 110\n당기순이익 110 (20)\n자산총계 1,200\n부채총계 400\n부채와자본총계 1,200\n자본총계 800\n영업활동으로 인한 현금흐름 △30\n발행주식총수 10,000,000\n주가 22,000';
+  const rv = E.parseStatement(txt, D), ra = E.analyze(rv, { unit: 1e8 });
+  check('붙여넣은 글에서 숫자를 읽음', rv.sales === 1200 && rv.net === 110 && rv.equity === 800 && rv.debt === 400 && rv.cfo === -30 && rv.shares === 1e7);
+  check('비율 계산(PER 20·PBR 2.75·부채비율 50%·ROE 13.75%)', Math.abs(ra.per - 20) < 1e-9 && Math.abs(ra.pbr - 2.75) < 1e-9 && ra.debtRatio === 0.5 && Math.abs(ra.roe - 0.1375) < 1e-9);
+  check('점검표: 흑자·빚 통과, 현금·그레이엄·버핏 주의', ra.checks.map(c => c.state).join() === 'ok,ok,warn,warn,warn');
+  check('숫자가 모자라면 "자료 없음"', E.analyze({ sales: 10, net: 1 }, {}).checks.filter(c => c.state === 'na').length === 4);
+  const rq = E.makeRealQuiz(rv, 0);
+  check('실제 숫자로 문제 3개', rq.length === 3 && rq[0].options[rq[0].answer] === '9%' && rq[1].options[rq[1].answer] === '50%' && rq[2].options[rq[2].answer] === '13%');
+  const W1 = E.newPlayer('w', D, 17); W1.stage = 'world';
+  E.saveReal(W1, D, -1, '시험회사', { label: '1기', unit: 1e8, v: rv });
+  E.predictReal(W1, 0, 'good', '매출이 늘어서');
+  const rr = E.saveReal(W1, D, 0, '', { label: '2기', unit: 1e8, v: Object.assign({}, rv, { net: 140 }) });
+  check('예측 → 다음 기간을 넣으면 복기', rr.review && rr.review.right && W1.stats.pred === 1 && W1.real[0].periods.length === 2 && W1.real[0].pred === null);
   // 예전 저장분
   const old = E.newPlayer('o', D, 16); delete old.journal; delete old.looked; delete old.stats.quiz; delete old.world.shops.bread.shares;
   E.upgrade(old, D); E.guess(old, 'good'); E.nextTurn(old, D);
@@ -187,6 +201,32 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   await p.click('.sheetbody .go'); await p.click('[data-act=close]');
   await p.click('[data-act=journal]');
   check('숲: 투자일지 창', (await p.locator('.jr').count()) === 1);
+  await p.click('[data-act=close2]');
+  // ---- v3: 세계 ----
+  check('숲 단계에는 실제 회사 책장이 없음', (await p.locator('[data-act=real]').count()) === 0);
+  await setStage('world');
+  await p.click('[data-act=real]');
+  await p.click('[data-act=realNew]');
+  await p.click('[data-act=realSave]');
+  check('세계: 빠진 칸이 있으면 저장 안 됨', (await p.textContent('#rMsg')).includes('빠진 것') && await ev(() => window.__st.P().real.length === 0));
+  await p.fill('#rName', '시험회사'); await p.fill('#rLabel', '1기');
+  await p.fill('#rPaste', '매출액 1,200\n영업이익 150\n당기순이익 110\n부채총계 400\n자본총계 800\n영업활동현금흐름 130\n발행주식총수 10,000,000\n주가 11,000');
+  await p.click('[data-act=realParse]');
+  check('세계: 붙여넣은 글이 칸에 들어감', (await p.inputValue('#rf_sales')) === '1200' && (await p.inputValue('#rf_equity')) === '800');
+  await p.click('[data-act=realSave]');
+  check('세계: 점검표 5줄과 비율 8개', (await p.locator('.checks li').count()) === 5 && (await p.locator('.ratios span').count()) === 8 && (await p.locator('.checks li.ok').count()) === 4);
+  if (process.env.SHOT) await p.screenshot({ path: process.env.SHOT.replace('.png', '-world.png') });
+  await p.fill('#rWhy', '이익률이 좋아서'); await p.click('[data-act=realPred][data-id=good]');
+  check('세계: 예측을 걸어 둠', await ev(() => window.__st.P().real[0].pred.guess === 'good'));
+  await p.click('[data-act=realQuiz]');
+  check('세계: 실제 숫자 문제 3개', (await p.locator('.q').count()) === 3);
+  await p.click('.sheetbody .go');
+  await p.click('[data-act=realAdd]');
+  await p.fill('#rLabel', '2기'); await p.fill('#rf_sales', '1300'); await p.fill('#rf_net', '90'); await p.fill('#rf_debt', '420'); await p.fill('#rf_equity', '850');
+  await p.click('[data-act=realSave]');
+  check('세계: 다음 기간을 넣으면 예측이 복기됨(빗나감)', (await p.locator('.answer.wrong').count()) === 1 && await ev(() => window.__st.P().real[0].reviews.length === 1));
+  await p.click('.sheetbody [data-act=real]');
+  check('세계: 책장에 회사 1곳', (await p.locator('.realrow').count()) === 1);
   await p.click('[data-act=close2]');
   if (process.env.SHOT) { await p.click('[data-act=shop][data-id=bread]'); await p.screenshot({ path: process.env.SHOT.replace('.png', '-shop.png'), fullPage: false }); await p.click('[data-act=close]'); }
   if (process.env.SHOT) { await p.screenshot({ path: process.env.SHOT }); }
