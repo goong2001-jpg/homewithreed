@@ -146,6 +146,10 @@ jobs:
           mkdir -p site/god-village
           cp -r god-village/. site/god-village/
           rm -rf site/god-village/test site/god-village/*.md
+          # seed-town(씨앗 마을)도 빌드 없는 정적 앱이다. 테스트 폴더와 문서는 빼고 올린다.
+          mkdir -p site/seed-town
+          cp -r seed-town/. site/seed-town/
+          rm -rf site/seed-town/test site/seed-town/*.md
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

@@ -106,6 +106,8 @@ jobs:
             port: 8152
           - app: god-village
             port: 8153
+          - app: seed-town
+            port: 8154
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
