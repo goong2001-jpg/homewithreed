@@ -107,7 +107,7 @@
 
   function newPlayer(name, D, seed) {
     var P = {
-      name: name, stage: 'seed', coins: D.RULES.startCoins, stars: 0,
+      name: name, stage: (D.RULES.profileStage || {})[name] || 'seed', stagePicked: 0, coins: D.RULES.startCoins, stars: 0,
       met: {},             // 한 번이라도 심어 본 가게
       hold: {},            // 가게 id → { shares 씨앗 수, put 넣은 동전, since 처음 심은 계절, fruit 자라는 열매(0~1), ripe 익은 열매 }
       world: newWorld(D, seed),
@@ -127,6 +127,11 @@
   function upgrade(P, D) {
     var st = P.stats;
     ['line', 'informed', 'cheap', 'reasoned', 'quiz', 'real', 'pred'].forEach(function (k) { if (st[k] === undefined) st[k] = 0; });
+    if (!P.stagePicked) {   // 단계를 직접 고른 적이 없으면 이름에 맞는 단계로 (아빠·엄마가 씨앗 화면을 보던 문제)
+      var want = (D.RULES.profileStage || {})[P.name];
+      if (want && P.stage === 'seed') P.stage = want;
+      P.stagePicked = 1;
+    }
     if (!P.looked) P.looked = {};
     if (!P.journal) P.journal = [];
     if (!P.real) P.real = [];
@@ -328,7 +333,8 @@
     if (!last || last.d !== today) { last = { d: today, turns: 0, self: null }; P.log.push(last); if (P.log.length > 120) P.log.shift(); }
     return last;
   }
-  function canPlay(P, D) { return P.turnsToday < D.RULES.turnsPerDay; }
+  function dayLimit(P, D) { var t = (D.RULES.turnsByStage || {})[P.stage]; return t === undefined ? D.RULES.turnsPerDay : t; }   // 0 = 제한 없음
+  function canPlay(P, D) { var lim = dayLimit(P, D); return !lim || P.turnsToday < lim; }
 
   /* ---------- 숲: 공시 원문 읽기 ---------- */
   // 가게의 지난 계절 장부로 보고서 숫자와 문제 3개를 만든다. 장부가 없으면 null.
@@ -445,7 +451,7 @@
   function predictReal(P, idx, g, why) { if (P.real[idx]) P.real[idx].pred = { guess: g, why: String(why || '').slice(0, 120) }; }
 
   return {
-    toNum: toNum, parseStatement: parseStatement, analyze: analyze, makeRealQuiz: makeRealQuiz, saveReal: saveReal, predictReal: predictReal,
+    dayLimit: dayLimit, toNum: toNum, parseStatement: parseStatement, analyze: analyze, makeRealQuiz: makeRealQuiz, saveReal: saveReal, predictReal: predictReal,
     upgrade: upgrade, stageIdx: stageIdx, ratios: ratios, guessLine: guessLine, answerOf: answerOf, lineOf: lineOf,
     makeQuiz: makeQuiz, scoreQuiz: scoreQuiz, shopDef: shopDef,
     newWorld: newWorld, newPlayer: newPlayer, step: step, level: level,

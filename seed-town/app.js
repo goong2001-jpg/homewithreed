@@ -224,7 +224,9 @@
     D.RULES.profiles.forEach(function (n) { if (all.indexOf(n) < 0) all.push(n); });
     all.forEach(function (n) {
       var pl = S.players[n];
-      h += '<button data-act="who" data-id="' + esc(n) + '"><b>' + esc(n) + '</b><small>' + (pl ? yearOf(pl) + '년째 · 보물 ' + E.wealth(pl) : '처음') + '</small></button>';
+      var stg = D.STAGES[pl ? E.stageIdx(pl, D) : 0].name;
+      if (!pl) D.STAGES.forEach(function (s) { if (s.id === D.RULES.profileStage[n]) stg = s.name; });
+      h += '<button data-act="who" data-id="' + esc(n) + '"><b>' + esc(n) + '</b><small>' + stg + ' 단계 · ' + (pl ? yearOf(pl) + '년째 · 보물 ' + E.wealth(pl) : '처음') + '</small></button>';
     });
     h += '</div><form id="newWho" class="newwho"><input id="whoName" maxlength="8" placeholder="다른 이름" aria-label="다른 이름"><button>시작</button></form></div>';
     app.innerHTML = h;
@@ -235,14 +237,17 @@
     S.cur = name; save(); render();
   }
 
+  var introSaid = false;
   function renderIntro() {
-    var p = P(), def = D.SHOPS[0];
+    var p = P(), def = D.SHOPS[0], lines = si() >= 2 ? D.TEXT.introAdult : D.TEXT.intro;
     document.body.style.background = '#f6ecd6';
     app.innerHTML = '<div class="pickpage"><h1>' + esc(p.name) + '의 씨앗 마을</h1>' +
       '<div class="introart">' + shopSvg(def, p.world.shops[def.id], { ripe: 2, fruit: 0.5 }, 9, true) + '</div>' +
-      '<ol class="intro">' + D.TEXT.intro.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ol>' +
-      '<button class="go" data-act="introOk">시작하기</button><button class="link" data-act="read" data-text="' + esc(D.TEXT.intro.join(' ')) + '">들려줘</button></div>';
-    say(D.TEXT.intro.join(' '));
+      '<p class="sub">누구에게 맞출까요?</p><div class="stagepick row">' + D.STAGES.map(function (s) { return '<button data-act="stage0" data-id="' + s.id + '" class="' + (p.stage === s.id ? 'on' : '') + '"><b>' + s.name + '</b><small>' + s.age + '</small></button>'; }).join('') + '</div>' +
+      '<p class="desc">' + D.STAGES[si()].shows + (E.dayLimit(p, D) ? ' · 하루 ' + E.dayLimit(p, D) + '계절까지' : ' · 하루 제한 없음') + '</p>' +
+      '<ol class="intro">' + lines.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ol>' +
+      '<button class="go" data-act="introOk">시작하기</button><button class="link" data-act="read" data-text="' + esc(lines.join(' ')) + '">들려줘</button></div>';
+    if (!introSaid) { introSaid = true; say(lines.join(' ')); }
   }
 
   /* ---------- 아래에서 올라오는 창 ---------- */
@@ -548,7 +553,7 @@
     h += '</table></div></section>';
     // 단계
     h += '<section><h3>단계 고르기</h3><p class="desc">같은 마을을 보되 단계가 오를수록 더 많은 숫자가 열립니다. 바꿔도 마을과 기록은 그대로입니다.</p><div class="stagepick">';
-    D.STAGES.forEach(function (s) { h += '<button data-act="stage" data-id="' + s.id + '" class="' + (p.stage === s.id ? 'on' : '') + '"' + (s.open ? '' : ' disabled') + '><b>' + s.name + '</b> ' + s.age + '<small>' + s.shows + '</small></button>'; });
+    D.STAGES.forEach(function (s) { var lim = (D.RULES.turnsByStage || {})[s.id]; h += '<button data-act="stage" data-id="' + s.id + '" class="' + (p.stage === s.id ? 'on' : '') + '"' + (s.open ? '' : ' disabled') + '><b>' + s.name + '</b> ' + s.age + '<small>' + s.shows + ' · ' + (lim ? '하루 ' + lim + '계절까지' : '하루 제한 없음') + '</small></button>'; });
     h += '</div></section>';
     // 설정
     h += '<section><h3>설정</h3><div class="sets">' +
@@ -574,7 +579,8 @@
     if (act === 'who') return pick(id);
     if (act === 'who0') { S.cur = null; save(); return render(); }
     if (act === 'read') return say(b.dataset.text);
-    if (act === 'introOk') { p.introDone = 1; save(); return render(); }
+    if (act === 'introOk') { p.introDone = 1; p.stagePicked = 1; save(); return render(); }
+    if (act === 'stage0') { p.stage = id; p.stagePicked = 1; save(); return render(); }
     if (act === 'close') return closeSheet(true);
     if (act === 'close2') { closeSheet(true); return; }
     if (act === 'night') return showNight();
@@ -618,7 +624,7 @@
       if (b.dataset.sure) { p.real.splice(realIdx, 1); p.stats.real = p.real.length; save(); render(); return showReal(); }
       b.dataset.sure = '1'; b.textContent = '정말 지울까요? 한 번 더 누르면 지워집니다'; return;
     }
-    if (act === 'stage') { p.stage = id; save(); render(); return showParent(); }
+    if (act === 'stage') { p.stage = id; p.stagePicked = 1; save(); render(); return showParent(); }
     if (act === 'pick') {
       var n = E.harvest(p, id);
       if (n) { save(); chime(); render(); bump(); }
