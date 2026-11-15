@@ -88,6 +88,42 @@
     { id: 'rum2', shop: 'bike', kind: 'rumor', dir: -1, sales: 0.35, turns: 2, text: '자전거 가게가 곧 문을 닫는다는 소문이 돌아요.', after: '소문이었어요.' },
     { id: 'rum3', shop: 'ice', kind: 'rumor', sales: 0.35, turns: 2, text: '누가 그러는데 아이스크림 가게가 대박이 난대요.', after: '소문이었어요.' },
     { id: 'rum4', shop: 'bread', kind: 'rumor', dir: -1, sales: 0.3, turns: 2, text: '빵집 빵이 맛없어졌다는 소문이 있어요.', after: '소문이었어요.' },
+    // ---- 나무 단계부터: 공시 카드(kind 'disc'). answer 가 정답, sales 는 부호를 직접 적는다.
+    // sharesMul 주식 수 배수(유상증자 >1, 소각 <1) / priceMul 값만 잠깐 움직임 / explain 결과 창의 풀이
+    { id: 'd_raise1', stage: 'tree', shop: 'toy', kind: 'disc', answer: 'bad', sharesMul: 1.25, title: '주요사항보고서 (유상증자 결정)',
+      text: '장난감 가게가 새 주식을 25% 더 찍어서 팔기로 했습니다. 받은 돈은 빚을 갚는 데 씁니다.',
+      explain: '주식 수가 늘면 한 주가 갖는 몫이 줄어듭니다(희석). 회사에는 돈이 들어오지만, 기존 주주에게는 보통 나쁜 소식입니다. 그 돈을 어디에 쓰는지 꼭 봅니다.' },
+    { id: 'd_raise2', stage: 'tree', shop: 'bike', kind: 'disc', answer: 'bad', sharesMul: 1.2, title: '주요사항보고서 (유상증자 결정)',
+      text: '자전거 가게가 새 주식을 20% 더 찍어서 팔기로 했습니다. 받은 돈으로 가게를 넓힙니다.',
+      explain: '주식 수가 늘어 한 주의 몫은 줄었습니다. 다만 그 돈으로 장사를 키우면 나중에 만회할 수도 있습니다. 당장은 희석이 먼저 옵니다.' },
+    { id: 'd_burn1', stage: 'tree', shop: 'bread', kind: 'disc', answer: 'good', sharesMul: 0.92, title: '주요사항보고서 (자기주식 취득 및 소각 결정)',
+      text: '빵집이 가진 돈으로 자기 주식을 8% 사들여 없애기로 했습니다.',
+      explain: '주식 수가 줄면 남은 한 주가 갖는 몫이 커집니다. 회사 돈은 줄지만 주주에게는 보통 좋은 소식입니다.' },
+    { id: 'd_burn2', stage: 'tree', shop: 'book', kind: 'disc', answer: 'good', sharesMul: 0.93, title: '주요사항보고서 (자기주식 취득 및 소각 결정)',
+      text: '책방이 가진 돈으로 자기 주식을 7% 사들여 없애기로 했습니다.',
+      explain: '같은 이익을 더 적은 주식이 나눠 갖게 됩니다. 주주에게 돈을 돌려주는 방법 중 하나입니다.' },
+    { id: 'd_sell1', stage: 'tree', shop: 'ice', kind: 'disc', answer: 'unknown', priceMul: 0.9, title: '임원·주요주주 특정증권등 소유상황보고서',
+      text: '아이스크림 가게의 가장 큰 주인이 자기 주식 일부를 팔았습니다.',
+      explain: '주가는 잠깐 내렸지만 가게 장부(매출·이익)는 그대로입니다. 왜 팔았는지에 따라 뜻이 달라서, 이 공시만으로는 좋다 나쁘다를 알 수 없습니다.' },
+    { id: 'd_sell2', stage: 'tree', shop: 'fruit', kind: 'disc', answer: 'unknown', priceMul: 0.92, title: '임원·주요주주 특정증권등 소유상황보고서',
+      text: '과일가게의 가장 큰 주인이 자기 주식 일부를 팔았습니다.',
+      explain: '장부는 바뀌지 않았습니다. 큰 주인이 판 이유(개인 사정인지, 회사 앞날을 어둡게 보는지)를 더 알아봐야 합니다.' },
+    { id: 'd_earn1', stage: 'tree', shop: 'bike', kind: 'disc', answer: 'good', sales: 0.3, turns: 2, title: '영업(잠정)실적 공시',
+      text: '자전거 가게의 이번 분기 매출이 예상보다 30% 많았다고 발표했습니다.',
+      explain: '실적 공시는 소문이 아니라 회사가 직접 밝힌 숫자입니다. 매출이 늘면 고정비는 그대로라 이익은 더 크게 늡니다.' },
+    { id: 'd_earn2', stage: 'tree', shop: 'ice', kind: 'disc', answer: 'bad', sales: -0.3, turns: 2, title: '영업(잠정)실적 공시',
+      text: '아이스크림 가게의 이번 분기 매출이 예상보다 30% 적었다고 발표했습니다.',
+      explain: '매출이 줄어도 고정비는 그대로 나가서 이익은 더 크게 줄어듭니다.' },
+    // 위기 카드: 실제 있었던 일을 본뜬 마을 전체 충격. note 는 결과 창에 뜨는 역사 한 줄.
+    { id: 'c1997', stage: 'tree', shop: 'all', kind: 'bad', sales: 0.35, turns: 3, title: '위기: 나라에 달러가 모자라요',
+      text: '나라 전체에 돈이 말라서 가게마다 손님이 뚝 끊겼습니다.',
+      after: '모든 가게가 힘든 계절을 보냈어요.', note: '본뜬 일: 1997년 외환위기. 한국은 1997년 11월 IMF 에 구제금융을 신청했습니다.' },
+    { id: 'c2008', stage: 'tree', shop: 'all', kind: 'bad', sales: 0.3, turns: 3, title: '위기: 큰 은행이 무너졌어요',
+      text: '먼 나라의 큰 은행이 망하면서 온 세상 사람들이 지갑을 닫았습니다.',
+      after: '모든 가게가 힘든 계절을 보냈어요.', note: '본뜬 일: 2008년 글로벌 금융위기. 2008년 9월 미국 투자은행 리먼 브러더스가 파산했습니다.' },
+    { id: 'c2020', stage: 'tree', shop: 'all', kind: 'bad', sales: 0.3, turns: 2, title: '위기: 큰 전염병이 돌아요',
+      text: '전염병이 퍼져서 사람들이 밖에 나오지 못합니다.',
+      after: '모든 가게가 힘든 계절을 보냈어요.', note: '본뜬 일: 2020년 코로나19. 2020년 3월 세계보건기구(WHO)가 세계적 대유행을 선언했습니다.' },
     { id: 'rum5', shop: 'fruit', kind: 'rumor', sales: 0.3, turns: 2, text: '과일가게에 임금님이 오신다는 소문이 있어요.', after: '소문이었어요.' }
   ];
 
@@ -106,6 +142,14 @@
     { id: 'rumor3', type: 'rumor', n: 3, name: '소문은 소문', text: '소문을 세 번 알아봤어요.', talk: '"~라는 소문이 있어요"는 아직 아무도 모르는 이야기야. 진짜 소식이랑 뭐가 달라?' },
     { id: 'storm', type: 'storm', name: '비 와도 괜찮아', text: '힘든 가게가 있었지만 마을 보물은 늘었어요.', talk: '한 가게가 힘들었는데 왜 전체는 늘었을까?' },
     { id: 'brave', type: 'buyBad', name: '겁내지 않기', text: '힘든 계절을 보낸 가게에 씨앗을 심었어요.', mentor: 'templeton', talk: '힘들 때 심은 가게가 나중에 어떻게 되는지 지켜보자.' },
+    // ---- 새싹부터 (stage 가 있으면 그 단계부터 받을 수 있다). stat 은 engine 의 P.stats 이름 ----
+    { id: 'lines', type: 'stat', stat: 'line', n: 5, stage: 'sprout', name: '성적표 읽기', text: '소식이 성적표의 어느 줄을 바꾸는지 다섯 번 맞혔어요.', talk: '번 돈이 늘어나는 소식이랑 쓴 돈이 늘어나는 소식은 뭐가 달라?' },
+    { id: 'know', type: 'stat', stat: 'informed', n: 5, stage: 'sprout', name: '알고 심기', text: '성적표를 보고 나서 심기를 다섯 번 했어요.', mentor: 'lynch', talk: '그 가게가 뭘 팔아서 돈을 버는지 말해 줄 수 있어?' },
+    { id: 'margin', type: 'stat', stat: 'cheap', n: 3, stage: 'tree', name: '싸게 사기', text: '평소 값보다 20% 넘게 쌀 때 세 번 샀어요.', mentor: 'graham', talk: '값이 싸진 이유가 잠깐의 일인지, 가게가 정말 나빠진 건지 어떻게 구별할까?' },
+    { id: 'why5', type: 'stat', stat: 'reasoned', n: 5, stage: 'forest', name: '이유 있는 투자', text: '이유를 적고 사기를 다섯 번 했어요.', mentor: 'munger', talk: '이유를 한 줄로 적을 수 없는 투자는 하지 않는다.' },
+    { id: 'read9', type: 'stat', stat: 'quiz', n: 9, stage: 'forest', name: '공시 읽기', text: '공시 읽기 문제를 아홉 개 맞혔어요.' },
+    { id: 'real3', type: 'stat', stat: 'real', n: 3, stage: 'world', name: '세계로', text: '실제 회사 세 곳의 재무제표를 넣고 읽었어요.', talk: '세 회사 중 빚이 가장 적은 곳은 어디였나?' },
+    { id: 'pred3', type: 'stat', stat: 'pred', n: 3, stage: 'world', name: '복기하는 투자자', text: '다음 실적 예측을 세 번 맞혔어요.', talk: '맞힌 예측은 이유도 맞았나, 운이었나?' },
     { id: 'year3', type: 'year', n: 3, name: '세 해', text: '마을에서 3년을 보냈어요.', talk: '처음보다 마을 보물이 얼마나 늘었어?' },
     { id: 'w50', type: 'wealth', n: 50, name: '보물 50', text: '마을 보물이 50개가 됐어요.' },
     { id: 'w100', type: 'wealth', n: 100, name: '보물 100', text: '마을 보물이 100개가 됐어요.' }
@@ -133,13 +177,34 @@
     { id: 'munger', name: '찰리 멍거', stage: 'forest', rule: '모르는 것은 하지 않는다(능력 범위).', source: '『가난한 찰리의 연감』' }
   ];
 
-  /* 단계. 씨앗만 열려 있다. 다음 단계는 HANDOFF.md 의 로드맵대로 붙인다. */
+  /* 단계. 같은 세계를 보되 단계가 오를수록 더 많은 숫자가 열린다. 어른 메뉴에서 바꾼다. */
   var STAGES = [
     { id: 'seed', name: '씨앗', age: '5~7세', open: true, shows: '가게 그림 · 동전 · 열매' },
-    { id: 'sprout', name: '새싹', age: '초등', open: false, shows: '가격 · 뉴스 카드 · 가게 성적표 3줄' },
-    { id: 'tree', name: '나무', age: '청소년', open: false, shows: '재무제표 3표 · 공시 카드 · PER·ROE' },
-    { id: 'forest', name: '숲', age: '성인', open: false, shows: '공시 원문 읽기 · 투자일지 · 복기' }
+    { id: 'sprout', name: '새싹', age: '초등', open: true, shows: '가격 · 뉴스 카드 · 가게 성적표 3줄' },
+    { id: 'tree', name: '나무', age: '청소년', open: true, shows: '재무제표 3표 · 공시 카드 · PER·ROE' },
+    { id: 'forest', name: '숲', age: '성인', open: true, shows: '공시 원문 읽기 · 투자일지 · 복기' },
+    { id: 'world', name: '세계', age: '실전', open: true, shows: '실제 회사 재무제표 넣기 · 비율·점검 · 문제 · 다음 실적 예측과 복기' }
   ];
+
+  /* 세계 단계: 실제 재무제표에서 읽어 올 칸. find 는 붙여넣은 글에서 그 항목을 찾는 정규식(문자열).
+   * need: 꼭 있어야 하는 칸. money: 금액 단위(원·백만원·억원)를 따르는 칸. */
+  var REAL_FIELDS = [
+    { id: 'sales', label: '매출액', need: true, money: true, find: '매출액|영업수익|매출(?!원가|총|채권)' },
+    { id: 'cogs', label: '매출원가', money: true, find: '매출원가' },
+    { id: 'sga', label: '판매비와관리비', money: true, find: '판매비와\\s?관리비|판매관리비|판관비' },
+    { id: 'op', label: '영업이익', money: true, find: '영업이익(?!률)|영업손익' },
+    { id: 'interest', label: '이자비용', money: true, find: '이자비용|금융비용' },
+    { id: 'net', label: '당기순이익', need: true, money: true, find: '당기순이익|분기순이익|반기순이익|당기순손익|순이익(?!률)' },
+    { id: 'cash', label: '현금및현금성자산', money: true, find: '현금\\s?및\\s?현금성\\s?자산' },
+    { id: 'assets', label: '자산총계', money: true, find: '자산\\s?총계' },
+    { id: 'debt', label: '부채총계', need: true, money: true, find: '부채\\s?총계' },
+    { id: 'equity', label: '자본총계', need: true, money: true, find: '(?<!부채와|부채및|부채 및 |부채와 )자본\\s?총계' },
+    { id: 'cfo', label: '영업활동현금흐름', money: true, find: '영업활동[^\\d\\n]{0,12}현금흐름' },
+    { id: 'div', label: '배당금총액', money: true, find: '현금배당금총액|배당금총액|배당금' },
+    { id: 'shares', label: '발행주식수 (주)', find: '발행주식총수|발행주식수|발행한 주식의 총수|주식수' },
+    { id: 'price', label: '주가 (원)', find: '주가|종가' }
+  ];
+  var REAL_UNITS = [{ v: 1, name: '원' }, { v: 1e6, name: '백만원' }, { v: 1e8, name: '억원' }];
 
   var TEXT = {
     intro: ['가게에 동전을 심으면 나도 그 가게 주인이 돼요.', '가게가 잘되면 나무에 열매가 열려요.', '계절이 지나가길 기다려 보세요.'],
@@ -149,5 +214,5 @@
     night: '오늘은 여기까지예요. 나무는 밤에도 자라요. 내일 또 만나요.'
   };
 
-  return { RULES: RULES, SEASONS: SEASONS, SHOPS: SHOPS, NEWS: NEWS, BADGES: BADGES, WISHES: WISHES, MENTORS: MENTORS, STAGES: STAGES, TEXT: TEXT };
+  return { RULES: RULES, SEASONS: SEASONS, SHOPS: SHOPS, NEWS: NEWS, BADGES: BADGES, WISHES: WISHES, MENTORS: MENTORS, STAGES: STAGES, TEXT: TEXT, REAL_FIELDS: REAL_FIELDS, REAL_UNITS: REAL_UNITS };
 });
