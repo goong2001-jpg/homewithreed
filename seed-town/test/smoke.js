@@ -8,6 +8,8 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
 
 // ---- 엔진 (브라우저 없이) ----
 (function engine() {
+  check('기본은 모든 단계 하루 제한 없음', Object.values(D.RULES.turnsByStage).every(v => v === 0));
+  D.RULES.turnsByStage.seed = 4;   // 제한 기능 자체가 살아 있는지 보려고 켠다
   const P = E.newPlayer('t', D, 42);
   check('처음 동전·소식 카드', P.coins === D.RULES.startCoins && !!E.newsCard(P, D));
   check('처음 씨앗 값은 동전 1개', D.SHOPS.every(s => Math.abs(P.world.shops[s.id].price - 1) < 1e-9));
@@ -118,6 +120,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   await p.goto(BASE + '/index.html');
   await p.waitForFunction(() => window.__st);
   const ev = fn => p.evaluate(fn);
+  await ev(() => { window.__st.D.RULES.turnsByStage.seed = 4; });   // 하루 제한 화면 검사용
   check('첫 화면: 누가 할까요', (await p.locator('[data-act=who]').count()) === 4);
   await p.click('[data-act=who][data-id="구름"]');
   check('처음이면 설명이 나옴', (await p.locator('.intro li').count()) === 3);
@@ -127,7 +130,18 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('처음엔 "아직 몰라요"가 없음', (await p.locator('[data-act=guess]').count()) === 2);
   await p.click('[data-act=guess][data-id=good]');
   check('고르면 닫힘', await p.locator('#sheet').isHidden());
-  for (const id of ['bread', 'fruit', 'book']) {
+  check('길잡이: 마을에 말풍선이 뜨고 빵집이 반짝임', (await p.locator('#app .coach').count()) === 1 && (await p.locator('[data-act=shop][data-id=bread].hl').count()) === 1);
+  await p.click('[data-act=shop][data-id=bread]');
+  check('길잡이: 가게 창에서 심기 단추가 반짝임', (await p.locator('.sheetbody .coach').count()) === 1 && (await p.locator('[data-act=plant][data-n="1"].hl').count()) === 1);
+  await p.click('[data-act=plant][data-n="1"]');
+  check('길잡이: 심으면 새싹 설명으로 넘어감', (await p.textContent('.sheetbody .coach')).includes('새싹') && await ev(() => window.__st.P().tut === 3));
+  await p.click('[data-act=plant][data-n="1"]');
+  await p.click('[data-act=close]');
+  check('길잡이: 닫으면 계절 단추가 반짝임', (await p.locator('[data-act=next].hl').count()) === 1);
+  await p.click('[data-act=help]');
+  check('도움말: 설명 10가지', (await p.locator('.helps li').count()) === 10);
+  await p.click('.sheetbody [data-act=close]');
+  for (const id of ['fruit', 'book']) {
     await p.click(`[data-act=shop][data-id=${id}]`);
     await p.click('[data-act=plant][data-n="1"]');
     await p.click('[data-act=plant][data-n="1"]');
@@ -137,9 +151,13 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('배지 2개(나도 주인·나눠 담기)', await ev(() => Object.keys(window.__st.P().badges).length === 2));
   await p.click('[data-act=next]');
   check('계절 결과 창', (await p.locator('.rows li').count()) === 6 && await p.locator('.answer').isVisible());
+  check('길잡이: 결과 창에서 얼굴 설명', (await p.textContent('.sheetbody .coach')).includes('웃는 얼굴'));
   await p.click('[data-act=resultOk]');
   check('다음 소식이 뜸', await p.locator('.newstext').isVisible());
   for (let i = 0; i < 3; i++) { await p.click('[data-act=guess][data-id=bad]'); await p.click('[data-act=next]'); await p.click('[data-act=resultOk]'); }
+  check('길잡이: 두 번째 소식 뒤 숫자 설명까지 옴', await ev(() => window.__st.P().tut === 7));
+  await ev(() => { const b = document.querySelector('[data-act=tutSkip]'); if (b) b.click(); });   // 하루 끝 창에 가려 있어서 직접 누른다
+  check('길잡이: 그만 보기를 누르면 끝남', await ev(() => window.__st.P().tut === 'done') && (await p.locator('.coach').count()) === 0);
   check('4계절 뒤 하루 끝 화면', await p.locator('.years').isVisible() && await ev(() => window.__st.P().world.turn === 4));
   await p.click('[data-act=close2]');
   check('오늘은 더 못 넘김', (await p.locator('.go.rest').count()) === 1);
