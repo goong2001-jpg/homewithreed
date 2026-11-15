@@ -212,7 +212,7 @@
     if (!p.introDone) return renderIntro();
     var se = seasonOf(p), w = E.wealth(p), nw = nextWish(p);
     document.body.style.background = se.sky;
-    var h = '<header class="top"><div class="when"><b>' + yearOf(p) + '년째</b> ' + se.name + (si() ? ' <small class="stg">' + D.STAGES[si()].name + '</small>' : '') + '</div>' +
+    var h = '<header class="top"><div class="when"><button class="me" data-act="who0" aria-label="다른 사람으로 바꾸기">' + esc(p.name) + ' <i>바꾸기</i></button><b>' + yearOf(p) + '년째</b> ' + se.name + (si() ? ' <small class="stg">' + D.STAGES[si()].name + '</small>' : '') + '</div>' +
       '<div class="purse" id="purse">' + coinSvg(24) + '<b id="coinN">' + p.coins + '</b></div>' +
       '<div class="purse">' + starSvg(22) + '<b>' + p.stars + '</b></div>' +
       (si() <= 1 ? '<button class="help" data-act="help" aria-label="도움말">?</button>' : '') + '<button class="gear" data-act="parent" aria-label="어른 메뉴">어른</button></header>';
@@ -305,6 +305,7 @@
     h += def ? '<div class="newsart">' + shopSvg(def, p.world.shops[def.id], null, 0, true) + '</div><p class="tag">' + esc(def.name) + '</p>' : '<p class="tag">마을 전체</p>';
     h += '<p class="newstext">' + esc(card.text) + '</p>';
     h += '<button class="link" data-act="read" data-text="' + esc(card.text) + '">들려줘</button>';
+    if (si() <= 1) h += '<p class="whyline"><b>왜 소식을 볼까요?</b> ' + D.TEXT.why.news + '</p>';
     h += '<p class="ask">가게에 어떤 소식일까요?</p><div class="guess">' +
       '<button data-act="guess" data-id="good">' + faceSvg('good', 46) + '<span>좋은 소식</span></button>' +
       '<button data-act="guess" data-id="bad">' + faceSvg('bad', 46) + '<span>나쁜 소식</span></button>' +
@@ -329,6 +330,7 @@
       return openSheet(h);
     }
     h += '<p class="desc">' + esc(def.desc) + '</p>';
+    if (si() <= 1) h += '<p class="whyline"><b>왜 심을까요?</b> ' + D.TEXT.why.plant + '</p>';
     if (c.hist.length) h += '<p class="moodline">' + faceSvg(c.mood, 28) + ' 지난 계절: ' + D.TEXT.mood[c.mood] + '</p>';
     if (si() >= 1) {
       p.looked[id] = p.world.turn; save();
@@ -377,23 +379,38 @@
     if (out.news && out.news.card.explain) h += '<p class="note explain">' + esc(out.news.card.explain) + '</p>';
     if (out.news && out.news.card.note) h += '<p class="note explain">' + esc(out.news.card.note) + '</p>';
     h += '<ul class="rows">';
-    D.SHOPS.forEach(function (def) {
-      var o = out.shops[def.id], mine = p.hold[def.id];
-      if (out.closed.indexOf(def.id) >= 0) { h += '<li class="shut">' + faceSvg('bad', 26) + '<span>' + esc(def.name) + '</span><em>문을 닫았어요</em></li>'; return; }
+    var newsShop = out.news ? out.news.card.shop : null;
+    D.SHOPS.slice().sort(function (a, b) { return (out.shops[b.id].mine ? 1 : 0) - (out.shops[a.id].mine ? 1 : 0); }).forEach(function (def) {
+      var o = out.shops[def.id], mine = o.mine;
+      if (out.closed.indexOf(def.id) >= 0) { h += '<li class="shut">' + faceSvg('bad', 26) + '<span>' + esc(def.name) + '</span><em>문을 닫았어요' + (mine ? ' · 심은 동전 ' + o.before + '개가 사라졌어요' : '') + '</em></li>'; return; }
       if (out.reopened.indexOf(def.id) >= 0) { h += '<li>' + faceSvg('ok', 26) + '<span>' + esc(def.name) + '</span><em>새로 문을 열었어요</em></li>'; return; }
       if (o.closed) return;
-      h += '<li' + (mine ? ' class="mine"' : '') + '>' + faceSvg(o.mood, 26) + '<span>' + esc(def.name) + '</span><em>' + D.TEXT.mood[o.mood] + '</em>' +
-        (o.got ? '<i>' + fruitSvg(18) + '+' + o.got + '</i>' : '') + '</li>';
+      var dv = mine ? o.after - o.before : 0, because = (newsShop === def.id || newsShop === 'all') && o.mood !== 'ok' ? ' (소식 때문이에요)' : '';
+      h += '<li' + (mine ? ' class="mine"' : '') + '>' + faceSvg(o.mood, 26) + '<span>' + esc(def.name) + '</span><em>' + D.TEXT.mood[o.mood] + because + '</em>' +
+        (mine ? '<u>내 나무 ' + coinSvg(15) + o.before + ' → <b>' + o.after + '</b>' + (dv > 0 ? ' <i class="up">▲' + dv + '</i>' : dv < 0 ? ' <i class="dn">▼' + (-dv) + '</i>' : ' 그대로') + (o.got ? ' · ' + fruitSvg(16) + '열매 +' + o.got : '') + '</u>' : '') + '</li>';
     });
     h += '</ul>';
     if (out.closed.length) h += '<p class="note">' + D.TEXT.closed + '</p>';
+    var m = out.mine, resLine = '';
+    if (m) {
+      var top = Math.max(m.idle, m.wealth, 1), diff = m.wealth - m.idle;
+      resLine = !m.held ? '아직 아무 가게에도 심지 않았어요. 그냥 둔 동전은 늘지 않아요. 가게를 눌러 심어 보세요.'
+        : m.shopGain > 0 ? '내가 심은 가게에서 동전이 ' + m.shopGain + '개 생겼어요.'
+        : m.shopGain < 0 ? '내가 심은 가게에서 동전이 ' + (-m.shopGain) + '개 줄었어요. 힘든 계절도 있어요. 기다리면 다시 자라기도 해요.'
+        : '이번 계절엔 그대로예요. 나무는 천천히 자라요.';
+      h += '<div class="myres"><h3>내 선택의 결과</h3><p>' + resLine + '</p>' +
+        '<p class="cmp"><span>그냥 뒀다면</span><i class="idle" style="width:' + Math.round(m.idle / top * 55) + '%"></i><b>' + m.idle + '</b></p>' +
+        '<p class="cmp"><span>심은 지금</span><i style="width:' + Math.round(m.wealth / top * 55) + '%"></i><b>' + m.wealth + '</b></p>' +
+        '<p class="cmpsum">' + (diff > 0 ? '가게에 심어서 지금까지 <b>' + diff + '개</b> 더 생겼어요.' : diff < 0 ? '지금은 그냥 뒀을 때보다 ' + (-diff) + '개 적어요. 나무가 자라려면 시간이 걸려요.' : '아직은 그냥 뒀을 때와 같아요.') + '</p></div>';
+    }
     h += '<p class="note">심부름 동전 ' + coinSvg(16) + ' +' + D.RULES.allowance + '</p>';
     out.wishes.forEach(function (w) { h += '<p class="prize">마을에 <b>' + w.name + '</b>이(가) 생겼어요!</p>'; });
     out.badges.forEach(function (b) { h += '<p class="prize">' + starSvg(20) + ' <b>' + esc(b.name) + '</b> 배지 — ' + esc(b.text) + '</p>'; });
     h += '<button class="go" data-act="resultOk">확인</button>';
     openSheet(h, true);
     if (out.badges.length || out.wishes.length || (out.news && out.news.right)) chime();
-    var line = out.closed.length ? D.TEXT.closed : out.badges.length ? out.badges[0].name + ' 배지를 받았어요. ' + out.badges[0].text : out.fruits ? '열매가 ' + out.fruits + '개 열렸어요.' : '';
+    var line = out.closed.length ? D.TEXT.closed : out.badges.length ? out.badges[0].name + ' 배지를 받았어요. ' + out.badges[0].text : (out.fruits ? '열매가 ' + out.fruits + '개 열렸어요. ' : '') + (si() <= 1 ? resLine : '');
+    if (tutText('result')) line = '';   // 길잡이가 읽는 중이면 겹치지 않게
     if (line) say(line);
   }
 

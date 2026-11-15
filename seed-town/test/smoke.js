@@ -19,6 +19,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   E.guess(P, 'good');
   const before = P.coins, out = E.nextTurn(P, D);
   check('계절이 넘어가고 심부름 동전을 받음', P.world.turn === 1 && P.coins === before + D.RULES.allowance && !!out.news);
+  check('내 선택의 결과가 계산됨(가게에서 생긴 동전, 그냥 뒀을 때와 견주기)', out.mine.held === 1 && out.mine.idle === D.RULES.startCoins + D.RULES.allowance && out.mine.wealth === E.wealth(P) && out.shops.bread.mine && out.shops.bread.before === 3 && out.mine.shopGain === out.shops.bread.after - 3 + out.shops.bread.got);
   check('가게 장부가 기록됨', P.world.shops.bread.hist.length === 1 && P.world.shops.bread.hist[0].sales > 0);
   check('같은 씨앗값이면 같은 결과', (() => { const a = E.newPlayer('a', D, 7), b = E.newPlayer('b', D, 7); for (let i = 0; i < 12; i++) { E.nextTurn(a, D); E.nextTurn(b, D); } return JSON.stringify(a.world) === JSON.stringify(b.world); })());
   // 48계절(12일) 여러 판: 고루 나눠 심으면 대체로 늘고, 장난감 가게는 가끔 문을 닫는다
@@ -151,6 +152,7 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   check('배지 2개(나도 주인·나눠 담기)', await ev(() => Object.keys(window.__st.P().badges).length === 2));
   await p.click('[data-act=next]');
   check('계절 결과 창', (await p.locator('.rows li').count()) === 6 && await p.locator('.answer').isVisible());
+  check('결과 창: 내 가게 3곳의 변화와 "내 선택의 결과"', (await p.locator('.rows li.mine u').count()) === 3 && (await p.locator('.myres .cmp').count()) === 2 && (await p.locator('.rows li').first().getAttribute('class')) === 'mine');
   check('길잡이: 결과 창에서 얼굴 설명', (await p.textContent('.sheetbody .coach')).includes('웃는 얼굴'));
   await p.click('[data-act=resultOk]');
   check('다음 소식이 뜸', await p.locator('.newstext').isVisible());
@@ -265,6 +267,8 @@ function check(name, ok, extra) { console.log((ok ? 'PASS  ' : 'FAIL  ') + name 
   for (let i = 0; i < 6; i++) { await p.click('[data-act=guess]'); await p.click('[data-act=line]', { timeout: 500 }).catch(() => {}); await p.click('[data-act=next]'); await p.click('[data-act=resultOk]'); }
   check('아빠는 6계절을 넘겨도 "오늘은 여기까지"가 안 뜸', (await p.locator('.go.rest').count()) === 0 && await ev(() => window.__st.P().world.turn === 6) && (await p.locator('.px').count()) >= 5);
   if (process.env.SHOT) { await p.click('[data-act=guess]'); await p.click('[data-act=line]', { timeout: 500 }).catch(() => {}); await p.screenshot({ path: process.env.SHOT.replace('.png', '-dad.png') }); }
+  await ev(() => document.querySelector('[data-act=who0]').click());   // 소식 창이 떠 있어도 눌리게 직접 누른다
+  check('위쪽 이름 단추로 사람 고르는 화면으로 나감', (await p.locator('[data-act=who]').count()) >= 4);
   check('오류 없음', errors.length === 0, errors.join(' | '));
   await browser.close();
   console.log(fail.length ? '\n실패 ' + fail.length + '개: ' + fail.join(', ') : '\n모두 통과');

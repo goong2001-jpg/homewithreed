@@ -236,3 +236,22 @@ table.fs tr.sum td { font-weight: 800; border-bottom: 2.5px solid var(--line); }
 .helps div { flex: 1; }
 .helps .dot { width: 34px; flex: none; }
 .helps .rd { border: 2px solid var(--line); background: #fff; border-radius: 10px; font-size: 12.5px; padding: 6px 7px; flex: none; }
+
+/* ---------- v6: 사람 바꾸기, 왜 할까요, 내 선택의 결과 ---------- */
+.when { line-height: 1.25; }
+.me { display: block; border: 2px solid var(--line); background: var(--paper); border-radius: 10px 12px 9px 13px; padding: 2px 8px; font-size: 14px; font-weight: 800; margin-bottom: 2px; }
+.me i { font-style: normal; font-weight: 500; font-size: 11.5px; opacity: .65; text-decoration: underline; }
+.whyline { font-size: 14.5px; line-height: 1.5; background: #f3ecd8; border-left: 5px solid var(--go); border-radius: 4px; padding: 7px 10px; margin: 8px 0; word-break: keep-all; }
+.rows li { flex-wrap: wrap; }
+.rows u { text-decoration: none; flex-basis: 100%; padding-left: 34px; font-size: 15px; font-variant-numeric: tabular-nums; }
+.rows u b { font-size: 17px; }
+.rows u i.up { color: var(--red); } .rows u i.dn { color: #3f6f8c; }
+.myres { border: 3px solid var(--line); border-radius: 16px 20px 14px 22px / 20px 14px 22px 16px; background: #fff7d6; padding: 10px 14px; margin: 12px 0 4px; }
+.myres h3 { margin: 0 0 4px; font-size: 18px; }
+.myres p { margin: 5px 0; font-size: 16.5px; line-height: 1.45; word-break: keep-all; }
+.cmp { display: flex; align-items: center; gap: 8px; }
+.cmp span { width: 78px; flex: none; font-size: 13.5px; font-weight: 700; }
+.cmp i { display: block; height: 16px; background: var(--leaf); border: 2px solid var(--line); border-radius: 4px; min-width: 6px; }
+.cmp i.idle { background: #d8cfbd; }
+.cmp b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.cmpsum { font-size: 15px !important; }
