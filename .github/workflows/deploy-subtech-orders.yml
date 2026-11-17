@@ -1,0 +1,130 @@
+# 써브텍 주문앱(Google Apps Script) 자동 배포 — 재고앱(deploy-subtech.yml)과 별개의 프로젝트·주소
+# subtech-orders/ 가 바뀌어 푸시되면 Apps Script 프로젝트에 코드를 올리고(clasp push)
+# 기존 웹앱 배포를 새 버전으로 갱신합니다(clasp deploy -i) — 웹앱 주소는 그대로.
+#
+# 저장소 Secrets (없으면 건너뜀):
+#   CLASPRC_JSON         : 재고앱과 같이 씀 (이미 있음)
+#   ORDERS_SCRIPT_ID     : 주문앱 Apps Script 프로젝트의 스크립트 ID
+#   ORDERS_DEPLOYMENT_ID : 주문앱 웹앱의 배포 ID (없으면 코드만 올리고 배포는 건너뜀 — 첫 설정 때)
+# 설정 방법: subtech-orders/DEPLOY.md
+name: 써브텍 주문앱 배포
+
+on:
+  push:
+    branches:
+      - ccr-45fa06b9-ax86xs
+      - main
+    paths:
+      - 'subtech-orders/**'
+      - '.github/workflows/deploy-subtech-orders.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 배포 성공 후 subtech-orders/CHANGELOG.md 자동 기록 커밋용
+
+concurrency:
+  group: subtech-orders-apps-script
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+      CLASP_SCRIPT_ID: ${{ secrets.ORDERS_SCRIPT_ID }}
+      CLASP_DEPLOYMENT_ID: ${{ secrets.ORDERS_DEPLOYMENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 이번 푸시의 커밋들을 이력에 적으려면 기록 전체가 필요
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 코드 점검 (문법, 버전 짝, 테스트)
+        working-directory: subtech-orders
+        run: |
+          cp Code.gs /tmp/code.js && node --check /tmp/code.js
+          APP=$(grep -oP "var APP_VERSION = '\K[^']+" Code.gs)
+          HTML=$(grep -oP "var HTML_VERSION = '\K[^']+" Index.html)
+          echo "Code.gs=$APP Index.html=$HTML"
+          if [ "$APP" != "$HTML" ]; then echo "::error::버전 불일치 Code.gs=$APP Index.html=$HTML"; exit 1; fi
+          node dev/test.js
+
+      - name: 설정 확인
+        id: check
+        run: |
+          if [ -z "$CLASPRC_JSON" ] || [ -z "$CLASP_SCRIPT_ID" ]; then
+            echo "::notice::배포 Secrets(CLASPRC_JSON, ORDERS_SCRIPT_ID)가 아직 없어 배포를 건너뜁니다. subtech-orders/DEPLOY.md 참고."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "$CLASP_DEPLOYMENT_ID" ]; then echo "deploy=true" >> "$GITHUB_OUTPUT"; else echo "deploy=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: 올릴 파일 준비
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          mkdir -p dist
+          cp subtech-orders/Code.gs subtech-orders/Index.html subtech-orders/Parse.html subtech-orders/Xlsx.html \
+             subtech-orders/Out.html subtech-orders/appsscript.json dist/
+          printf '{"scriptId":"%s","rootDir":"."}' "$(printf '%s' "$CLASP_SCRIPT_ID" | tr -d '[:space:]')" > dist/.clasp.json
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          ls -la dist
+
+      - name: Apps Script 에 올리기 (clasp push)
+        if: steps.check.outputs.ready == 'true'
+        working-directory: dist
+        run: npx --yes @google/clasp@2.4.2 push --force
+
+      - name: 배포 ID 없음 안내 (첫 설정)
+        if: steps.check.outputs.ready == 'true' && steps.check.outputs.deploy != 'true'
+        run: echo "::notice::배포 ID(ORDERS_DEPLOYMENT_ID)가 없어 코드만 올렸습니다. DEPLOY.md 4~5번(웹앱 새 배포 → 배포 ID 등록)을 해주세요."
+
+      - name: 웹앱 새 버전으로 배포 (주소 그대로)
+        if: steps.check.outputs.ready == 'true' && steps.check.outputs.deploy == 'true'
+        working-directory: dist
+        run: |
+          VER=$(grep -oP "var APP_VERSION = '\K[^']+" Code.gs)
+          # 배포 ID 정리: 공백·줄바꿈 제거, 웹앱 주소 전체(…/macros/s/<ID>/exec)를 넣었어도 ID만 꺼냄
+          ID=$(printf '%s' "$CLASP_DEPLOYMENT_ID" | tr -d '[:space:]')
+          case "$ID" in *"/s/"*) ID=$(printf '%s' "$ID" | sed -E 's#.*/s/([^/?]+).*#\1#') ;; esac
+          echo "::add-mask::$ID"
+          LIST=$(npx --yes @google/clasp@2.4.2 deployments)
+          if ! printf '%s\n' "$LIST" | grep -qF -- "$ID"; then
+            echo "::error::ORDERS_DEPLOYMENT_ID 가 이 Apps Script 프로젝트의 배포 목록에 없습니다. 아래 목록(앞 6자…뒤 4자) 중 @HEAD 가 아닌, 주문앱 웹앱 주소와 같은 ID를 비밀값에 다시 넣으세요."
+            printf '%s\n' "$LIST" | grep -oE 'AKfyc[A-Za-z0-9_-]+.*' | while read -r d rest; do
+              echo "  - ${d:0:6}…${d: -4} $rest"
+            done
+            exit 1
+          fi
+          npx --yes @google/clasp@2.4.2 deploy --deploymentId "$ID" --description "$VER github ${GITHUB_SHA::7}"
+          echo "::notice::배포 완료: $VER (${GITHUB_SHA::7})"
+
+      # 배포가 성공했을 때만: 이번 푸시의 커밋 메시지를 CHANGELOG.md 맨 위에 추가하고 같은 브랜치에 커밋
+      # (GITHUB_TOKEN 으로 푸시한 커밋은 워크플로를 다시 실행시키지 않음 → 무한 반복 없음)
+      - name: 변경 이력 자동 기록 (CHANGELOG.md)
+        if: steps.check.outputs.ready == 'true' && steps.check.outputs.deploy == 'true' && github.event_name == 'push'
+        continue-on-error: true   # 기록이 실패해도 배포 성공은 그대로
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          node subtech-orders/dev/changelog.js "$BEFORE" "$AFTER"
+          if git diff --quiet -- subtech-orders/CHANGELOG.md; then echo "기록할 것 없음"; exit 0; fi
+          VER=$(grep -oP "var APP_VERSION = '\K[^']+" subtech-orders/Code.gs)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add subtech-orders/CHANGELOG.md
+          git commit -m "[skip ci] 주문앱 변경 이력 자동 기록 ($VER)"
+          for i in 1 2 3; do
+            git pull --rebase origin "$BRANCH" && git push origin "HEAD:$BRANCH" && { echo "::notice::이력 기록 완료 ($VER)"; exit 0; }
+            sleep $((i*5))
+          done
+          echo "::warning::이력 기록 푸시 실패 (배포는 성공)"; exit 1
+
+      - name: 로그인 정보 지우기
+        if: always()
+        run: rm -f "$HOME/.clasprc.json"

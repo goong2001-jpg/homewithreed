@@ -1,0 +1,139 @@
+/**
+ * 써브텍 주문앱 테스트 (node 만 있으면 됨) —   node subtech-orders/dev/test.js
+ *  1) 카톡 나누기(Parse.html)  2) 엑셀 양식(Out.html)·엑셀 만들기/읽기(Xlsx.html)  3) 서버(Code.gs, 가짜 시트)  4) 템플릿·버전 검사
+ * 견본의 이름·전화·주소는 모두 지어낸 것입니다 (실제 고객 정보 넣지 말 것).
+ */
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const D = path.join(__dirname, '..');
+const load = f => { const m = { exports: {} }; new Function('module', 'XL', fs.readFileSync(path.join(D, f), 'utf8').replace(/<\/?script>/g, ''))(m, global.XL); return m.exports; };
+const OP = load('Parse.html'), XL = global.XL = load('Xlsx.html'), OUT = load('Out.html');
+let fail = 0; const ok = (c, m) => { console.log((c ? '  ✓ ' : '  ✗ ') + m); if (!c) fail++; };
+const eq = (a, b, m) => ok(JSON.stringify(a) === JSON.stringify(b), m + (JSON.stringify(a) === JSON.stringify(b) ? '' : '\n      받은 값 ' + JSON.stringify(a) + '\n      기대 값 ' + JSON.stringify(b)));
+const throws = (fn, m) => { try { fn(); ok(false, m); } catch (e) { ok(true, m + ' → ' + e.message); } };
+const it = l => { const i = OP.itemParse(l); return i ? [i.name, i.sensor, i.qty, i.unit, i.note] : null; };
+
+console.log('1) 카톡 나누기');
+eq(it('H10    7단계    X    6  스티커있음'), ['H10 7단계', 'X', 6, '', '스티커있음'], '센서 X + 수량 + 메모');
+eq(it('SV7 O 1000개 명판있슴'), ['SV7', 'O', 1000, '개', '명판있슴'], '센서 O + 개');
+eq(it('STT-1.3 - 10개'), ['STT-1.3', '', 10, '개', ''], '이름 - 수량');
+eq(it('STT-2.6DE       90'), ['STT-2.6DE', '', 90, '', ''], '이름 + 숫자만');
+eq(it('습식센서 2M 5개'), ['습식센서 2M', '', 5, '개', ''], '규격 숫자(2M)와 수량 구분');
+eq(it('SV500    7단계     X     4회로  1세트'), ['SV500 7단계 4회로', 'X', 1, '세트', ''], '세트');
+eq(it('H200WF(화이트)-20'), ['H200WF(화이트)', '', 20, '', ''], '붙여 쓴 이름-수량');
+eq(it('STF-7S-30'), ['STF-7S', '', 30, '', ''], '모델명 안의 - 와 수량 -');
+eq(it('H10   X    50(스티커 있음)'), ['H10', 'X', 50, '', '(스티커 있음)'], '수량 뒤 괄호 메모');
+eq(it('Sv7 블랙 8개(무센서)'), ['Sv7 블랙', 'X', 8, '개', '(무센서)'], '(무센서) → 센서 X');
+ok(it('STT-2.6') === null && it('STT-10D') === null && it('네 알겠습니다') === null, '수량 없는 모델명·잡담은 품목 아님');
+let o = OP.parseOrder('가나상사 발주\n\nSV7 - 30개\nSTT-1.3 - 10개\n\n광주광역시 북구 가나대로86\n홍길동대리 010-0000-1234\n * 세금계산서 가나상사로 발행요망', { today: '2026-11-17' });
+ok(o.isOrder && o.cust === '가나상사' && o.items.length === 2 && o.addr === '광주광역시 북구 가나대로86' && o.recv === '홍길동대리' && o.phone === '010-0000-1234' && /세금계산서/.test(o.memo), '거래처·품목·주소·받는분·전화·메모');
+o = OP.parseOrder('다라시스템 \n\nH10    7단계    X    6  스티커있음 \n파워코드2.5 2C      6개\n\n택배선불 청구 \n\n충북 증평군 증평읍 증천리21 마바건축\n01000005597');
+ok(o.carrier === 'CJ' && o.pay === '선불' && o.claim && o.ship === undefined && o.shipRaw === '택배선불 청구' && o.phone === '010-0000-5597' && /증천리21/.test(o.addr), '택배선불 청구 → CJ·선불·청구, 붙여 쓴 전화');
+o = OP.parseOrder('사아이엔지 \n\n더블습식센서 황백 10미터   50개\nSV11  외출  X    50\n\n대신화물 \n센서는 다른 곳에서 직송할거에요');
+ok(o.carrier === '대신' && o.mode === '화물' && o.shipRaw === '대신화물' && o.items[1].name === 'SV11 외출' && /직송/.test(o.memo), '대신화물 + 메모 줄');
+o = OP.parseOrder('자차코퍼레이션\nSTF-7S 1개\n김철수\n010-0000-8453\n경상북도 상주시 가나마루1길 17-40 주택\n부재 시 문 앞에 놓아주세요.');
+ok(o.recv === '김철수' && o.msg === '부재 시 문 앞에 놓아주세요.' && !o.carrier && /주택$/.test(o.addr), '이름 줄 + 전화 줄, 배송 메시지는 주소에 안 붙음');
+o = OP.parseOrder('카타전기\nSTT-2.6  30\n경동화물\n원주 우산 692 지점\n내일 출고', { today: '2026-11-17' });
+ok(o.carrier === '경동' && o.branch === '원주 우산 692 지점' && o.due === '2026-11-18' && o.shipRaw === '경동화물', '경동 + 지점 + 내일');
+o = OP.parseOrder('파하종합상사 \nSV7  X   100개\n직접수령해 가셨습니다');
+ok(o.carrier === '방문' && o.shipRaw === '직접수령', '직접수령');
+o = OP.parseOrder('천지상사 \n보내는분 하늘무역으로 032-000-7106\n\nSTF-7S  X  10\n\n받는분 이몽룡\n010-0000-4827\n서산 고북면 고북1로 343-22 신우\n택배선불 청구');
+ok(o.sender === '하늘무역' && o.senderPhone === '032-000-7106' && o.recv === '이몽룡' && o.phone === '010-0000-4827', '보내는분·받는분 줄');
+ok(!OP.parseOrder('택배 30건\n반품 1건').isOrder && !OP.parseOrder('사진 3장').isOrder && !OP.parseOrder('네').isOrder, '발주가 아닌 메시지');
+let ms = OP.splitMessages('2026년 11월 17일 오전 9:49, 홍길동 : 가나상사 \nSV5 X  29개\n2026년 11월 17일 오전 9:58, 홍길동 : 대신화물\n\n2026년 11월 17일 오후 1:10\n2026년 11월 17일 오후 1:10, 김영희 : 네');
+ok(ms.length === 3 && ms[0].who === '홍길동' && ms[0].time === '09:49' && ms[2].time === '13:10' && ms[0].body === '가나상사 \nSV5 X  29개', '폰 내보내기 형식 나누기');
+ms = OP.splitMessages('--------------- 2026년 11월 17일 화요일 ---------------\n[홍길동] [오전 11:06] 가나상사\nH10 X 6\n택배\n[김영희] [오후 12:04] 다라상사\nSV7 O 5');
+ok(ms.length === 2 && ms[0].date === '2026-11-17' && ms[1].time === '12:04' && /택배$/.test(ms[0].body), 'PC 카톡 복사 형식 나누기');
+ok(OP.splitMessages('가나상사\nSV7 X 5').length === 1, '형식 없는 글은 1건');
+const custs = [{ name: '(경기 광주)가나난방', addr: 'A' }, { name: '(경기 광주)가나난방', addr: 'B' }, { name: '다라테크', addr: 'C' }, { name: '광주 다라보일러상사', addr: 'D' }];
+ok(OP.findCust(custs, '가나난방').length === 2 && OP.findCust(custs, '다라테크')[0].addr === 'C' && OP.findCust(custs, '없는곳').length === 0, '거래처 찾기 (지역 표시 무시, 같은 이름 여러 주소)');
+o = OP.parseOrder('다라테크 몰딩센서 2M 1000개\n금일 경동택배 출고', { custs });
+ok(o.cust === '다라테크' && o.items[0].name === '몰딩센서 2M' && o.carrier === '경동', '거래처+품목이 한 줄');
+
+console.log('2) 박스 추천');
+const hist = [['CJ', 'a', 'SV7  X  50', 1, '대', 0], ['CJ', 'b', 'SV7  X  10', 1, '소', 0], ['CJ', 'c', 'SV7  X  2', 1, '극소', 0], ['CJ', 'd', 'STT-1.3DE      60/\nSTT-2.6DE      60', 4, '대', 0], ['CJ', 'd', 'STT-1.3DE      60/\nSTT-2.6DE      60', 1, '중', 0], ['경동', 'e', 'H7 X 50', 1, '소', 5000]];
+const M = OP.buildRec(hist);
+eq(OP.suggest(M, [{ name: 'STT-1.3DE', qty: 60 }, { name: 'STT-2.6DE', qty: 60 }], 'CJ').box, [{ k: '대', b: 4 }, { k: '중', b: 1 }], '같은 주문 기록 → 그대로 (대4 + 중1)');
+eq(OP.suggest(M, [{ name: 'SV7', qty: 100 }], 'CJ').box, [{ k: '대', b: 2 }], 'SV7 100 → 대 2');
+eq(OP.suggest(M, [{ name: 'SV7', qty: 8 }], 'CJ').box, [{ k: '소', b: 1 }], 'SV7 8 → 소 1');
+eq(OP.suggest(M, [{ name: 'H7', qty: 50 }], '경동').box, [{ k: '소', b: 1, f: 5000 }], '경동 운임도 같이');
+ok(OP.suggest(M, [{ name: '처음보는것', qty: 3 }], 'CJ') === null, '기록 없으면 추천 안 함');
+
+console.log('3) 엑셀 양식');
+const def = { name: '써브텍', phone: '02-0000-0000', addr: '경기도 포천시' };
+const A = { id: 'A', cust: '가나상사', due: '2026-11-17', items: [{ name: 'STT-1.3DE', sensor: '', qty: 60, unit: '', note: '' }, { name: 'H7', sensor: 'X', qty: 100, unit: '', note: '스티커 있음' }, { name: '파워코드 2C', sensor: '', qty: 50, unit: '개', note: '' }], memo: '', recv: '', phone: '042-000-7728', phone2: '', addr: '대전광역시 대덕구 대전로 1', ship: '택배선불', carrier: 'CJ', pay: '선불', box: [{ k: '대', b: 4 }, { k: '중', b: 1 }], stmt: 'O', tax: '월말발행' };
+const B = { id: 'B', cust: '자차코퍼레이션', due: '준비되면', items: [{ name: 'STF-7S', sensor: '', qty: 1, unit: '개', note: '' }], memo: '직송건', recv: '김철수', phone: '010-0000-8453', addr: '(37100) 경상북도 상주시 가나길 1', msg: '문 앞', sender: '자차코퍼레이션', senderPhone: '010-0000-8108', senderAddr: '대전 유성구', ship: '택배선불 청구', carrier: 'CJ', pay: '선불', branch: '상주영업소', mode: '화물', box: [{ k: '극소', b: 1, f: 4000 }] };
+let x = OUT.cj([A, B], def, '2026-11-17');
+ok(x.rows.length === 3 && x.rows[0][0] === '써브텍' && x.rows[0][4] === '가나상사' && x.rows[0][9] === 4 && x.rows[0][10] === '대' && x.rows[1][10] === '중' && x.rows[0][12] === '신용', 'CJ: 박스 크기마다 한 줄, 운임구분 신용');
+ok(x.rows[2][0] === '자차코퍼레이션' && x.rows[2][3] === '대전 유성구' && x.rows[2][4] === '김철수' && x.rows[2][13] === '문 앞/김철수', 'CJ: 직송은 보내는분=거래처, 배송메세지 "메시지/이름"');
+eq(x.sheets[0].rows[0].map(c => c.v), ['보내는분성명', '보내는분전화번호', '보내는분기타연락처', '보내는분주소(전체, 분할)', '받는분성명', '받는분전화번호', '받는분기타연락처', '받는분주소(전체, 분할)', '품목명', '박스수량', '박스타입', '기본운임', '운임구분', '배송메세지1'], 'CJ 머리줄 = 원래 양식');
+ok(x.rows[0][8] === 'STT-1.3DE    60/\nH7    X    100/\n파워코드 2C    50개' && x.hist.length === 3 && x.hist[0][1] === 'CJ', 'CJ 품목명 줄바꿈 표기 + 송장기록');
+x = OUT.kd([B], def, '2026-11-17');
+ok(x.sheets[0].rows[0].length === 26 && x.rows[0][7] === '37100' && x.rows[0][3] === '경상북도 상주시 가나길 1' && x.rows[0][8] === '상주영업소' && x.rows[0][11] === '선불' && x.rows[0][20] === 4000 && x.rows[0][25] === '김철수/극소', '경동: 26열, 우편번호 분리, 영업소, 운임, 메모 "이름/크기"');
+x = OUT.ds([A, B], def, '2026-11-17');
+ok(x.sheets[0].name === '11월 17일' && x.sheets[0].rows[2][0].v === '발화주 :써브텍,02-0000-0000' && x.sheets[0].rows.some(r => r[0] && r[0].v === '발화주 :자차코퍼레이션,010-0000-8108') && x.rows[2][0] === '상주영업소' && x.rows[2][7] === '현불' && x.rows[2][10] === 4000, '대신: 날짜 탭, 발화주별 표, 도착지=영업소, 현불, 총운임');
+const rep = OUT.report({ date: '2026-11-17', shipped: [A], pending: [B] }, OP.isAcc), RR = rep.sheets[0].rows;
+ok(RR[0][0].v === '2026/11/17-출고현황' && RR[1].map(c => c.v).join('|') === 'no.|일자-No.|거래처명|품목명[규격]|센서|수량|적요|받는분|배송방법|거래명세서|계산서 발행 여부', '출하서: 제목·머리줄 = 원래 양식');
+ok(RR[2][0].v === 1 && RR[2][1].v === '11월 17일' && RR[2][5].v === 60 && RR[3][6].v === '스티커 있음' && RR[4][5].v === '50개' && RR[5][0].v === '합계' && RR[5][5].v === 160, '출하서: 번호·일자·수량, 부자재는 "50개"로 쓰고 합계에서 제외');
+ok(RR[6][1].v === '준비되면' && RR[6][0].v === '' && RR[6][7].v === '김철수 / 010-0000-8453 (37100) 경상북도 상주시 가나길 1' && RR[7][0].v === '출고 대기 합계', '출하서: 아래쪽 = 못 나간 주문(대기)');
+ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merges.some(m => m.join() === '0,0,0,10'), '출하서: 여러 품목이면 거래처 칸 병합');
+
+(async () => {
+  console.log('4) 엑셀 만들기 → 다시 읽기');
+  const bytes = XL.build(rep.sheets.concat(OUT.cj([A, B], def, '2026-11-17').sheets));
+  const R = await XL.read(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  ok(Object.keys(R).join() === '11월 17일,건별출력' && R['11월 17일'][2][2] === '가나상사' && R['11월 17일'][2][5] === 60 && R['건별출력'][1][8] === 'STT-1.3DE    60/\nH7    X    100/\n파워코드 2C    50개', '만든 엑셀을 다시 읽으면 같은 값');
+  const imp = OUT.importBook({ '매출처 주소록': [['거래처 주소록'], ['No'], [], [1, '(가나)다라난방', '010-0000-9225', '', '강원도 강릉시 교동 1'], ['', '(가나)다라난방', '', '', '경동: 강릉교동9']],
+    '송장출력건': [['01월 02일'], [], ['써브텍', '02', '', '주소', '가나상사', '042', '', '대전', 'SV7  X  50', 1, '대', '', '신용', '가나상사']],
+    '발송기록': [KDH(), ['', '', '마바전기', '충북 청주시 가나로 15', '', '', '', '28481', '청주가나648영업소', '043-000-4000', '', '착불', 'SV7 X 20', 1, '박스', 10, 10, 10, 10, 50, 5000, 100, '', '', '', '마바전기/소']],
+    '11월 13일': [['11월 13일'], [], ['발화주 :써브텍,02'], ['도착지', '수화주전화', '수화주명', '품명', '소/대 구분', '포장방법', '수량', '현/착불', '운임', '운송방법', '총운임'], ['인천가나지점', '010-0000-5097', '사아코리아', 'SV7 X  30개', '소', '박스', 1, '현불', 5000, '화물', 5000]] }, def);
+  function KDH() { return ['보내는분']; }
+  ok(imp.custs.length === 4 && imp.custs[1].kd === '강릉교동9' && imp.custs[2].kd === '청주가나648영업소' && imp.custs[3].ds === '인천가나지점' && imp.hist.length === 3 && imp.hist[1][5] === '소' && imp.hist[1][6] === 5000 && imp.hist[2][1] === '대신', '옛 엑셀 가져오기: 주소록·영업소·송장기록');
+
+  console.log('5) 서버 (가짜 시트)');
+  const makeGas = require('./fake-gas.js');
+  const master = [['품목ID', '품명', '분류'], ['SV7||기판', 'SV7', '기판'], ['SV7||완포', 'SV7', '완포'], ['H7||완포', 'H7', '완포']], log = [['일시', '품목ID'], ['x', 'SV7||기판']];
+  const gas = makeGas({ '품목마스터': master, '거래로그': log }), keep = JSON.stringify([master, log]);
+  const ctx = Object.assign({ console }, gas); vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(D, 'Code.gs'), 'utf8'), ctx);
+  const api = (fn, arg, pin) => JSON.parse(JSON.stringify(vm.runInContext('api', ctx)(pin || '', fn, arg)));
+  let b = api('boot');
+  eq(b.items, ['SV7', 'H7'], 'boot: 품목마스터 품명(중복 없이) 읽기');
+  ok(b.orders.length === 0 && b.sender.name === '써브텍' && ['주문', '주문_거래처', '주문_송장기록', '주문_설정'].every(t => gas.__tabs[t]), 'boot: 주문용 탭을 스스로 만듦');
+  let s = api('saveOrders', { orders: [Object.assign({}, A, { id: undefined, box: [] }), Object.assign({}, B, { id: undefined })] });
+  ok(s.orders.length === 2 && /^O\d{6}-\d{6}-1$/.test(s.orders[0].id) && s.orders[0].st === '대기' && gas.__tabs['주문'].length === 3 && gas.__tabs['주문'][1][5] === 'STT-1.3DE 60 / H7 X 100 (스티커 있음) / 파워코드 2C 50개', '주문 저장: ID·상태, 품목 칸은 읽기 쉬운 글');
+  ok(s.custs.some(c => c.name === '가나상사' && c.ship === '택배선불' && c.tax === '월말발행') && s.custs.some(c => c.name === '자차코퍼레이션' && c.sender === '자차코퍼레이션' && !c.addr), '거래처 기본값 기억 (배송방법·계산서·보내는분), 주소는 자동으로 안 바꿈');
+  const [ia, ib] = s.orders.map(o => o.id);
+  s = api('saveOrders', { orders: [Object.assign({}, s.orders[0], { memo: '급함' })] });
+  ok(gas.__tabs['주문'].length === 3 && gas.__tabs['주문'][1][6] === '급함', '주문 고치기: 줄이 늘지 않고 그 줄만 바뀜');
+  throws(() => api('saveOrders', { orders: [{ cust: 'x', items: [] }] }), '품목 없는 주문 거절');
+  throws(() => api('saveOrders', { orders: [Object.assign({}, A, { id: 'NOPE' })] }), '없는 주문 ID 거절');
+  s = api('markPrinted', { ids: [ia], box: { [ia]: [{ k: '대', b: 4 }] }, hist: [['2026-11-17', 'CJ', '가나상사', 'x', 4, '대', '']] });
+  ok(s.orders[0].printed && s.orders[0].box[0].b === 4 && gas.__tabs['주문_송장기록'].length === 2 && gas.__tabs['주문_송장기록'][1][7] === '앱', '송장 뽑음 표시 + 박스 저장 + 송장기록');
+  throws(() => api('setStatus', { ids: [ia], st: '이상한값' }), '잘못된 상태 거절');
+  throws(() => api('setStatus', { ids: [ia, 'NOPE'], st: '취소' }), '없는 ID가 섞이면 아무것도 안 바꿈');
+  ok(api('boot').orders.every(o => o.st === '대기'), '  (위 실패 뒤에도 둘 다 대기 그대로)');
+  s = api('closeDay', { date: '2026-11-17', shippedIds: [ia] });
+  ok(s.orders[0].st === '출고완료' && s.orders[0].shipped === '2026-11-17' && s.report.shipped.length === 1 && s.report.pending.length === 1 && s.report.pending[0].id === ib, '하루 마감: 나간 것 출고완료, 못 나간 것은 대기로 기록');
+  api('closeDay', { date: '2026-11-17', shippedIds: [] });
+  ok(gas.__tabs['주문_출하기록'].length === 2 && api('reports').list[0].shipped === 1 && api('report', { date: '2026-11-17' }).report.shipped[0].cust === '가나상사', '같은 날 다시 마감하면 그 날짜 줄만 갱신, 지난 출하서 다시 받기');
+  throws(() => api('report', { date: '2020-01-01' }), '없는 날짜');
+  s = api('setStatus', { ids: [ia], st: '대기' }); ok(s.orders[0].st === '대기' && s.orders[0].shipped === '', '대기로 되돌리기');
+  s = api('custImport', { rows: imp.custs.concat(imp.custs) });
+  ok(s.added === 3 && s.custs.filter(c => c.name === '(가나)다라난방').length === 1 && s.custs.find(c => c.name === '(가나)다라난방').kd === '강릉교동9', '주소록 가져오기: 겹치는 줄 건너뜀, 영업소는 같은 이름에 채움');
+  ok(api('custImport', { rows: imp.custs }).added === 0, '같은 파일 다시 넣어도 안 늘어남');
+  ok(api('histImport', { rows: imp.hist }).added === 3 && api('histImport', { rows: imp.hist }).added === 0 && api('recData').hist.length === 4, '송장기록 가져오기: 겹치지 않게');
+  s = api('custSave', { row: 0, cust: { name: '새거래처', addr: '서울' } }); ok(s.custs.some(c => c.name === '새거래처'), '거래처 추가');
+  api('setPin', { pin: '1234' });
+  ok(api('boot').needPin === true && api('boot', {}, '0000').needPin === true && api('boot', {}, '1234').orders.length === 2, '암호를 켜면 암호 없이는 아무것도 못 봄');
+  api('setPin', { pin: '' }, '1234'); ok(!api('boot').needPin, '암호 끄기');
+  ok(JSON.stringify([master, log]) === keep, '품목마스터·거래로그는 한 글자도 안 바뀜');
+  throws(() => vm.runInContext('sheet_', ctx)('거래로그', ['x']), '주문용 탭이 아니면 쓰기용으로 열 수 없음');
+  ok(!/getSheetByName\('거래로그'\)|getSheetByName\("거래로그"\)/.test(fs.readFileSync(path.join(D, 'Code.gs'), 'utf8')), 'Code.gs 는 거래로그 탭을 부르지 않음');
+
+  console.log('6) 템플릿·버전');
+  const idx = fs.readFileSync(path.join(D, 'Index.html'), 'utf8'), tags = idx.match(/<\?[\s\S]*?\?>/g) || [];
+  ok((idx.match(/<\?/g) || []).length === 3 && tags.join() === "<?!= inc('Parse') ?>,<?!= inc('Xlsx') ?>,<?!= inc('Out') ?>", 'Index.html 의 <? ?> 는 끼워넣기 3개뿐 (다른 곳에 있으면 앱이 안 열림)');
+  const av = (fs.readFileSync(path.join(D, 'Code.gs'), 'utf8').match(/var APP_VERSION = '([^']+)'/) || [])[1], hv = (idx.match(/var HTML_VERSION = '([^']+)'/) || [])[1];
+  ok(av && av === hv, '버전 짝: Code.gs ' + av + ' = Index.html ' + hv);
+  console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과'); process.exit(fail ? 1 : 0);
+})().catch(e => { console.error(e); process.exit(1); });

@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>써브텍 주문</title>
+<style>
+:root{--bg:#F4F2EE;--card:#FFFFFF;--ink:#1C2430;--sub:#5B6472;--line:#DDD8CF;--pri:#B4470F;--pri2:#93390B;--ok:#1E6B45;--warn:#9A5B00;--bad:#A12B2B;--chip:#ECE8E1;--sel:#FBEDE3}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 "Pretendard","Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+#app{display:flex;flex-direction:column;min-height:100%}
+header{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:16px;margin:0;font-weight:700;letter-spacing:-.2px}
+header .st{margin-left:auto;font-size:12px;opacity:.8}
+nav{display:flex;background:var(--card);border-top:1px solid var(--line);position:fixed;left:0;right:0;bottom:0;z-index:6;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;padding:10px 2px 9px;font-size:13px;color:var(--sub);min-height:52px;border-top:3px solid transparent}
+nav button.on{color:var(--pri);font-weight:700;border-top-color:var(--pri)}
+nav button b{display:inline-block;min-width:18px;padding:0 5px;margin-left:3px;border-radius:9px;background:var(--pri);color:#fff;font-size:12px;font-weight:700}
+main{flex:1;padding:14px 14px 84px;max-width:1080px;width:100%;margin:0 auto}
+@media(min-width:900px){
+  #app{flex-direction:row;flex-wrap:wrap}
+  header{flex:0 0 100%}
+  nav{position:sticky;top:44px;bottom:auto;flex:0 0 150px;flex-direction:column;height:calc(100vh - 44px);border-top:0;border-right:1px solid var(--line)}
+  nav button{flex:0 0 auto;text-align:left;padding:14px 18px;border-top:0;border-left:3px solid transparent;font-size:15px}
+  nav button.on{border-left-color:var(--pri);background:var(--sel)}
+  main{padding:20px 24px 40px;margin:0}
+}
+h2{font-size:17px;margin:0 0 10px}
+.muted{color:var(--sub);font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1 1 0;min-width:0}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:0 14px;min-height:44px;font-weight:600}
+.btn.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.pri:active{background:var(--pri2)}
+.btn.ghost{background:none}
+.btn.sm{min-height:36px;padding:0 10px;font-size:13px}
+.btn:disabled{opacity:.45}
+.btn.danger{color:var(--bad)}
+textarea,input[type=text],input[type=tel],input[type=number],input[type=date],input[type=password],select{width:100%;border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px 11px;min-height:44px}
+textarea{min-height:150px;resize:vertical;line-height:1.5}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--pri);outline-offset:-1px}
+label.f{display:block;font-size:12px;color:var(--sub);margin:10px 0 4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 13px;margin-bottom:9px}
+.card.tap{cursor:pointer}
+.card.off{opacity:.55}
+.card .top{display:flex;gap:8px;align-items:flex-start}
+.card .cust{font-weight:700;font-size:16px;word-break:keep-all}
+.card .items{margin:5px 0 0;font-size:14px;white-space:pre-wrap;word-break:break-word}
+.card .meta{margin-top:6px;font-size:13px;color:var(--sub);word-break:break-word}
+.tag{display:inline-block;font-size:12px;font-weight:700;border-radius:5px;padding:1px 7px;background:var(--chip);color:var(--ink);margin:0 4px 3px 0;white-space:nowrap}
+.tag.ship{background:#E3ECF5;color:#1D3F66}
+.tag.ok{background:#E0F0E6;color:var(--ok)}
+.tag.warn{background:#FBEBCB;color:var(--warn)}
+.tag.bad{background:#F6DDDD;color:var(--bad)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{border:1px solid var(--line);background:var(--card);border-radius:18px;padding:0 13px;min-height:38px;font-size:14px}
+.chips button.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:700}
+input[type=checkbox]{width:22px;height:22px;accent-color:var(--pri);flex:0 0 auto;margin:1px 0 0}
+.bar{position:sticky;bottom:62px;background:var(--bg);padding:10px 0 4px;display:flex;gap:8px;z-index:3}
+@media(min-width:900px){.bar{bottom:0}}
+.shade{position:fixed;inset:0;background:rgba(20,24,30,.45);z-index:20}
+.sheet{position:fixed;z-index:21;left:0;right:0;bottom:0;top:5%;background:var(--bg);border-radius:14px 14px 0 0;display:flex;flex-direction:column}
+@media(min-width:900px){.sheet{left:50%;right:auto;top:4%;bottom:4%;width:720px;margin-left:-360px;border-radius:14px}}
+.sheet .hd{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);gap:8px}
+.sheet .hd b{font-size:16px}
+.sheet .bd{flex:1;overflow:auto;padding:4px 14px 16px;-webkit-overflow-scrolling:touch}
+.sheet .ft{display:flex;gap:8px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--card);flex-wrap:wrap}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.itrow{display:grid;grid-template-columns:minmax(0,1fr) 62px 74px 44px;gap:6px;margin-bottom:6px;align-items:center}
+.itrow .nt{grid-column:1/4}
+.itrow .x{border:0;background:none;color:var(--bad);font-size:20px;min-height:44px}
+.box{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.box select{width:84px}.box input{width:70px}.box input.fare{width:92px}
+.box .rec{font-size:12px;color:var(--warn)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:76px;z-index:40;background:var(--ink);color:#fff;border-radius:8px;padding:10px 16px;font-size:14px;max-width:90vw;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+#toast.err{background:var(--bad)}
+.sec{font-size:13px;font-weight:700;color:var(--sub);margin:16px 0 6px;letter-spacing:.2px}
+details.raw{margin-top:10px}details.raw pre{white-space:pre-wrap;font:13px/1.5 inherit;background:var(--chip);border-radius:8px;padding:10px;margin:6px 0 0}
+table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+.pick{border:1px dashed var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13px;background:#fff}
+.pick button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 2px;min-height:40px;border-bottom:1px solid var(--line)}
+.pick button:last-child{border-bottom:0}
+</style>
+</head>
+<body>
+<div id="app">
+  <header><h1>써브텍 주문</h1><span class="st" id="st">불러오는 중…</span></header>
+  <nav id="nav">
+    <button data-v="new" class="on">새 주문</button>
+    <button data-v="list">주문<b id="nWait" class="hidden"></b></button>
+    <button data-v="print">송장</button>
+    <button data-v="close">출하서</button>
+    <button data-v="more">더보기</button>
+  </nav>
+  <main>
+    <section id="v-new">
+      <h2>카톡 발주 붙여넣기</h2>
+      <p class="muted" style="margin:0 0 8px">카톡 메시지를 복사해서 붙여넣으세요. 여러 건을 한꺼번에 넣어도 됩니다.</p>
+      <textarea id="paste" placeholder="예)&#10;드림온 발주&#10;&#10;SV7 - 30개&#10;STT-1.3 - 10개&#10;&#10;광주광역시 북구 서암대로86&#10;나예원대리 010-0000-0000"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn pri grow" data-act="parse">나누기</button>
+        <button class="btn" data-act="manual">직접 입력</button>
+      </div>
+      <div id="drafts" style="margin-top:14px"></div>
+    </section>
+    <section id="v-list" class="hidden">
+      <div class="chips" id="fChips"></div>
+      <input type="text" id="q" placeholder="거래처·품목·받는분 검색" style="margin:10px 0">
+      <div id="orders"></div>
+    </section>
+    <section id="v-print" class="hidden">
+      <div class="chips" id="pChips"></div>
+      <p class="muted" id="pHelp" style="margin:10px 0 8px"></p>
+      <div id="pList"></div>
+      <div class="bar"><button class="btn pri grow" data-act="pXlsx">엑셀 받기</button><button class="btn" data-act="pCopy">복사</button></div>
+    </section>
+    <section id="v-close" class="hidden">
+      <h2>출하서 (하루 마감)</h2>
+      <div class="row"><input type="date" id="cDate" style="max-width:180px"><span class="muted">오늘 나간 주문에 체크하세요. 체크 안 한 주문은 대기로 남습니다.</span></div>
+      <div id="cList" style="margin-top:12px"></div>
+      <div class="bar"><button class="btn pri grow" data-act="closeDay">마감하고 출하서 받기</button></div>
+      <div class="sec">지난 출하서</div>
+      <div id="rList" class="muted">불러오는 중…</div>
+    </section>
+    <section id="v-more" class="hidden">
+      <h2>거래처 주소록</h2>
+      <div class="row"><input type="text" id="cq" class="grow" placeholder="거래처 이름 검색"><button class="btn" data-act="custNew">추가</button></div>
+      <div id="custs" style="margin-top:10px"></div>
+      <div class="sec">옛 엑셀 가져오기</div>
+      <div class="card"><p class="muted" style="margin:0 0 8px">CJ·경동·대신 엑셀 파일을 고르면 주소록과 옛 송장 기록(박스 추천에 씀)을 가져옵니다. 같은 파일을 다시 넣어도 겹치지 않습니다.</p>
+        <input type="file" id="imp" accept=".xlsx" multiple><div id="impMsg" class="muted" style="margin-top:8px"></div></div>
+      <div class="sec">접속 암호</div>
+      <div class="card"><p class="muted" style="margin:0 0 8px">암호를 넣으면 앱을 열 때 물어봅니다. 비우고 저장하면 암호 없이 열립니다.</p>
+        <div class="row"><input type="text" id="pinNew" class="grow" placeholder="새 암호 (비우면 끄기)"><button class="btn" data-act="pinSave">저장</button></div></div>
+      <p class="muted" style="margin-top:18px">써브텍 주문앱 <span id="ver"></span></p>
+    </section>
+  </main>
+</div>
+<div id="toast" class="hidden"></div>
+<div id="shade" class="shade hidden"></div>
+<div id="sheet" class="sheet hidden"><div class="hd"><b id="shT" class="grow"></b><button class="btn sm ghost" data-act="shClose">닫기</button></div><div class="bd" id="shB"></div><div class="ft" id="shF"></div></div>
+
+<?!= inc('Parse') ?>
+<?!= inc('Xlsx') ?>
+<?!= inc('Out') ?>
+<script>
+var HTML_VERSION = 'v1';
+var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
+try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
+var $ = function (id) { return document.getElementById(id); };
+function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+var toastT = 0;
+function notice(m, err) { var t = $('toast'); t.textContent = err ? ((m && m.message) || String(m)).replace(/^Error:\s*/, '') : m; t.className = err ? 'err' : ''; clearTimeout(toastT); toastT = setTimeout(function () { t.className = 'hidden'; }, err ? 6000 : 2600); }
+function status(m) { $('st').textContent = m; }
+
+/* ---------- 서버 ---------- */
+function call(fn, arg, ok, fail) {
+  status('저장 중…');
+  google.script.run.withSuccessHandler(function (r) {
+    if (r && r.needPin) { askPin(function () { call(fn, arg, ok, fail); }); return; }
+    status(''); ok && ok(r);
+  }).withFailureHandler(function (e) { status(''); notice(e, 1); fail && fail(e); }).api(S.pin, fn, arg || {});
+}
+function askPin(then) { var p = prompt('접속 암호를 넣어주세요'); if (p == null) { status('암호가 필요합니다'); return; } S.pin = p; try { localStorage.setItem('so-pin', p); } catch (e) {} then(); }
+function boot() {
+  status('불러오는 중…');
+  call('boot', {}, function (r) {
+    S.orders = r.orders; S.custs = r.custs; S.items = r.items; S.sender = r.sender; S.today = r.today; S.histCount = r.histCount;
+    $('ver').textContent = HTML_VERSION + (r.version !== HTML_VERSION ? ' (서버 ' + r.version + ' — 버전 불일치, 새로고침 해보세요)' : '');
+    $('cDate').value = S.today; render(); status('');
+    if (r.histCount) call('recData', {}, function (x) { S.rec = OP.buildRec(x.hist); if (S.view === 'print') renderPrint(); status(''); });
+  });
+}
+function mergeOrders(list) { (list || []).forEach(function (o) { var i = S.orders.map(function (x) { return x.id; }).indexOf(o.id); if (i >= 0) S.orders[i] = o; else S.orders.push(o); }); }
+
+/* ---------- 주문 보조 ---------- */
+function blank() { return { cust: '', items: [{ name: '', sensor: '', qty: '', unit: '', note: '' }], memo: '', recv: '', phone: '', phone2: '', addr: '', ship: '', carrier: '', pay: '', claim: false, mode: '', branch: '', sender: '', senderPhone: '', senderAddr: '', msg: '', box: [], due: S.today, stmt: '', tax: '', who: '', raw: '', st: '대기' }; }
+// 주소록으로 빈 칸 채우기 (주소·전화·지난번 배송방법·영업소·보내는분)
+function enrich(o) {
+  var m = OP.findCust(S.custs, o.cust); o._m = m; o._auto = [];
+  if (!m.length) return o;
+  var c = m[0], hadAddr = !!o.addr;
+  if (hadAddr && o.recv && !o.sender && OP.norm(o.recv) !== OP.norm(o.cust)) {   // 받는분이 따로 있는 직송 건 → 보내는분 = 거래처
+    var a = m.filter(function (x) { return x.addr; })[0] || c;
+    if (c.sender || a.addr) { o.sender = c.sender || c.name; o.senderPhone = c.senderPhone || a.phone || ''; o.senderAddr = c.senderAddr || a.addr || ''; o._auto.push('보내는분 ' + o.sender); }
+  }
+  if (!hadAddr && !o.branch) {
+    var withAddr = m.filter(function (x) { return x.addr; });
+    if (withAddr.length) { o.addr = withAddr[0].addr; if (!o.phone) o.phone = withAddr[0].phone; if (!o.phone2) o.phone2 = withAddr[0].phone2; o._auto.push('주소록 주소'); if (withAddr.length > 1) o._pick = withAddr; }
+  }
+  if (!o.phone) { var wp = m.filter(function (x) { return x.phone; })[0]; if (wp) o.phone = wp.phone; }
+  if (!o.carrier && c.ship) { var sp = OP.shipParse(c.ship); o.carrier = sp.carrier; o.pay = o.pay || sp.pay; o.claim = o.claim || sp.claim; o.mode = sp.mode; o.ship = OP.shipLabel(o); o._auto.push('지난번 배송방법'); }
+  if (!o.branch) { var br = m.filter(function (x) { return o.carrier === '경동' ? x.kd : (o.carrier === '대신' ? x.ds : ''); })[0]; if (br) o.branch = o.carrier === '경동' ? br.kd : br.ds; }
+  if (!o.stmt && c.stmt) o.stmt = c.stmt; if (!o.tax && c.tax) o.tax = c.tax;
+  return o;
+}
+function warns(o) {
+  var w = [];
+  if (!o.cust) w.push('거래처 없음');
+  if ((o.items || []).some(function (i) { return i.qty === '' || i.qty == null; })) w.push('수량 없음');
+  if (!o.carrier) w.push('배송방법 없음'); else if (o.carrier === '화물') w.push('화물 — 경동/대신 선택');
+  if ((o.carrier === 'CJ' || (o.carrier === '경동' && !o.branch)) && !o.addr) w.push('주소 없음');
+  if (o.carrier === '대신' && !o.branch && !o.addr) w.push('도착지 없음');
+  if ((o.carrier === 'CJ' || o.carrier === '경동' || o.carrier === '대신') && !o.phone) w.push('전화 없음');
+  return w;
+}
+function clean(o) { var x = {}; Object.keys(o).forEach(function (k) { if (k.charAt(0) !== '_') x[k] = o[k]; }); x.items = (o.items || []).filter(function (i) { return String(i.name || '').trim(); }); return x; }
+function dueTxt(o) { return /^\d{4}-\d{2}-\d{2}$/.test(o.due) ? (o.due === S.today ? '오늘' : OUT.md(o.due)) : (o.due || ''); }
+function cardHTML(o, opt) {
+  opt = opt || {}; var w = warns(o), it = (o.items || []).map(function (i) { return esc(OUT.itemStr(i).replace(/\s{4}/g, '  ')) + (i.note ? ' <span class="muted">' + esc(i.note) + '</span>' : ''); }).join('\n');
+  var to = [o.recv, o.phone, o.branch ? '[' + o.branch + ']' : '', o.addr].filter(Boolean).join(' · ');
+  return '<div class="card tap' + (opt.off ? ' off' : '') + '" data-act="' + (opt.act || 'edit') + '" data-i="' + esc(opt.key) + '"><div class="top">' + (opt.check != null ? '<input type="checkbox" data-chk="' + esc(opt.key) + '"' + (opt.check ? ' checked' : '') + '>' : '') +
+    '<div class="grow"><div class="cust">' + esc(o.cust || '(거래처 없음)') + '</div><div class="items">' + it + '</div>' +
+    '<div class="meta">' + (o.ship ? '<span class="tag ship">' + esc(o.ship) + '</span>' : '') + (dueTxt(o) ? '<span class="tag">' + esc(dueTxt(o)) + '</span>' : '') +
+    (o.st === '출고완료' ? '<span class="tag ok">출고 ' + esc(OUT.md(o.shipped)) + '</span>' : '') + (o.st === '취소' ? '<span class="tag bad">취소</span>' : '') + (o.printed && o.st === '대기' ? '<span class="tag ok">송장 뽑음</span>' : '') +
+    w.map(function (x) { return '<span class="tag warn">' + esc(x) + '</span>'; }).join('') + (o._auto && o._auto.length ? '<span class="tag">' + esc(o._auto.join(', ')) + '</span>' : '') +
+    (to ? '<div>' + esc(to) + '</div>' : '') + (o.memo ? '<div>' + esc(o.memo) + '</div>' : '') + (opt.extra || '') + '</div></div></div></div>';
+}
+
+/* ---------- 화면 전환 ---------- */
+function render() {
+  var wait = S.orders.filter(function (o) { return o.st === '대기'; }).length;
+  $('nWait').textContent = wait; $('nWait').classList.toggle('hidden', !wait);
+  ['new', 'list', 'print', 'close', 'more'].forEach(function (v) { $('v-' + v).classList.toggle('hidden', S.view !== v); });
+  Array.prototype.forEach.call(document.querySelectorAll('#nav button'), function (b) { b.classList.toggle('on', b.dataset.v === S.view); });
+  if (S.view === 'new') renderDrafts(); if (S.view === 'list') renderList(); if (S.view === 'print') renderPrint(); if (S.view === 'close') renderClose(); if (S.view === 'more') renderCusts();
+}
+function go(v) { S.view = v; render(); window.scrollTo(0, 0); if (v === 'close') loadReports(); }
+
+/* ---------- 1. 새 주문 ---------- */
+function doParse() {
+  var txt = $('paste').value; if (!txt.trim()) { notice('붙여넣은 내용이 없습니다'); return; }
+  var msgs = OP.splitMessages(txt), n = 0;
+  S.drafts = msgs.map(function (m) {
+    var o = OP.parseOrder(m.body, { today: S.today, custs: S.custs }); o.who = m.who || ''; o.at = m.date && m.time ? m.date + ' ' + m.time + ':00' : '';
+    if (!o.isOrder) return null; o.ship = o.shipRaw; delete o.shipRaw; delete o.isOrder; o.box = []; o.st = '대기'; o.stmt = ''; o.tax = ''; o.senderAddr = '';
+    enrich(o); o._on = !!o.cust; n++; return o;
+  }).filter(Boolean);
+  if (!n) notice('발주로 보이는 메시지를 찾지 못했습니다. "직접 입력"을 써보세요.');
+  renderDrafts();
+}
+function renderDrafts() {
+  var d = S.drafts, on = d.filter(function (o) { return o._on; }).length;
+  $('drafts').innerHTML = !d.length ? '' : '<div class="row" style="margin-bottom:8px"><b class="grow">나눈 결과 ' + d.length + '건</b><span class="muted">눌러서 고치기</span></div>' +
+    d.map(function (o, i) { return cardHTML(o, { key: i, act: 'draftEdit', check: o._on, off: !o._on }); }).join('') +
+    '<div class="bar"><button class="btn pri grow" data-act="draftSave"' + (on ? '' : ' disabled') + '>체크한 ' + on + '건 저장</button><button class="btn" data-act="draftClear">비우기</button></div>';
+}
+function saveDrafts() {
+  var list = S.drafts.filter(function (o) { return o._on; }).map(clean); if (!list.length) return;
+  var bad = list.filter(function (o) { return !o.items.length; }); if (bad.length) { notice('품목이 없는 주문이 있습니다', 1); return; }
+  call('saveOrders', { orders: list }, function (r) { mergeOrders(r.orders); S.custs = r.custs; S.drafts = S.drafts.filter(function (o) { return !o._on; }); if (!S.drafts.length) $('paste').value = ''; notice(r.orders.length + '건 저장했습니다'); render(); });
+}
+
+/* ---------- 주문 고치기 창 ---------- */
+var ED = null;   // {o: 고치는 사본, done: 저장 뒤 할 일, draft: 번호}
+var CARR = [['CJ', '택배(CJ)'], ['경동', '경동'], ['대신', '대신'], ['직납', '직납'], ['방문', '직접수령'], ['퀵', '퀵']];
+function openEdit(o, opt) { ED = { o: JSON.parse(JSON.stringify(o)), opt: opt || {} }; if (!ED.o.items.length) ED.o.items.push({ name: '', sensor: '', qty: '', unit: '', note: '' }); drawEdit(); showSheet(true); }
+function showSheet(on) { $('shade').classList.toggle('hidden', !on); $('sheet').classList.toggle('hidden', !on); if (!on) ED = null; }
+function drawEdit() {
+  var o = ED.o, isNew = !o.id, m = OP.findCust(S.custs, o.cust);
+  $('shT').textContent = isNew ? '새 주문' : '주문 고치기';
+  var h = '<label class="f">거래처</label><input type="text" id="e-cust" list="dl-cust" value="' + esc(o.cust) + '"><datalist id="dl-cust">' + uniq(S.custs.map(function (c) { return c.name; })).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>';
+  h += '<div class="sec">품목</div><datalist id="dl-item">' + S.items.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist><div id="e-items">' + o.items.map(function (i, k) {
+    return '<div class="itrow" data-k="' + k + '"><input type="text" class="nm" list="dl-item" placeholder="품목명" value="' + esc(i.name) + '"><select class="sn"><option value="">센서-</option><option' + (i.sensor === 'X' ? ' selected' : '') + '>X</option><option' + (i.sensor === 'O' ? ' selected' : '') + '>O</option></select>' +
+      '<input type="text" class="qt" inputmode="numeric" placeholder="수량" value="' + esc(i.qty === '' || i.qty == null ? '' : i.qty + (i.unit || '')) + '"><button class="x" data-act="itDel" data-i="' + k + '" aria-label="품목 삭제">×</button><input type="text" class="nt" placeholder="품목 메모 (스티커 있음 등)" value="' + esc(i.note || '') + '"></div>'; }).join('') + '</div><button class="btn sm" data-act="itAdd">+ 품목 추가</button>';
+  h += '<label class="f">적요 (주문 전체 메모)</label><input type="text" id="e-memo" value="' + esc(o.memo) + '">';
+  h += '<div class="sec">출고 예정</div><div class="row"><input type="text" id="e-due" class="grow" value="' + esc(o.due) + '" placeholder="2026-11-17 또는 준비되면"><div class="chips">' + [['오늘', S.today], ['내일', addDay(S.today, 1)], ['준비되면', '준비되면']].map(function (x) { return '<button data-act="due" data-i="' + x[1] + '"' + (o.due === x[1] ? ' class="on"' : '') + '>' + x[0] + '</button>'; }).join('') + '</div></div>';
+  h += '<div class="sec">배송</div><div class="chips">' + CARR.map(function (c) { return '<button data-act="car" data-i="' + c[0] + '"' + (o.carrier === c[0] ? ' class="on"' : '') + '>' + c[1] + '</button>'; }).join('') + '</div>';
+  var parcel = o.carrier === 'CJ' || o.carrier === '경동' || o.carrier === '대신' || o.carrier === '화물';
+  if (parcel) {
+    h += '<div class="chips" style="margin-top:8px">' + [['선불', '선불'], ['착불', '착불']].map(function (x) { return '<button data-act="pay" data-i="' + x[0] + '"' + (o.pay === x[0] ? ' class="on"' : '') + '>' + x[1] + '</button>'; }).join('') + '<button data-act="claim"' + (o.claim ? ' class="on"' : '') + '>운임 청구</button>' +
+      (o.carrier === '경동' || o.carrier === '대신' ? [['화물', '화물'], ['택배', '택배']].map(function (x) { return '<button data-act="mode" data-i="' + x[0] + '"' + ((o.mode || (o.carrier === '대신' ? '화물' : '택배')) === x[0] ? ' class="on"' : '') + '>' + x[1] + '</button>'; }).join('') : '') + '</div>';
+    if (o.carrier !== 'CJ') h += '<label class="f">도착 영업소·지점 (경동·대신)</label><input type="text" id="e-branch" value="' + esc(o.branch) + '">';
+  }
+  h += '<label class="f">출하서에 적을 배송방법</label><input type="text" id="e-ship" value="' + esc(o.ship) + '">';
+  h += '<div class="g2"><div><label class="f">받는분</label><input type="text" id="e-recv" value="' + esc(o.recv) + '"></div><div><label class="f">전화</label><input type="tel" id="e-phone" value="' + esc(o.phone) + '"></div></div>';
+  h += '<label class="f">주소</label><input type="text" id="e-addr" value="' + esc(o.addr) + '">';
+  var ad = m.filter(function (x) { return x.addr; });
+  if (ad.length) h += '<div class="pick"><span class="muted">주소록에서 고르기</span>' + ad.map(function (x) { return '<button data-act="pickAddr" data-i="' + x.row + '">' + esc(x.name) + ' · ' + esc(x.addr) + (x.phone ? ' · ' + esc(x.phone) : '') + '</button>'; }).join('') + '</div>';
+  h += '<div class="g2"><div><label class="f">전화2</label><input type="tel" id="e-phone2" value="' + esc(o.phone2) + '"></div><div><label class="f">배송 메시지</label><input type="text" id="e-msg" value="' + esc(o.msg) + '"></div></div>';
+  h += '<div class="sec">보내는분</div><div class="chips"><button data-act="snd" data-i="def"' + (!o.sender ? ' class="on"' : '') + '>' + esc(S.sender.name) + '</button>' + (o.cust ? '<button data-act="snd" data-i="cust"' + (o.sender ? ' class="on"' : '') + '>거래처 이름으로 (직송)</button>' : '') + '</div>';
+  if (o.sender) h += '<div class="g2"><div><label class="f">보내는분 이름</label><input type="text" id="e-sender" value="' + esc(o.sender) + '"></div><div><label class="f">보내는분 전화</label><input type="tel" id="e-senderPhone" value="' + esc(o.senderPhone) + '"></div></div><label class="f">보내는분 주소</label><input type="text" id="e-senderAddr" value="' + esc(o.senderAddr) + '">';
+  h += '<div class="g2"><div><label class="f">거래명세서</label><input type="text" id="e-stmt" list="dl-ox" value="' + esc(o.stmt) + '"></div><div><label class="f">계산서 발행</label><input type="text" id="e-tax" list="dl-tax" value="' + esc(o.tax) + '"></div></div><datalist id="dl-ox"><option value="O"></datalist><datalist id="dl-tax"><option value="O"><option value="월말발행"><option value="결제받음"></datalist>';
+  if (o.raw) h += '<details class="raw"><summary class="muted">카톡 원문 보기' + (o.who ? ' (' + esc(o.who) + ')' : '') + '</summary><pre>' + esc(o.raw) + '</pre></details>';
+  $('shB').innerHTML = h;
+  var f = '<button class="btn pri grow" data-act="edSave">' + (ED.opt.draft != null ? '확인' : '저장') + '</button>';
+  if (o.id && o.st === '대기') f += '<button class="btn" data-act="edShip">출고완료</button><button class="btn" data-act="edCopy">복제</button><button class="btn danger" data-act="edCancel">주문 취소</button>';
+  if (o.id && o.st !== '대기') f += '<button class="btn" data-act="edBack">대기로 되돌리기</button>';
+  if (ED.opt.draft != null) f += '<button class="btn danger" data-act="edDrop">빼기</button>';
+  $('shF').innerHTML = f;
+}
+function uniq(a) { var s = {}; return a.filter(function (x) { if (!x || s[x]) return false; s[x] = 1; return true; }); }
+function addDay(d, n) { var t = new Date(d + 'T12:00:00'); t.setDate(t.getDate() + n); return OP.ymd(t); }
+function readEdit() {   // 입력칸 → ED.o (다시 그리기 전에 꼭 부름)
+  var o = ED.o, g = function (id) { var e = $('e-' + id); return e ? e.value.trim() : null; };
+  ['cust', 'memo', 'due', 'branch', 'ship', 'recv', 'phone', 'phone2', 'addr', 'msg', 'sender', 'senderPhone', 'senderAddr', 'stmt', 'tax'].forEach(function (k) { var v = g(k); if (v != null) o[k] = v; });
+  o.items = Array.prototype.map.call(document.querySelectorAll('#e-items .itrow'), function (r) {
+    var q = r.querySelector('.qt').value.trim(), m = q.match(/^([\d,]+)\s*(.*)$/);
+    return { name: r.querySelector('.nm').value.trim(), sensor: r.querySelector('.sn').value, qty: m ? +m[1].replace(/,/g, '') : '', unit: m ? m[2] : '', note: r.querySelector('.nt').value.trim() };
+  });
+  return o;
+}
+function relabel() { ED.o.ship = OP.shipLabel(ED.o); }
+function saveEdit(extra) {
+  var o = clean(readEdit()); if (!o.items.length) { notice('품목을 하나 이상 넣어주세요', 1); return; }
+  if (ED.opt.draft != null) { var d = S.drafts[ED.opt.draft], on = d._on; Object.keys(o).forEach(function (k) { d[k] = o[k]; }); d._on = on || !!o.cust; d._auto = []; showSheet(false); renderDrafts(); return; }
+  call('saveOrders', { orders: [o] }, function (r) { mergeOrders(r.orders); S.custs = r.custs; showSheet(false); notice('저장했습니다'); if (extra) extra(r.orders[0]); else render(); });
+}
+
+/* ---------- 2. 주문 목록 ---------- */
+var FILT = [['wait', '대기'], ['today', '오늘 접수'], ['done', '출고완료'], ['cancel', '취소']];
+function renderList() {
+  $('fChips').innerHTML = FILT.map(function (f) { return '<button data-act="filt" data-i="' + f[0] + '"' + (S.filter === f[0] ? ' class="on"' : '') + '>' + f[1] + '</button>'; }).join('');
+  var q = OP.norm($('q').value), list = S.orders.filter(function (o) {
+    if (S.filter === 'wait' && o.st !== '대기') return false; if (S.filter === 'done' && o.st !== '출고완료') return false; if (S.filter === 'cancel' && o.st !== '취소') return false;
+    if (S.filter === 'today' && String(o.at).slice(0, 10) !== S.today) return false;
+    return !q || OP.norm([o.cust, o.recv, o.addr, o.memo, OUT.itemText(o, ' ')].join(' ')).indexOf(q) >= 0;
+  });
+  list.sort(function (a, b) { return S.filter === 'done' ? (b.shipped + b.upd).localeCompare(a.shipped + a.upd) : String(a.at).localeCompare(String(b.at)); });
+  $('orders').innerHTML = list.length ? '<p class="muted" style="margin:0 0 8px">' + list.length + '건</p>' + list.map(function (o) { return cardHTML(o, { key: o.id }); }).join('') : '<p class="muted">주문이 없습니다.</p>';
+}
+function byId(id) { return S.orders.filter(function (o) { return o.id === id; })[0]; }
+
+/* ---------- 3. 송장 (CJ·경동·대신 엑셀) ---------- */
+var PSEL = {}, PBOX = {}, PSHOW = false;
+function pOrders() { return S.orders.filter(function (o) { return o.st === '대기' && o.carrier === S.carrier && (PSHOW || !o.printed); }); }
+function boxOf(o) {
+  if (PBOX[o.id]) return PBOX[o.id];
+  var b = (o.box && o.box.length) ? JSON.parse(JSON.stringify(o.box)) : null, rec = '';
+  if (!b) { var s = OP.suggest(S.rec, o.items, o.carrier); if (s) { b = s.box; rec = s.how; } else b = [{ k: '', b: 1 }]; }
+  return (PBOX[o.id] = { box: b, rec: rec });
+}
+function renderPrint() {
+  $('pChips').innerHTML = [['CJ', 'CJ대한통운'], ['경동', '경동'], ['대신', '대신']].map(function (c) { var n = S.orders.filter(function (o) { return o.st === '대기' && o.carrier === c[0] && !o.printed; }).length;
+    return '<button data-act="pCar" data-i="' + c[0] + '"' + (S.carrier === c[0] ? ' class="on"' : '') + '>' + c[1] + (n ? ' ' + n : '') + '</button>'; }).join('') + '<button data-act="pShow"' + (PSHOW ? ' class="on"' : '') + '>뽑은 것도 보기</button>';
+  var list = pOrders();
+  $('pHelp').textContent = list.length ? '박스 수·크기' + (S.carrier === 'CJ' ? '' : '·운임') + '를 확인하고 엑셀로 받으세요. 받으면 "송장 뽑음"으로 표시됩니다.' + (S.rec ? '' : ' (옛 송장 기록을 가져오면 박스를 추천해 드립니다 — 더보기)') : S.carrier + '로 보낼 대기 주문이 없습니다.';
+  $('pList').innerHTML = list.map(function (o) {
+    if (PSEL[o.id] == null) PSEL[o.id] = !o.printed && !warns(o).length;
+    var bx = boxOf(o), fare = S.carrier !== 'CJ';
+    var ex = '<div data-box="' + esc(o.id) + '">' + bx.box.map(function (x, k) {
+      return '<div class="box" data-k="' + k + '"><select class="bk">' + [''].concat(OP.TYPES).map(function (t) { return '<option value="' + t + '"' + (x.k === t ? ' selected' : '') + '>' + (t || '크기') + '</option>'; }).join('') + '</select><input type="number" class="bb" min="1" inputmode="numeric" value="' + esc(x.b || 1) + '"><span class="muted">박스</span>' +
+        (fare ? '<input type="number" class="bf fare" inputmode="numeric" placeholder="운임" value="' + esc(x.f || '') + '">' : '') + (k ? '<button class="btn sm ghost danger" data-act="bxDel" data-i="' + esc(o.id) + '" data-k="' + k + '">삭제</button>' : '<button class="btn sm ghost" data-act="bxAdd" data-i="' + esc(o.id) + '">+ 다른 크기</button>') + '</div>'; }).join('') +
+      (bx.rec ? '<div class="rec">추천: ' + esc(bx.rec) + ' — 맞는지 확인하세요</div>' : '') + '</div>';
+    return cardHTML(o, { key: o.id, check: PSEL[o.id], extra: ex, act: 'none' });
+  }).join('');
+}
+function readBoxes() { Array.prototype.forEach.call(document.querySelectorAll('[data-box]'), function (d) { var id = d.getAttribute('data-box'); if (!PBOX[id]) return;
+  PBOX[id].box = Array.prototype.map.call(d.querySelectorAll('.box'), function (r) { var x = { k: r.querySelector('.bk').value, b: Math.max(1, +r.querySelector('.bb').value || 1) }, f = r.querySelector('.bf'); if (f && +f.value) x.f = +f.value; return x; }); }); }
+function pBuild() {
+  readBoxes(); var list = pOrders().filter(function (o) { return PSEL[o.id]; }); if (!list.length) { notice('뽑을 주문을 체크하세요'); return null; }
+  var miss = list.filter(function (o) { return warns(o).length; }); if (miss.length && !confirm(miss.length + '건에 빠진 정보가 있습니다 (' + miss[0].cust + ': ' + warns(miss[0]).join(', ') + ').\n그래도 뽑을까요?')) return null;
+  var withBox = list.map(function (o) { var x = JSON.parse(JSON.stringify(o)); x.box = PBOX[o.id].box; return x; });
+  var out = (S.carrier === 'CJ' ? OUT.cj : S.carrier === '경동' ? OUT.kd : OUT.ds)(withBox, S.sender, S.today); out.orders = withBox; return out;
+}
+function pDone(out) { var box = {}; out.orders.forEach(function (o) { box[o.id] = o.box; });
+  call('markPrinted', { ids: out.orders.map(function (o) { return o.id; }), box: box, hist: out.hist }, function (r) { mergeOrders(r.orders); out.orders.forEach(function (o) { delete PSEL[o.id]; delete PBOX[o.id]; }); render(); }); }
+function download(bytes, name) { var a = document.createElement('a'), u = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); a.href = u; a.download = name + '.xlsx'; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(u); a.remove(); }, 1500); }
+function copyText(t, ok) { var done = function () { notice(ok); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, function () { fallbackCopy(t); done(); }); else { fallbackCopy(t); done(); } }
+function fallbackCopy(t) { var ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.remove(); }
+
+/* ---------- 4. 출하서 ---------- */
+var CSEL = {};
+function renderClose() {
+  var d = $('cDate').value || S.today, wait = S.orders.filter(function (o) { return o.st === '대기'; }), done = S.orders.filter(function (o) { return o.st === '출고완료' && o.shipped === d; });
+  wait.sort(function (a, b) { return String(a.at).localeCompare(String(b.at)); });
+  $('cList').innerHTML = (done.length ? '<div class="sec">이미 출고완료 ' + done.length + '건</div>' + done.map(function (o) { return cardHTML(o, { key: o.id }); }).join('') : '') +
+    '<div class="sec">대기 중 ' + wait.length + '건 — 오늘 나간 것에 체크</div>' + (wait.length ? wait.map(function (o) { if (CSEL[o.id] == null) CSEL[o.id] = String(o.printed).slice(0, 10) === d; return cardHTML(o, { key: o.id, check: CSEL[o.id], act: 'none' }); }).join('') : '<p class="muted">대기 중인 주문이 없습니다.</p>');
+}
+function doClose() {
+  var d = $('cDate').value || S.today, ids = S.orders.filter(function (o) { return o.st === '대기' && CSEL[o.id]; }).map(function (o) { return o.id; });
+  var left = S.orders.filter(function (o) { return o.st === '대기'; }).length - ids.length;
+  if (!confirm(OUT.md(d) + ' 출하서를 만듭니다.\n· 출고완료로 바꿀 주문 ' + ids.length + '건\n· 대기로 남는 주문 ' + left + '건\n진행할까요?')) return;
+  call('closeDay', { date: d, shippedIds: ids }, function (r) { mergeOrders(r.orders); CSEL = {}; reportFile(r.report); notice('출하서를 만들었습니다 (출고 ' + r.report.shipped.length + '건 · 대기 ' + r.report.pending.length + '건)'); render(); loadReports(); });
+}
+function reportFile(snap) { var out = OUT.report(snap, OP.isAcc); download(XL.build(out.sheets), out.name); }
+function loadReports() { call('reports', {}, function (r) { $('rList').innerHTML = r.list.length ? r.list.map(function (x) { return '<div class="card tap" data-act="rGet" data-i="' + x.date + '"><b>' + esc(x.date) + '</b> <span class="muted">출고 ' + x.shipped + '건 · 대기 ' + x.pending + '건 · ' + esc(x.made.slice(5, 16)) + ' 마감</span></div>'; }).join('') : '아직 마감한 날이 없습니다.'; }); }
+
+/* ---------- 5. 더보기: 주소록·가져오기·암호 ---------- */
+function renderCusts() {
+  var q = OP.norm($('cq').value), list = S.custs.filter(function (c) { return !q || OP.norm(c.name + c.addr).indexOf(q) >= 0; });
+  $('custs').innerHTML = '<p class="muted" style="margin:0 0 6px">' + S.custs.length + '줄' + (q ? ' 중 ' + list.length + '줄' : '') + '</p>' + (q || S.custs.length <= 30 ? list.slice(0, 60) : []).map(function (c) {
+    return '<div class="card tap" data-act="custEdit" data-i="' + c.row + '"><b>' + esc(c.name) + '</b><div class="meta">' + esc([c.phone, c.addr].filter(Boolean).join(' · ')) + (c.kd ? ' <span class="tag">경동 ' + esc(c.kd) + '</span>' : '') + (c.ds ? ' <span class="tag">대신 ' + esc(c.ds) + '</span>' : '') + (c.ship ? ' <span class="tag ship">' + esc(c.ship) + '</span>' : '') + '</div></div>'; }).join('') + (!q && S.custs.length > 30 ? '<p class="muted">이름을 검색하면 보입니다.</p>' : '');
+}
+var CE = null, CF = [['name', '거래처 이름'], ['phone', '전화'], ['phone2', '전화2'], ['addr', '주소'], ['kd', '경동 영업소'], ['ds', '대신 영업소'], ['ship', '기본 배송방법 (예: 택배선불)'], ['sender', '보내는분 이름 (직송 때)'], ['senderPhone', '보내는분 전화'], ['senderAddr', '보내는분 주소'], ['stmt', '거래명세서'], ['tax', '계산서'], ['memo', '메모']];
+function openCust(c) { CE = c || { row: 0 }; ED = null; $('shT').textContent = c ? '거래처 고치기' : '거래처 추가';
+  $('shB').innerHTML = CF.map(function (f) { return '<label class="f">' + f[1] + '</label><input type="text" id="c-' + f[0] + '" value="' + esc(CE[f[0]] || '') + '">'; }).join('');
+  $('shF').innerHTML = '<button class="btn pri grow" data-act="custSave">저장</button>'; $('shade').classList.remove('hidden'); $('sheet').classList.remove('hidden'); }
+function doImport(files) {
+  var msg = $('impMsg'), all = { custs: [], hist: [], what: [] }, i = 0; msg.textContent = '파일을 읽는 중…';
+  function next() {
+    if (i >= files.length) return send();
+    var f = files[i++]; f.arrayBuffer().then(function (b) { return XL.read(b, 30); }).then(function (R) { var x = OUT.importBook(R, S.sender); all.custs = all.custs.concat(x.custs); all.hist = all.hist.concat(x.hist); all.what = all.what.concat(x.what.length ? x.what : [f.name + ' (가져올 내용 없음)']); next(); })
+      .catch(function (e) { msg.textContent = f.name + ' 읽기 실패: ' + (e.message || e); });
+  }
+  function send() {
+    if (!all.custs.length && !all.hist.length) { msg.textContent = '가져올 내용을 찾지 못했습니다. (' + all.what.join(', ') + ')'; return; }
+    if (!confirm('가져옵니다.\n· ' + all.what.join('\n· ') + '\n· 주소록 ' + all.custs.length + '줄, 송장 기록 ' + all.hist.length + '줄\n진행할까요?')) { msg.textContent = '취소했습니다.'; return; }
+    msg.textContent = '주소록 저장 중…';
+    call('custImport', { rows: all.custs }, function (r) { S.custs = r.custs; var done = 0, added = 0, parts = []; for (var k = 0; k < all.hist.length; k += 1500) parts.push(all.hist.slice(k, k + 1500));
+      (function step() { if (done >= parts.length) { msg.textContent = '완료: 주소록 ' + r.added + '줄 추가' + (r.filled ? ' (빈칸 ' + r.filled + '곳 채움)' : '') + ', 송장 기록 ' + added + '줄 추가.'; renderCusts(); call('recData', {}, function (x) { S.rec = OP.buildRec(x.hist); }); return; }
+        msg.textContent = '송장 기록 저장 중… ' + (done + 1) + '/' + parts.length; call('histImport', { rows: parts[done] }, function (h) { added += h.added; done++; step(); }); })(); });
+  }
+  next();
+}
+
+/* ---------- 누르기 ---------- */
+document.addEventListener('click', function (ev) {
+  var chk = ev.target.closest('[data-chk]'); if (chk) { var key = chk.getAttribute('data-chk'); if (S.view === 'new') { S.drafts[+key]._on = chk.checked; renderDrafts(); } if (S.view === 'print') PSEL[key] = chk.checked; if (S.view === 'close') CSEL[key] = chk.checked; return; }
+  if (ev.target.closest('[data-box]') && !ev.target.closest('[data-act="bxAdd"],[data-act="bxDel"]')) return;
+  var b = ev.target.closest('[data-act],[data-v]'); if (!b) return;
+  if (b.dataset.v) { go(b.dataset.v); return; }
+  var a = b.dataset.act, i = b.dataset.i, o;
+  if (a === 'none') return;
+  if (a === 'parse') doParse();
+  else if (a === 'manual') { var n = blank(); openEdit(n); }
+  else if (a === 'draftEdit') openEdit(S.drafts[+i], { draft: +i });
+  else if (a === 'draftSave') saveDrafts();
+  else if (a === 'draftClear') { if (!S.drafts.length || confirm('나눈 결과를 비울까요?')) { S.drafts = []; $('paste').value = ''; renderDrafts(); } }
+  else if (a === 'shClose') showSheet(false);
+  else if (a === 'edit') { o = byId(i); if (o) openEdit(o); }
+  else if (a === 'filt') { S.filter = i; renderList(); }
+  else if (a === 'itAdd') { readEdit(); ED.o.items.push({ name: '', sensor: '', qty: '', unit: '', note: '' }); drawEdit(); }
+  else if (a === 'itDel') { readEdit(); ED.o.items.splice(+i, 1); if (!ED.o.items.length) ED.o.items.push({ name: '', sensor: '', qty: '', unit: '', note: '' }); drawEdit(); }
+  else if (a === 'due') { readEdit(); ED.o.due = i; drawEdit(); }
+  else if (a === 'car') { readEdit(); ED.o.carrier = ED.o.carrier === i ? '' : i; if (!ED.o.branch) { var mm = OP.findCust(S.custs, ED.o.cust).filter(function (x) { return i === '경동' ? x.kd : (i === '대신' ? x.ds : ''); })[0]; if (mm) ED.o.branch = i === '경동' ? mm.kd : mm.ds; } relabel(); drawEdit(); }
+  else if (a === 'pay') { readEdit(); ED.o.pay = ED.o.pay === i ? '' : i; relabel(); drawEdit(); }
+  else if (a === 'claim') { readEdit(); ED.o.claim = !ED.o.claim; relabel(); drawEdit(); }
+  else if (a === 'mode') { readEdit(); ED.o.mode = i; relabel(); drawEdit(); }
+  else if (a === 'pickAddr') { readEdit(); var c = S.custs.filter(function (x) { return x.row === +i; })[0]; if (c) { ED.o.addr = c.addr; if (c.phone) ED.o.phone = c.phone; if (c.phone2) ED.o.phone2 = c.phone2; } drawEdit(); }
+  else if (a === 'snd') { readEdit(); if (i === 'def') { ED.o.sender = ''; ED.o.senderPhone = ''; ED.o.senderAddr = ''; } else { var mc = OP.findCust(S.custs, ED.o.cust), c0 = mc[0] || {}, ca = mc.filter(function (x) { return x.addr; })[0] || c0; ED.o.sender = c0.sender || ED.o.cust; ED.o.senderPhone = c0.senderPhone || ca.phone || ''; ED.o.senderAddr = c0.senderAddr || ca.addr || ''; } drawEdit(); }
+  else if (a === 'edSave') saveEdit();
+  else if (a === 'edDrop') { S.drafts.splice(ED.opt.draft, 1); showSheet(false); renderDrafts(); }
+  else if (a === 'edShip') { var id = ED.o.id; saveEdit(function () { call('setStatus', { ids: [id], st: '출고완료', shipped: S.today }, function (r) { mergeOrders(r.orders); notice('출고완료로 바꿨습니다'); render(); }); }); }
+  else if (a === 'edCancel') { if (confirm('이 주문을 취소할까요? (지워지지 않고 취소로 남습니다)')) { var id2 = ED.o.id; showSheet(false); call('setStatus', { ids: [id2], st: '취소' }, function (r) { mergeOrders(r.orders); notice('취소했습니다'); render(); }); } }
+  else if (a === 'edBack') { var id3 = ED.o.id; showSheet(false); call('setStatus', { ids: [id3], st: '대기' }, function (r) { mergeOrders(r.orders); notice('대기로 되돌렸습니다'); render(); }); }
+  else if (a === 'edCopy') { var cp = clean(readEdit()); delete cp.id; cp.at = ''; cp.printed = ''; cp.shipped = ''; cp.st = '대기'; cp.box = []; showSheet(false); openEdit(cp); notice('복제본입니다. 고친 뒤 저장하세요 (나눠서 출고할 때)'); }
+  else if (a === 'pCar') { readBoxes(); S.carrier = i; renderPrint(); }
+  else if (a === 'pShow') { readBoxes(); PSHOW = !PSHOW; renderPrint(); }
+  else if (a === 'bxAdd') { readBoxes(); PBOX[i].box.push({ k: '', b: 1 }); PBOX[i].rec = ''; renderPrint(); }
+  else if (a === 'bxDel') { readBoxes(); PBOX[i].box.splice(+b.dataset.k, 1); renderPrint(); }
+  else if (a === 'pXlsx') { var out = pBuild(); if (out) { download(XL.build(out.sheets), out.name); pDone(out); notice(out.orders.length + '건 엑셀을 받았습니다'); } }
+  else if (a === 'pCopy') { var out2 = pBuild(); if (out2) { copyText(out2.tsv, out2.orders.length + '건 복사했습니다. 엑셀 빈 줄에 붙여넣으세요'); pDone(out2); } }
+  else if (a === 'closeDay') doClose();
+  else if (a === 'rGet') call('report', { date: i }, function (r) { reportFile(r.report); });
+  else if (a === 'custNew') openCust(null);
+  else if (a === 'custEdit') openCust(S.custs.filter(function (x) { return x.row === +i; })[0]);
+  else if (a === 'custSave') { var c2 = {}; CF.forEach(function (f) { c2[f[0]] = $('c-' + f[0]).value.trim(); }); call('custSave', { row: CE.row, cust: c2 }, function (r) { S.custs = r.custs; showSheet(false); notice('저장했습니다'); renderCusts(); }); }
+  else if (a === 'pinSave') { var np = $('pinNew').value.trim(); if (!confirm(np ? '접속 암호를 "' + np + '"(으)로 바꿉니다. 같이 쓰는 분들께 알려주세요.' : '접속 암호를 끕니다. 주소만 알면 누구나 열 수 있게 됩니다.')) return; call('setPin', { pin: np }, function () { S.pin = np; try { localStorage.setItem('so-pin', np); } catch (e) {} $('pinNew').value = ''; notice(np ? '암호를 설정했습니다' : '암호를 껐습니다'); }); }
+});
+$('shade').addEventListener('click', function () { showSheet(false); });
+$('q').addEventListener('input', renderList);
+$('cq').addEventListener('input', renderCusts);
+$('cDate').addEventListener('change', function () { CSEL = {}; renderClose(); });
+$('imp').addEventListener('change', function () { if (this.files.length) doImport(Array.prototype.slice.call(this.files)); this.value = ''; });
+document.addEventListener('change', function (ev) { if (ev.target.id === 'e-cust' && ED) { readEdit(); var had = ED.o.addr; enrich(ED.o); if (!had && ED.o.addr) notice('주소록에서 주소를 채웠습니다'); drawEdit(); } });
+boot();
+</script>
+</body>
+</html>

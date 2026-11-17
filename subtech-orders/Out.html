@@ -1,0 +1,141 @@
+<script>
+/* 써브텍 주문앱 — 엑셀 양식 만들기(CJ·경동·대신·출하서)와 옛 엑셀 가져오기. DOM 안 씀 (dev 테스트와 같이 씀)
+   양식의 열 순서·머리줄 글자는 사무실이 쓰던 엑셀 그대로다. 바꾸지 말 것. */
+var OUT = (function () {
+  var SP = '    ';
+  function isDirect(o, def) { return !!(o.sender && o.sender !== (def && def.name)); }
+  function snd(o, def) { return isDirect(o, def) ? { name: o.sender, phone: o.senderPhone || '', addr: o.senderAddr || '' } : { name: def.name, phone: def.phone, addr: def.addr }; }
+  function itemStr(i) { return i.name + (i.sensor ? SP + i.sensor : '') + (i.qty === '' || i.qty == null ? '' : SP + i.qty + (i.unit || '')); }
+  function itemText(o, sep) { return (o.items || []).map(itemStr).join(sep); }
+  function recvName(o, def) { if (!o.recv) return o.cust || ''; if (isDirect(o, def) || !o.cust || o.recv.indexOf(o.cust) >= 0) return o.recv; return o.cust + ' ' + o.recv; }
+  function boxes(o) { return o.box && o.box.length ? o.box : [{ k: '', b: 1 }]; }
+  function md(ymd) { var m = String(ymd || '').match(/^\d{4}-(\d{2})-(\d{2})/); return m ? m[1] + '월 ' + m[2] + '일' : String(ymd || ''); }
+  function tsv(rows) { return rows.map(function (r) { return r.map(function (v) { v = v == null ? '' : String(v); return /[\t\n"]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join('\t'); }).join('\n'); }
+  function hd(a, s) { return a.map(function (v) { return { v: v, s: s }; }); }
+  function bd(a, left) { return a.map(function (v, i) { return { v: v, s: left && left.indexOf(i) >= 0 ? 10 : 2 }; }); }
+
+  /* ----- CJ대한통운 (건별출력) ----- */
+  var CJ_H = ['보내는분성명', '보내는분전화번호', '보내는분기타연락처', '보내는분주소(전체, 분할)', '받는분성명', '받는분전화번호', '받는분기타연락처', '받는분주소(전체, 분할)', '품목명', '박스수량', '박스타입', '기본운임', '운임구분', '배송메세지1'];
+  function cj(orders, def, date) {
+    var rows = [], hist = [];
+    orders.forEach(function (o) {
+      var s = snd(o, def), nm = recvName(o, def), txt = itemText(o, '/\n');
+      boxes(o).forEach(function (x) {
+        rows.push([s.name, s.phone, '', s.addr, nm, o.phone || '', o.phone2 || '', o.addr || '', txt, x.b || 1, x.k || '', '', o.pay === '착불' ? '착불' : '신용', (o.msg ? o.msg + '/' : '') + nm]);
+        hist.push([date, 'CJ', nm, txt, x.b || 1, x.k || '', '']);
+      });
+    });
+    return { name: 'CJ택배_' + date, rows: rows, hist: hist, tsv: tsv(rows),
+      sheets: [{ name: '건별출력', rows: [hd(CJ_H, 6)].concat(rows.map(function (r) { return bd(r); })), widths: [18.4, 15, 17.6, 46.5, 18.6, 18, 17.5, 48.4, 24.6, 9.1, 10, 5.6, 8.2, 14.5], freeze: 1 }] };
+  }
+
+  /* ----- 경동택배 (발송자료) ----- */
+  var KD_H = ['보내는분', '보내는분 연락처', '받는분', '주소', '상세주소', '운송장번호', '고객사주문번호', '우편번호', '도착영업소', '전화번호', '기타전화번호', '선불후불', '품목명', '수량', '포장상태', '가로', '세로', '높이', '무게', '개별단가', '배송운임', '기타운임', '별도운임', '할증운임', '도서운임', '메모'];
+  function kd(orders, def, date) {
+    var rows = [], hist = [];
+    orders.forEach(function (o) {
+      var s = snd(o, def), nm = recvName(o, def), txt = itemText(o, '/'), zip = (String(o.addr || '').match(/\(?(\d{5})\)?/) || [])[1] || '';
+      boxes(o).forEach(function (x) {
+        rows.push([s.name, s.phone, nm, String(o.addr || '').replace(/^\(?\d{5}\)?\s*/, ''), '', '', '', zip, o.branch || '', o.phone || '', o.phone2 || '', o.pay === '착불' ? '착불' : '선불', txt, x.b || 1, '박스', 10, 10, 10, 10, 50, x.f || '', 100, '', '', '', nm + (x.k ? '/' + x.k : '')]);
+        hist.push([date, '경동', nm, txt, x.b || 1, x.k || '', x.f || '']);
+      });
+    });
+    return { name: '경동택배_' + date, rows: rows, hist: hist, tsv: tsv(rows),
+      sheets: [{ name: '발송자료', rows: [hd(KD_H, 6)].concat(rows.map(function (r) { return bd(r); })), widths: [14.2, 23.8, 27.2, 47, 12.5, 9.9, 14.9, 9, 17.1, 14.4, 13, 13, 27.9, 5.2, 9, 5.2, 5.2, 5.2, 5.2, 14.4, 14.4, 9, 9, 9, 9, 19.2], freeze: 1 }] };
+  }
+
+  /* ----- 대신화물 (날짜 탭, 발화주별 표) ----- */
+  var DS_H = ['도착지', '수화주전화', '수화주명', '품명', '소/대 구분', '포장방법', '수량', '현/착불', '운임', '운송방법', '총운임'];
+  function ds(orders, def, date) {
+    var groups = {}, order = [], hist = [], flat = [];
+    orders.forEach(function (o) { var s = snd(o, def), k = s.name + ',' + s.phone; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(o); });
+    var rows = [[{ v: md(date), s: 7 }], []], merges = [], heights = { 0: 34 };
+    order.forEach(function (k, gi) {
+      if (gi) { rows.push([]); rows.push([]); }
+      rows.push([{ v: '발화주 :' + k, s: 8 }]); heights[rows.length - 1] = 26;
+      rows.push(hd(DS_H, 6));
+      groups[k].forEach(function (o) {
+        var nm = recvName(o, def), txt = itemText(o, '\n');
+        boxes(o).forEach(function (x) {
+          var b = x.b || 1, f = x.f || '', r = [o.branch || o.addr || '', o.phone || '', nm, txt, x.k || '', '박스', b, o.pay === '착불' ? '착불' : '현불', f, o.mode || '화물', f ? f * b : ''];
+          flat.push(r); rows.push(r.map(function (v, i) { return { v: v, s: i === 7 ? 9 : 2 }; })); heights[rows.length - 1] = Math.max(45, 18 * (o.items || []).length + 12);
+          hist.push([date, '대신', nm, txt, b, x.k || '', f]);
+        });
+      });
+    });
+    return { name: '대신화물_' + date, rows: flat, hist: hist, tsv: tsv(flat),
+      sheets: [{ name: md(date), rows: rows, widths: [56.5, 19.1, 18.2, 30.6, 18.6, 13.1, 11.5, 10.6, 10.5, 11.8, 10.4], heights: heights, merges: merges, landscape: true }] };
+  }
+
+  /* ----- 출하서 (출고현황) : 위 = 그날 나간 것, 합계, 아래 = 못 나간 것(대기) ----- */
+  var RP_H = ['no.', '일자-No.', '거래처명', '품목명[규격]', '센서', '수량', '적요', '받는분', '배송방법', '거래명세서', '계산서 발행 여부'];
+  function qtyCell(i, isAcc) { if (i.qty === '' || i.qty == null) return ''; return (i.unit && i.unit !== '개') || isAcc(i.name) ? i.qty + (i.unit || '개') : +i.qty; }
+  function report(snap, isAcc) {
+    isAcc = isAcc || function () { return false; };
+    var rows = [], merges = [[0, 0, 0, 10]], sum = [0, 0];
+    rows.push(hd([snap.date.replace(/-/g, '/') + '-출고현황', '', '', '', '', '', '', '', '', '', ''], 3));
+    rows.push(hd(RP_H, 1));
+    function block(list, which, numbered) {
+      list.forEach(function (o, n) {
+        var its = o.items && o.items.length ? o.items : [{ name: '', sensor: '', qty: '', unit: '', note: '' }], r0 = rows.length, anyNote = its.some(function (i) { return i.note; });
+        var to = [o.recv, o.phone].filter(Boolean).join(' / '), recv = [to, o.addr].filter(Boolean).join(' ') || (o.branch || '');
+        its.forEach(function (i, k) {
+          var q = qtyCell(i, isAcc); if (typeof q === 'number') sum[which] += q;
+          var note = anyNote ? (k === 0 ? [o.memo, i.note].filter(Boolean).join(' / ') : (i.note || '')) : (k === 0 ? (o.memo || '') : '');
+          rows.push([{ v: k === 0 && numbered ? n + 1 : '', s: 2 }, { v: k === 0 ? (which ? md(o.due) : md(snap.date)) : '', s: 2 }, { v: k === 0 ? o.cust : '', s: 2 }, { v: i.name, s: 2 }, { v: i.sensor || '', s: 2 },
+            { v: q, s: typeof q === 'number' ? 5 : 2 }, { v: note, s: 2 }, { v: k === 0 ? recv : '', s: 2 }, { v: k === 0 ? (o.ship || '') : '', s: 2 }, { v: k === 0 ? (o.stmt || '') : '', s: 2 }, { v: k === 0 ? (o.tax || '') : '', s: 2 }]);
+        });
+        if (its.length > 1) { var r1 = rows.length - 1; [0, 1, 2, 7, 8, 9, 10].forEach(function (c) { merges.push([r0, c, r1, c]); }); if (!anyNote) merges.push([r0, 6, r1, 6]); }
+      });
+    }
+    block(snap.shipped || [], 0, true);
+    var t = rows.length; rows.push(hd(['합계', '', '', '', '', sum[0], '', '', '', '', ''], 4)); merges.push([t, 0, t, 1]);
+    block(snap.pending || [], 1, false);
+    t = rows.length; rows.push(hd(['출고 대기 합계', '', '', '', '', sum[1], '부자재(센서·파워코드 등) 수량 제외', '', '', '', ''], 4)); merges.push([t, 0, t, 1]);
+    return { name: '출하서_' + snap.date, sum: sum, sheets: [{ name: md(snap.date), rows: rows, merges: merges, widths: [5.1, 16.5, 36.4, 23.2, 9.2, 10.4, 33.6, 35.9, 20.1, 13.8, 21.8], rowH: 30, landscape: true }] };
+  }
+
+  /* ----- 옛 엑셀 가져오기: XL.read 결과 → {custs, hist, what} ----- */
+  function cl(v) { return String(v == null ? '' : v).replace(/\r/g, '').replace(/^\s+|\s+$/g, ''); }
+  function dateLabel(v) { if (typeof v === 'number' && v > 40000 && v < 60000) return XL.date(v); var s = cl(v); return /^\d{1,2}월\s*\d{1,2}일$/.test(s) ? s : ''; }
+  function importBook(R, def) {
+    var custs = [], hist = [], what = [], defName = (def && def.name) || '써브텍';
+    var book = R['매출처 주소록'], cjLog = R['송장출력건'], kdLog = R['발송기록'];
+    if (book) {
+      book.slice(3).forEach(function (r) { var nm = cl(r[1]), ad = cl(r[4]), m; if (!nm) return;
+        if ((m = ad.match(/^(경동|대신)\s*(?:택배|화물)?\s*[:：]\s*(.+)$/))) { var c = { name: nm }; c[m[1] === '경동' ? 'kd' : 'ds'] = cl(m[2]); custs.push(c); return; }
+        custs.push({ name: nm, phone: cl(r[2]), phone2: cl(r[3]), addr: ad }); });
+      what.push('CJ 매출처 주소록');
+    }
+    if (cjLog) {
+      var d = ''; cjLog.forEach(function (r) { var dl = dateLabel(r[0]); if (dl && !r[4]) { d = dl; return; }
+        if (r[4] && r[7] && r[8] && cl(r[4]) !== '받는분성명') hist.push([d, 'CJ', cl(r[4]), cl(r[8]), +r[9] || 1, cl(r[10]), '']); });
+      what.push('CJ 송장출력건');
+    }
+    if (kdLog) {
+      var d2 = ''; kdLog.slice(1).forEach(function (r) { var dl = dateLabel(r[0]); if (dl && !r[2]) { d2 = dl; return; }
+        if (!r[2] || !r[12]) return; var memo = cl(r[25]), k = memo.indexOf('/') >= 0 ? cl(memo.split('/').pop()) : '', snd = cl(r[0]);
+        hist.push([d2, '경동', cl(r[2]), cl(r[12]), +r[13] || 1, k, +r[20] || '']);
+        if (!snd || snd === defName) custs.push({ name: cl(r[2]), addr: cl([cl(r[3]), cl(r[4])].join(' ')), phone: cl(r[9]), phone2: cl(r[10]), kd: cl(r[8]) }); });
+      what.push('경동 발송기록');
+    }
+    var dsN = 0;
+    Object.keys(R).forEach(function (name) {
+      var rows = R[name], on = false, sender = '';
+      rows.forEach(function (r) {
+        var a = cl(r[0]), m;
+        if ((m = a.match(/^발화주\s*[:：]\s*([^,\/]+)/))) { sender = cl(m[1]); on = false; return; }
+        if (a === '도착지' && cl(r[2]) === '수화주명') { on = true; dsN++; return; }
+        if (!on) return; if (!r[2] || !r[3]) { if (!a) on = false; return; }
+        hist.push([name, '대신', cl(r[2]), cl(r[3]), +r[6] || 1, cl(r[4]), +r[8] || '']);
+        if (!sender || sender === defName) { var isAd = /\d/.test(a) && /(로|길|동|리|읍|면)\s?\d/.test(a), c = { name: cl(r[2]), phone: cl(r[1]) }; if (isAd) c.addr = a; else c.ds = a; custs.push(c); }
+      });
+    });
+    if (dsN) what.push('대신화물 ' + dsN + '일치');
+    return { custs: custs, hist: hist, what: what };
+  }
+
+  return { cj: cj, kd: kd, ds: ds, report: report, importBook: importBook, itemText: itemText, itemStr: itemStr, recvName: recvName, isDirect: isDirect, md: md, tsv: tsv };
+})();
+if (typeof module !== 'undefined') module.exports = OUT;
+</script>

@@ -6,6 +6,10 @@
 `couple-budget`(우리집 하루수입 가계부) 작업은 시작 전에 `couple-budget/HANDOFF.md` 를 먼저 읽고 `couple-budget/CLAUDE.md` 규칙을 따른다.
 `couple-budget/CHANGELOG.md` 는 배포 때 자동 기록되므로 손대지 않는다.
 
+## 써브텍 주문앱 (subtech-orders)
+`subtech-orders`(사무실 주문 관리: 카톡 발주 → 주문 → 송장 엑셀 → 출하서) 작업은 시작 전에 `subtech-orders/HANDOFF.md` 를 먼저 읽고 `subtech-orders/CLAUDE.md` 규칙을 따른다.
+재고앱(`subtech-inventory/`, 다른 브랜치)과 재고 탭은 건드리지 않는다. `subtech-orders/CHANGELOG.md` 는 배포 때 자동 기록되므로 손대지 않는다.
+
 ## 기술 학습 코치
 사용자가 "시작", "복습", "면접모드"라고 하거나 기술 학습 코칭을 요청하면
 `tech-coach/CLAUDE.md` 지침을 읽고 그대로 진행한다.
