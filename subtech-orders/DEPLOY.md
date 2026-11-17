@@ -16,8 +16,9 @@ GitHub 저장소 → **Settings → Secrets and variables → Actions → New re
 | `ORDERS_SCRIPT_ID` | 1-3의 스크립트 ID |
 
 ## 3. 코드 올리기 (첫 실행)
-GitHub **Actions** 탭 → 왼쪽 **써브텍 주문앱 배포** → **Run workflow** → 브랜치 `ccr-45fa06b9-ax86xs` → **Run workflow**
-- 초록 체크가 뜨면 Apps Script 프로젝트에 코드가 올라간 것입니다. (아직 웹앱 주소는 없음 — "배포 ID 없음, 코드만 올림" 안내가 뜹니다)
+Claude에게 **"Secrets 넣었어"** 라고 말하면 Claude가 이 브랜치에 푸시해서 배포 작업을 실행시킵니다.
+- (GitHub Actions의 Run workflow 버튼은 기본 브랜치에 있는 워크플로에만 나타나서, 이 브랜치에서는 안 보입니다)
+- 초록 체크가 뜨면 Apps Script 프로젝트에 코드가 올라간 것입니다. 아직 웹앱 주소는 없고 "배포 ID 없음, 코드만 올림" 안내가 뜹니다.
 
 ## 4. 웹앱으로 배포 (주소 만들기 — 이때 한 번만 "새 배포")
 1. Apps Script 편집기 새로고침 → 오른쪽 위 **배포 > 새 배포**
@@ -31,6 +32,7 @@ GitHub **Actions** 탭 → 왼쪽 **써브텍 주문앱 배포** → **Run workf
 |---|---|
 | `ORDERS_DEPLOYMENT_ID` | 4-5의 배포 ID (웹앱 주소 전체를 넣어도 됩니다) |
 
+넣은 뒤 Claude에게 **"배포 ID 넣었어"** 라고 하면 한 번 더 푸시해서 자동 배포가 되는지 확인합니다.
 이후에는 코드가 올라올 때마다 **같은 주소**로 자동 배포됩니다. "새 배포"는 다시 누르지 마세요(주소가 바뀝니다).
 
 ## 6. 처음 열었을 때
