@@ -424,3 +424,19 @@ function locQuickOut(p) {
     lock.releaseLock();
   }
 }
+
+/** 품목 기본박스입수(품목마스터 D열)가 비어 있을 때만 채움 — 위치도 박스 빠른 출입고에서 처음 넣은 1박스 개수 (v46) */
+function locSetUnit(p) {
+  p = p || {};
+  const unit = Math.floor(Number(p.unit) || 0);
+  if (!(unit > 0)) throw new Error('1박스 개수를 넣어주세요.');
+  const m = SpreadsheetApp.getActive().getSheetByName(TAB_MASTER);
+  if (!m || m.getLastRow() < 2) return { ok: false };
+  const ids = m.getRange(2, 1, m.getLastRow() - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) if (ids[i][0] === p.id) {
+    const cell = m.getRange(i + 2, 4);
+    if (cell.getValue() === '' || cell.getValue() === null) { cell.setValue(unit); return { ok: true, unit: unit }; }
+    return { ok: false, unit: cell.getValue() };   // 이미 있으면 그대로
+  }
+  return { ok: false };
+}

@@ -6,7 +6,8 @@ const fs = require('fs'), vm = require('vm'), path = require('path');
 const D = path.join(__dirname, '..');
 function sheet(rows) { return { rows, appendRow(r) { this.rows.push(r) }, getLastRow() { return this.rows.length }, getRange(r, c, nr, nc) { const self = this; return {
   getValues() { return self.rows.slice(r - 1, r - 1 + nr).map(x => { const a = x.slice(c - 1, c - 1 + nc); while (a.length < nc) a.push(''); return a }) },
-  setValues(v) { v.forEach((row, i) => { self.rows[r - 1 + i] = row.slice() }) } } } } }
+  setValues(v) { v.forEach((row, i) => { self.rows[r - 1 + i] = row.slice() }) },
+  getValue() { const row = self.rows[r - 1] || []; return row[c - 1] === undefined ? '' : row[c - 1] }, setValue(v) { (self.rows[r - 1] = self.rows[r - 1] || [])[c - 1] = v } } } } }
 const master = sheet([['ID', '품명', '분류', '단위', '안전'], ['SV7||기판', 'SV7', '기판', 100, 0], ['SV7||완포', 'SV7', '완포', 0, 0]]);
 const log = sheet([['일시']]);
 const sheets = { '품목마스터': master, '거래로그': log };
@@ -70,4 +71,10 @@ ok(Object.values(st).every(s => s.total === 0 && s.boxes === 0), '전체 초기�
   ok(R('computeStock_')['SV7||완포'].locs['A동1층'] === -491, '마이너스 -491 만들어 둠');
   R('locSetQty', { rows: [{ id: 'SV7||완포', loc: 'A동1층', qty: 0, note: '마이너스·연결 안 된 재고 정리' }] });
   ok(R('computeStock_')['SV7||완포'].locs['A동1층'] === 0 && /-491→0/.test(log.rows[log.rows.length - 1][11]), '0으로 정리 (조정 +491, 메모 -491→0)'); }
+
+// v46: 기본박스입수가 비었을 때만 채움
+{ const row = master.rows.find(x => x[0] === 'SV7||완포'); row[3] = '';
+  ok(R('locSetUnit', { id: 'SV7||완포', unit: 50 }).ok === true && row[3] === 50, '빈 기본박스입수 채움 (50)');
+  ok(R('locSetUnit', { id: 'SV7||완포', unit: 70 }).ok === false && row[3] === 50, '이미 있으면 그대로');
+  ok(R('locSetUnit', { id: 'SV7||기판', unit: 30 }).ok === false && master.rows.find(x => x[0] === 'SV7||기판')[3] === 100, '기존 값(100) 안 바뀜'); }
 console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과'); process.exit(fail ? 1 : 0);

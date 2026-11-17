@@ -56,6 +56,7 @@ var F={
  undoTransaction:function(row,k){CALLS.push({undo:[row,k]});var it=item('SV7||기판');return {ok:true,id:it.id,total:it.total,locs:it.locs,rows:1}},
  exportSave:function(p){CALLS.push({exp:{name:p.name,mime:p.mime,len:p.data.length}});return {ok:true,name:p.name,url:'https://drive.google.com/file/d/TEST/view'}},
  getRecentLog:function(){return []}, getMonthlyReport:function(){return []},
+ locSetUnit:function(p){CALLS.push({setUnit:p});var it=item(p.id);if(it&&!(it.unit>0)){it.unit=p.unit;return {ok:true,unit:p.unit}}return {ok:false}},
  resetAllStock:function(p){if(p.confirm!=='초기화')throw new Error('확인 문구');ITEMS.forEach(function(it){Object.keys(it.locs).forEach(function(k){it.locs[k]=0});it.total=0});return {ok:true,rows:ITEMS.length}}};
 function runner(s,f){var o={withSuccessHandler:function(h){return runner(h,f)},withFailureHandler:function(h){return runner(s,h)}};
  Object.keys(F).forEach(function(n){o[n]=function(){var a=arguments;setTimeout(function(){try{var r=JSON.parse(JSON.stringify(F[n].apply(null,a)));s&&s(r)}catch(e){f&&f(e)}},n==='appBoot'?DELAY:20)}});return o}
