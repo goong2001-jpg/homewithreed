@@ -200,6 +200,13 @@ SV7 O 1000개 명판있슴
     await lp.locator('.lncard').filter({ hasText: '가나보일러' }).locator('[data-w=tagged]').click();
     await lp.waitForFunction(() => LN.orders.some(o => o.cust === '가나보일러' && o.tagged));
     ok(/^가나보일러/.test(await lp.locator('.lncard').last().locator('.cu').textContent()) && await lp.locator('.lncard.s2').count() === 1, '송장부착한 주문은 흐리게 맨 아래로');
+    // v10: 검색 (탭과 상관없이 대기 전체)
+    await lp.fill('#lnQ', '보일러'); ok(await lp.locator('.lncard').count() === 1 && /가나보일러/.test(await lp.textContent('#lnBody')), '검색 "보일러" → 거래처로 1건');
+    await lp.fill('#lnQ', 'sv7'); ok(await lp.locator('.lncard').count() === 2 && /다음/.test(await lp.textContent('#lnBody')) && /마바전기/.test(await lp.textContent('#lnBody')), '검색 "sv7" → 품목으로, 오늘·다음 둘 다에서 2건');
+    await lp.fill('#lnQ', '김비밀'); ok(await lp.locator('.lncard').count() === 1, '검색: 받는분 이름으로도');
+    await lp.fill('#lnQ', 'sv7 경동'); ok(await lp.locator('.lncard').count() === 1 && /마바전기/.test(await lp.textContent('#lnBody')), '검색: 낱말 여러 개 (sv7 경동) → 모두 맞는 것만');
+    await lp.screenshot({ path: path.join(OUT, '14-line-search.png') });
+    await lp.click('[data-act=lnQClear]'); ok(await lp.inputValue('#lnQ') === '' && await lp.locator('.lncnt').count() === 1, '✕ 누르면 원래 화면');
     await lp.click('.lnnav [data-i=next]'); ok(/내일/.test(await lp.textContent('#lnBody')) && /마바전기/.test(await lp.textContent('#lnBody')), '다음 탭: 내일 출고');
     await lp.click('.lnnav [data-i=sum]'); ok(/전체 대기 중 아직 만들 것/.test(await lp.textContent('#lnBody')), '만들 양 탭');
     await lp.click('.lnnav [data-i=today]');

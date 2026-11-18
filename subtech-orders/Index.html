@@ -117,6 +117,9 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 .lnsum .r:last-child{border-bottom:0}
 .lnsum .r b{font-size:17px}
 .lncnt{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.lnsearch{position:sticky;top:44px;z-index:4;display:flex;gap:6px;background:var(--bg);padding:2px 0 10px}
+.lnsearch input{font-size:17px;min-height:50px}
+.lnsearch .btn{min-width:50px;min-height:50px}
 .lncnt>div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .lncnt .k{font-size:14px;color:var(--sub);font-weight:700}
 .lncnt .v{font-size:21px;font-weight:800;margin-top:2px;word-break:keep-all}
@@ -199,7 +202,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 </div>
 <div id="line" class="hidden">
   <header><h1>써브텍 생산</h1><span class="st" id="lnSt"></span><button class="btn sm" data-act="lnReload" style="margin-left:auto;background:#fff;color:var(--ink)">새로고침</button></header>
-  <div class="lnbody" id="lnBody"><p class="muted">불러오는 중…</p></div>
+  <div class="lnbody"><div class="lnsearch"><input type="text" id="lnQ" enterkeyhint="search" placeholder="검색: 거래처 · 받는분 · 품목 (예: 와이코, SV7)" autocomplete="off"><button class="btn" data-act="lnQClear" aria-label="검색 지우기">✕</button></div><div id="lnBody"><p class="muted">불러오는 중…</p></div></div>
   <div class="lnnav"><button data-act="lnTab" data-i="today" class="on">오늘</button><button data-act="lnTab" data-i="next">다음</button><button data-act="lnTab" data-i="sum">만들 양</button></div>
 </div>
 <div id="toast" class="hidden"></div>
@@ -210,7 +213,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v9';
+var HTML_VERSION = 'v10';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -698,6 +701,7 @@ document.addEventListener('click', function (ev) {
   else if (a === 'lnTab') { LN.tab = i; renderLine(); window.scrollTo(0, 0); }
   else if (a === 'lnCar') { LN.car = LN.car === i ? '' : i; renderLine(); }
   else if (a === 'lnReload') lineLoad();
+  else if (a === 'lnQClear') { $('lnQ').value = ''; renderLine(); $('lnQ').focus(); }
   else if (a === 'lnMark') lineMark(i, b.dataset.w);
   else if (a === 'lnName') { var nn = prompt('이름 (버튼 누른 사람으로 남습니다)', LN.name || ''); if (nn != null) { LN.name = nn.trim(); try { localStorage.setItem('so-name', LN.name); } catch (e) {} renderLine(); } }
 });
@@ -706,7 +710,7 @@ $('q').addEventListener('input', renderList);
 $('cq').addEventListener('input', renderCusts);
 $('cDate').addEventListener('change', function () { CSEL = {}; renderClose(); });
 $('imp').addEventListener('change', function () { if (this.files.length) doImport(Array.prototype.slice.call(this.files)); this.value = ''; });
-document.addEventListener('input', function (ev) { if (ev.target.classList && ev.target.classList.contains('sq')) shipSync();
+document.addEventListener('input', function (ev) { if (ev.target.id === 'lnQ') { renderLine(); return; } if (ev.target.classList && ev.target.classList.contains('sq')) shipSync();
   if (ev.target.id === 'e-addr' && ED && $('e-saveAddrRow')) $('e-saveAddrRow').classList.toggle('hidden', !newAddr($('e-cust').value, ev.target.value)); });
 document.addEventListener('change', function (ev) { if (ev.target.classList && ev.target.classList.contains('sw')) { shipSync(); return; } if (ev.target.id === 'e-dueCal' && ED && ev.target.value) { readEdit(); ED.o.due = ev.target.value; drawEdit(); return; } if (ev.target.id === 'e-cust' && ED) { readEdit(); var had = ED.o.addr; enrich(ED.o); if (!had && ED.o.addr) notice('주소록에서 주소를 채웠습니다'); drawEdit(); } });
 /* ---------- 생산 화면 (?view=line) ---------- */
@@ -753,10 +757,20 @@ function lnCard(o) {
     '<div class="lnbtns"><button data-act="lnMark" data-i="' + esc(o.id) + '" data-w="ready"' + (o.ready ? ' class="on"' : '') + '>' + (o.ready ? '✓ ' : '') + '준비완료</button>' +
     '<button data-act="lnMark" data-i="' + esc(o.id) + '" data-w="tagged"' + (o.tagged ? ' class="on"' : '') + '>' + (o.tagged ? '✓ ' : '') + (nl ? '출고준비' : '송장부착') + '</button></div></div>';
 }
+// 검색: 띄어쓴 낱말이 모두 들어간 주문 (거래처·받는분·품목·메모·운송사, 띄어쓰기·대소문자·하이픈 무시)
+function lnText(o) { return OP.norm([o.cust, o.recv, o.memo, o.ship, carName(o.carrier)].concat((o.items || []).map(function (i) { return i.name + ' ' + (i.sensor || '') + ' ' + (i.note || ''); })).join(' ')); }
+function lnMatch(o, q) { var t = lnText(o); return q.split(/\s+/).filter(Boolean).every(function (w) { return t.indexOf(OP.norm(w)) >= 0; }); }
 function renderLine() {
   Array.prototype.forEach.call(document.querySelectorAll('.lnnav button'), function (b) { b.classList.toggle('on', b.dataset.i === LN.tab); });
   var all = LN.orders.slice().sort(function (a, b) { return (lnStage(a) - lnStage(b)) || (dueKey(a) + a.at).localeCompare(dueKey(b) + b.at); });
   var today = all.filter(function (o) { return isDate(o.due) && o.due <= S.today; }), next = all.filter(function (o) { return !(isDate(o.due) && o.due <= S.today); });
+  var q = ($('lnQ').value || '').trim();
+  if (q) {   // 검색 중에는 탭과 상관없이 대기 주문 전체에서 찾음
+    var ft = today.filter(function (o) { return lnMatch(o, q); }), fn = next.filter(function (o) { return lnMatch(o, q); });
+    $('lnBody').innerHTML = '<div class="grp">「' + esc(q) + '」 검색 ' + (ft.length + fn.length) + '건</div>' + (ft.length ? '<div class="grp">오늘 ' + ft.length + '건</div>' + ft.map(lnCard).join('') : '') +
+      (fn.length ? '<div class="grp">다음 (내일 이후·날짜 미정) ' + fn.length + '건</div>' + fn.map(lnCard).join('') : '') + (ft.length + fn.length ? '' : '<p class="muted">찾는 주문이 없습니다. 낱말을 줄여 보세요.</p>');
+    return;
+  }
   var h = '<div class="row" style="margin-bottom:10px"><span class="muted grow">' + (LN.at ? '업데이트 ' + new Date(LN.at).toTimeString().slice(0, 5) : '') + '</span><button class="btn sm ghost" data-act="lnName">' + (LN.name ? esc(LN.name) + ' (바꾸기)' : '내 이름 정하기') + '</button></div>';
   if (LN.tab === 'today') {
     var left = today.filter(function (o) { return lnStage(o) < 2; }).length;
