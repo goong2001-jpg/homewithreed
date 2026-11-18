@@ -177,10 +177,15 @@ SV7 O 1000개 명판있슴
     await lp.evaluate(() => new Promise(r => call('saveOrders', { orders: [
       { cust: '가나보일러', items: [{ name: 'SV7', sensor: 'X', qty: 50, unit: '', note: '스티커 있음' }, { name: '파워코드 2C', sensor: '', qty: 50, unit: '개', note: '' }], carrier: 'CJ', ship: '택배선불', due: S.today, recv: '김비밀', phone: '010-9999-0000', addr: '서울 비밀구 비밀로 1', memo: '명판있음' },
       { cust: '다라난방', items: [{ name: 'H10 7단계', sensor: 'X', qty: 30, unit: '', note: '' }], carrier: '직납', ship: '직납', due: S.today },
-      { cust: '마바전기', items: [{ name: 'SV7', sensor: 'X', qty: 20, unit: '', note: '' }], carrier: '경동', ship: '경동택배선불', due: addDay(S.today, 1) }] }, () => { lineLoad(true); r(); })));
-    await lp.waitForFunction(() => document.querySelectorAll('#lnBody .lncard').length === 2);
+      { cust: '마바전기', items: [{ name: 'SV7', sensor: 'X', qty: 20, unit: '', note: '' }], carrier: '경동', ship: '경동택배선불', due: addDay(S.today, 1) },
+      { cust: '사아상사', items: [{ name: 'STT-1.3', sensor: '', qty: 60, unit: '', note: '' }], carrier: 'CJ', ship: '택배선불', due: S.today, printed: S.today + ' 10:00:00', box: [{ k: '대', b: 2 }, { k: '중', b: 1 }] },
+      { cust: '자차온돌', items: [{ name: 'H7', sensor: 'X', qty: 10, unit: '', note: '' }], carrier: '경동', ship: '경동택배선불', due: S.today }] }, () => { lineLoad(true); r(); })));
+    await lp.waitForFunction(() => document.querySelectorAll('#lnBody .lncard').length === 4);
+    { const cnt = await lp.locator('.lncnt').innerText(), first = await lp.evaluate(() => document.querySelector('#lnBody').firstElementChild.nextElementSibling.className);
+      ok(/CJ 택배\s*3박스 \+ 1건\s*1건 송장 출력 전/.test(cnt) && /경동\s*1건\s*송장 출력 전/.test(cnt) && /대신\s*0/.test(cnt) && /직납\s*1건/.test(cnt) && first === 'lncnt', '맨 위 운송별: CJ 3박스(출력분) + 1건(출력 전) · 경동 1건 · 대신 0 · 직납 1건');
+      ok(await lp.evaluate(() => { const b = document.getElementById('lnBody'), sum = b.querySelector('.lnsum'), cards = b.querySelectorAll('.lncard'); return !!(cards[cards.length - 1].compareDocumentPosition(sum) & Node.DOCUMENT_POSITION_FOLLOWING); }), '"오늘 아직 만들 것"은 카드 아래에'); }
     const body = await lp.textContent('#lnBody');
-    ok(await lp.locator('#app').isHidden() && /오늘 아직 만들 것/.test(body) && /SV7 X/.test(body) && /50/.test(body), '생산 화면: 사무실 메뉴 없이 오늘 출고 2건 + 아직 만들 양');
+    ok(await lp.locator('#app').isHidden() && /오늘 아직 만들 것/.test(body) && /SV7 X/.test(body) && /50/.test(body), '생산 화면: 사무실 메뉴 없이 오늘 출고 4건 + 아직 만들 양');
     ok(!/김비밀|010-9999|비밀구/.test(await lp.content()), '받는분·전화·주소는 화면 어디에도 없음');
     ok(await lp.locator('.lncard').nth(1).locator('[data-w=tagged]').textContent() === '출고준비' || /출고준비/.test(body), '직납은 "출고준비" 버튼');
     await lp.locator('.lncard').first().locator('[data-w=ready]').click();

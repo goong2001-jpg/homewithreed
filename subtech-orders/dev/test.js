@@ -253,7 +253,7 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
     let lb = api('lineBoot');
     const lo = lb.orders.find(o => o.id === p1.id);
     ok(lb.role === 'line' && lo && !('phone' in lo) && !('addr' in lo) && !('recv' in lo) && !('senderPhone' in lo) && !('raw' in lo) && lo.items.length, '생산 화면 데이터: 받는분·전화·주소·원문은 안 보냄');
-    ok(lb.orders.every(o => o.st === '대기'), '생산 화면은 대기 주문만');
+    ok(lb.orders.every(o => o.st === '대기') && lb.orders.every(o => 'box' in o && 'printed' in o), '생산 화면은 대기 주문만, 송장 출력·박스 수 포함 (운송별 건수용)');
     let r = api('lineMark', { id: p1.id, what: 'tagged', on: true, by: '홍길동' }).order;
     ok(r.tagged && r.ready && r.taggedBy === '홍길동' && r.readyBy === '홍길동', '송장부착을 누르면 준비완료도 같이');
     r = api('lineMark', { id: p1.id, what: 'ready', on: false, by: '홍길동' }).order;
