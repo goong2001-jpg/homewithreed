@@ -182,7 +182,9 @@ SV7 O 1000개 명판있슴
       { cust: '자차온돌', items: [{ name: 'H7', sensor: 'X', qty: 10, unit: '', note: '' }], carrier: '경동', ship: '경동택배선불', due: S.today }] }, () => { lineLoad(true); r(); })));
     await lp.waitForFunction(() => document.querySelectorAll('#lnBody .lncard').length === 4);
     { const cnt = await lp.locator('.lncnt').innerText(), first = await lp.evaluate(() => document.querySelector('#lnBody').firstElementChild.nextElementSibling.className);
-      ok(/CJ 택배\s*3박스 \+ 1건\s*1건 송장 출력 전/.test(cnt) && /경동\s*1건\s*송장 출력 전/.test(cnt) && /대신\s*0/.test(cnt) && /직납\s*1건/.test(cnt) && first === 'lncnt', '맨 위 운송별: CJ 3박스(출력분) + 1건(출력 전) · 경동 1건 · 대신 0 · 직납 1건');
+      ok(/CJ 택배\s*3박스 \+ 1건\s*1건 송장 출력 전/.test(cnt) && /경동\s*1건\s*송장 출력 전/.test(cnt) && /대신\s*0/.test(cnt) && /직납\s*1건/.test(cnt) && first === 'lnprog', '남은 일 카드 아래 운송별: CJ 3박스(출력분) + 1건(출력 전) · 경동 1건 · 대신 0 · 직납 1건');
+      ok(/오늘 남은 일 4건/.test(await lp.textContent('.lnprog')) && /만들 것 4건/.test(await lp.textContent('.lnprog')) && await lp.textContent('#lnLeftT') === '4' && await lp.textContent('#lnLeftN') === '1' && /남은 2건/.test(await lp.textContent('.lncnt .car-cj')), '남은 일: 맨 위 4건 · 아래 탭 오늘 4 / 다음 1 · CJ 칸 남은 2건');
+      ok(await lp.locator('.lnprog').evaluate(e => e.compareDocumentPosition(document.querySelector('.lncnt')) & Node.DOCUMENT_POSITION_FOLLOWING), '남은 일 카드는 운송사 칸 위');
       ok(await lp.locator('.lncard.car-cj').count() === 2 && await lp.locator('.lncard.car-kd').count() === 1 && await lp.locator('.lncard.car-jn').count() === 1 && /경동/.test(await lp.locator('.lncard.car-kd .cbadge').textContent()), '카드마다 운송사 색 배지 (CJ 파랑·경동 빨강·직납 갈색)');
       await lp.click('.lncnt .car-kd'); ok(await lp.locator('.lncard').count() === 1 && /경동만 보는 중/.test(await lp.textContent('#lnBody')), '위 경동 칸을 누르면 경동 주문만');
       await lp.screenshot({ path: path.join(OUT, '12-line-color.png') });
@@ -195,10 +197,13 @@ SV7 O 1000개 명판있슴
     await lp.locator('.lncard').first().locator('[data-w=ready]').click();
     await lp.waitForFunction(() => LN.orders.some(o => o.ready && o.readyBy === '홍길동'));
     ok(true, '준비완료 (처음 한 번 이름 묻고 기억)');
+    ok(/오늘 남은 일 4건/.test(await lp.textContent('.lnprog')) && /만들 것 3건 · 송장 붙일 것 1건/.test(await lp.textContent('.lnprog')), '준비완료 1건 → 만들 것 3 · 송장 붙일 것 1 (남은 일은 그대로 4)');
     await lp.screenshot({ path: path.join(OUT, '11-line.png'), fullPage: true });
     const firstCust = await lp.locator('.lncard').first().locator('.cu').textContent();
     await lp.locator('.lncard').filter({ hasText: '가나보일러' }).locator('[data-w=tagged]').click();
     await lp.waitForFunction(() => LN.orders.some(o => o.cust === '가나보일러' && o.tagged));
+    ok(/끝남 1 \/ 4건/.test(await lp.textContent('.lnprog')) && /오늘 남은 일 3건/.test(await lp.textContent('.lnprog')) && await lp.textContent('#lnLeftT') === '3', '송장부착 1건 → 남은 일 3건, 끝남 1/4, 탭 숫자 3');
+    await lp.screenshot({ path: path.join(OUT, '15-line-left.png') });
     ok(/^가나보일러/.test(await lp.locator('.lncard').last().locator('.cu').textContent()) && await lp.locator('.lncard.s2').count() === 1, '송장부착한 주문은 흐리게 맨 아래로');
     // v10: 검색 (탭과 상관없이 대기 전체)
     await lp.fill('#lnQ', '보일러'); ok(await lp.locator('.lncard').count() === 1 && /가나보일러/.test(await lp.textContent('#lnBody')), '검색 "보일러" → 거래처로 1건');

@@ -117,6 +117,16 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 .lnsum .r:last-child{border-bottom:0}
 .lnsum .r b{font-size:17px}
 .lncnt{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.lnnav button b{display:inline-block;min-width:22px;padding:0 6px;margin-left:4px;border-radius:11px;background:var(--pri);color:#fff;font-size:13px;font-weight:700;line-height:20px}
+.lnprog{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.lnprog .big{font-size:26px;font-weight:800}
+.lnprog .big.done{color:var(--ok)}
+.lnprog .sub{font-size:15px;margin-top:2px}
+.lnprog .sub b{font-size:17px}
+.lnprog .bar{height:10px;background:var(--chip);border-radius:5px;margin:10px 0 4px;overflow:hidden}
+.lnprog .bar i{display:block;height:100%;background:var(--ok)}
+.lncnt .left{font-size:13px;font-weight:700;margin-top:4px;color:var(--ink)}
+.lncnt .left.done{color:var(--ok)}
 .lnsearch{position:sticky;top:44px;z-index:4;display:flex;gap:6px;background:var(--bg);padding:2px 0 10px}
 .lnsearch input{font-size:17px;min-height:50px}
 .lnsearch .btn{min-width:50px;min-height:50px}
@@ -203,7 +213,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <div id="line" class="hidden">
   <header><h1>써브텍 생산</h1><span class="st" id="lnSt"></span><button class="btn sm" data-act="lnReload" style="margin-left:auto;background:#fff;color:var(--ink)">새로고침</button></header>
   <div class="lnbody"><div class="lnsearch"><input type="text" id="lnQ" enterkeyhint="search" placeholder="검색: 거래처 · 받는분 · 품목 (예: 와이코, SV7)" autocomplete="off"><button class="btn" data-act="lnQClear" aria-label="검색 지우기">✕</button></div><div id="lnBody"><p class="muted">불러오는 중…</p></div></div>
-  <div class="lnnav"><button data-act="lnTab" data-i="today" class="on">오늘</button><button data-act="lnTab" data-i="next">다음</button><button data-act="lnTab" data-i="sum">만들 양</button></div>
+  <div class="lnnav"><button data-act="lnTab" data-i="today" class="on">오늘<b id="lnLeftT" class="hidden"></b></button><button data-act="lnTab" data-i="next">다음<b id="lnLeftN" class="hidden"></b></button><button data-act="lnTab" data-i="sum">만들 양</button></div>
 </div>
 <div id="toast" class="hidden"></div>
 <div id="shade" class="shade hidden"></div>
@@ -213,7 +223,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v10';
+var HTML_VERSION = 'v11';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -701,6 +711,7 @@ document.addEventListener('click', function (ev) {
   else if (a === 'lnTab') { LN.tab = i; renderLine(); window.scrollTo(0, 0); }
   else if (a === 'lnCar') { LN.car = LN.car === i ? '' : i; renderLine(); }
   else if (a === 'lnReload') lineLoad();
+  else if (a === 'lnToSum') { ev.preventDefault(); var sm = document.querySelector('#lnBody .lnsum'); if (sm) sm.scrollIntoView({ block: 'start' }); }
   else if (a === 'lnQClear') { $('lnQ').value = ''; renderLine(); $('lnQ').focus(); }
   else if (a === 'lnMark') lineMark(i, b.dataset.w);
   else if (a === 'lnName') { var nn = prompt('이름 (버튼 누른 사람으로 남습니다)', LN.name || ''); if (nn != null) { LN.name = nn.trim(); try { localStorage.setItem('so-name', LN.name); } catch (e) {} renderLine(); } }
@@ -743,10 +754,20 @@ function lnCount(list) {
     l.forEach(function (o) { if (label && o.printed) { pr++; (o.box && o.box.length ? o.box : [{ b: 1 }]).forEach(function (x) { boxes += +x.b || 1; }); } else un++; });
     var v = !l.length ? '0' : label ? [pr ? boxes + '박스' : '', un ? un + '건' : ''].filter(Boolean).join(' + ') : un + '건';
     var sub = label && un ? (pr ? un + '건 송장 출력 전' : '송장 출력 전') : '';
-    return '<div class="' + carClass(key) + (LN.car === key ? ' pick' : '') + '" data-act="lnCar" data-i="' + key + '"><div class="k">' + esc(name) + '</div><div class="v">' + esc(v) + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + '</div>';
+    var left = l.filter(function (o) { return lnStage(o) < 2; }).length, lt = !l.length ? '' : left ? '<div class="left">남은 ' + left + '건</div>' : '<div class="left done">✓ 다 끝남</div>';
+    return '<div class="' + carClass(key) + (LN.car === key ? ' pick' : '') + '" data-act="lnCar" data-i="' + key + '"><div class="k">' + esc(name) + '</div><div class="v">' + esc(v) + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + lt + '</div>';
   };
   return '<div class="lncnt">' + C.map(function (c) { return cell(c[1], list.filter(function (o) { return o.carrier === c[0]; }), c[0] !== '직납', c[0]); }).join('') + '</div>' +
     (etc.length ? '<p class="muted" style="margin:-4px 0 10px">그 밖(직접수령·퀵·미정) ' + etc.length + '건</p>' : '');
+}
+// 남은 일: 아직 안 만든 것 + 준비완료만 된 것(송장 붙일 것). 송장부착(출고준비)까지 하면 끝
+function lnProgress(list, title) {
+  var n0 = 0, n1 = 0, n2 = 0; list.forEach(function (o) { var st = lnStage(o); if (st === 0) n0++; else if (st === 1) n1++; else n2++; });
+  var tot = list.length, left = n0 + n1;
+  if (!tot) return '';
+  return '<div class="lnprog"><div class="big' + (left ? '' : ' done') + '">' + esc(title) + ' ' + (left ? '남은 일 ' + left + '건' : '다 끝났습니다 ✓') + '</div>' +
+    (left ? '<div class="sub">만들 것 <b>' + n0 + '</b>건 · 송장 붙일 것 <b>' + n1 + '</b>건</div>' : '') +
+    '<div class="bar"><i style="width:' + Math.round(n2 * 100 / tot) + '%"></i></div><div class="muted">끝남 ' + n2 + ' / ' + tot + '건' + (n0 ? ' · <a href="#" data-act="lnToSum">남은 품목 보기 ↓</a>' : '') + '</div></div>';
 }
 function lnCard(o) {
   var st = lnStage(o), nl = lnNoLabel(o), it = (o.items || []).map(function (i) { var n = OUT.noteOf(i); return esc(i.name) + (i.sensor ? ' ' + esc(i.sensor) : '') + ' <span class="q">' + esc(i.qty === '' || i.qty == null ? '' : i.qty + (i.unit || '')) + '</span>' + (n ? ' <span class="muted">' + esc(n) + '</span>' : ''); }).join('<br>');
@@ -764,6 +785,8 @@ function renderLine() {
   Array.prototype.forEach.call(document.querySelectorAll('.lnnav button'), function (b) { b.classList.toggle('on', b.dataset.i === LN.tab); });
   var all = LN.orders.slice().sort(function (a, b) { return (lnStage(a) - lnStage(b)) || (dueKey(a) + a.at).localeCompare(dueKey(b) + b.at); });
   var today = all.filter(function (o) { return isDate(o.due) && o.due <= S.today; }), next = all.filter(function (o) { return !(isDate(o.due) && o.due <= S.today); });
+  var lt = today.filter(function (o) { return lnStage(o) < 2; }).length, lx = next.filter(function (o) { return lnStage(o) < 2; }).length;
+  $('lnLeftT').textContent = lt; $('lnLeftT').classList.toggle('hidden', !lt); $('lnLeftN').textContent = lx; $('lnLeftN').classList.toggle('hidden', !lx);
   var q = ($('lnQ').value || '').trim();
   if (q) {   // 검색 중에는 탭과 상관없이 대기 주문 전체에서 찾음
     var ft = today.filter(function (o) { return lnMatch(o, q); }), fn = next.filter(function (o) { return lnMatch(o, q); });
@@ -775,9 +798,10 @@ function renderLine() {
   if (LN.tab === 'today') {
     var left = today.filter(function (o) { return lnStage(o) < 2; }).length;
     var shown = LN.car ? today.filter(function (o) { return o.carrier === LN.car; }) : today;
-    h += lnCount(today) + (LN.car ? '<div class="row" style="margin:0 0 8px"><span class="cbadge ' + carClass(LN.car) + '">' + esc(carName(LN.car)) + '만 보는 중 ' + shown.length + '건</span><button class="btn sm" data-act="lnCar" data-i="">전체 보기</button></div>' : '<div class="grp">오늘 출고 ' + today.length + '건 · 남은 일 ' + left + '건 <span style="font-weight:400">(위 칸을 누르면 그 운송만)</span></div>') + (shown.length ? shown.map(lnCard).join('') : '<p class="muted">오늘 출고 예정이 없습니다.</p>') + '<div style="margin-top:16px">' + lnSumHTML('오늘 아직 만들 것', today) + '</div>';
+    h += lnProgress(today, '오늘') + lnCount(today) + (LN.car ? '<div class="row" style="margin:0 0 8px"><span class="cbadge ' + carClass(LN.car) + '">' + esc(carName(LN.car)) + '만 보는 중 ' + shown.length + '건</span><button class="btn sm" data-act="lnCar" data-i="">전체 보기</button></div>' : '<div class="grp">오늘 출고 ' + today.length + '건 · 남은 일 ' + left + '건 <span style="font-weight:400">(위 칸을 누르면 그 운송만)</span></div>') + (shown.length ? shown.map(lnCard).join('') : '<p class="muted">오늘 출고 예정이 없습니다.</p>') + '<div style="margin-top:16px">' + lnSumHTML('오늘 아직 만들 것', today) + '</div>';
   } else if (LN.tab === 'next') {
     var last = null; next.sort(function (a, b) { return (dueKey(a) + a.at).localeCompare(dueKey(b) + b.at) || (lnStage(a) - lnStage(b)); });
+    h += lnProgress(next, '다음');
     next.forEach(function (o) { var g = dueGroup(o); if (g !== last) { h += '<div class="grp">' + esc(g) + '</div>'; last = g; } h += lnCard(o); });
     if (!next.length) h += '<p class="muted">다음 출고 예정이 없습니다.</p>';
   } else h += lnSumHTML('오늘 아직 만들 것', today) + lnSumHTML('전체 대기 중 아직 만들 것 (내일 이후·날짜 미정 포함)', all);
