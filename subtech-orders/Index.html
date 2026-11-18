@@ -210,7 +210,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v8';
+var HTML_VERSION = 'v9';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -721,6 +721,8 @@ function lineLoad(quiet) {
 }
 function carClass(c) { return 'car-' + ({ 'CJ': 'cj', '경동': 'kd', '대신': 'ds', '직납': 'jn' }[c] || 'etc'); }
 function carName(c) { return { 'CJ': 'CJ택배', '경동': '경동', '대신': '대신', '직납': '직납', '방문': '직접수령', '퀵': '퀵', '화물': '화물' }[c] || '미정'; }
+// 거래처명(받는분) — 받는분이 없거나 거래처와 같으면 거래처명만
+function lnName(o) { var c = o.cust || '(거래처 없음)', r = String(o.recv || '').trim(); return r && OP.norm(r) !== OP.norm(c) && OP.norm(c).indexOf(OP.norm(r)) < 0 ? c + '(' + r + ')' : c; }
 function lnStage(o) { return o.tagged ? 2 : o.ready ? 1 : 0; }
 function lnNoLabel(o) { return /^(직납|방문|퀵)$/.test(o.carrier || ''); }
 function lnSum(list) {   // 아직 안 만든(0단계) 주문의 품목 합계
@@ -744,7 +746,7 @@ function lnCount(list) {
 }
 function lnCard(o) {
   var st = lnStage(o), nl = lnNoLabel(o), it = (o.items || []).map(function (i) { var n = OUT.noteOf(i); return esc(i.name) + (i.sensor ? ' ' + esc(i.sensor) : '') + ' <span class="q">' + esc(i.qty === '' || i.qty == null ? '' : i.qty + (i.unit || '')) + '</span>' + (n ? ' <span class="muted">' + esc(n) + '</span>' : ''); }).join('<br>');
-  return '<div class="lncard s' + st + ' ' + carClass(o.carrier) + '"><div class="row"><div class="cu grow">' + esc(o.cust || '(거래처 없음)') + '</div><span class="cbadge">' + esc(carName(o.carrier)) + '</span></div>' +
+  return '<div class="lncard s' + st + ' ' + carClass(o.carrier) + '"><div class="row"><div class="cu grow">' + esc(lnName(o)) + '</div><span class="cbadge">' + esc(carName(o.carrier)) + '</span></div>' +
     '<div class="it">' + it + '</div>' + (o.memo ? '<div class="muted">' + esc(o.memo) + '</div>' : '') +
     '<div class="meta" style="margin-top:6px">' + (isDate(o.due) ? '<span class="tag">' + esc(o.due <= S.today ? '오늘' + (o.due < S.today ? ' (' + OUT.md(o.due) + ' 예정)' : '') : OUT.md(o.due)) + '</span>' : '<span class="tag">' + esc(o.due || '날짜 미정') + '</span>') + (o.parent ? '<span class="tag warn">잔량</span>' : '') + (o.printed && !nl ? '<span class="tag ok">송장출력 ✓</span>' : '') + '</div>' +
     (o.ready || o.tagged ? '<div class="who">' + (o.ready ? '준비완료 ' + esc(when(o.ready)) + (o.readyBy ? ' ' + esc(o.readyBy) : '') : '') + (o.tagged ? ' · ' + (nl ? '출고준비 ' : '송장부착 ') + esc(when(o.tagged)) + (o.taggedBy ? ' ' + esc(o.taggedBy) : '') : '') + '</div>' : '') +

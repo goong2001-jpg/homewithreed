@@ -4,7 +4,7 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v8';
+var APP_VERSION = 'v9';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
 var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록', DEL: '주문_삭제기록', LRN: '주문_학습' };
@@ -86,8 +86,8 @@ function api(pin, fn, arg) {
   if (role === 'line' && LINE_FNS.indexOf(fn) < 0) throw new Error('생산 화면에서는 쓸 수 없는 기능입니다');
   return API[fn](arg || {}, set, role);
 }
-// 생산 화면에 보내는 주문 모양: 받는분·전화·주소·보내는분·원문은 빼고 생산에 필요한 것만
-function lineSlim_(o) { var x = {}; ['id', 'at', 'due', 'cust', 'items', 'memo', 'ship', 'carrier', 'printed', 'box', 'ready', 'readyBy', 'tagged', 'taggedBy', 'parent', 'st'].forEach(function (k) { x[k] = o[k]; }); return x; }
+// 생산 화면에 보내는 주문 모양: 받는분은 이름만(v9, 거래처명(받는분) 표시용), 전화·주소·보내는분·원문은 빼고 생산에 필요한 것만
+function lineSlim_(o) { var x = {}; ['id', 'at', 'due', 'cust', 'recv', 'items', 'memo', 'ship', 'carrier', 'printed', 'box', 'ready', 'readyBy', 'tagged', 'taggedBy', 'parent', 'st'].forEach(function (k) { x[k] = o[k]; }); return x; }
 var API = {
   boot: function (a, set) {
     var items = [];

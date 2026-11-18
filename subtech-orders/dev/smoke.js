@@ -190,7 +190,7 @@ SV7 O 1000개 명판있슴
       ok(await lp.evaluate(() => { const b = document.getElementById('lnBody'), sum = b.querySelector('.lnsum'), cards = b.querySelectorAll('.lncard'); return !!(cards[cards.length - 1].compareDocumentPosition(sum) & Node.DOCUMENT_POSITION_FOLLOWING); }), '"오늘 아직 만들 것"은 카드 아래에'); }
     const body = await lp.textContent('#lnBody');
     ok(await lp.locator('#app').isHidden() && /오늘 아직 만들 것/.test(body) && /SV7 X/.test(body) && /50/.test(body), '생산 화면: 사무실 메뉴 없이 오늘 출고 4건 + 아직 만들 양');
-    ok(!/김비밀|010-9999|비밀구/.test(await lp.content()), '받는분·전화·주소는 화면 어디에도 없음');
+    ok(!/010-9999|비밀구|비밀로/.test(await lp.content()) && /가나보일러\(김비밀\)/.test(await lp.textContent('#lnBody')) && /다라난방</.test(await lp.content()), '카드 이름 = 거래처명(받는분), 받는분 없으면 거래처명만 · 전화·주소는 화면에 없음');
     ok(await lp.locator('.lncard').nth(1).locator('[data-w=tagged]').textContent() === '출고준비' || /출고준비/.test(body), '직납은 "출고준비" 버튼');
     await lp.locator('.lncard').first().locator('[data-w=ready]').click();
     await lp.waitForFunction(() => LN.orders.some(o => o.ready && o.readyBy === '홍길동'));
@@ -199,7 +199,7 @@ SV7 O 1000개 명판있슴
     const firstCust = await lp.locator('.lncard').first().locator('.cu').textContent();
     await lp.locator('.lncard').filter({ hasText: '가나보일러' }).locator('[data-w=tagged]').click();
     await lp.waitForFunction(() => LN.orders.some(o => o.cust === '가나보일러' && o.tagged));
-    ok(await lp.locator('.lncard').last().locator('.cu').textContent() === '가나보일러' && await lp.locator('.lncard.s2').count() === 1, '송장부착한 주문은 흐리게 맨 아래로');
+    ok(/^가나보일러/.test(await lp.locator('.lncard').last().locator('.cu').textContent()) && await lp.locator('.lncard.s2').count() === 1, '송장부착한 주문은 흐리게 맨 아래로');
     await lp.click('.lnnav [data-i=next]'); ok(/내일/.test(await lp.textContent('#lnBody')) && /마바전기/.test(await lp.textContent('#lnBody')), '다음 탭: 내일 출고');
     await lp.click('.lnnav [data-i=sum]'); ok(/전체 대기 중 아직 만들 것/.test(await lp.textContent('#lnBody')), '만들 양 탭');
     await lp.click('.lnnav [data-i=today]');
