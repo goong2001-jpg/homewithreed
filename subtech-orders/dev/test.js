@@ -100,7 +100,7 @@ ok(x.rows[2][0] === '자차코퍼레이션' && x.rows[2][3] === '대전 유성�
 eq(x.sheets[0].rows[0].map(c => c.v), ['보내는분성명', '보내는분전화번호', '보내는분기타연락처', '보내는분주소(전체, 분할)', '받는분성명', '받는분전화번호', '받는분기타연락처', '받는분주소(전체, 분할)', '품목명', '박스수량', '박스타입', '기본운임', '운임구분', '배송메세지1'], 'CJ 머리줄 = 원래 양식');
 ok(x.rows[0][8] === 'STT-1.3DE    60/\nH7    X    100/\n파워코드 2C    50개' && x.hist.length === 3 && x.hist[0][1] === 'CJ', 'CJ 품목명 줄바꿈 표기 + 송장기록');
 x = OUT.kd([B], def, '2026-11-17');
-ok(x.sheets[0].rows[0].length === 26 && x.rows[0][7] === '37100' && x.rows[0][3] === '경상북도 상주시 가나길 1' && x.rows[0][8] === '상주영업소' && x.rows[0][11] === '선불' && x.rows[0][20] === 4000 && x.rows[0][25] === '김철수/극소', '경동: 26열, 우편번호 분리, 영업소, 운임, 메모 "이름/크기"');
+ok(x.sheets[0].rows[0].length === 26 && x.rows[0][7] === '37100' && x.rows[0][3] === '경상북도 상주시 가나길 1' && x.rows[0][8] === '상주영업소' && x.rows[0][11] === '선불' && x.rows[0][20] === 4000 && x.rows[0][25] === '김철수', '경동: 26열, 우편번호 분리, 영업소, 운임, 메모는 이름만 (크기 안 씀)');
 x = OUT.ds([A, B], def, '2026-11-17');
 ok(x.sheets[0].name === '11월 17일' && x.sheets[0].rows[2][0].v === '발화주 :써브텍,02-0000-0000' && x.sheets[0].rows.some(r => r[0] && r[0].v === '발화주 :자차코퍼레이션,010-0000-8108') && x.rows[2][0] === '상주영업소' && x.rows[2][7] === '현불' && x.rows[2][10] === 4000, '대신: 날짜 탭, 발화주별 표, 도착지=영업소, 현불, 총운임');
 const rep = OUT.report({ date: '2026-11-17', shipped: [A], pending: [B] }, OP.isAcc), RR = rep.sheets[0].rows;
@@ -108,6 +108,13 @@ ok(RR[0][0].v === '2026/11/17-출고현황' && RR[1].map(c => c.v).join('|') ===
 ok(RR[2][0].v === 1 && RR[2][1].v === '11월 17일' && RR[2][5].v === 60 && RR[3][6].v === '스티커 있음' && RR[4][5].v === '50개' && RR[5][0].v === '합계' && RR[5][5].v === 160, '출하서: 번호·일자·수량, 부자재는 "50개"로 쓰고 합계에서 제외');
 ok(RR[6][1].v === '준비되면' && RR[6][0].v === '' && RR[6][7].v === '김철수 / 010-0000-8453 (37100) 경상북도 상주시 가나길 1' && RR[7][0].v === '출고 대기 합계', '출하서: 아래쪽 = 못 나간 주문(대기)');
 ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merges.some(m => m.join() === '0,0,0,10'), '출하서: 여러 품목이면 거래처 칸 병합');
+{ // v14: 같은 거래처 직송 여러 건 → 한 번호, 적요 "직송 1 / 문 앞", 받는분·배송방법은 주문마다 / 대기는 출고 예정 순서
+  const Y = (n, recv, msg) => ({ cust: '자차코퍼레이션', items: [{ name: 'STF-7S', sensor: '', qty: n, unit: '개', note: '' }], recv, phone: '010-0000-000' + n, addr: '서울 ' + recv, own: true, msg, ship: '택배선불 청구', stmt: 'O', tax: 'O', sender: '자차코퍼레이션' });
+  const g = OUT.report({ date: '2026-11-18', shipped: [Y(1, '김가', '문 앞'), A, Y(2, '이나', '')], pending: [Object.assign({}, B, { due: '준비되면' }), Object.assign({}, B, { cust: '다라', due: '2026-11-20' }), Object.assign({}, B, { cust: '라마', due: '2026-11-19' })] }, OP.isAcc).sheets[0], Rw = g.rows;
+  ok(Rw[2][0].v === 1 && Rw[2][2].v === '자차코퍼레이션' && Rw[2][6].v === '직송 1 / 문 앞' && Rw[3][0].v === '' && Rw[3][2].v === '' && Rw[3][6].v === '직송 2' && /이나/.test(Rw[3][7].v) && Rw[4][0].v === 2 && Rw[4][2].v === '가나상사', '같은 거래처 직송 2건 → 1번 한 칸에 직송 1·2 (받는분은 각각), 다음 거래처는 2번');
+  ok(g.merges.some(m => m.join() === '2,2,3,2') && g.merges.some(m => m.join() === '2,0,3,0'), '거래처·번호 칸은 묶음 전체 병합');
+  const pend = Rw.slice(Rw.findIndex(r => r[0].v === '합계') + 1, -1).map(r => r[1].v).filter(Boolean);
+  eq(pend, ['11월 19일', '11월 20일', '준비되면'], '출고 대기는 예정일 순서 (날짜 없는 것은 뒤)'); }
 
 (async () => {
   console.log('4) 엑셀 만들기 → 다시 읽기');
@@ -293,7 +300,17 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
     throws(() => api('searchOld', { q: ' ' }), '빈 검색 거절');
     api('deleteOrders', { ids: [o9.id] }); }
 
-  console.log('11) 템플릿·버전');
+  console.log('11) v14: 예정일 한꺼번에 바꾸기');
+  { const [q1, q2] = api('saveOrders', { orders: [Object.assign({}, B, { id: undefined }), Object.assign({}, B, { id: undefined })] }).orders;
+    const r = api('setDue', { ids: [q1.id, q2.id], due: '2026-11-25' });
+    ok(r.orders.length === 2 && r.orders.every(o => o.due === '2026-11-25'), '여러 건 출고 예정 한 번에 바꾸기');
+    ok(api('setDue', { ids: [q1.id], due: '준비되면' }).orders[0].due === '준비되면', '"준비되면"으로도');
+    throws(() => api('setDue', { ids: [q1.id], due: '' }), '빈 예정일 거절');
+    throws(() => api('setDue', { ids: [q1.id, 'NOPE'], due: '2026-11-26' }), '없는 주문이 섞이면 아무것도 안 바꿈');
+    ok(api('boot').orders.find(o => o.id === q2.id).due === '2026-11-25', '  (위 실패 뒤 그대로)');
+    api('deleteOrders', { ids: [q1.id, q2.id] }); }
+
+  console.log('12) 템플릿·버전');
   const idx = fs.readFileSync(path.join(D, 'Index.html'), 'utf8'), tags = idx.match(/<\?[\s\S]*?\?>/g) || [];
   ok((idx.match(/<\?/g) || []).length === 3 && tags.join() === "<?!= inc('Parse') ?>,<?!= inc('Xlsx') ?>,<?!= inc('Out') ?>", 'Index.html 의 <? ?> 는 끼워넣기 3개뿐 (다른 곳에 있으면 앱이 안 열림)');
   const av = (fs.readFileSync(path.join(D, 'Code.gs'), 'utf8').match(/var APP_VERSION = '([^']+)'/) || [])[1], hv = (idx.match(/var HTML_VERSION = '([^']+)'/) || [])[1];

@@ -59,6 +59,8 @@ label.f{display:block;font-size:12px;color:var(--sub);margin:10px 0 4px}
   .cgrid>.card{margin:0}
   .cgrid>*:not(.card){grid-column:1/-1}
   #v-new textarea,#v-new>.row,#v-new>p,#v-new>h2{max-width:1080px}
+  #orders.cgrid>.card{height:178px;overflow:hidden}   /* 주문 목록 카드 크기 일정하게 (품목 3줄까지, 나머지는 '외 N개') */
+  #orders.cgrid>.card .items{white-space:pre-line}
 }
 .tag{display:inline-block;font-size:12px;font-weight:700;border-radius:5px;padding:0 6px;background:var(--chip);color:var(--ink);margin:0 4px 3px 0;white-space:nowrap}
 .tag.ship{background:#E3ECF5;color:#1D3F66}
@@ -179,7 +181,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
       <div class="chips" id="fChips"></div>
       <div class="row" style="margin:10px 0"><input type="text" id="q" class="grow" placeholder="검색: 거래처·받는분·품목·주소·전화 (띄어 쓰면 모두 포함)"><select id="lSort" style="width:auto" aria-label="정렬"><option value="auto">기본 정렬</option><option value="new">최신 접수순</option><option value="old">오래된 접수순</option><option value="cust">거래처 이름순</option></select><button class="btn" data-act="lPick" id="lPickBtn">고르기</button></div>
       <div class="cgrid" id="orders"></div>
-      <div class="bar hidden" id="lBar"><button class="btn danger grow" data-act="lDel">고른 것 삭제</button><button class="btn" data-act="lCancel">고른 것 취소</button><button class="btn ghost" data-act="lPick">닫기</button></div>
+      <div class="bar hidden" id="lBar" style="flex-wrap:wrap"><span class="muted" id="lSelN" style="align-self:center;min-width:70px"></span><button class="btn sm" data-act="lSelAll">보이는 것 전체 선택</button><button class="btn sm" data-act="lBulk" data-i="due">예정일 바꾸기</button><button class="btn sm" data-act="lBulk" data-i="ship">출고완료</button><button class="btn sm" data-act="lCancel">취소</button><button class="btn sm danger" data-act="lDel">삭제</button><button class="btn sm ghost" data-act="lPick">닫기</button></div>
     </section>
     <section id="v-print" class="hidden">
       <div class="today" id="pToday"></div>
@@ -234,7 +236,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v13';
+var HTML_VERSION = 'v14';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -311,7 +313,7 @@ function lineTags(o) { if (o.st !== '대기') return ''; var noLabel = /^(직납
   return (o.ready ? '<span class="tag ok">준비완료 ✓ ' + esc(when(o.ready)) + '</span>' : '') + (o.tagged ? '<span class="tag ok">' + (noLabel ? '출고준비' : '송장부착') + ' ✓ ' + esc(when(o.tagged)) + '</span>' : ''); }
 function printedTag(o) { if (!o.printed || o.st === '취소') return ''; var d = String(o.printed).slice(0, 10); return '<span class="tag ok">송장출력 ✓ ' + esc(d === S.today ? hm(o.printed) : OUT.md(d)) + '</span>'; }
 function cardHTML(o, opt) {
-  opt = opt || {}; var w = o.st === '대기' ? warns(o) : [], it = (o.items || []).map(function (i) { var n = OUT.noteOf(i); return esc(OUT.itemStr(i).replace(/\s{4}/g, '  ')) + (n ? ' <span class="muted">' + esc(n) + '</span>' : ''); }).join('\n');
+  opt = opt || {}; var w = o.st === '대기' ? warns(o) : [], its0 = o.items || [], cut = opt.max && its0.length > opt.max ? opt.max - 1 : its0.length, it = its0.slice(0, cut).map(function (i) { var n = OUT.noteOf(i); return esc(OUT.itemStr(i).replace(/\s{4}/g, '  ')) + (n ? ' <span class="muted">' + esc(n) + '</span>' : ''); }).join('\n') + (cut < its0.length ? '\n<span class="muted">외 ' + (its0.length - cut) + '개 품목 (눌러서 보기)</span>' : '');
   var to = [o.recv, o.phone, o.branch ? '[' + o.branch + ']' : '', o.addr].filter(Boolean).join(' · ');
   return '<div class="card tap' + (opt.off ? ' off' : '') + '" data-act="' + (opt.act || 'edit') + '" data-i="' + esc(opt.key) + '"><div class="top">' + (opt.check != null ? '<input type="checkbox" data-chk="' + esc(opt.key) + '"' + (opt.check ? ' checked' : '') + '>' : '') +
     '<div class="grow"><div class="cust">' + esc(o.cust || '(거래처 없음)') + '</div><div class="items">' + it + '</div>' +
@@ -522,14 +524,34 @@ function renderList() {
   else { key = function (o) { return String(o.at); }; grp = function (o) { return '접수 ' + dayLabel(o.at); }; }
   var desc = mode === 'ship' || mode === 'new';
   list.sort(function (a, b) { var r = String(key(a)).localeCompare(String(key(b)), 'ko'); return desc ? -r : r; });
-  $('lBar').classList.toggle('hidden', !LPICK); $('lPickBtn').textContent = LPICK ? '고르기 끝' : '고르기';
-  var card = function (o) { return cardHTML(o, LPICK ? { key: o.id, check: !!LSEL[o.id], act: 'none' } : { key: o.id }); }, h = '', last = null;
+  $('lBar').classList.toggle('hidden', !LPICK); $('lPickBtn').textContent = LPICK ? '고르기 끝' : '고르기'; lSelCount();
+  S.lIds = list.map(function (o) { return o.id; });
+  var card = function (o) { return cardHTML(o, LPICK ? { key: o.id, check: !!LSEL[o.id], act: 'none', max: 3 } : { key: o.id, max: 3 }); }, h = '', last = null;
   if (grp) list.forEach(function (o) { var g = grp(o); if (g !== last) { var n = list.filter(function (x) { return grp(x) === g; }).length; h += '<div class="grp">' + esc(g) + ' ' + n + '건</div>'; last = g; } h += card(o); });
   else h = list.map(card).join('');
   var old = t.length && S.filter !== 'wait' && S.filter !== 'today' ? '<div class="row" style="margin:10px 0"><span class="muted grow">화면에는 대기 주문과 최근 21일 안에 끝난 주문만 있습니다.</span><button class="btn sm" data-act="lOld">더 오래된 주문에서도 찾기</button></div>' : '';
   $('orders').innerHTML = (list.length ? '<p class="muted" style="margin:0 0 6px">' + list.length + '건' + (LPICK ? ' · 지울 것을 체크하세요' : '') + '</p>' + h : '<p class="muted">주문이 없습니다.</p>') + old;
 }
 var LPICK = false, LSEL = {};
+function lSelIds() { return Object.keys(LSEL).filter(function (k) { return LSEL[k] && byId(k); }); }
+function lSelCount() { if ($('lSelN')) $('lSelN').textContent = lSelIds().length + '건 고름'; }
+// 여러 건 한꺼번에: 예정일 바꾸기 / 출고완료 (날짜 고르는 작은 창)
+function openBulk(kind) {
+  var ids = lSelIds(); if (!ids.length) { notice('고른 주문이 없습니다'); return; }
+  ED = null; CE = null; SH = null; BK = { kind: kind, ids: ids };
+  $('shT').textContent = (kind === 'due' ? '출고 예정 바꾸기' : '출고완료로 처리') + ' — ' + ids.length + '건';
+  $('shB').innerHTML = '<label class="f">' + (kind === 'due' ? '새 출고 예정' : '출고 날짜') + '</label><div class="row"><input type="date" id="bk-date" value="' + S.today + '" style="max-width:190px"><div class="chips"><button data-act="bkDate" data-i="' + S.today + '">오늘</button>' + (kind === 'due' ? '<button data-act="bkDate" data-i="' + addDay(S.today, 1) + '">내일</button><button data-act="bkDate" data-i="준비되면">준비되면</button>' : '<button data-act="bkDate" data-i="' + addDay(S.today, -1) + '">어제</button>') + '</div></div>' +
+    (kind === 'ship' ? '<p class="muted">대기 중인 주문만 출고완료로 바뀝니다. 일부만 나간 주문은 주문을 열어 "출고"로 따로 기록하세요.</p>' : '') + '<div class="sec">고른 주문</div><div class="muted">' + ids.map(function (id) { var o = byId(id); return esc(o.cust + ' · ' + OUT.itemText(o, ' / ').replace(/\s{4}/g, ' ')); }).join('<br>') + '</div>';
+  $('shF').innerHTML = '<button class="btn pri grow" data-act="bkGo">' + ids.length + '건 ' + (kind === 'due' ? '예정일 바꾸기' : '출고완료') + '</button>';
+  $('shade').classList.remove('hidden'); $('sheet').classList.remove('hidden');
+}
+var BK = null;
+function bulkGo() {
+  var v = $('bk-date').dataset.text || $('bk-date').value; if (!v) { notice('날짜를 고르세요', 1); return; }
+  var ids = BK.ids, kind = BK.kind, done = function (r) { mergeOrders(r.orders); showSheet(false); LSEL = {}; LPICK = false; notice(r.orders.length + '건 ' + (kind === 'due' ? '출고 예정을 ' + (isDate(v) ? OUT.md(v) : v) + '(으)로 바꿨습니다' : OUT.md(v) + ' 출고완료로 바꿨습니다')); render(); };
+  if (kind === 'due') call('setDue', { ids: ids, due: v }, done);
+  else { var w = ids.filter(function (id) { return byId(id).st === '대기'; }); if (!w.length) { notice('대기 중인 주문이 없습니다', 1); return; } call('setStatus', { ids: w, st: '출고완료', shipped: v }, done); }
+}
 // 출고 예정 묶음: 지난·오늘 / 내일 / 이번 주 / 그 뒤 / 날짜 미정
 function isDate(d) { return /^\d{4}-\d{2}-\d{2}$/.test(d || ''); }
 function dueKey(o) { return isDate(o.due) ? (o.due < S.today ? S.today : o.due) : '9999'; }
@@ -586,7 +608,7 @@ function renderPrint() {
     if (PSEL[o.id] == null) PSEL[o.id] = !o.printed && !warns(o).length;
     var bx = boxOf(o), fare = S.carrier !== 'CJ';
     var ex = '<div data-box="' + esc(o.id) + '">' + bx.box.map(function (x, k) {
-      return '<div class="box" data-k="' + k + '"><select class="bk">' + [''].concat(OP.TYPES).map(function (t) { return '<option value="' + t + '"' + (x.k === t ? ' selected' : '') + '>' + (t || '크기') + '</option>'; }).join('') + '</select><input type="number" class="bb" min="1" inputmode="numeric" value="' + esc(x.b || 1) + '"><span class="muted">박스</span>' +
+      return '<div class="box" data-k="' + k + '"><select class="bk"' + (S.carrier === '경동' ? ' style="display:none"' : '') + '>' + [''].concat(OP.TYPES).map(function (t) { return '<option value="' + t + '"' + (x.k === t ? ' selected' : '') + '>' + (t || '크기') + '</option>'; }).join('') + '</select><input type="number" class="bb" min="1" inputmode="numeric" value="' + esc(x.b || 1) + '"><span class="muted">박스</span>' +
         (fare ? '<input type="number" class="bf fare" inputmode="numeric" placeholder="운임" value="' + esc(x.f || '') + '">' : '') + (k ? '<button class="btn sm ghost danger" data-act="bxDel" data-i="' + esc(o.id) + '" data-k="' + k + '">삭제</button>' : '<button class="btn sm ghost" data-act="bxAdd" data-i="' + esc(o.id) + '">+ 다른 크기</button>') + '</div>'; }).join('') +
       (bx.rec ? '<div class="rec">추천: ' + esc(bx.rec) + ' — 맞는지 확인하세요</div>' : '') + '</div>';
     ex += '<button class="btn sm" data-act="pEdit" data-i="' + esc(o.id) + '" style="margin-top:8px">받는 곳 · 보내는분 고치기</button>';
@@ -611,7 +633,8 @@ function fallbackCopy(t) { var ta = document.createElement('textarea'); ta.value
 /* ---------- 4. 출하서 ---------- */
 var CSEL = {};
 // 출하서 체크: 사무실이 직접 누른 것(CSEL)이 우선, 아니면 기본값 = 송장부착(출고준비)된 것. 생산이 아직 아무것도 안 누른 날은 예전처럼 그날 송장 뽑은 것
-function closeChecked(o, d, lineUsed) { if (o.id in CSEL) return CSEL[o.id]; return lineUsed ? !!o.tagged : String(o.printed).slice(0, 10) === d; }
+function closeFuture(o, d) { return isDate(o.due) && o.due > d; }   // 고른 날짜보다 뒤에 나갈 주문
+function closeChecked(o, d, lineUsed) { if (o.id in CSEL) return CSEL[o.id]; if (closeFuture(o, d)) return false; return lineUsed ? !!o.tagged : String(o.printed).slice(0, 10) === d; }
 function closeLineUsed() { return S.orders.some(function (o) { return o.st === '대기' && (o.ready || o.tagged); }); }
 var CGR = [];   // 출하서 대기 묶음별 주문 ID (묶음 모두 체크용)
 function renderClose() {
@@ -621,7 +644,7 @@ function renderClose() {
   var h = '<div class="today" id="cSum"></div>';
   if (done.length) h += '<div class="sec">이미 출고완료 ' + done.length + '건</div>' + done.map(function (o) { return cardHTML(o, { key: o.id }); }).join('');
   h += '<div class="row" style="margin:16px 0 4px"><b class="grow">대기 중 ' + wait.length + '건</b>' + (wait.length ? '<button class="btn sm" data-act="cAll" data-i="1">전체 선택</button><button class="btn sm" data-act="cAll" data-i="0">전체 해제</button>' : '') + '</div>' +
-    '<p class="muted" style="margin:0 0 6px">다 나간 것은 체크, 일부만 나갔거나 날짜가 다르면 버튼. 출고 예정별로 묶여 있습니다.</p>';
+    '<p class="muted" style="margin:0 0 6px">다 나간 것은 체크, 일부만 나갔거나 날짜가 다르면 버튼. 출고 예정별로 묶여 있고, 출고 예정이 고른 날짜보다 뒤인 주문은 전체 선택에서 빠집니다.</p>';
   CGR = []; var last = null;
   wait.forEach(function (o) {
     var g = dueGroup(o);
@@ -642,6 +665,8 @@ function closeSum() {
 function doClose() {
   var d = $('cDate').value || S.today, lu = closeLineUsed(), ids = S.orders.filter(function (o) { return o.st === '대기' && closeChecked(o, d, lu); }).map(function (o) { return o.id; });
   var left = S.orders.filter(function (o) { return o.st === '대기'; }).length - ids.length;
+  var fut = ids.map(byId).filter(function (o) { return closeFuture(o, d); });
+  if (fut.length && !confirm('⚠️ 출고 예정이 ' + OUT.md(d) + '보다 뒤인 주문 ' + fut.length + '건이 체크돼 있습니다.\n' + fut.slice(0, 5).map(function (o) { return '· ' + o.cust + ' (' + OUT.md(o.due) + ' 예정)'; }).join('\n') + '\n이 주문도 ' + OUT.md(d) + ' 출고로 처리할까요?\n(아니면 취소 누르고 체크를 빼세요)')) return;
   if (!confirm(OUT.md(d) + ' 출하서를 만듭니다.\n· 출고완료로 바꿀 주문 ' + ids.length + '건\n· 대기로 남는 주문 ' + left + '건\n진행할까요?')) return;
   call('closeDay', { date: d, shippedIds: ids }, function (r) { mergeOrders(r.orders); CSEL = {}; reportFile(r.report); notice('출하서를 만들었습니다 (출고 ' + r.report.shipped.length + '건 · 대기 ' + r.report.pending.length + '건)'); render(); loadReports(); });
 }
@@ -686,7 +711,7 @@ function loadDeleted() { call('deletedList', {}, function (r) { $('delList').inn
 
 /* ---------- 누르기 ---------- */
 document.addEventListener('click', function (ev) {
-  var chk = ev.target.closest('[data-chk]'); if (chk) { var key = chk.getAttribute('data-chk'); if (S.view === 'new') { S.drafts[+key]._on = chk.checked; renderDrafts(); } if (S.view === 'print') { PSEL[key] = chk.checked; pCountSel(); } if (S.view === 'close') { CSEL[key] = chk.checked; closeSum(); } if (S.view === 'list') LSEL[key] = chk.checked; return; }
+  var chk = ev.target.closest('[data-chk]'); if (chk) { var key = chk.getAttribute('data-chk'); if (S.view === 'new') { S.drafts[+key]._on = chk.checked; renderDrafts(); } if (S.view === 'print') { PSEL[key] = chk.checked; pCountSel(); } if (S.view === 'close') { CSEL[key] = chk.checked; closeSum(); } if (S.view === 'list') { LSEL[key] = chk.checked; lSelCount(); } return; }
   if (ev.target.closest('[data-box]') && !ev.target.closest('[data-act="bxAdd"],[data-act="bxDel"]')) return;
   var b = ev.target.closest('[data-act],[data-v]'); if (!b) return;
   if (b.dataset.v) { go(b.dataset.v); return; }
@@ -726,6 +751,10 @@ document.addEventListener('click', function (ev) {
   else if (a === 'sSave') shipSave();
   else if (a === 'lPick') { LPICK = !LPICK; LSEL = {}; renderList(); }
   else if (a === 'lDel') lDo('del');
+  else if (a === 'lSelAll') { var allOn = (S.lIds || []).every(function (id) { return LSEL[id]; }); (S.lIds || []).forEach(function (id) { LSEL[id] = !allOn; }); renderList(); }
+  else if (a === 'lBulk') openBulk(i);
+  else if (a === 'bkDate') { var bd = $('bk-date'); if (isDate(i)) { bd.value = i; delete bd.dataset.text; } else { bd.value = ''; bd.dataset.text = i; notice('출고 예정: ' + i); } }
+  else if (a === 'bkGo') bulkGo();
   else if (a === 'lCancel') lDo('cancel');
   else if (a === 'pReport') copyText(S.todayMsg, '복사했습니다: ' + S.todayMsg);
   else if (a === 'pAll') pAll();
@@ -757,7 +786,7 @@ document.addEventListener('click', function (ev) {
   else if (a === 'lnReload') lineLoad();
   else if (a === 'lnToSum') { ev.preventDefault(); var sm = document.querySelector('#lnBody .lnsum'); if (sm) sm.scrollIntoView({ block: 'start' }); }
   else if (a === 'pSelAll') { readBoxes(); pOrders().forEach(function (o) { PSEL[o.id] = i === '1'; }); renderPrint(); }
-  else if (a === 'cAll') { S.orders.forEach(function (o) { if (o.st === '대기') CSEL[o.id] = i === '1'; }); renderClose(); }
+  else if (a === 'cAll') { var dA = $('cDate').value || S.today, skip = 0; S.orders.forEach(function (o) { if (o.st !== '대기') return; if (i === '1' && closeFuture(o, dA)) { CSEL[o.id] = false; skip++; return; } CSEL[o.id] = i === '1'; }); renderClose(); if (skip) notice('출고 예정이 ' + OUT.md(dA) + ' 뒤인 ' + skip + '건은 빼고 체크했습니다'); }
   else if (a === 'cGrp') { var gi = CGR[+i] || [], dd = $('cDate').value || S.today, lu2 = closeLineUsed(), allOn = gi.every(function (id) { return closeChecked(byId(id), dd, lu2); }); gi.forEach(function (id) { CSEL[id] = !allOn; }); renderClose(); }
   else if (a === 'lOld') { var qq = $('q').value.trim(); call('searchOld', { q: qq }, function (r) { mergeOrders(r.orders); notice(r.orders.length ? '오래된 주문 ' + r.orders.length + '건을 불러왔습니다' + (r.more ? ' (앞의 100건만)' : '') : '더 오래된 주문 중에는 없습니다'); if (r.orders.length && S.filter === 'wait') S.filter = 'all'; renderList(); }); }
   else if (a === 'lnQClear') { $('lnQ').value = ''; renderLine(); $('lnQ').focus(); }
@@ -772,7 +801,7 @@ $('cDate').addEventListener('change', function () { CSEL = {}; renderClose(); })
 $('imp').addEventListener('change', function () { if (this.files.length) doImport(Array.prototype.slice.call(this.files)); this.value = ''; });
 document.addEventListener('input', function (ev) { if (ev.target.id === 'lnQ') { renderLine(); return; } if (ev.target.classList && ev.target.classList.contains('sq')) shipSync();
   if (ev.target.id === 'e-addr' && ED && $('e-saveAddrRow')) $('e-saveAddrRow').classList.toggle('hidden', !newAddr($('e-cust').value, ev.target.value)); });
-document.addEventListener('change', function (ev) { if (ev.target.classList && ev.target.classList.contains('sw')) { shipSync(); return; } if (ev.target.id === 'e-dueCal' && ED && ev.target.value) { readEdit(); ED.o.due = ev.target.value; drawEdit(); return; } if (ev.target.id === 'e-cust' && ED) { readEdit(); var had = ED.o.addr; enrich(ED.o); if (!had && ED.o.addr) notice('주소록에서 주소를 채웠습니다'); drawEdit(); } });
+document.addEventListener('change', function (ev) { if (ev.target.id === 'bk-date') { delete ev.target.dataset.text; return; } if (ev.target.classList && ev.target.classList.contains('sw')) { shipSync(); return; } if (ev.target.id === 'e-dueCal' && ED && ev.target.value) { readEdit(); ED.o.due = ev.target.value; drawEdit(); return; } if (ev.target.id === 'e-cust' && ED) { readEdit(); var had = ED.o.addr; enrich(ED.o); if (!had && ED.o.addr) notice('주소록에서 주소를 채웠습니다'); drawEdit(); } });
 /* ---------- 새 버전 알림: 화면을 오래 열어 두면 옛 버전으로 계속 쓰게 됨 → 서버 버전이 다르면 새로고침 안내 ---------- */
 var VER_AT = Date.now();
 function checkVer() { VER_AT = Date.now(); try { google.script.run.withSuccessHandler(function (r) { if (r && r.version && r.version !== HTML_VERSION) showNewVer(r.version); }).withFailureHandler(function () {}).api(S.pin, 'ver', {}); } catch (e) {} }

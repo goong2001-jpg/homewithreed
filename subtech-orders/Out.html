@@ -36,7 +36,7 @@ var OUT = (function () {
     orders.forEach(function (o) {
       var s = snd(o, def), nm = recvName(o, def), txt = itemText(o, '/'), zip = (String(o.addr || '').match(/\(?(\d{5})\)?/) || [])[1] || '';
       boxes(o).forEach(function (x) {
-        rows.push([s.name, s.phone, nm, String(o.addr || '').replace(/^\(?\d{5}\)?\s*/, ''), '', '', '', zip, o.branch || '', o.phone || '', o.phone2 || '', o.pay === '착불' ? '착불' : '선불', txt, x.b || 1, '박스', 10, 10, 10, 10, 50, x.f || '', 100, '', '', '', nm + (x.k ? '/' + x.k : '')]);
+        rows.push([s.name, s.phone, nm, String(o.addr || '').replace(/^\(?\d{5}\)?\s*/, ''), '', '', '', zip, o.branch || '', o.phone || '', o.phone2 || '', o.pay === '착불' ? '착불' : '선불', txt, x.b || 1, '박스', 10, 10, 10, 10, 50, x.f || '', 100, '', '', '', nm]);   // 경동 메모엔 박스 크기 안 씀 (사용자 요청 11-18)
         hist.push([date, '경동', nm, txt, x.b || 1, x.k || '', x.f || '']);
       });
     });
@@ -77,19 +77,30 @@ var OUT = (function () {
     var rows = [], merges = [[0, 0, 0, 10]], sum = [0, 0];
     rows.push(hd([snap.date.replace(/-/g, '/') + '-출고현황', '', '', '', '', '', '', '', '', '', ''], 3));
     rows.push(hd(RP_H, 1));
+    // 같은 거래처 주문은 한 번호로 묶음 (예: 와이코퍼레이션 직송 여러 건 → 적요에 "직송 1 / 문 앞", 받는분·배송방법은 주문마다)
+    // 대기 쪽은 거래처 + 출고 예정이 같을 때만 묶음
     function block(list, which, numbered) {
-      list.forEach(function (o, n) {
-        var its = (o.items && o.items.length ? o.items : [{ name: '', sensor: '', qty: '', unit: '', note: '' }]).map(function (i) { return Object.assign({}, i, { note: noteOf(i) }); }), r0 = rows.length, anyNote = its.some(function (i) { return i.note; });
-        var mine = o.own !== false, to = mine ? [o.recv, o.phone].filter(Boolean).join(' / ') : '', recv = [to, mine ? o.addr : ''].filter(Boolean).join(' ') || (o.branch || '');   // own=false: 단골 기본 주소는 출하서에 안 씀
-        its.forEach(function (i, k) {
-          var q = qtyCell(i, isAcc); if (typeof q === 'number') sum[which] += q;
-          var note = anyNote ? (k === 0 ? [o.memo, i.note].filter(Boolean).join(' / ') : (i.note || '')) : (k === 0 ? (o.memo || '') : '');
-          rows.push([{ v: k === 0 && numbered ? n + 1 : '', s: 2 }, { v: k === 0 ? (which ? md(o.due) : md(snap.date)) : '', s: 2 }, { v: k === 0 ? o.cust : '', s: 2 }, { v: i.name, s: 2 }, { v: i.sensor || '', s: 2 },
-            { v: q, s: typeof q === 'number' ? 5 : 2 }, { v: note, s: 2 }, { v: k === 0 ? recv : '', s: 2 }, { v: k === 0 ? (o.ship || '') : '', s: 2 }, { v: k === 0 ? (o.stmt || '') : '', s: 2 }, { v: k === 0 ? (o.tax || '') : '', s: 2 }]);
+      var groups = [], at = {};
+      list.forEach(function (o) { var k = String(o.cust || '').replace(/\s/g, '').toLowerCase() + (which ? '|' + (o.due || '') : ''); if (!(k in at)) { at[k] = groups.length; groups.push([]); } groups[at[k]].push(o); });
+      groups.forEach(function (g, n) {
+        var g0 = rows.length, multi = g.length > 1;
+        g.forEach(function (o, j) {
+          var its = (o.items && o.items.length ? o.items : [{ name: '', sensor: '', qty: '', unit: '', note: '' }]).map(function (i) { return Object.assign({}, i, { note: noteOf(i) }); }), r0 = rows.length, anyNote = its.some(function (i) { return i.note; });
+          var mine = o.own !== false, to = mine ? [o.recv, o.phone].filter(Boolean).join(' / ') : '', recv = [to, mine ? o.addr : ''].filter(Boolean).join(' ') || (o.branch || '');   // own=false: 단골 기본 주소는 출하서에 안 씀
+          var head = [multi ? ((o.sender || o.recv) ? '직송 ' : '') + (j + 1) : '', o.memo, multi ? o.msg : ''].filter(Boolean).join(' / ');
+          its.forEach(function (i, k) {
+            var q = qtyCell(i, isAcc); if (typeof q === 'number') sum[which] += q;
+            var note = k === 0 ? [head, i.note].filter(Boolean).join(' / ') : (i.note || ''), top = j === 0 && k === 0;
+            rows.push([{ v: top && numbered ? n + 1 : '', s: 2 }, { v: top ? (which ? md(o.due) : md(snap.date)) : '', s: 2 }, { v: top ? o.cust : '', s: 2 }, { v: i.name, s: 2 }, { v: i.sensor || '', s: 2 },
+              { v: q, s: typeof q === 'number' ? 5 : 2 }, { v: note, s: 2 }, { v: k === 0 ? recv : '', s: 2 }, { v: k === 0 ? (o.ship || '') : '', s: 2 }, { v: top ? (o.stmt || '') : '', s: 2 }, { v: top ? (o.tax || '') : '', s: 2 }]);
+          });
+          if (its.length > 1) { var r1 = rows.length - 1; [7, 8].forEach(function (c) { merges.push([r0, c, r1, c]); }); if (!anyNote) merges.push([r0, 6, r1, 6]); }
         });
-        if (its.length > 1) { var r1 = rows.length - 1; [0, 1, 2, 7, 8, 9, 10].forEach(function (c) { merges.push([r0, c, r1, c]); }); if (!anyNote) merges.push([r0, 6, r1, 6]); }
+        var g1 = rows.length - 1; if (g1 > g0) [0, 1, 2, 9, 10].forEach(function (c) { merges.push([g0, c, g1, c]); });
       });
     }
+    var dk = function (o) { return /^\d{4}-\d{2}-\d{2}$/.test(o.due || '') ? o.due : '9999' + (o.due || ''); };
+    snap = Object.assign({}, snap, { pending: (snap.pending || []).slice().sort(function (a, b) { return dk(a).localeCompare(dk(b)); }) });   // 대기는 출고 예정 순서
     block(snap.shipped || [], 0, true);
     var t = rows.length; rows.push(hd(['합계', '', '', '', '', sum[0], '', '', '', '', ''], 4)); merges.push([t, 0, t, 1]);
     block(snap.pending || [], 1, false);

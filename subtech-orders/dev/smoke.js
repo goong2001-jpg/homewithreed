@@ -241,9 +241,14 @@ SV7 O 1000개 명판있슴
     const grps = await page.locator('#cList .grp').allTextContents();
     ok(grps.length === 3 && /^오늘/.test(grps[0]) && /^내일/.test(grps[1]) && /^날짜 미정/.test(grps[2]), '출하서 대기 목록: 오늘 / 내일 / 날짜 미정으로 묶임');
     await page.click('[data-act=cAll][data-i="1"]');
-    ok(await page.locator('#cList input:checked').count() === 4 && /4건 · 수량 합계 65개/.test(await page.textContent('#cSum')) && /부자재 10개 별도/.test(await page.textContent('#cSum')) && /\(4건\)/.test(await page.textContent('[data-act=closeDay]')), '전체 선택 → 4건 · 수량 합계 65개 (부자재 10개 별도), 마감 버튼에 건수');
+    ok(await page.locator('#cList input:checked').count() === 3 && /3건 · 수량 합계 55개/.test(await page.textContent('#cSum')) && /\(3건\)/.test(await page.textContent('[data-act=closeDay]')) && /뒤인 1건은 빼고/.test(await page.textContent('#toast')), '전체 선택 → 내일 예정 1건은 빼고 3건 · 수량 합계 55개, 마감 버튼에 건수');
     await page.locator('#cList input[type=checkbox]').first().uncheck();
-    ok(/3건 · 수량 합계/.test(await page.textContent('#cSum')), '하나 빼면 합계 바로 바뀜');
+    ok(/2건 · 수량 합계/.test(await page.textContent('#cSum')), '하나 빼면 합계 바로 바뀜');
+    { const msgs = []; const h = d => msgs.push(d.message()); page.on('dialog', h);
+      await page.locator('#cList .card').filter({ hasText: '내일상사' }).locator('input[type=checkbox]').check();
+      page.once('dialog', d => {}); await page.evaluate(() => { window.__c = window.confirm; window.confirm = m => { window.__m = m; return false; }; }); await page.click('[data-act=closeDay]');
+      ok(/출고 예정이 .*보다 뒤인 주문 1건/.test(await page.evaluate(() => window.__m)) && await page.evaluate(() => S.orders.find(o => o.cust === '내일상사').st) === '대기', '내일 예정 주문을 체크하고 마감하면 경고 → 취소하면 그대로 대기');
+      await page.evaluate(() => { window.confirm = window.__c; }); page.off('dialog', h); }
     await page.click('[data-act=cAll][data-i="0"]'); ok(await page.locator('#cList input:checked').count() === 0 && /0건 · 수량 합계 0개/.test(await page.textContent('#cSum')), '전체 해제');
     await page.click('[data-act=cGrp][data-i="0"]'); ok(await page.locator('#cList input:checked').count() === 2, '이 묶음 모두 체크 (오늘 2건)');
     await page.click('[data-act=cGrp][data-i="0"]'); ok(await page.locator('#cList input:checked').count() === 0, '한 번 더 누르면 묶음 해제');
@@ -272,7 +277,19 @@ SV7 O 1000개 명판있슴
   await pc.click('[data-act=filt][data-i=done]'); await pc.fill('#q', '없는거래처'); ok(await pc.locator('[data-act=lOld]').count() === 1, '출고완료 검색 → "더 오래된 주문에서도 찾기" 버튼');
   await pc.click('[data-act=lOld]'); await pc.waitForFunction(() => /더 오래된 주문 중에는 없습니다/.test(document.getElementById('toast').textContent)); ok(true, '오래된 주문 찾기 (서버)');
   await pc.fill('#q', ''); await pc.click('[data-act=filt][data-i=wait]');
+  const hs = await pc.locator('#orders .card').evaluateAll(cs => cs.map(c => c.getBoundingClientRect().height));
+  ok(hs.length >= 3 && hs.every(h => h === hs[0]), 'PC 주문 카드 크기 일정 (' + hs[0] + 'px)');
   await pc.screenshot({ path: path.join(OUT, '18-pc-list.png') });
+  // v14: 검색 → 고르기 → 전체 선택 → 예정일 바꾸기 / 출고완료
+  await pc.fill('#q', '가나'); await pc.click('[data-act=lPick]'); await pc.click('[data-act=lSelAll]');
+  const nSel = await pc.evaluate(() => lSelIds().length); ok(nSel >= 1 && nSel === await pc.locator('#orders .card').count() && /건 고름/.test(await pc.textContent('#lSelN')), '검색 결과에서 보이는 것 전체 선택 (' + nSel + '건)');
+  await pc.click('[data-act=lBulk][data-i=due]'); await pc.click('#sheet [data-act=bkDate]:nth-child(2)'); await pc.click('[data-act=bkGo]');
+  await pc.waitForFunction(n => S.orders.filter(o => o.due === addDay(S.today, 1)).length >= n, nSel);
+  ok(true, '고른 주문 예정일을 내일로 한 번에');
+  await pc.fill('#q', ''); await pc.click('[data-act=lPick]'); await pc.locator('#orders input[type=checkbox]').first().check(); await pc.locator('#orders input[type=checkbox]').nth(1).check();
+  await pc.click('[data-act=lBulk][data-i=ship]'); await pc.click('[data-act=bkGo]');
+  await pc.waitForFunction(() => S.orders.filter(o => o.st === '출고완료' && o.shipped === S.today).length === 2);
+  ok(true, '고른 2건 출고완료 한 번에');
   await browser.close(); server.close();
   console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과'); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

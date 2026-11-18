@@ -4,7 +4,7 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v13';
+var APP_VERSION = 'v14';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
 var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록', DEL: '주문_삭제기록', LRN: '주문_학습' };
@@ -122,6 +122,12 @@ var API = {
   setStatus: function (a) {
     if (['대기', '출고완료', '취소'].indexOf(a.st) < 0) throw new Error('상태가 올바르지 않습니다');
     return lock_(function () { return { orders: patch_(a.ids, function (o) { o.st = a.st; o.shipped = a.st === '출고완료' ? (a.shipped || Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd')) : ''; }) }; });
+  },
+
+  // 출고 예정 한꺼번에 바꾸기: {ids, due:'yyyy-MM-dd'|'준비되면' 등}
+  setDue: function (a) {
+    var due = String(a.due || '').trim(); if (!due || due.length > 20) throw new Error('출고 예정이 올바르지 않습니다');
+    return lock_(function () { return { orders: patch_(a.ids, function (o) { o.due = due; }) }; });
   },
 
   // 송장 엑셀을 뽑았다고 표시 + 박스·운임을 송장기록에 남김(다음 추천에 씀). {ids, hist:[[일자,운송,받는분,품목,박스수,박스타입,운임]]}
