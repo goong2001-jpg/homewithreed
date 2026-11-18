@@ -102,6 +102,26 @@ jobs:
           npx --yes @google/clasp@2.4.2 deploy --deploymentId "$ID" --description "$VER github ${GITHUB_SHA::7}"
           echo "::notice::배포 완료: $VER (${GITHUB_SHA::7})"
 
+      # 배포 뒤 웹앱 주소가 로그인 없이(폰·카톡에서 처음 여는 사람처럼) 열리는지 확인 — 결과만 알림, 실패해도 배포는 그대로
+      - name: 웹앱 주소 열림 확인 (로그인 없이)
+        if: steps.check.outputs.ready == 'true' && steps.check.outputs.deploy == 'true'
+        continue-on-error: true
+        run: |
+          ID=$(printf '%s' "$CLASP_DEPLOYMENT_ID" | tr -d '[:space:]')
+          case "$ID" in *"/s/"*) ID=$(printf '%s' "$ID" | sed -E 's#.*/s/([^/?]+).*#\1#') ;; esac
+          echo "::add-mask::$ID"
+          sleep 5
+          for V in "" "?view=line"; do
+            OUT=$(curl -sL --max-redirs 10 -A "Mozilla/5.0 (Linux; Android 14) Mobile" -o page.html -w '%{http_code} %{url_effective}' "https://script.google.com/macros/s/$ID/exec$V" || true)
+            CODE=${OUT%% *}; HOST=$(printf '%s' "${OUT#* }" | sed -E 's#^https?://([^/]+).*#\1#')
+            TITLE=$(grep -o '<title>[^<]*' page.html | head -1 | sed 's/<title>//')
+            echo "주소${V:- (사무실)}: HTTP $CODE · 최종 호스트 $HOST · 제목 [$TITLE]"
+            if printf '%s' "$HOST" | grep -q 'accounts.google.com'; then echo "::warning::로그인 페이지로 이동함 → 배포 관리에서 웹앱 액세스를 '모든 사용자'로 바꿔야 함"
+            elif grep -q '써브텍' page.html; then echo "::notice::로그인 없이 열림 OK${V}"
+            else echo "::warning::앱이 아닌 페이지가 열림 [$TITLE] → 배포 ID·액세스 설정 확인"; fi
+          done
+          rm -f page.html
+
       # 배포가 성공했을 때만: 이번 푸시의 커밋 메시지를 CHANGELOG.md 맨 위에 추가하고 같은 브랜치에 커밋
       # (GITHUB_TOKEN 으로 푸시한 커밋은 워크플로를 다시 실행시키지 않음 → 무한 반복 없음)
       - name: 변경 이력 자동 기록 (CHANGELOG.md)
