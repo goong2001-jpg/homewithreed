@@ -121,6 +121,15 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 .lncnt .k{font-size:14px;color:var(--sub);font-weight:700}
 .lncnt .v{font-size:21px;font-weight:800;margin-top:2px;word-break:keep-all}
 .lncnt .s{font-size:12px;color:var(--warn);margin-top:2px}
+/* 운송사 색 — 위 칸·카드 배지·사무실 태그가 같은 색 */
+.car-cj{--cc:#1D5FA8;--cb:#E8F0FA}.car-kd{--cc:#C0392B;--cb:#FBEAEA}.car-ds{--cc:#2E7D32;--cb:#E8F4E9}.car-jn{--cc:#6D4C2F;--cb:#F3ECE4}.car-etc{--cc:#5B6472;--cb:#EEF0F2}
+.lncnt>div[class*="car-"]{border-top:6px solid var(--cc);background:var(--cb);cursor:pointer}
+.lncnt>div[class*="car-"] .k{color:var(--cc);font-size:15px}
+.lncnt>div[class*="car-"] .v{color:var(--cc)}
+.lncnt>div.pick{outline:3px solid var(--cc);outline-offset:-1px}
+.lncard[class*="car-"]{border-top:5px solid var(--cc)}
+.cbadge{display:inline-block;font-size:15px;font-weight:800;color:#fff;background:var(--cc);border-radius:6px;padding:4px 10px;white-space:nowrap}
+.tag.ship[class*="car-"]{background:var(--cb);color:var(--cc)}
 </style>
 </head>
 <body>
@@ -201,7 +210,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v6';
+var HTML_VERSION = 'v7';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -281,7 +290,7 @@ function cardHTML(o, opt) {
   var to = [o.recv, o.phone, o.branch ? '[' + o.branch + ']' : '', o.addr].filter(Boolean).join(' · ');
   return '<div class="card tap' + (opt.off ? ' off' : '') + '" data-act="' + (opt.act || 'edit') + '" data-i="' + esc(opt.key) + '"><div class="top">' + (opt.check != null ? '<input type="checkbox" data-chk="' + esc(opt.key) + '"' + (opt.check ? ' checked' : '') + '>' : '') +
     '<div class="grow"><div class="cust">' + esc(o.cust || '(거래처 없음)') + '</div><div class="items">' + it + '</div>' +
-    '<div class="meta">' + (o.ship ? '<span class="tag ship">' + esc(o.ship) + '</span>' : '') + (dueTxt(o) ? '<span class="tag">' + esc(dueTxt(o)) + '</span>' : '') +
+    '<div class="meta">' + (o.ship ? '<span class="tag ship ' + carClass(o.carrier) + '">' + esc(o.ship) + '</span>' : '') + (dueTxt(o) ? '<span class="tag">' + esc(dueTxt(o)) + '</span>' : '') +
     (o.st === '출고완료' ? '<span class="tag ok">출고 ' + esc(OUT.md(o.shipped)) + '</span>' : '') + (o.st === '취소' ? '<span class="tag bad">취소</span>' : '') + itemTag(o) + printedTag(o) + lineTags(o) + (o.parent && o.st === '대기' ? '<span class="tag warn">잔량</span>' : '') +
     w.map(function (x) { return '<span class="tag warn">' + esc(x) + '</span>'; }).join('') + (o._auto && o._auto.length ? '<span class="tag">' + esc(o._auto.join(', ')) + '</span>' : '') +
     (to ? '<div>' + esc(to) + '</div>' : '') + (o.memo ? '<div>' + esc(o.memo) + '</div>' : '') + (opt.extra || '') + '</div></div></div></div>';
@@ -675,6 +684,7 @@ document.addEventListener('click', function (ev) {
     if (!confirm(np ? nm + '를 "' + np + '"(으)로 바꿉니다. 쓰는 분들께 알려주세요.' : nm + '를 끕니다.' + (line ? '' : ' 주소만 알면 누구나 모든 기능을 쓸 수 있게 됩니다.'))) return;
     call('setPin', { pin: np, kind: line ? 'line' : 'office' }, function () { if (!line) { S.pin = np; try { localStorage.setItem('so-pin', np); } catch (e) {} S.pinOn = !!np; } else S.linePinOn = !!np; $(line ? 'pinLine' : 'pinNew').value = ''; renderPinState(); notice(np ? nm + '를 설정했습니다' : nm + '를 껐습니다'); }); }
   else if (a === 'lnTab') { LN.tab = i; renderLine(); window.scrollTo(0, 0); }
+  else if (a === 'lnCar') { LN.car = LN.car === i ? '' : i; renderLine(); }
   else if (a === 'lnReload') lineLoad();
   else if (a === 'lnMark') lineMark(i, b.dataset.w);
   else if (a === 'lnName') { var nn = prompt('이름 (버튼 누른 사람으로 남습니다)', LN.name || ''); if (nn != null) { LN.name = nn.trim(); try { localStorage.setItem('so-name', LN.name); } catch (e) {} renderLine(); } }
@@ -688,7 +698,7 @@ document.addEventListener('input', function (ev) { if (ev.target.classList && ev
   if (ev.target.id === 'e-addr' && ED && $('e-saveAddrRow')) $('e-saveAddrRow').classList.toggle('hidden', !newAddr($('e-cust').value, ev.target.value)); });
 document.addEventListener('change', function (ev) { if (ev.target.classList && ev.target.classList.contains('sw')) { shipSync(); return; } if (ev.target.id === 'e-dueCal' && ED && ev.target.value) { readEdit(); ED.o.due = ev.target.value; drawEdit(); return; } if (ev.target.id === 'e-cust' && ED) { readEdit(); var had = ED.o.addr; enrich(ED.o); if (!had && ED.o.addr) notice('주소록에서 주소를 채웠습니다'); drawEdit(); } });
 /* ---------- 생산 화면 (?view=line) ---------- */
-var LN = { tab: 'today', orders: [], at: 0, name: '' };
+var LN = { tab: 'today', orders: [], at: 0, name: '', car: '' };
 try { LN.name = localStorage.getItem('so-name') || ''; } catch (e) {}
 function renderPinState() { var e = $('pinState'); if (!e) return;
   e.innerHTML = '사무실 암호: <b>' + (S.pinOn ? '켜짐' : '꺼짐') + '</b> · 생산 암호: <b>' + (S.linePinOn ? '켜짐' : '꺼짐') + '</b>' + (!S.pinOn ? '<br>⚠️ 사무실 암호가 꺼져 있으면 생산 암호와 상관없이 주소만 알면 누구나 모든 기능을 쓸 수 있습니다.' : ''); }
@@ -697,6 +707,8 @@ function lineLoad(quiet) {
   call('lineBoot', {}, function (r) { LN.orders = r.orders; LN.at = Date.now(); S.today = r.today; status(''); renderLine();
     if (r.version !== HTML_VERSION) status('새 버전 — 새로고침'); });
 }
+function carClass(c) { return 'car-' + ({ 'CJ': 'cj', '경동': 'kd', '대신': 'ds', '직납': 'jn' }[c] || 'etc'); }
+function carName(c) { return { 'CJ': 'CJ택배', '경동': '경동', '대신': '대신', '직납': '직납', '방문': '직접수령', '퀵': '퀵', '화물': '화물' }[c] || '미정'; }
 function lnStage(o) { return o.tagged ? 2 : o.ready ? 1 : 0; }
 function lnNoLabel(o) { return /^(직납|방문|퀵)$/.test(o.carrier || ''); }
 function lnSum(list) {   // 아직 안 만든(0단계) 주문의 품목 합계
@@ -708,19 +720,19 @@ function lnSumHTML(title, list) { var s = lnSum(list); return '<div class="lnsum
 // 오늘 운송별 건수: 송장 뽑은 건은 뽑을 때 넣은 박스 수, 아직 안 뽑은 건은 건수
 function lnCount(list) {
   var C = [['CJ', 'CJ 택배'], ['경동', '경동'], ['대신', '대신'], ['직납', '직납']], etc = list.filter(function (o) { return ['CJ', '경동', '대신', '직납'].indexOf(o.carrier) < 0; });
-  var cell = function (name, l, label) {
+  var cell = function (name, l, label, key) {
     var boxes = 0, pr = 0, un = 0;
     l.forEach(function (o) { if (label && o.printed) { pr++; (o.box && o.box.length ? o.box : [{ b: 1 }]).forEach(function (x) { boxes += +x.b || 1; }); } else un++; });
     var v = !l.length ? '0' : label ? [pr ? boxes + '박스' : '', un ? un + '건' : ''].filter(Boolean).join(' + ') : un + '건';
     var sub = label && un ? (pr ? un + '건 송장 출력 전' : '송장 출력 전') : '';
-    return '<div><div class="k">' + esc(name) + '</div><div class="v">' + esc(v) + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + '</div>';
+    return '<div class="' + carClass(key) + (LN.car === key ? ' pick' : '') + '" data-act="lnCar" data-i="' + key + '"><div class="k">' + esc(name) + '</div><div class="v">' + esc(v) + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + '</div>';
   };
-  return '<div class="lncnt">' + C.map(function (c) { return cell(c[1], list.filter(function (o) { return o.carrier === c[0]; }), c[0] !== '직납'); }).join('') + '</div>' +
+  return '<div class="lncnt">' + C.map(function (c) { return cell(c[1], list.filter(function (o) { return o.carrier === c[0]; }), c[0] !== '직납', c[0]); }).join('') + '</div>' +
     (etc.length ? '<p class="muted" style="margin:-4px 0 10px">그 밖(직접수령·퀵·미정) ' + etc.length + '건</p>' : '');
 }
 function lnCard(o) {
   var st = lnStage(o), nl = lnNoLabel(o), it = (o.items || []).map(function (i) { var n = OUT.noteOf(i); return esc(i.name) + (i.sensor ? ' ' + esc(i.sensor) : '') + ' <span class="q">' + esc(i.qty === '' || i.qty == null ? '' : i.qty + (i.unit || '')) + '</span>' + (n ? ' <span class="muted">' + esc(n) + '</span>' : ''); }).join('<br>');
-  return '<div class="lncard s' + st + '"><div class="row"><div class="cu grow">' + esc(o.cust || '(거래처 없음)') + '</div>' + (o.ship ? '<span class="tag ship">' + esc(o.ship) + '</span>' : '') + '</div>' +
+  return '<div class="lncard s' + st + ' ' + carClass(o.carrier) + '"><div class="row"><div class="cu grow">' + esc(o.cust || '(거래처 없음)') + '</div><span class="cbadge">' + esc(carName(o.carrier)) + '</span></div>' +
     '<div class="it">' + it + '</div>' + (o.memo ? '<div class="muted">' + esc(o.memo) + '</div>' : '') +
     '<div class="meta" style="margin-top:6px">' + (isDate(o.due) ? '<span class="tag">' + esc(o.due <= S.today ? '오늘' + (o.due < S.today ? ' (' + OUT.md(o.due) + ' 예정)' : '') : OUT.md(o.due)) + '</span>' : '<span class="tag">' + esc(o.due || '날짜 미정') + '</span>') + (o.parent ? '<span class="tag warn">잔량</span>' : '') + (o.printed && !nl ? '<span class="tag ok">송장출력 ✓</span>' : '') + '</div>' +
     (o.ready || o.tagged ? '<div class="who">' + (o.ready ? '준비완료 ' + esc(when(o.ready)) + (o.readyBy ? ' ' + esc(o.readyBy) : '') : '') + (o.tagged ? ' · ' + (nl ? '출고준비 ' : '송장부착 ') + esc(when(o.tagged)) + (o.taggedBy ? ' ' + esc(o.taggedBy) : '') : '') + '</div>' : '') +
@@ -734,7 +746,8 @@ function renderLine() {
   var h = '<div class="row" style="margin-bottom:10px"><span class="muted grow">' + (LN.at ? '업데이트 ' + new Date(LN.at).toTimeString().slice(0, 5) : '') + '</span><button class="btn sm ghost" data-act="lnName">' + (LN.name ? esc(LN.name) + ' (바꾸기)' : '내 이름 정하기') + '</button></div>';
   if (LN.tab === 'today') {
     var left = today.filter(function (o) { return lnStage(o) < 2; }).length;
-    h += lnCount(today) + '<div class="grp">오늘 출고 ' + today.length + '건 · 남은 일 ' + left + '건</div>' + (today.length ? today.map(lnCard).join('') : '<p class="muted">오늘 출고 예정이 없습니다.</p>') + '<div style="margin-top:16px">' + lnSumHTML('오늘 아직 만들 것', today) + '</div>';
+    var shown = LN.car ? today.filter(function (o) { return o.carrier === LN.car; }) : today;
+    h += lnCount(today) + (LN.car ? '<div class="row" style="margin:0 0 8px"><span class="cbadge ' + carClass(LN.car) + '">' + esc(carName(LN.car)) + '만 보는 중 ' + shown.length + '건</span><button class="btn sm" data-act="lnCar" data-i="">전체 보기</button></div>' : '<div class="grp">오늘 출고 ' + today.length + '건 · 남은 일 ' + left + '건 <span style="font-weight:400">(위 칸을 누르면 그 운송만)</span></div>') + (shown.length ? shown.map(lnCard).join('') : '<p class="muted">오늘 출고 예정이 없습니다.</p>') + '<div style="margin-top:16px">' + lnSumHTML('오늘 아직 만들 것', today) + '</div>';
   } else if (LN.tab === 'next') {
     var last = null; next.sort(function (a, b) { return (dueKey(a) + a.at).localeCompare(dueKey(b) + b.at) || (lnStage(a) - lnStage(b)); });
     next.forEach(function (o) { var g = dueGroup(o); if (g !== last) { h += '<div class="grp">' + esc(g) + '</div>'; last = g; } h += lnCard(o); });

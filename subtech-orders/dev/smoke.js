@@ -183,6 +183,10 @@ SV7 O 1000개 명판있슴
     await lp.waitForFunction(() => document.querySelectorAll('#lnBody .lncard').length === 4);
     { const cnt = await lp.locator('.lncnt').innerText(), first = await lp.evaluate(() => document.querySelector('#lnBody').firstElementChild.nextElementSibling.className);
       ok(/CJ 택배\s*3박스 \+ 1건\s*1건 송장 출력 전/.test(cnt) && /경동\s*1건\s*송장 출력 전/.test(cnt) && /대신\s*0/.test(cnt) && /직납\s*1건/.test(cnt) && first === 'lncnt', '맨 위 운송별: CJ 3박스(출력분) + 1건(출력 전) · 경동 1건 · 대신 0 · 직납 1건');
+      ok(await lp.locator('.lncard.car-cj').count() === 2 && await lp.locator('.lncard.car-kd').count() === 1 && await lp.locator('.lncard.car-jn').count() === 1 && /경동/.test(await lp.locator('.lncard.car-kd .cbadge').textContent()), '카드마다 운송사 색 배지 (CJ 파랑·경동 빨강·직납 갈색)');
+      await lp.click('.lncnt .car-kd'); ok(await lp.locator('.lncard').count() === 1 && /경동만 보는 중/.test(await lp.textContent('#lnBody')), '위 경동 칸을 누르면 경동 주문만');
+      await lp.screenshot({ path: path.join(OUT, '12-line-color.png') });
+      await lp.click('[data-act=lnCar][data-i=""]'); ok(await lp.locator('.lncard').count() === 4, '전체 보기');
       ok(await lp.evaluate(() => { const b = document.getElementById('lnBody'), sum = b.querySelector('.lnsum'), cards = b.querySelectorAll('.lncard'); return !!(cards[cards.length - 1].compareDocumentPosition(sum) & Node.DOCUMENT_POSITION_FOLLOWING); }), '"오늘 아직 만들 것"은 카드 아래에'); }
     const body = await lp.textContent('#lnBody');
     ok(await lp.locator('#app').isHidden() && /오늘 아직 만들 것/.test(body) && /SV7 X/.test(body) && /50/.test(body), '생산 화면: 사무실 메뉴 없이 오늘 출고 4건 + 아직 만들 양');
