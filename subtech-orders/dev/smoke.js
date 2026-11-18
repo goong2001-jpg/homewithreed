@@ -266,7 +266,21 @@ SV7 O 1000개 명판있슴
     await page.click('[data-act=pSelAll][data-i="1"]'); const nP = await page.locator('#pList input[type=checkbox]').count();
     ok(nP >= 2 && await page.locator('#pList input:checked').count() === nP && (await page.textContent('[data-act=pXlsx]')) === '체크한 ' + nP + '건 엑셀 받기', '송장 전체 선택 → 버튼에 체크한 건수');
     await page.evaluate(() => { HTML_VERSION = 'v0'; checkVer(); }); await page.waitForSelector('#newVer:not(.hidden)');
-    ok(/새 버전\(v\d+\)이 나왔어요/.test(await page.textContent('#newVer')), '서버가 새 버전이면 화면 위에 새로고침 안내'); }
+    ok(/새 버전\(v\d+\)이 나왔어요/.test(await page.textContent('#newVer')), '서버가 새 버전이면 화면 위에 새로고침 안내');
+    await page.click('#newVer'); ok(await page.locator('#newVer').isHidden(), '안내는 눌러서 닫을 수 있음'); await page.evaluate(() => { HTML_VERSION = S.ver0 || HTML_VERSION; }); }
+  // v16: 옛 출고현황 가져오기 (앞에서 받은 하루 파일을 다시 넣어 봄 → 미리보기 → 넣기 → 두 번째는 0건)
+  { await page.click('#nav [data-v=more]');
+    const n0 = await page.evaluate(() => S.orders.length);
+    await page.setInputFiles('#impShip', path.join(OUT, 'chulha.xlsx'));
+    await page.waitForSelector('[data-act=siGo]');
+    const pv = await page.textContent('#shB');
+    ok(/가져올 날짜/.test(pv) && /출고 2건 · 대기 2건/.test(pv) && /새로 넣을 주문 \d+건/.test(pv), '가져오기 미리보기: 날짜별 출고·대기 건수');
+    const nNew = +(pv.match(/새로 넣을 주문 (\d+)건/) || [])[1];
+    await page.click('[data-act=siGo]'); await page.waitForFunction(() => /가져왔습니다/.test(document.getElementById('toast').textContent));
+    ok(await page.evaluate(() => S.orders.length) === n0 + nNew && nNew >= 2, '가져오기: 새 주문 ' + nNew + '건 들어감');
+    await page.setInputFiles('#impShip', path.join(OUT, 'chulha.xlsx')); await page.waitForSelector('[data-act=siGo]');
+    ok(/새로 넣을 주문 0건/.test(await page.textContent('#shB')) && await page.locator('[data-act=siGo]').isDisabled(), '같은 파일 다시 넣으면 0건 (겹치지 않음)');
+    await page.click('#sheet [data-act=shClose]'); }
   // PC 화면
   const pc = await browser.newPage({ viewport: { width: 1280, height: 800 } }); await pc.goto(URL); await pc.waitForFunction(() => document.getElementById('st').textContent === '');
   await pc.fill('#paste', PASTE); await pc.click('[data-act=parse]'); await pc.screenshot({ path: path.join(OUT, '6-pc.png') });

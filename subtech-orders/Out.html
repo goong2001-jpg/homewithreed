@@ -193,7 +193,58 @@ var OUT = (function () {
     return { custs: custs, hist: hist, what: what };
   }
 
-  return { cj: cj, kd: kd, ds: ds, report: report, day: day, month: month, noteOf: noteOf, importBook: importBook, itemText: itemText, itemStr: itemStr, recvName: recvName, isDirect: isDirect, md: md, tsv: tsv };
+  /* ----- 옛 출고현황(출하서) 엑셀 읽기: 날짜 탭마다 → {date, shipped:[주문], pending:[주문]} (v16)
+     A1 "2026/11/18-출고현황", 머리줄 no.·일자-No.·거래처명·품목명·센서·수량·적요·받는분·배송방법·거래명세서·계산서
+     거래처명 칸이 채워진 줄 = 새 거래처 묶음. 묶음 안에서 받는분 칸이 새로 시작하면(값이 있거나 새 병합 칸) 따로 나간 주문(직송) */
+  function p2(n) { return ('0' + n).slice(-2); }
+  function qtyOf(v) { if (typeof v === 'number') return { n: v, u: '' }; var m = cl(v).replace(/,/g, '').match(/^(\d+(?:\.\d+)?)\s*([가-힣A-Za-z]*)/); return m ? { n: +m[1], u: m[2] || '' } : { n: '', u: '' }; }
+  function recvOf(t) {   // "조규상 / 010-0000-0000 경기도 …" → 받는분·전화·주소
+    t = cl(t).replace(/\s+/g, ' '); if (!t) return { recv: '', phone: '', addr: '' };
+    var m = t.match(/(?:0\d{1,3}|1[5-9]\d{2})[-. ]?\d{3,4}[-. ]?\d{4}/);
+    if (m) { var before = cl(t.slice(0, m.index).replace(/[\/:：]|연락처|전화/g, ' ')), after = cl(t.slice(m.index + m[0].length).replace(/^[\s\/,]+/, '')); return { recv: before, phone: m[0], addr: after }; }
+    return /\d/.test(t) && /(로|길|동|리|읍|면|구|시)\s?\d|\d+번지/.test(t) ? { recv: '', phone: '', addr: t } : { recv: t, phone: '', addr: '' };
+  }
+  function importShipping(R) {
+    var days = [];
+    Object.keys(R).forEach(function (name) {
+      var rows = R[name]; if (!rows || !rows.length) return;
+      var m = cl(rows[0] && rows[0][0]).match(/(\d{4})\/(\d{1,2})\/(\d{1,2})-출고현황/); if (!m) return;
+      var date = m[1] + '-' + p2(m[2]) + '-' + p2(m[3]), year = m[1], hr = -1;
+      for (var i = 0; i < rows.length; i++) if (cl((rows[i] || [])[0]) === 'no.' && /일자/.test(cl(rows[i][1]))) { hr = i; break; }
+      if (hr < 0) return;
+      var mg = rows.merges || [], mergeAt = function (r, c) { for (var k = 0; k < mg.length; k++) { var g = mg[k]; if (r >= g[0] && r <= g[2] && c >= g[1] && c <= g[3]) return g; } return null; };
+      var sec = 'shipped', out = { date: date, shipped: [], pending: [] }, grp = null;
+      for (var r = hr + 1; r < rows.length; r++) {
+        var row = rows[r] || [], ab = cl(row[0]) + cl(row[1]);
+        if (/합계/.test(ab)) { if (sec === 'pending') break; sec = 'pending'; grp = null; continue; }
+        var cust = cl(row[2]), item = cl(row[3]);
+        if (cust) { cust = cust.replace(/\s*\n\s*/g, ' '); grp = { cust: cust, day: cl(row[1]), stmt: cl(row[9]), tax: cl(row[10]), subs: [] }; out[sec].push(grp); }
+        if (!grp || !item) continue;
+        var hv = cl(row[7]), hm = mergeAt(r, 7), start = !grp.subs.length || (hm ? hm[0] === r && (hv || grp.subs[grp.subs.length - 1].recv) : !!hv);
+        if (start) grp.subs.push({ recv: hv, ship: cl(row[8]), rows: [] });
+        var sub = grp.subs[grp.subs.length - 1]; if (!sub.ship && cl(row[8])) sub.ship = cl(row[8]);
+        sub.rows.push({ item: item.replace(/\s*\n\s*/g, ' '), sensor: cl(row[4]), qty: row[5], note: cl(row[6]).replace(/\s*\n\s*/g, ' / ') });
+      }
+      ['shipped', 'pending'].forEach(function (k) {
+        out[k] = out[k].reduce(function (acc, g) {
+          var dm = g.day.match(/^(\d{1,2})월\s*(\d{1,2})일(\s*\([월화수목금토일]\))?$/), due = k === 'shipped' ? date : (dm ? year + '-' + p2(dm[1]) + '-' + p2(dm[2]) : (g.day || '준비되면'));
+          g.subs.forEach(function (sb) {
+            var rc = recvOf(sb.recv), sp = (typeof OP !== 'undefined') ? OP.shipParse(sb.ship) : { carrier: '', pay: '', claim: false, mode: '' };
+            if (/차량/.test(sb.ship)) sp.carrier = '직납';
+            var memo = cl(sb.rows[0].note.replace(/^직송건?\s*\d*\s*(\/\s*)?/, ''));
+            acc.push({ cust: g.cust, items: sb.rows.map(function (x, j) { var q = qtyOf(x.qty), sn = x.sensor.replace('○', 'O').toUpperCase(); return { name: x.item, sensor: /^[OX]$/.test(sn) ? sn : '', qty: q.n, unit: q.u, note: j ? x.note : '' }; }),
+              memo: memo, recv: rc.recv, phone: rc.phone, addr: rc.addr, ship: sb.ship, carrier: sp.carrier, pay: sp.pay, claim: sp.claim, mode: sp.mode || '',
+              stmt: g.stmt, tax: g.tax, due: due, st: k === 'shipped' ? '출고완료' : '대기', shipped: k === 'shipped' ? date : '', at: date + ' 09:00:00', box: [], who: '출고현황 가져오기', raw: '' });
+          });
+          return acc;
+        }, []);
+      });
+      days.push(out);
+    });
+    return days.sort(function (a, b) { return a.date.localeCompare(b.date); });
+  }
+
+  return { cj: cj, kd: kd, ds: ds, report: report, day: day, month: month, noteOf: noteOf, importShipping: importShipping, importBook: importBook, itemText: itemText, itemStr: itemStr, recvName: recvName, isDirect: isDirect, md: md, tsv: tsv };
 })();
 if (typeof module !== 'undefined') module.exports = OUT;
 </script>

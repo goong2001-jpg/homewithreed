@@ -209,6 +209,9 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
       <div class="sec">옛 엑셀 가져오기</div>
       <div class="card"><p class="muted" style="margin:0 0 8px">CJ·경동·대신 엑셀 파일을 고르면 주소록과 옛 송장 기록(박스 추천에 씀)을 가져옵니다. 같은 파일을 다시 넣어도 겹치지 않습니다.</p>
         <input type="file" id="imp" accept=".xlsx" multiple><div id="impMsg" class="muted" style="margin-top:8px"></div></div>
+      <div class="sec">옛 출고현황(출하서) 가져오기</div>
+      <div class="card"><p class="muted" style="margin:0 0 8px">지금까지 손으로 쓰던 출고현황 엑셀(예: 11월.xlsx)을 고르면 날짜 탭마다 읽어서, 그날 나간 것은 <b>출고완료</b>로, 가장 마지막 날짜 탭의 출고 대기는 <b>대기</b>(입고되면·준비되면 같은 예정 그대로)로 넣습니다. 앱에 이미 있는 주문은 건너뛰거나 맞춰 고치니 두 번 넣어도 겹치지 않습니다. 넣기 전에 미리보기로 확인합니다.</p>
+        <input type="file" id="impShip" accept=".xlsx"></div>
       <div class="sec">나누기 학습 (고친 것 기억)</div>
       <div class="card"><p class="muted" style="margin:0 0 8px">새 주문에서 옵션을 물어볼 때 고른 답과, 나눈 결과의 품목명을 고친 것이 여기 쌓입니다. 잘못 기억한 것은 지우세요.</p><div id="lrnList" class="muted">아래 버튼을 누르면 보입니다.</div><button class="btn sm" data-act="lrnShow" style="margin-top:8px">학습 목록 보기</button></div>
       <div class="sec">삭제한 주문 (30일 보관)</div>
@@ -236,7 +239,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v15';
+var HTML_VERSION = 'v16';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -708,10 +711,58 @@ function renderLearn() {
   var L = S.learn || [];
   $('lrnList').innerHTML = L.length ? L.map(function (x, k) { return '<div class="row" style="border-bottom:1px solid var(--line);padding:8px 0"><div class="grow">' + (x.kind === 'opt' ? '옵션 「' + esc(x.from) + '」 → ' + (x.to === 'item' ? '따로 품목' : '메모') : '품목 「' + esc(x.from) + '」 → 「' + esc(x.to) + '」' + (x.cust ? ' <span class="muted">(' + esc(x.cust) + ')</span>' : '')) + '</div><button class="btn sm danger" data-act="lrnDel" data-i="' + k + '">지우기</button></div>'; }).join('') : '아직 기억한 것이 없습니다.';
 }
+/* ---------- 옛 출고현황 가져오기 (v16) ---------- */
+var SI = null;
+function siSame(a, b) { if (nz(a.cust) !== nz(b.cust)) return false; var n = {}; (a.items || []).forEach(function (i) { n[OP.norm(i.name)] = 1; }); return (b.items || []).some(function (i) { return n[OP.norm(i.name)]; }); }
+// 고른 날짜들로 할 일 계산: 새로 넣기 / 앱 대기 → 출고완료 / 대기 예정 고치기 / 건너뜀
+function siPlan() {
+  var on = SI.days.filter(function (d) { return SI.on[d.date]; }), last = on[on.length - 1], create = [], toShip = [], toDue = [], skip = [], used = {};
+  var wait = S.orders.filter(function (x) { return x.st === '대기'; });
+  on.forEach(function (d) { d.shipped.forEach(function (o) {
+    if (S.orders.some(function (x) { return x.st === '출고완료' && x.shipped === d.date && nz(x.cust) === nz(o.cust); })) { skip.push(o); return; }
+    var w = wait.filter(function (x) { return !used[x.id] && siSame(x, o); })[0]; if (w) { used[w.id] = 1; toShip.push({ id: w.id, date: d.date, o: o }); return; }
+    create.push(o); }); });
+  if (last) last.pending.forEach(function (o) {
+    var w = wait.filter(function (x) { return !used[x.id] && siSame(x, o); })[0];
+    if (w) { used[w.id] = 1; if (w.due !== o.due) toDue.push({ id: w.id, due: o.due, o: o }); else skip.push(o); return; }
+    create.push(o); });
+  return { create: create, toShip: toShip, toDue: toDue, skip: skip, last: last };
+}
+function openShipImport(days) {
+  SI = { days: days, on: {} }; days.forEach(function (d) { SI.on[d.date] = true; });
+  ED = null; CE = null; SH = null; BK = null; drawShipImport(); $('shade').classList.remove('hidden'); $('sheet').classList.remove('hidden');
+}
+function drawShipImport() {
+  var P = siPlan(), names = function (l, f) { return l.slice(0, 12).map(f).join(', ') + (l.length > 12 ? ' 외 ' + (l.length - 12) + '건' : ''); };
+  $('shT').textContent = '옛 출고현황 가져오기';
+  var h = '<div class="sec">가져올 날짜 (탭)</div>' + SI.days.map(function (d) { return '<label class="row" style="padding:4px 0"><input type="checkbox" data-sid="' + d.date + '"' + (SI.on[d.date] ? ' checked' : '') + '> <b>' + esc(OUT.md(d.date)) + '</b> <span class="muted">출고 ' + d.shipped.length + '건 · 대기 ' + d.pending.length + '건</span></label>'; }).join('');
+  h += '<div class="sec">미리보기</div><div class="today">' +
+    '<div>새로 넣을 주문 <b>' + P.create.length + '건</b> (출고완료 ' + P.create.filter(function (o) { return o.st === '출고완료'; }).length + ' · 대기 ' + P.create.filter(function (o) { return o.st === '대기'; }).length + ')</div>' +
+    '<div>앱에 대기로 있던 것 → 출고완료로 <b>' + P.toShip.length + '건</b></div>' +
+    '<div>대기 출고 예정 고치기 <b>' + P.toDue.length + '건</b> <span class="muted">(' + (P.last ? OUT.md(P.last.date) : '-') + ' 출하서 기준)</span></div>' +
+    '<div class="muted">이미 있어서 건너뜀 ' + P.skip.length + '건</div></div>';
+  if (P.create.length) h += '<p class="muted">새로: ' + esc(names(P.create, function (o) { return o.cust + (o.st === '대기' ? '(대기 ' + (isDate(o.due) ? OUT.md(o.due) : o.due) + ')' : '(' + OUT.md(o.shipped) + ')'); })) + '</p>';
+  if (P.toShip.length) h += '<p class="muted">출고완료로: ' + esc(names(P.toShip, function (x) { return x.o.cust + '(' + OUT.md(x.date) + ')'; })) + '</p>';
+  if (P.toDue.length) h += '<p class="muted">예정 고침: ' + esc(names(P.toDue, function (x) { return x.o.cust + ' → ' + (isDate(x.due) ? OUT.md(x.due) : x.due); })) + '</p>';
+  h += '<p class="muted">대기는 체크한 날짜 중 <b>가장 마지막 탭</b>의 "출고 대기"를 기준으로 합니다. 앱에만 있는 대기 주문은 그대로 둡니다.</p>';
+  $('shB').innerHTML = h;
+  var n = P.create.length + P.toShip.length + P.toDue.length;
+  $('shF').innerHTML = '<button class="btn pri grow" data-act="siGo"' + (n ? '' : ' disabled') + '>' + (n ? n + '건 가져오기' : '가져올 것 없음') + '</button>';
+}
+function shipImportGo() {
+  var P = siPlan(), steps = [], i;
+  for (i = 0; i < P.create.length; i += 40) (function (part) { steps.push(function (next) { call('saveOrders', { orders: part }, function (r) { mergeOrders(r.orders); next(); }); }); })(P.create.slice(i, i + 40));
+  var byDate = {}; P.toShip.forEach(function (x) { (byDate[x.date] = byDate[x.date] || []).push(x.id); });
+  Object.keys(byDate).forEach(function (d) { steps.push(function (next) { call('setStatus', { ids: byDate[d], st: '출고완료', shipped: d }, function (r) { mergeOrders(r.orders); next(); }); }); });
+  var byDue = {}; P.toDue.forEach(function (x) { (byDue[x.due] = byDue[x.due] || []).push(x.id); });
+  Object.keys(byDue).forEach(function (d) { steps.push(function (next) { call('setDue', { ids: byDue[d], due: d }, function (r) { mergeOrders(r.orders); next(); }); }); });
+  var k = 0; (function run() { if (k >= steps.length) { showSheet(false); notice('가져왔습니다: 새로 ' + P.create.length + ' · 출고완료로 ' + P.toShip.length + ' · 예정 고침 ' + P.toDue.length); render(); return; } status('가져오는 중… ' + (k + 1) + '/' + steps.length); steps[k++](run); })();
+}
 function loadDeleted() { call('deletedList', {}, function (r) { $('delList').innerHTML = r.list.length ? r.list.map(function (x) { return '<div class="row" style="border-bottom:1px solid var(--line);padding:8px 0"><div class="grow"><b>' + esc(x.cust || '(거래처 없음)') + '</b> <span class="muted">' + esc(x.items) + '<br>' + esc(x.at.slice(5, 16)) + ' 삭제</span></div><button class="btn sm" data-act="delRestore" data-i="' + esc(x.id) + '">되살리기</button></div>'; }).join('') : '삭제한 주문이 없습니다.'; }); }
 
 /* ---------- 누르기 ---------- */
 document.addEventListener('click', function (ev) {
+  var sid = ev.target.closest('[data-sid]'); if (sid) { SI.on[sid.getAttribute('data-sid')] = sid.checked; drawShipImport(); return; }
   var chk = ev.target.closest('[data-chk]'); if (chk) { var key = chk.getAttribute('data-chk'); if (S.view === 'new') { S.drafts[+key]._on = chk.checked; renderDrafts(); } if (S.view === 'print') { PSEL[key] = chk.checked; pCountSel(); } if (S.view === 'close') { CSEL[key] = chk.checked; closeSum(); } if (S.view === 'list') { LSEL[key] = chk.checked; lSelCount(); } return; }
   if (ev.target.closest('[data-box]') && !ev.target.closest('[data-act="bxAdd"],[data-act="bxDel"]')) return;
   var b = ev.target.closest('[data-act],[data-v]'); if (!b) return;
@@ -756,6 +807,7 @@ document.addEventListener('click', function (ev) {
   else if (a === 'lBulk') openBulk(i);
   else if (a === 'bkDate') { var bd = $('bk-date'); if (isDate(i)) { bd.value = i; delete bd.dataset.text; } else { bd.value = ''; bd.dataset.text = i; notice('출고 예정: ' + i); } }
   else if (a === 'bkGo') bulkGo();
+  else if (a === 'siGo') shipImportGo();
   else if (a === 'lCancel') lDo('cancel');
   else if (a === 'pReport') copyText(S.todayMsg, '복사했습니다: ' + S.todayMsg);
   else if (a === 'pAll') pAll();
@@ -802,6 +854,7 @@ $('q').addEventListener('input', renderList);
 $('lSort').addEventListener('change', renderList);
 $('cq').addEventListener('input', renderCusts);
 $('cDate').addEventListener('change', function () { CSEL = {}; renderClose(); });
+$('impShip').addEventListener('change', function () { var f = this.files[0]; this.value = ''; if (!f) return; status('읽는 중…'); f.arrayBuffer().then(function (b) { return XL.read(b, 14); }).then(function (R) { status(''); var days = OUT.importShipping(R); if (!days.length) { notice('출고현황 탭(제목 "2026/11/18-출고현황" 모양)을 찾지 못했습니다', 1); return; } openShipImport(days); }).catch(function (e) { status(''); notice('엑셀을 읽지 못했습니다: ' + (e.message || e), 1); }); });
 $('imp').addEventListener('change', function () { if (this.files.length) doImport(Array.prototype.slice.call(this.files)); this.value = ''; });
 document.addEventListener('input', function (ev) { if (ev.target.id === 'lnQ') { renderLine(); return; } if (ev.target.classList && ev.target.classList.contains('sq')) shipSync();
   if (ev.target.id === 'e-addr' && ED && $('e-saveAddrRow')) $('e-saveAddrRow').classList.toggle('hidden', !newAddr($('e-cust').value, ev.target.value)); });
@@ -809,7 +862,7 @@ document.addEventListener('change', function (ev) { if (ev.target.id === 'bk-dat
 /* ---------- 새 버전 알림: 화면을 오래 열어 두면 옛 버전으로 계속 쓰게 됨 → 서버 버전이 다르면 새로고침 안내 ---------- */
 var VER_AT = Date.now();
 function checkVer() { VER_AT = Date.now(); try { google.script.run.withSuccessHandler(function (r) { if (r && r.version && r.version !== HTML_VERSION) showNewVer(r.version); }).withFailureHandler(function () {}).api(S.pin, 'ver', {}); } catch (e) {} }
-function showNewVer(v) { var b = $('newVer'); b.innerHTML = '새 버전(' + esc(v) + ')이 나왔어요. 브라우저 <b>새로고침</b>을 눌러주세요 (PC: F5 · 폰: 새로고침 버튼).' + (S.role === 'line' ? '' : ' 저장 안 한 나눈 결과는 그대로 남아요.'); b.classList.remove('hidden'); }
+function showNewVer(v) { var b = $('newVer'); b.innerHTML = '새 버전(' + esc(v) + ')이 나왔어요. 브라우저 <b>새로고침</b>을 눌러주세요 (PC: F5 · 폰: 새로고침 버튼).' + (S.role === 'line' ? '' : ' 저장 안 한 나눈 결과는 그대로 남아요.') + ' <span style="float:right;text-decoration:underline;cursor:pointer">닫기 ✕</span>'; b.onclick = function () { b.classList.add('hidden'); }; b.classList.remove('hidden'); }
 setInterval(function () { if (document.visibilityState === 'visible') checkVer(); }, 300000);
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && Date.now() - VER_AT > 60000) checkVer(); });
 

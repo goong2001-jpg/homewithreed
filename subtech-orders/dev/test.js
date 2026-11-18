@@ -128,6 +128,18 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
   function KDH() { return ['보내는분']; }
   ok(imp.custs.length === 4 && imp.custs[1].kd === '강릉교동9' && imp.custs[2].kd === '청주가나648영업소' && imp.custs[3].ds === '인천가나지점' && imp.hist.length === 3 && imp.hist[1][5] === '소' && imp.hist[1][6] === 5000 && imp.hist[2][1] === '대신', '옛 엑셀 가져오기: 주소록·영업소·송장기록');
 
+  console.log('4-2) v16: 옛 출고현황 읽기 (출하서 엑셀 → 주문)');
+  { global.OP = OP;
+    const Y = (n, recv, msg) => ({ cust: '자차코퍼레이션', items: [{ name: 'STF-7S', sensor: 'X', qty: n, unit: '', note: '' }], recv, phone: '010-0000-100' + n, addr: '서울 강서구 가나로 ' + n, own: true, msg, ship: '택배선불 청구', stmt: 'O', tax: '월말발행', sender: '자차코퍼레이션' });
+    const snap = { date: '2026-11-18', shipped: [Y(1, '김가', '문 앞'), A, Y(2, '이나', '')], pending: [Object.assign({}, B, { cust: '다라', due: '2026-11-19', items: [{ name: '리모컨', sensor: '', qty: 1, unit: '개', note: '' }], ship: '택배선불' }), Object.assign({}, B, { cust: '라마', due: '입고되면', ship: '대신화물 선불', items: [{ name: 'SV11 외출', sensor: 'X', qty: 50, unit: '', note: '' }] })] };
+    const by = XL.build(OUT.report(snap, OP.isAcc).sheets), Rr = await XL.read(by.buffer.slice(by.byteOffset, by.byteOffset + by.byteLength));
+    const dd = OUT.importShipping(Rr), d0 = dd[0];
+    ok(dd.length === 1 && d0.date === '2026-11-18' && d0.shipped.length === 3 && d0.pending.length === 2, '출하서 탭 1개 → 출고 3건 · 대기 2건');
+    const [y1, y2, a1] = d0.shipped;   // 출하서에서 같은 거래처끼리 붙어 있음
+    ok(y1.cust === '자차코퍼레이션' && y1.recv === '김가' && y1.phone === '010-0000-1001' && /가나로 1/.test(y1.addr) && y1.items[0].qty === 1 && y1.items[0].sensor === 'X' && y1.st === '출고완료' && y1.shipped === '2026-11-18' && y1.stmt === 'O' && y1.tax === '월말발행', '같은 거래처 직송 1: 받는분·전화·주소·명세서·계산서');
+    ok(y2.cust === '자차코퍼레이션' && y2.recv === '이나' && a1.cust === '가나상사' && a1.items.length === 3 && a1.items[2].qty === 50 && a1.items[2].unit === '개' && a1.items[1].note === '스티커 있음', '직송 2는 따로, 여러 품목 주문은 하나로 (50개·품목 메모)');
+    ok(d0.pending[0].cust === '다라' && d0.pending[0].due === '2026-11-19' && d0.pending[0].st === '대기' && d0.pending[1].due === '입고되면' && d0.pending[1].carrier === '대신', '대기: 날짜는 예정일로, "입고되면" 같은 글자는 그대로');
+  }
   console.log('5) 서버 (가짜 시트)');
   const makeGas = require('./fake-gas.js');
   const master = [['품목ID', '품명', '분류'], ['SV7||기판', 'SV7', '기판'], ['SV7||완포', 'SV7', '완포'], ['H7||완포', 'H7', '완포']], log = [['일시', '품목ID'], ['x', 'SV7||기판']];

@@ -101,6 +101,9 @@ var XL = (function () {
       for (var i = 0; i < row.length; i++) if (row[i] === undefined) row[i] = '';
       rows[rn - 1] = row;
     }
+    // 병합 칸 [시작줄, 시작칸, 끝줄, 끝칸] (0부터) — 배열의 속성으로 붙임 (시트 줄 목록은 그대로)
+    var mg = []; xml.replace(/<mergeCell\b[^>]*\bref="([A-Z]+)(\d+):([A-Z]+)(\d+)"/g, function (t, c1, r1, c2, r2) { mg.push([+r1 - 1, colIdx(c1), +r2 - 1, colIdx(c2)]); return t; });
+    rows.merges = mg;
     return rows;
   }
   function read(buf, maxCol) {
