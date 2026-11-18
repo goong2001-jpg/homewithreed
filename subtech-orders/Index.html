@@ -148,6 +148,8 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
       <div class="sec">옛 엑셀 가져오기</div>
       <div class="card"><p class="muted" style="margin:0 0 8px">CJ·경동·대신 엑셀 파일을 고르면 주소록과 옛 송장 기록(박스 추천에 씀)을 가져옵니다. 같은 파일을 다시 넣어도 겹치지 않습니다.</p>
         <input type="file" id="imp" accept=".xlsx" multiple><div id="impMsg" class="muted" style="margin-top:8px"></div></div>
+      <div class="sec">나누기 학습 (고친 것 기억)</div>
+      <div class="card"><p class="muted" style="margin:0 0 8px">새 주문에서 옵션을 물어볼 때 고른 답과, 나눈 결과의 품목명을 고친 것이 여기 쌓입니다. 잘못 기억한 것은 지우세요.</p><div id="lrnList" class="muted">아래 버튼을 누르면 보입니다.</div><button class="btn sm" data-act="lrnShow" style="margin-top:8px">학습 목록 보기</button></div>
       <div class="sec">삭제한 주문 (30일 보관)</div>
       <div class="card"><div id="delList" class="muted">아래 버튼을 누르면 불러옵니다.</div><button class="btn sm" data-act="delLoad" style="margin-top:8px">삭제한 주문 보기</button></div>
       <div class="sec">접속 암호</div>
@@ -165,7 +167,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v3';
+var HTML_VERSION = 'v4';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -186,7 +188,7 @@ function askPin(then) { var p = prompt('접속 암호를 넣어주세요'); if (
 function boot() {
   status('불러오는 중…');
   call('boot', {}, function (r) {
-    S.orders = r.orders; S.custs = r.custs; S.items = r.items; S.sender = r.sender; S.today = r.today; S.histCount = r.histCount; S.addrHist = r.addrHist || {}; $('mMonth').value = S.today.slice(0, 7);
+    S.orders = r.orders; S.custs = r.custs; S.items = r.items; S.sender = r.sender; S.today = r.today; S.histCount = r.histCount; S.addrHist = r.addrHist || {}; S.learn = r.learn || []; $('mMonth').value = S.today.slice(0, 7);
     $('ver').textContent = HTML_VERSION + (r.version !== HTML_VERSION ? ' (서버 ' + r.version + ' — 버전 불일치, 새로고침 해보세요)' : '');
     $('cDate').value = S.today; render(); status('');
     if (r.histCount) call('recData', {}, function (x) { S.rec = OP.buildRec(x.hist); if (S.view === 'print') renderPrint(); status(''); });
@@ -225,9 +227,16 @@ function warns(o) {
   if ((o.carrier === 'CJ' || o.carrier === '경동' || o.carrier === '대신') && !o.phone) w.push('전화 없음');
   return w;
 }
-function clean(o) { var x = {}; Object.keys(o).forEach(function (k) { if (k.charAt(0) !== '_') x[k] = o[k]; }); x.items = (o.items || []).filter(function (i) { return String(i.name || '').trim(); }); return x; }
+function clean(o) { var x = {}; Object.keys(o).forEach(function (k) { if (k.charAt(0) !== '_') x[k] = o[k]; }); x.items = (o.items || []).filter(function (i) { return String(i.name || '').trim(); }).map(function (i) { var y = Object.assign({}, i); delete y.ask; delete y.from; return y; }); return x; }
 function dueTxt(o) { return /^\d{4}-\d{2}-\d{2}$/.test(o.due) ? (o.due === S.today ? '오늘' : OUT.md(o.due)) : (o.due || ''); }
 function hm(ts) { return String(ts || '').slice(11, 16); }
+// 품목마스터에 없는 모델명이면 표시 (틀린 품목명을 저장 전에 보이게). 한글 부자재(센서·파워코드 등)는 안 봄
+function itemTag(o) {
+  if (o.st && o.st !== '대기' || !S.items || !S.items.length) return '';
+  if (!S._itemSet) { S._itemSet = {}; S.items.forEach(function (n) { S._itemSet[OP.norm(n)] = 1; var m = String(n).match(/^[A-Za-z][A-Za-z0-9.\-]*\+?/); if (m) S._itemSet[OP.norm(m[0])] = 1; }); }
+  var miss = (o.items || []).map(function (i) { var m = String(i.name || '').match(/^[A-Za-z][A-Za-z0-9.\-]*\+?/); return m && /\d/.test(m[0]) && !S._itemSet[OP.norm(m[0])] && !S._itemSet[OP.norm(i.name)] ? m[0] : ''; }).filter(Boolean);
+  return miss.length ? '<span class="tag">품목마스터에 없음: ' + esc(miss.join(', ')) + '</span>' : '';
+}
 function printedTag(o) { if (!o.printed || o.st === '취소') return ''; var d = String(o.printed).slice(0, 10); return '<span class="tag ok">송장출력 ✓ ' + esc(d === S.today ? hm(o.printed) : OUT.md(d)) + '</span>'; }
 function cardHTML(o, opt) {
   opt = opt || {}; var w = o.st === '대기' ? warns(o) : [], it = (o.items || []).map(function (i) { var n = OUT.noteOf(i); return esc(OUT.itemStr(i).replace(/\s{4}/g, '  ')) + (n ? ' <span class="muted">' + esc(n) + '</span>' : ''); }).join('\n');
@@ -235,7 +244,7 @@ function cardHTML(o, opt) {
   return '<div class="card tap' + (opt.off ? ' off' : '') + '" data-act="' + (opt.act || 'edit') + '" data-i="' + esc(opt.key) + '"><div class="top">' + (opt.check != null ? '<input type="checkbox" data-chk="' + esc(opt.key) + '"' + (opt.check ? ' checked' : '') + '>' : '') +
     '<div class="grow"><div class="cust">' + esc(o.cust || '(거래처 없음)') + '</div><div class="items">' + it + '</div>' +
     '<div class="meta">' + (o.ship ? '<span class="tag ship">' + esc(o.ship) + '</span>' : '') + (dueTxt(o) ? '<span class="tag">' + esc(dueTxt(o)) + '</span>' : '') +
-    (o.st === '출고완료' ? '<span class="tag ok">출고 ' + esc(OUT.md(o.shipped)) + '</span>' : '') + (o.st === '취소' ? '<span class="tag bad">취소</span>' : '') + printedTag(o) + (o.parent && o.st === '대기' ? '<span class="tag warn">잔량</span>' : '') +
+    (o.st === '출고완료' ? '<span class="tag ok">출고 ' + esc(OUT.md(o.shipped)) + '</span>' : '') + (o.st === '취소' ? '<span class="tag bad">취소</span>' : '') + itemTag(o) + printedTag(o) + (o.parent && o.st === '대기' ? '<span class="tag warn">잔량</span>' : '') +
     w.map(function (x) { return '<span class="tag warn">' + esc(x) + '</span>'; }).join('') + (o._auto && o._auto.length ? '<span class="tag">' + esc(o._auto.join(', ')) + '</span>' : '') +
     (to ? '<div>' + esc(to) + '</div>' : '') + (o.memo ? '<div>' + esc(o.memo) + '</div>' : '') + (opt.extra || '') + '</div></div></div></div>';
 }
@@ -255,17 +264,32 @@ function doParse() {
   var txt = $('paste').value; if (!txt.trim()) { notice('붙여넣은 내용이 없습니다'); return; }
   var msgs = OP.splitMessages(txt), n = 0;
   S.drafts = msgs.map(function (m) {
-    var o = OP.parseOrder(m.body, { today: S.today, custs: S.custs }); o.who = m.who || ''; o.at = m.date && m.time ? m.date + ' ' + m.time + ':00' : '';
+    var o = OP.parseOrder(m.body, { today: S.today, custs: S.custs, learn: S.learn }); o.who = m.who || ''; o.at = m.date && m.time ? m.date + ' ' + m.time + ':00' : '';
     if (!o.isOrder) return null; o.ship = o.shipRaw; delete o.shipRaw; delete o.isOrder; o.box = []; o.st = '대기'; o.stmt = ''; o.tax = ''; o.senderAddr = '';
     enrich(o); o._on = !!o.cust; n++; return o;
   }).filter(Boolean);
   if (!n) notice('발주로 보이는 메시지를 찾지 못했습니다. "직접 입력"을 써보세요.');
   renderDrafts();
 }
+// 처음 보는 옵션 단어 물어보기 → 답은 학습(주문_학습)에 남아 다음부터 자동
+function askHTML(o, di) {
+  var h = '';
+  (o.items || []).forEach(function (it, k) { (it.ask || []).forEach(function (w) {
+    h += '<div class="pick" style="margin-top:8px"><span class="muted">「' + esc(it.name) + '」 옵션 「' + esc(w) + '」 은(는)?</span><div class="chips" style="margin-top:6px">' +
+      '<button data-act="askOpt" data-i="' + di + '|' + k + '|' + esc(w) + '" data-to="item">따로 품목으로</button><button data-act="askOpt" data-i="' + di + '|' + k + '|' + esc(w) + '" data-to="memo">메모로 두기</button></div></div>'; }); });
+  return h;
+}
+function askOpt(key, to) {
+  var p = key.split('|'), o = S.drafts[+p[0]], it = o && o.items[+p[1]], w = p.slice(2).join('|'); if (!it) return;
+  it.ask = (it.ask || []).filter(function (x) { return x !== w; });
+  if (to === 'item') { it.note = String(it.note || '').split(' · ').filter(function (x) { return x !== w; }).join(' · '); var at = +p[1] + 1; while (o.items[at] && /^(온도센서|파워코드|리모컨)$/.test(o.items[at].name)) at++; o.items.splice(at, 0, { name: w, sensor: '', qty: it.qty, unit: it.unit || '개', note: '' }); }   // 새로 붙여넣을 때와 같은 순서
+  renderDrafts();
+  call('learnSave', { rows: [{ kind: 'opt', from: w, to: to }] }, function (r) { S.learn = r.learn; notice('기억했습니다: 「' + w + '」 → ' + (to === 'item' ? '따로 품목' : '메모')); });
+}
 function renderDrafts() {
   var d = S.drafts, on = d.filter(function (o) { return o._on; }).length;
   $('drafts').innerHTML = !d.length ? '' : '<div class="row" style="margin-bottom:8px"><b class="grow">나눈 결과 ' + d.length + '건</b><span class="muted">눌러서 고치기</span></div>' +
-    d.map(function (o, i) { return cardHTML(o, { key: i, act: 'draftEdit', check: o._on, off: !o._on }); }).join('') +
+    d.map(function (o, i) { return cardHTML(o, { key: i, act: 'draftEdit', check: o._on, off: !o._on, extra: askHTML(o, i) }); }).join('') +
     '<div class="bar"><button class="btn pri grow" data-act="draftSave"' + (on ? '' : ' disabled') + '>체크한 ' + on + '건 저장</button><button class="btn" data-act="draftClear">비우기</button></div>';
 }
 function saveDrafts() {
@@ -277,7 +301,7 @@ function saveDrafts() {
 /* ---------- 주문 고치기 창 ---------- */
 var ED = null;   // {o: 고치는 사본, done: 저장 뒤 할 일, draft: 번호}
 var CARR = [['CJ', '택배(CJ)'], ['경동', '경동'], ['대신', '대신'], ['직납', '직납'], ['방문', '직접수령'], ['퀵', '퀵']];
-function openEdit(o, opt) { ED = { o: JSON.parse(JSON.stringify(o)), opt: opt || {} }; if (!ED.o.items.length) ED.o.items.push({ name: '', sensor: '', qty: '', unit: '', note: '' }); drawEdit(); showSheet(true); }
+function openEdit(o, opt) { ED = { o: JSON.parse(JSON.stringify(o)), opt: opt || {}, orig: JSON.parse(JSON.stringify(o.items || [])) }; if (!ED.o.items.length) ED.o.items.push({ name: '', sensor: '', qty: '', unit: '', note: '' }); drawEdit(); showSheet(true); }
 function showSheet(on) { $('shade').classList.toggle('hidden', !on); $('sheet').classList.toggle('hidden', !on); if (!on) ED = null; }
 function drawEdit() {
   var o = ED.o, isNew = !o.id, m = OP.findCust(S.custs, o.cust);
@@ -350,6 +374,10 @@ function saveEdit(extra) {
   var sa = $('e-saveAddr'), o = clean(readEdit()); if (sa && !newAddr(o.cust, o.addr)) sa = null;
   if (sa && sa.checked && o.cust && o.addr) call('custSave', { row: 0, cust: { name: o.cust, phone: o.phone, phone2: o.phone2, addr: o.addr } }, function (r) { S.custs = r.custs; notice('주소록에 저장했습니다'); });
   if (o.addr || o.branch) rememberAddr(o); if (!o.items.length) { notice('품목을 하나 이상 넣어주세요', 1); return; }
+  if (ED.opt.draft != null) {   // 나눈 결과에서 품목명을 고치면 "원래 → 고친 이름"을 이 거래처 기준으로 기억
+    var lr = []; (ED.orig || []).forEach(function (a, k) { var b = o.items[k], from = a.from || a.name; if (a && b && from && b.name && OP.norm(a.name) !== OP.norm(b.name) && OP.norm(from) !== OP.norm(b.name)) lr.push({ kind: 'name', cust: o.cust, from: from, to: b.name }); });
+    if (lr.length) call('learnSave', { rows: lr }, function (r) { S.learn = r.learn; notice('기억했습니다: ' + lr.map(function (x) { return '「' + x.from + '」→「' + x.to + '」'; }).join(', ') + (o.cust ? ' (' + o.cust + ')' : '')); });
+  }
   if (ED.opt.draft != null) { var d = S.drafts[ED.opt.draft], on = d._on; Object.keys(o).forEach(function (k) { d[k] = o[k]; }); d._on = on || !!o.cust; d._auto = []; showSheet(false); renderDrafts(); return; }
   call('saveOrders', { orders: [o] }, function (r) { mergeOrders(r.orders); S.custs = r.custs; showSheet(false); notice('저장했습니다'); if (extra) extra(r.orders[0]); else render(); });
 }
@@ -530,6 +558,10 @@ function doImport(files) {
   next();
 }
 
+function renderLearn() {
+  var L = S.learn || [];
+  $('lrnList').innerHTML = L.length ? L.map(function (x, k) { return '<div class="row" style="border-bottom:1px solid var(--line);padding:8px 0"><div class="grow">' + (x.kind === 'opt' ? '옵션 「' + esc(x.from) + '」 → ' + (x.to === 'item' ? '따로 품목' : '메모') : '품목 「' + esc(x.from) + '」 → 「' + esc(x.to) + '」' + (x.cust ? ' <span class="muted">(' + esc(x.cust) + ')</span>' : '')) + '</div><button class="btn sm danger" data-act="lrnDel" data-i="' + k + '">지우기</button></div>'; }).join('') : '아직 기억한 것이 없습니다.';
+}
 function loadDeleted() { call('deletedList', {}, function (r) { $('delList').innerHTML = r.list.length ? r.list.map(function (x) { return '<div class="row" style="border-bottom:1px solid var(--line);padding:8px 0"><div class="grow"><b>' + esc(x.cust || '(거래처 없음)') + '</b> <span class="muted">' + esc(x.items) + '<br>' + esc(x.at.slice(5, 16)) + ' 삭제</span></div><button class="btn sm" data-act="delRestore" data-i="' + esc(x.id) + '">되살리기</button></div>'; }).join('') : '삭제한 주문이 없습니다.'; }); }
 
 /* ---------- 누르기 ---------- */
@@ -578,6 +610,9 @@ document.addEventListener('click', function (ev) {
   else if (a === 'pReport') copyText(S.todayMsg, '복사했습니다: ' + S.todayMsg);
   else if (a === 'pAll') pAll();
   else if (a === 'delLoad') loadDeleted();
+  else if (a === 'askOpt') askOpt(i, b.dataset.to);
+  else if (a === 'lrnShow') renderLearn();
+  else if (a === 'lrnDel') { var lx = S.learn[+i]; if (lx && confirm('이 학습을 지울까요?')) call('learnDelete', { rows: [lx] }, function (r) { S.learn = r.learn; renderLearn(); notice('지웠습니다'); }); }
   else if (a === 'delRestore') call('restoreOrders', { ids: [i] }, function (r) { mergeOrders(r.orders); notice('되살렸습니다'); loadDeleted(); render(); });
   else if (a === 'edCancel') { if (confirm('이 주문을 취소할까요? (지워지지 않고 취소로 남습니다)')) { var id2 = ED.o.id; showSheet(false); call('setStatus', { ids: [id2], st: '취소' }, function (r) { mergeOrders(r.orders); notice('취소했습니다'); render(); }); } }
   else if (a === 'edBack') { var id3 = ED.o.id; if (ED.o.st === '출고완료' && S.orders.some(function (x) { return x.parent === id3 && x.st === '대기'; }) && !confirm('이 주문의 잔량 주문이 따로 있습니다. 되돌려도 잔량 주문은 그대로 남습니다. 계속할까요?')) return; showSheet(false); call('setStatus', { ids: [id3], st: '대기' }, function (r) { mergeOrders(r.orders); notice('대기로 되돌렸습니다'); render(); }); }

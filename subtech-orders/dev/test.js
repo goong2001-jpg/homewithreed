@@ -49,6 +49,38 @@ ok(OP.findCust(custs, '가나난방').length === 2 && OP.findCust(custs, '다라
 o = OP.parseOrder('다라테크 몰딩센서 2M 1000개\n금일 경동택배 출고', { custs });
 ok(o.cust === '다라테크' && o.items[0].name === '몰딩센서 2M' && o.carrier === '경동', '거래처+품목이 한 줄');
 
+console.log('1-2) v4: 옵션 줄 펼치기·배송 메시지·학습');
+const its = o => o.items.map(i => [i.name, i.sensor, i.qty, i.note].join('|'));
+o = OP.parseOrder('가나코퍼레이션\nH300WF\n색상:화이트,종류:조절기+온도센서 2개\n홍길동\n010-0000-1172\n경기도 안산시 상록구 가나물길 26-5\n(양상동) 다라시스템');
+eq(its(o), ['H300WF|X|2|화이트', '온도센서||2|'], '모델 줄 + "색상:화이트,종류:조절기+온도센서 2개" → H300WF 2 · 온도센서 2 (둘 다 주문 수량)');
+ok(/다라시스템$/.test(o.addr) && !o.msg && !o.memo, '  주소 다음 줄 상세주소는 주소에');
+o = OP.parseOrder('가나코퍼레이션\n\nSV7\n조절기+온도센서+파워코드 2개\n김가나\n0502-0000-9714\n충청남도 천안시 동남구 병천면 가나길 113-1\n직접 받고 부재 시 문 앞');
+eq(its(o), ['SV7|X|2|', '온도센서||2|', '파워코드||2|'], '조절기+온도센서+파워코드 → 품목 3줄');
+ok(o.msg === '직접 받고 부재 시 문 앞', '  배송 요청은 배송 메시지로');
+o = OP.parseOrder('가나코퍼레이션\n\nH200WF\n실버 조절기만 1개\n이가나\n0502-0000-4934\n경기도 시흥시 가나섬1로 4 다라프라자 6층\n마바 프론트 ( 정왕동 )\n물건 프론트 안쪽으로 넣어주시고\n던지지마세요 파손시 책임물어 바로 환불조치합니다');
+eq(its(o), ['H200WF|X|1|실버'], '실버 조절기만 → H200WF 센서 X, 메모 실버');
+ok(/정왕동 \)$/.test(o.addr) && o.msg === '물건 프론트 안쪽으로 넣어주시고 던지지마세요 파손시 책임물어 바로 환불조치합니다' && !o.memo, '주소 뒤 부탁 문장 여러 줄 → 배송 메시지 (주소·적요에 안 붙음)');
+o = OP.parseOrder('라마썬\n\nH5R 실버 (리모컨포함)-1\n몰딩센서2M  2개\n박가나 / 010-0000-0978\n경기도 안산시 단원구 가나로 325 6층');
+eq(its(o), ['H5R||1|실버', '리모컨||1|', '몰딩센서2M||2|'], '"H5R 실버 (리모컨포함)-1" → H5R 1 · 리모컨 1 (메모 실버)');
+eq(its(OP.parseOrder('가나\nSV7 리모컨없음 조절기+온도센서 5')), ['SV7|X|5|리모컨 없음', '온도센서||5|'], '"리모컨없음"은 품목이 아니라 메모');
+eq(its(OP.parseOrder('가나\nSTF-7L 리모컨 없음 X 3 (무센서)')), ['STF-7L|X|3|리모컨 없음'], '"리모컨 없음"(띄어쓰기)도 메모');
+eq(its(OP.parseOrder('가나\nH200WF실버 O 10')), ['H200WF|O|10|실버'], '모델명에 붙은 색상 (H200WF실버) — 모델명이 잘리지 않음');
+eq(its(OP.parseOrder('가나\nSV7 C485 조절기만 X 6')), ['SV7 C485|X|6|'], 'C485 같은 규격은 품목명에 남음');
+eq(its(OP.parseOrder('가나\nH10    7단계    X    6  스티커있음')), ['H10 7단계|X|6|스티커있음'], '옵션 단어 없는 일반 발주는 그대로');
+eq(its(OP.parseOrder('가나\nsv7 조절기 20개 (서산 가까운지점으로 보내주세요)')), ['sv7||20|(서산 가까운지점으로 보내주세요)'], '괄호 속 일반 메모는 쪼개지 않음');
+eq(its(OP.parseOrder('가나\nH200WF+ X 1개')), ['H200WF+|X|1|'], 'H200WF+ 모델명 그대로');
+o = OP.parseOrder('가나\nH300WF\n종류:조절기+진동모듈 2개');
+ok(o.items.length === 1 && o.items[0].note === '진동모듈' && JSON.stringify(o.items[0].ask) === '["진동모듈"]', '처음 보는 옵션(진동모듈) → 메모에 두고 물어보기 표시');
+const learn = [{ kind: 'opt', from: '진동모듈', to: 'item' }, { kind: 'name', cust: '가나', from: '온도센서', to: '몰딩센서 2M' }];
+o = OP.parseOrder('가나\nH300WF\n종류:조절기+온도센서+진동모듈 2개', { learn });
+eq(its(o), ['H300WF|X|2|', '몰딩센서 2M||2|', '진동모듈||2|'], '학습 적용: 진동모듈 → 품목, (가나) 온도센서 → 몰딩센서 2M');
+eq(its(OP.parseOrder('다라\nH300WF\n종류:조절기+온도센서 1개', { learn })), ['H300WF|X|1|', '온도센서||1|'], '품목명 학습은 그 거래처에만');
+o = OP.parseOrder('가나상사\nH5-W X 10\n카다로그 동봉\n신제품 카다로그도 넣어주세요\n택배선불');
+ok(!o.msg && /카다로그도 넣어주세요/.test(o.memo), '포장 지시(카다로그 넣어주세요)는 적요에 남음');
+o = OP.parseOrder('가나전기 직송건\nSV3K 2개 김가나님\n0504 0000 8331\n강원도 강릉시 가나로2874번길35 안내데스크\n택배로 보내주세요');
+ok(!o.msg && o.carrier === 'CJ', '"택배로 보내주세요"는 배송방법');
+o = OP.parseOrder('가나썬\n이가나 / 010-0000-5824\n경북 구미시 가나 9길 15-2 203호\n1층 택배실에 놓아주세요\nH7-1(무센서)');
+ok(o.msg === '1층 택배실에 놓아주세요', '"택배실에 놓아주세요"는 배송 메시지');
 console.log('2) 박스 추천');
 const hist = [['CJ', 'a', 'SV7  X  50', 1, '대', 0], ['CJ', 'b', 'SV7  X  10', 1, '소', 0], ['CJ', 'c', 'SV7  X  2', 1, '극소', 0], ['CJ', 'd', 'STT-1.3DE      60/\nSTT-2.6DE      60', 4, '대', 0], ['CJ', 'd', 'STT-1.3DE      60/\nSTT-2.6DE      60', 1, '중', 0], ['경동', 'e', 'H7 X 50', 1, '소', 5000]];
 const M = OP.buildRec(hist);
@@ -205,7 +237,18 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
     ok(OUT.report({ date: '2026-11-19', shipped: [{ cust: 'x', items: [], recv: '홍', phone: '010', addr: '서울' }], pending: [] }).sheets[0].rows[2][7].v === '홍 / 010 서울', '옛 마감 기록(own 없음)은 받는분 그대로 표시');
   }
 
-  console.log('8) 템플릿·버전');
+  console.log('8) v4: 학습 저장');
+  { let r = api('learnSave', { rows: [{ kind: 'opt', from: '진동모듈', to: 'item' }, { kind: 'name', cust: '가나', from: '온도센서', to: '몰딩센서 2M' }] });
+    ok(r.learn.length === 2 && gas.__tabs['주문_학습'].length === 3, '학습 2건 저장 (주문_학습 탭)');
+    r = api('learnSave', { rows: [{ kind: 'opt', from: '진동모듈', to: 'memo' }] });
+    ok(r.learn.length === 2 && r.learn.find(x => x.from === '진동모듈').to === 'memo', '같은 것을 다시 고르면 덮어씀 (줄 안 늘어남)');
+    throws(() => api('learnSave', { rows: [{ kind: 'x', from: 'a', to: 'b' }] }), '잘못된 학습 거절');
+    ok(api('boot').learn.length === 2, 'boot 에 학습 목록');
+    r = api('learnDelete', { rows: [{ kind: 'name', cust: '가나', from: '온도센서' }] });
+    ok(r.learn.length === 1 && r.learn[0].kind === 'opt', '학습 지우기');
+    ok(JSON.stringify([master, log]) === keep, '품목마스터·거래로그는 그대로 (v4 뒤에도)'); }
+
+  console.log('9) 템플릿·버전');
   const idx = fs.readFileSync(path.join(D, 'Index.html'), 'utf8'), tags = idx.match(/<\?[\s\S]*?\?>/g) || [];
   ok((idx.match(/<\?/g) || []).length === 3 && tags.join() === "<?!= inc('Parse') ?>,<?!= inc('Xlsx') ?>,<?!= inc('Out') ?>", 'Index.html 의 <? ?> 는 끼워넣기 3개뿐 (다른 곳에 있으면 앱이 안 열림)');
   const av = (fs.readFileSync(path.join(D, 'Code.gs'), 'utf8').match(/var APP_VERSION = '([^']+)'/) || [])[1], hv = (idx.match(/var HTML_VERSION = '([^']+)'/) || [])[1];

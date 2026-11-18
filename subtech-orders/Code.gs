@@ -4,11 +4,12 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v3';
+var APP_VERSION = 'v4';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
-var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록', DEL: '주문_삭제기록' };
-var OWN = [T.ORD, T.CUST, T.HIST, T.SET, T.RPT, T.DEL];
+var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록', DEL: '주문_삭제기록', LRN: '주문_학습' };
+var OWN = [T.ORD, T.CUST, T.HIST, T.SET, T.RPT, T.DEL, T.LRN];
+var LH = ['종류', '거래처', '원래 글', '바꿀 값', '수정일시'];   // 학습: 종류 opt(옵션 단어 → item/memo) · name(품목명 → 바꿀 품목명, 거래처별)
 var DH = ['삭제일시', '주문ID', '거래처', '품목', '내용'];   // 삭제기록: 내용 = 주문 줄 전체(JSON). 30일 지나면 지움
 var KEEP_DAYS = 30;   // 이 앱이 쓰는 탭 (이 밖의 탭엔 쓰지 않는다)
 
@@ -84,7 +85,7 @@ var API = {
     var items = [];
     try { var m = ss_().getSheetByName('품목마스터'); if (m && m.getLastRow() > 1) { var seen = {}; m.getRange(2, 1, m.getLastRow() - 1, 3).getValues().forEach(function (r) { var n = str_(r[1]); if (n && !seen[n]) { seen[n] = 1; items.push(n); } }); } } catch (e) {}
     var all = allOrders_();
-    return { version: APP_VERSION, today: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'), orders: recent_(all), addrHist: addrHist_(all), custs: custs_(), items: items,
+    return { version: APP_VERSION, today: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'), orders: recent_(all), addrHist: addrHist_(all), learn: learnList_(), custs: custs_(), items: items,
       sender: { name: set['보내는분'] || '써브텍', phone: set['보내는분전화'] || '', addr: set['보내는분주소'] || '' }, histCount: Math.max(0, sheet_(T.HIST, HH).getLastRow() - 1) };
   },
 
@@ -225,6 +226,29 @@ var API = {
     });
   },
 
+  /* ----- 학습 (나누기에서 고친 것 기억) ----- */
+  learnSave: function (a) {   // {rows:[{kind, cust, from, to}]} — 같은 종류·거래처·원래 글이면 바꿀 값만 고침
+    return lock_(function () {
+      var sh = sheet_(T.LRN, LH), v = rows_(sh, LH.length), stamp = now_(), key = function (k, c, f) { return k + '|' + nz_(c) + '|' + nz_(f); }, at = {};
+      v.forEach(function (r, i) { at[key(str_(r[0]), r[1], r[2])] = i; });
+      (a.rows || []).forEach(function (x) {
+        if (['opt', 'name'].indexOf(x.kind) < 0 || !String(x.from || '').trim() || !String(x.to || '').trim()) throw new Error('학습 내용이 올바르지 않습니다');
+        var row = [x.kind, x.kind === 'opt' ? '' : String(x.cust || ''), String(x.from).trim(), String(x.to).trim(), stamp], k = key(row[0], row[1], row[2]);
+        if (k in at) v[at[k]] = row; else { at[k] = v.length; v.push(row); }
+      });
+      if (v.length) sh.getRange(2, 1, v.length, LH.length).setValues(v.map(function (r) { return r.map(str_); }));
+      return { learn: learnList_() };
+    });
+  },
+  learnDelete: function (a) {   // {rows:[{kind, cust, from}]}
+    return lock_(function () {
+      var sh = sheet_(T.LRN, LH), v = rows_(sh, 3), del = {};
+      (a.rows || []).forEach(function (x) { del[x.kind + '|' + nz_(x.cust) + '|' + nz_(x.from)] = 1; });
+      for (var i = v.length - 1; i >= 0; i--) if (del[str_(v[i][0]) + '|' + nz_(v[i][1]) + '|' + nz_(v[i][2])]) sh.deleteRow(i + 2);
+      return { learn: learnList_() };
+    });
+  },
+
   /* ----- 거래처 주소록 ----- */
   custSave: function (a) {   // {row(시트 줄 번호, 없으면 새로), cust:{…}}
     var c = a.cust || {}; if (!String(c.name || '').trim()) throw new Error('거래처 이름을 넣어주세요');
@@ -285,6 +309,7 @@ function addrHist_(list) {
   });
   return m;
 }
+function learnList_() { return rows_(sheet_(T.LRN, LH), LH.length).filter(function (r) { return r[0] && r[2]; }).map(function (r) { return { kind: str_(r[0]), cust: str_(r[1]), from: str_(r[2]), to: str_(r[3]), at: str_(r[4]) }; }); }
 function uniq_(a) { var s = {}; return a.filter(function (x) { if (s[x]) return false; s[x] = 1; return true; }); }
 function deletedIds_() { return rows_(sheet_(T.DEL, DH), 2).map(function (r) { return str_(r[1]); }); }
 function purgeDeleted_() {   // 삭제기록에서 30일 지난 줄 지우기

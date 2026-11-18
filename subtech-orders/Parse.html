@@ -6,7 +6,15 @@ var OP = (function () {
   var REGION = /^(?:\(?\d{5}\)?\s*)?(?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|충청|전라|경상)/;
   var ADDR2 = /[가-힣](?:로|길|번길)\s?\d+|(?:읍|면|동|리|가)\s?\d+(?:-\d+)?(?:번지)?(?:\s|$)|\d+번지/;
   var SHIPW = /택배|경동|대신|직납|화물|퀵|직접\s*수령|수령해|가지러|방문|찾으러|갖다|선불|착불|현불/;
-  var MSGW = /문\s*앞|부재|놓아|경비실|배송\s*전|연락\s*(?:바|부탁|주)/;
+  var MSGW = /문\s*앞|부재|놓아|경비실|택배함|배송\s*전|도착\s*전|연락\s*(?:바|부탁|주)|던지|파손|깨지|취급\s*주의|조심|직접\s*받/;
+  var MSGV = /주세요|주시고|주십시오|마세요|마시고|바랍니다|조치/;          // 받는 곳 바로 뒤의 부탁 문장
+  var NOTMSG = /출고|발주|입금|계산서|명세서|직납|출하|생산|명판|스티커|프로그램|단계|케이스|샘플|반품|교환|AS|발행|박스|동봉|포장|카[다탈]로그|설명서|표시|장부|발송|택배(?![함실])|화물|경동|대신/;   // 이 말이 있으면 배송 메시지가 아니라 적요
+  /* 옵션 줄 (스마트스토어식): "H300WF / 색상:화이트,종류:조절기+온도센서 2개" → H300WF 2 · 온도센서 2 (메모: 화이트)
+     조절기 = 모델 자신, 온도센서·파워코드·리모컨 = 같은 수량의 품목 줄, 색상 = 메모, 처음 보는 단어 = 메모 + 물어보기(학습) */
+  var OPT_MARK = /색상|종류|조절기|온도\s*센서|파워\s*코드|리모[컨콘]|실버|화이트|블랙|골드|무센서|흰색|검정/;
+  var OPT_COLOR = /^(화이트|흰색|백색|실버|은색|블랙|검정|검정색|검은색|골드|그레이|회색|아이보리|white|silver|black)$/i;
+  var OPT_PART = { '온도센서': '온도센서', '센서': '온도센서', '파워코드': '파워코드', '리모컨': '리모컨', '리모콘': '리모컨', '리모컨포함': '리모컨', '리모콘포함': '리모컨' };
+  var OPT_SKIP = /^(조절기|본체|포함|세트|set|색상|종류|옵션)$/i;
   var ACC = /센서|코드|리모컨|리모콘|박스|기판|명판|케이블|세트|브라켓|나사|타이머|스티커|전선|단자|커버|노브/;
 
   function trim(s) { return String(s == null ? '' : s).replace(/[ 　\t]/g, ' ').replace(/\s+$/, '').replace(/^\s+/, ''); }
@@ -73,9 +81,40 @@ var OP = (function () {
     // "STT-2.6DE       90" / "STT1.3  60 명판있음" — 숫자만 (모델명 뒤 띄우고)
     if ((m = s.match(/^(.*?[A-Za-z가-힣)\]+].*?)\s+[-–:]?\s*(\d[\d,]*)$/)) && m[1].length <= 40) return mk(m[1], '', num(m[2]), '', '');
     if ((m = s.match(/^(.*?[A-Za-z].*?)\s{2,}(\d[\d,]*)\s{2,}(\S.*)$/))) return mk(m[1], '', num(m[2]), '', m[3]);
+    // "H5R 실버 (리모컨포함)-1" / "H5R(실버)리모컨 포함, 무센서-1" — 괄호 뒤나 옵션 단어 뒤의 -수량
+    if ((m = s.match(/^([A-Za-z][A-Za-z0-9.\-]*\d.*?)\s*-\s*(\d{1,4})$/)) && (/\)$/.test(m[1]) || OPT_MARK.test(m[1]))) return mk(m[1], '', num(m[2]), '', '');
     // "SV7-50" / "H200WF(화이트)-20" — 붙여 쓴 이름-수량 (이름에 숫자나 괄호가 있을 때만: STT-2.6 같은 모델명과 구분)
     if ((m = s.match(/^([A-Za-z][^\s]*[A-Za-z0-9가-힣)])-(\d{1,4})(?:\s*(\(.*\)))?$/)) && /\d|\)/.test(m[1])) return mk(m[1], '', num(m[2]), '', m[3]);
     return null;
+  }
+  function expandItem(it, learnOpt) {
+    if (!it || !it.name) return [it];
+    var nm = String(it.name), mm = nm.match(/^[A-Za-z][A-Za-z0-9.\-]*/);
+    if (!mm || !/\d/.test(mm[0])) return [it];
+    var model = mm[0]; if (nm.charAt(model.length) === '+' && !/[가-힣]/.test(nm.charAt(model.length + 1))) model += '+';   // "H200WF+" 는 모델명
+    var restName = nm.slice(model.length), note0 = it.note || '', lo = learnOpt || {};
+    var hit = function (t) { return OPT_MARK.test(t) || Object.keys(lo).some(function (k) { return k && norm(t).indexOf(k) >= 0; }); };
+    var useNote = hit(note0);                                   // 메모에 옵션 단어가 없으면 메모는 그대로 둠 (예: "(서산 가까운지점으로 보내주세요)")
+    if (!hit(restName) && !useNote) return [it];
+    var src = (restName + ' ' + (useNote ? note0 : '')).replace(/(색상|종류|옵션)\s*[:：]/g, ' ').replace(/리모[컨콘]\s*(없음|없이|제외|X|x)/g, ' 리모컨없음 ').replace(/리모[컨콘]\s*포함/g, ' 리모컨포함 ');
+    var parts = src.split(/[,\/()\[\]·:：\s]+/).reduce(function (a, p) { return a.concat(p.split('+')); }, []).map(function (p) { return p.trim(); }).filter(Boolean);
+    var extra = [], note = [], ask = [], keep = [], sensorX = false;
+    parts.forEach(function (p) {
+      var k = p.replace(/\s/g, ''), L = lo[norm(k)];
+      if (OPT_SKIP.test(k)) return;
+      if (/^조절기만$|^무센서$|^센서[Xx없]/.test(k)) { sensorX = true; return; }
+      if (/^리모컨없음$/.test(k)) { note.push('리모컨 없음'); return; }
+      if (OPT_PART[k]) { if (extra.indexOf(OPT_PART[k]) < 0) extra.push(OPT_PART[k]); return; }
+      if (OPT_COLOR.test(k)) { note.push(k); return; }
+      if (L === 'item') { if (extra.indexOf(k) < 0) extra.push(k); return; }
+      if (L === 'memo') { note.push(k); return; }
+      if (/\d/.test(k) && !/^\d+$/.test(k)) { keep.push(k); return; }   // C485 · 7단계 · 4kw 같은 규격은 품목명에 남김
+      note.push(k); ask.push(k);
+    });
+    if (!useNote && note0) note.push(note0);
+    var main = { name: [model].concat(keep).join(' '), sensor: extra.indexOf('온도센서') >= 0 || sensorX ? 'X' : it.sensor, qty: it.qty, unit: it.unit, note: note.join(' · ') };
+    if (ask.length) main.ask = ask;
+    return [main].concat(extra.map(function (n) { return { name: n, sensor: '', qty: it.qty, unit: it.unit || '개', note: '' }; }));
   }
   function modelOnly(s) { return /^[A-Za-z][A-Za-z0-9.\-+ ]{1,22}$/.test(s) && /\d/.test(s); }
   function isAcc(name) { return ACC.test(name) && !/^(SV|STT|STA|STF|STD|TI|H\d|E\d)[\w.\-+ ]*$/i.test(name); }
@@ -134,6 +173,8 @@ var OP = (function () {
         if ((mm = a.match(/\s(?:받는\s*분|수신)\s*[:：]?\s*(\S+)\s*$/))) { o.recv = o.recv || mm[1]; a = a.slice(0, mm.index); }
         o.addr = sq(o.addr ? o.addr + ' ' + a : a); lastKind = 'addr'; continue;
       }
+      // 배송 메시지 (문 앞·부재·파손·넣어주세요 …) — 품목보다 먼저 봄. 모델명(영문+숫자)이 있거나 출고·계산서 같은 말이 있으면 적요
+      if (s.length <= 80 && !NOTMSG.test(s) && !/[A-Za-z]+-?\d/.test(s) && (MSGW.test(s) || ((lastKind === 'addr' || lastKind === 'msg' || lastKind === 'phone' || lastKind === 'recv') && MSGV.test(s)))) { o.msg = sq(o.msg ? o.msg + ' ' + s : s); lastKind = 'msg'; continue; }
       // 품목
       it = itemParse(s);
       if (it && /^(사진|동영상|총|합계|택배|반품)\s*$/.test(it.name)) it = null;
@@ -145,8 +186,6 @@ var OP = (function () {
         else o.items.push(it);
         lastKind = 'item'; continue;
       }
-      // 배송 메시지 (문 앞, 부재 시 …)
-      if (MSGW.test(s) && s.length <= 40) { o.msg = sq(o.msg ? o.msg + ' ' + s : s); lastKind = 'msg'; continue; }
       // 배송방법
       if (SHIPW.test(s) && s.length <= 30) { shipLines.push(s); lastKind = 'ship'; continue; }
       // 배송방법 바로 다음 "○○점" = 영업소
@@ -174,6 +213,12 @@ var OP = (function () {
     if ((m = all.match(/(준비|입금|입고|명판|케이스|자재)\S{0,4}\s?(?:되면|들어오면|나오면|되는대로|되는 대로)/))) o.due = m[1] + '되면';
     else if (/내일/.test(all)) { var d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() + 1); o.due = ymd(d); }
     o.memo = memo.join(' / ');
+    var LR = learnMaps(opt.learn), ck = norm(o.cust);
+    o.items = o.items.reduce(function (a, it) { return a.concat(expandItem(it, LR.opt)); }, []).map(function (it) {
+      var to = LR.name[ck + '|' + norm(it.name)] || LR.name['|' + norm(it.name)];
+      if (to) { it.from = it.name; it.name = to; }
+      return it;
+    });
     o.isOrder = o.items.length > 0;
     return o;
   }
@@ -183,6 +228,13 @@ var OP = (function () {
     var w = name.split(' ');
     for (var k = Math.min(3, w.length - 1); k >= 1; k--) { var c = w.slice(0, k).join(' '), n = norm(c); if (n.length >= 3 && custs.some(function (x) { return norm(x.name) === n || core(x.name) === n; })) return [c, w.slice(k).join(' ')]; }
     return null;
+  }
+
+  // 학습 목록 [{kind:'opt'|'name', cust, from, to}] → 찾기 표
+  function learnMaps(list) {
+    var M = { opt: {}, name: {} };
+    (list || []).forEach(function (x) { if (!x || !x.from) return; if (x.kind === 'opt') M.opt[norm(x.from)] = x.to; else if (x.kind === 'name' && x.to) M.name[norm(x.cust || '') + '|' + norm(x.from)] = x.to; });
+    return M;
   }
 
   /* ---------- 5. 거래처 찾기 ---------- */
@@ -259,7 +311,7 @@ var OP = (function () {
     return { box: box, how: how };
   }
 
-  return { splitMessages: splitMessages, parseOrder: parseOrder, itemParse: itemParse, shipParse: shipParse, shipLabel: shipLabel, findCust: findCust, norm: norm,
+  return { splitMessages: splitMessages, parseOrder: parseOrder, itemParse: itemParse, expandItem: expandItem, learnMaps: learnMaps, shipParse: shipParse, shipLabel: shipLabel, findCust: findCust, norm: norm,
     fmtPhone: fmtPhone, isAcc: isAcc, buildRec: buildRec, suggest: suggest, itemsOfText: itemsOfText, ymd: ymd, TYPES: TYPES };
 })();
 if (typeof module !== 'undefined') module.exports = OP;
