@@ -176,6 +176,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
       <div class="today" id="pToday"></div>
       <div class="chips" id="pChips"></div>
       <p class="muted" id="pHelp" style="margin:10px 0 8px"></p>
+      <div class="row hidden" id="pSel" style="margin:0 0 8px"><span class="muted grow" id="pSelN"></span><button class="btn sm" data-act="pSelAll" data-i="1">전체 선택</button><button class="btn sm" data-act="pSelAll" data-i="0">전체 해제</button></div>
       <div id="pList"></div>
       <div class="bar"><button class="btn pri grow" data-act="pXlsx">엑셀 받기</button><button class="btn" data-act="pCopy">복사</button></div>
     </section>
@@ -215,6 +216,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
   <div class="lnbody"><div class="lnsearch"><input type="text" id="lnQ" enterkeyhint="search" placeholder="검색: 거래처 · 받는분 · 품목 (예: 와이코, SV7)" autocomplete="off"><button class="btn" data-act="lnQClear" aria-label="검색 지우기">✕</button></div><div id="lnBody"><p class="muted">불러오는 중…</p></div></div>
   <div class="lnnav"><button data-act="lnTab" data-i="today" class="on">오늘<b id="lnLeftT" class="hidden"></b></button><button data-act="lnTab" data-i="next">다음<b id="lnLeftN" class="hidden"></b></button><button data-act="lnTab" data-i="sum">만들 양</button></div>
 </div>
+<div id="newVer" class="hidden" style="position:fixed;top:0;left:0;right:0;z-index:50;background:#9A5B00;color:#fff;padding:10px 14px;font-size:15px;line-height:1.4"></div>
 <div id="toast" class="hidden"></div>
 <div id="shade" class="shade hidden"></div>
 <div id="sheet" class="sheet hidden"><div class="hd"><b id="shT" class="grow"></b><button class="btn sm ghost" data-act="shClose">닫기</button></div><div class="bd" id="shB"></div><div class="ft" id="shF"></div></div>
@@ -223,7 +225,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v11';
+var HTML_VERSION = 'v12';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -552,6 +554,7 @@ function pAll() {
   var out = (S.carrier === 'CJ' ? OUT.cj : S.carrier === '경동' ? OUT.kd : OUT.ds)(list, S.sender, S.today);
   download(XL.build(out.sheets), out.name + '_오늘전체'); notice(list.length + '건을 한 파일로 받았습니다');
 }
+function pCountSel() { var l = pOrders(), n = l.filter(function (o) { return PSEL[o.id]; }).length; $('pSel').classList.toggle('hidden', !l.length); $('pSelN').textContent = l.length + '건 중 ' + n + '건 체크'; var b = document.querySelector('[data-act="pXlsx"]'); if (b) b.textContent = n ? '체크한 ' + n + '건 엑셀 받기' : '엑셀 받기'; }
 function renderPrint() {
   renderToday();
   $('pChips').innerHTML = [['CJ', 'CJ대한통운'], ['경동', '경동'], ['대신', '대신']].map(function (c) { var n = S.orders.filter(function (o) { return o.st === '대기' && o.carrier === c[0] && !o.printed; }).length;
@@ -568,6 +571,7 @@ function renderPrint() {
     ex += '<button class="btn sm" data-act="pEdit" data-i="' + esc(o.id) + '" style="margin-top:8px">받는 곳 · 보내는분 고치기</button>';
     return cardHTML(o, { key: o.id, check: PSEL[o.id], extra: ex, act: 'none' });
   }).join('');
+  pCountSel();
 }
 function readBoxes() { Array.prototype.forEach.call(document.querySelectorAll('[data-box]'), function (d) { var id = d.getAttribute('data-box'); if (!PBOX[id]) return;
   PBOX[id].box = Array.prototype.map.call(d.querySelectorAll('.box'), function (r) { var x = { k: r.querySelector('.bk').value, b: Math.max(1, +r.querySelector('.bb').value || 1) }, f = r.querySelector('.bf'); if (f && +f.value) x.f = +f.value; return x; }); }); }
@@ -588,12 +592,31 @@ var CSEL = {};
 // 출하서 체크: 사무실이 직접 누른 것(CSEL)이 우선, 아니면 기본값 = 송장부착(출고준비)된 것. 생산이 아직 아무것도 안 누른 날은 예전처럼 그날 송장 뽑은 것
 function closeChecked(o, d, lineUsed) { if (o.id in CSEL) return CSEL[o.id]; return lineUsed ? !!o.tagged : String(o.printed).slice(0, 10) === d; }
 function closeLineUsed() { return S.orders.some(function (o) { return o.st === '대기' && (o.ready || o.tagged); }); }
+var CGR = [];   // 출하서 대기 묶음별 주문 ID (묶음 모두 체크용)
 function renderClose() {
   var lineUsed = closeLineUsed();
   var d = $('cDate').value || S.today, wait = S.orders.filter(function (o) { return o.st === '대기'; }), done = S.orders.filter(function (o) { return o.st === '출고완료' && o.shipped === d; });
-  wait.sort(function (a, b) { return String(a.at).localeCompare(String(b.at)); });
-  $('cList').innerHTML = (done.length ? '<div class="sec">이미 출고완료 ' + done.length + '건</div>' + done.map(function (o) { return cardHTML(o, { key: o.id }); }).join('') : '') +
-    '<div class="sec">대기 중 ' + wait.length + '건 — 다 나간 것은 체크, 일부만 나갔거나 날짜가 다르면 버튼</div>' + (wait.length ? wait.map(function (o) { return cardHTML(o, { key: o.id, check: closeChecked(o, d, lineUsed), act: 'none', extra: '<div style="margin-top:8px"><button class="btn sm" data-act="ship" data-i="' + esc(o.id) + '">일부 출고 · 다른 날짜</button></div>' }); }).join('') : '<p class="muted">대기 중인 주문이 없습니다.</p>');
+  wait.sort(function (a, b) { return (dueKey(a) + a.at).localeCompare(dueKey(b) + b.at); });
+  var h = '<div class="today" id="cSum"></div>';
+  if (done.length) h += '<div class="sec">이미 출고완료 ' + done.length + '건</div>' + done.map(function (o) { return cardHTML(o, { key: o.id }); }).join('');
+  h += '<div class="row" style="margin:16px 0 4px"><b class="grow">대기 중 ' + wait.length + '건</b>' + (wait.length ? '<button class="btn sm" data-act="cAll" data-i="1">전체 선택</button><button class="btn sm" data-act="cAll" data-i="0">전체 해제</button>' : '') + '</div>' +
+    '<p class="muted" style="margin:0 0 6px">다 나간 것은 체크, 일부만 나갔거나 날짜가 다르면 버튼. 출고 예정별로 묶여 있습니다.</p>';
+  CGR = []; var last = null;
+  wait.forEach(function (o) {
+    var g = dueGroup(o);
+    if (g !== last) { CGR.push([]); var n = wait.filter(function (x) { return dueGroup(x) === g; }).length; h += '<div class="grp row"><span class="grow">' + esc(g) + ' ' + n + '건</span><button class="btn sm ghost" data-act="cGrp" data-i="' + (CGR.length - 1) + '">이 묶음 모두 체크</button></div>'; last = g; }
+    CGR[CGR.length - 1].push(o.id);
+    h += cardHTML(o, { key: o.id, check: closeChecked(o, d, lineUsed), act: 'none', extra: '<div style="margin-top:8px"><button class="btn sm" data-act="ship" data-i="' + esc(o.id) + '">일부 출고 · 다른 날짜</button></div>' });
+  });
+  if (!wait.length) h += '<p class="muted">대기 중인 주문이 없습니다.</p>';
+  $('cList').innerHTML = h; closeSum();
+}
+// 그날 출하 합계 = 이미 출고완료 + 체크한 대기 주문. 수량은 출하서 엑셀처럼 부자재(센서·코드 등)를 빼고 합계
+function closeSum() {
+  var d = $('cDate').value || S.today, lu = closeLineUsed(), list = S.orders.filter(function (o) { return (o.st === '출고완료' && o.shipped === d) || (o.st === '대기' && closeChecked(o, d, lu)); }), q = 0, acc = 0;
+  list.forEach(function (o) { (o.items || []).forEach(function (i) { var n = +i.qty || 0; if ((i.unit && i.unit !== '개') || OP.isAcc(i.name)) acc += n; else q += n; }); });
+  if ($('cSum')) $('cSum').innerHTML = '<span class="muted">' + esc(OUT.md(d)) + ' 출하 (출고완료 + 체크한 것)</span><br><b style="font-size:18px">' + list.length + '건 · 수량 합계 ' + q.toLocaleString() + '개</b>' + (acc ? ' <span class="muted">· 부자재 ' + acc.toLocaleString() + '개 별도</span>' : '');
+  var bt = document.querySelector('[data-act="closeDay"]'); if (bt) bt.textContent = '마감하고 하루 파일 받기 (' + list.length + '건)';
 }
 function doClose() {
   var d = $('cDate').value || S.today, lu = closeLineUsed(), ids = S.orders.filter(function (o) { return o.st === '대기' && closeChecked(o, d, lu); }).map(function (o) { return o.id; });
@@ -642,7 +665,7 @@ function loadDeleted() { call('deletedList', {}, function (r) { $('delList').inn
 
 /* ---------- 누르기 ---------- */
 document.addEventListener('click', function (ev) {
-  var chk = ev.target.closest('[data-chk]'); if (chk) { var key = chk.getAttribute('data-chk'); if (S.view === 'new') { S.drafts[+key]._on = chk.checked; renderDrafts(); } if (S.view === 'print') PSEL[key] = chk.checked; if (S.view === 'close') CSEL[key] = chk.checked; if (S.view === 'list') LSEL[key] = chk.checked; return; }
+  var chk = ev.target.closest('[data-chk]'); if (chk) { var key = chk.getAttribute('data-chk'); if (S.view === 'new') { S.drafts[+key]._on = chk.checked; renderDrafts(); } if (S.view === 'print') { PSEL[key] = chk.checked; pCountSel(); } if (S.view === 'close') { CSEL[key] = chk.checked; closeSum(); } if (S.view === 'list') LSEL[key] = chk.checked; return; }
   if (ev.target.closest('[data-box]') && !ev.target.closest('[data-act="bxAdd"],[data-act="bxDel"]')) return;
   var b = ev.target.closest('[data-act],[data-v]'); if (!b) return;
   if (b.dataset.v) { go(b.dataset.v); return; }
@@ -712,6 +735,9 @@ document.addEventListener('click', function (ev) {
   else if (a === 'lnCar') { LN.car = LN.car === i ? '' : i; renderLine(); }
   else if (a === 'lnReload') lineLoad();
   else if (a === 'lnToSum') { ev.preventDefault(); var sm = document.querySelector('#lnBody .lnsum'); if (sm) sm.scrollIntoView({ block: 'start' }); }
+  else if (a === 'pSelAll') { readBoxes(); pOrders().forEach(function (o) { PSEL[o.id] = i === '1'; }); renderPrint(); }
+  else if (a === 'cAll') { S.orders.forEach(function (o) { if (o.st === '대기') CSEL[o.id] = i === '1'; }); renderClose(); }
+  else if (a === 'cGrp') { var gi = CGR[+i] || [], dd = $('cDate').value || S.today, lu2 = closeLineUsed(), allOn = gi.every(function (id) { return closeChecked(byId(id), dd, lu2); }); gi.forEach(function (id) { CSEL[id] = !allOn; }); renderClose(); }
   else if (a === 'lnQClear') { $('lnQ').value = ''; renderLine(); $('lnQ').focus(); }
   else if (a === 'lnMark') lineMark(i, b.dataset.w);
   else if (a === 'lnName') { var nn = prompt('이름 (버튼 누른 사람으로 남습니다)', LN.name || ''); if (nn != null) { LN.name = nn.trim(); try { localStorage.setItem('so-name', LN.name); } catch (e) {} renderLine(); } }
@@ -724,6 +750,13 @@ $('imp').addEventListener('change', function () { if (this.files.length) doImpor
 document.addEventListener('input', function (ev) { if (ev.target.id === 'lnQ') { renderLine(); return; } if (ev.target.classList && ev.target.classList.contains('sq')) shipSync();
   if (ev.target.id === 'e-addr' && ED && $('e-saveAddrRow')) $('e-saveAddrRow').classList.toggle('hidden', !newAddr($('e-cust').value, ev.target.value)); });
 document.addEventListener('change', function (ev) { if (ev.target.classList && ev.target.classList.contains('sw')) { shipSync(); return; } if (ev.target.id === 'e-dueCal' && ED && ev.target.value) { readEdit(); ED.o.due = ev.target.value; drawEdit(); return; } if (ev.target.id === 'e-cust' && ED) { readEdit(); var had = ED.o.addr; enrich(ED.o); if (!had && ED.o.addr) notice('주소록에서 주소를 채웠습니다'); drawEdit(); } });
+/* ---------- 새 버전 알림: 화면을 오래 열어 두면 옛 버전으로 계속 쓰게 됨 → 서버 버전이 다르면 새로고침 안내 ---------- */
+var VER_AT = Date.now();
+function checkVer() { VER_AT = Date.now(); try { google.script.run.withSuccessHandler(function (r) { if (r && r.version && r.version !== HTML_VERSION) showNewVer(r.version); }).withFailureHandler(function () {}).api(S.pin, 'ver', {}); } catch (e) {} }
+function showNewVer(v) { var b = $('newVer'); b.innerHTML = '새 버전(' + esc(v) + ')이 나왔어요. 브라우저 <b>새로고침</b>을 눌러주세요 (PC: F5 · 폰: 새로고침 버튼).' + (S.role === 'line' ? '' : ' 저장 안 한 나눈 결과는 그대로 남아요.'); b.classList.remove('hidden'); }
+setInterval(function () { if (document.visibilityState === 'visible') checkVer(); }, 300000);
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && Date.now() - VER_AT > 60000) checkVer(); });
+
 /* ---------- 생산 화면 (?view=line) ---------- */
 var LN = { tab: 'today', orders: [], at: 0, name: '', car: '' };
 try { LN.name = localStorage.getItem('so-name') || ''; } catch (e) {}

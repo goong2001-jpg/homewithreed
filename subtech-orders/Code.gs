@@ -4,7 +4,7 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v11';
+var APP_VERSION = 'v12';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
 var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록', DEL: '주문_삭제기록', LRN: '주문_학습' };
@@ -75,7 +75,7 @@ function recent_(list) {   // 화면에 보낼 주문: 대기 전부 + 최근 21
 
 /* ---------- 화면이 부르는 단 하나의 입구 ---------- */
 // 생산 암호로 들어온 사람이 쓸 수 있는 기능 (보기 + 준비완료·송장부착만)
-var LINE_FNS = ['lineBoot', 'lineMark'];
+var LINE_FNS = ['lineBoot', 'lineMark', 'ver'];
 function api(pin, fn, arg) {
   var set = settings_(), p = String(pin || ''), role = 'office';
   if (set['암호'] && p !== set['암호']) {
@@ -302,6 +302,8 @@ var API = {
     return lock_(function () { var sh = sheet_(T.SET, ['항목', '값', '설명']), v = rows_(sh, 1); for (var i = 0; i < v.length; i++) if (str_(v[i][0]) === key) { sh.getRange(i + 2, 2).setValue(String(a.pin || '')); return { ok: true }; }
       sh.getRange(sh.getLastRow() + 1, 1, 1, 3).setValues([[key, String(a.pin || ''), key === '생산암호' ? '생산 화면(?view=line)용 암호. 보기·준비완료·송장부착만 됨' : '']]); return { ok: true }; });
   },
+
+  ver: function () { return { version: APP_VERSION }; },   // 화면이 새 버전인지 확인용 (가벼움)
 
   /* ----- 생산 화면 ----- */
   lineBoot: function () {

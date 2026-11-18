@@ -233,6 +233,27 @@ SV7 O 1000개 명판있슴
     await page.click('[data-act=draftSave]'); await page.waitForFunction(() => !S.drafts.length);
     ok(await page.evaluate(() => S.orders.length === 2 && GAS.__tabs['주문'].length === 3) && await page.evaluate(() => localStorage.getItem('so-drafts')) === null,   // 새로고침으로 가짜 시트가 처음 상태라 정확히 2건
        '한 번에 2건 저장, 임시 보관 비움'); }
+  // v12: 출하서 날짜별 묶음·당일 수량 합계·전체 선택 / 송장 전체 선택 / 새 버전 알림
+  { await page.evaluate(() => new Promise(r => call('saveOrders', { orders: [
+      { cust: '내일상사', items: [{ name: 'SV7', sensor: 'X', qty: 10, unit: '', note: '' }, { name: '파워코드 2C', sensor: '', qty: 10, unit: '개', note: '' }], carrier: 'CJ', ship: '택배', due: addDay(S.today, 1) },
+      { cust: '준비상사', items: [{ name: 'H10', sensor: 'X', qty: 20, unit: '', note: '' }], carrier: '직납', ship: '직납', due: '준비되면' }] }, x => { mergeOrders(x.orders); r(); })));
+    await page.click('#nav [data-v=close]');
+    const grps = await page.locator('#cList .grp').allTextContents();
+    ok(grps.length === 3 && /^오늘/.test(grps[0]) && /^내일/.test(grps[1]) && /^날짜 미정/.test(grps[2]), '출하서 대기 목록: 오늘 / 내일 / 날짜 미정으로 묶임');
+    await page.click('[data-act=cAll][data-i="1"]');
+    ok(await page.locator('#cList input:checked').count() === 4 && /4건 · 수량 합계 65개/.test(await page.textContent('#cSum')) && /부자재 10개 별도/.test(await page.textContent('#cSum')) && /\(4건\)/.test(await page.textContent('[data-act=closeDay]')), '전체 선택 → 4건 · 수량 합계 65개 (부자재 10개 별도), 마감 버튼에 건수');
+    await page.locator('#cList input[type=checkbox]').first().uncheck();
+    ok(/3건 · 수량 합계/.test(await page.textContent('#cSum')), '하나 빼면 합계 바로 바뀜');
+    await page.click('[data-act=cAll][data-i="0"]'); ok(await page.locator('#cList input:checked').count() === 0 && /0건 · 수량 합계 0개/.test(await page.textContent('#cSum')), '전체 해제');
+    await page.click('[data-act=cGrp][data-i="0"]'); ok(await page.locator('#cList input:checked').count() === 2, '이 묶음 모두 체크 (오늘 2건)');
+    await page.click('[data-act=cGrp][data-i="0"]'); ok(await page.locator('#cList input:checked').count() === 0, '한 번 더 누르면 묶음 해제');
+    await page.screenshot({ path: path.join(OUT, '17-close.png'), fullPage: true });
+    await page.click('#nav [data-v=print]'); await page.click('[data-act=pCar][data-i=CJ]');
+    await page.click('[data-act=pSelAll][data-i="0"]'); ok(await page.locator('#pList input:checked').count() === 0 && (await page.textContent('[data-act=pXlsx]')) === '엑셀 받기', '송장 전체 해제');
+    await page.click('[data-act=pSelAll][data-i="1"]'); const nP = await page.locator('#pList input[type=checkbox]').count();
+    ok(nP >= 2 && await page.locator('#pList input:checked').count() === nP && (await page.textContent('[data-act=pXlsx]')) === '체크한 ' + nP + '건 엑셀 받기', '송장 전체 선택 → 버튼에 체크한 건수');
+    await page.evaluate(() => { HTML_VERSION = 'v0'; checkVer(); }); await page.waitForSelector('#newVer:not(.hidden)');
+    ok(/새 버전\(v\d+\)이 나왔어요/.test(await page.textContent('#newVer')), '서버가 새 버전이면 화면 위에 새로고침 안내'); }
   // PC 화면
   const pc = await browser.newPage({ viewport: { width: 1280, height: 800 } }); await pc.goto(URL); await pc.waitForFunction(() => document.getElementById('st').textContent === '');
   await pc.fill('#paste', PASTE); await pc.click('[data-act=parse]'); await pc.screenshot({ path: path.join(OUT, '6-pc.png') });
