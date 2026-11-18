@@ -248,7 +248,42 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
     ok(r.learn.length === 1 && r.learn[0].kind === 'opt', '학습 지우기');
     ok(JSON.stringify([master, log]) === keep, '품목마스터·거래로그는 그대로 (v4 뒤에도)'); }
 
-  console.log('9) 템플릿·버전');
+  console.log('9) v5: 생산 화면 (준비완료·송장부착·권한)');
+  { const P = api('saveOrders', { orders: [Object.assign({}, B, { id: undefined, due: '2026-11-18' }), Object.assign({}, A, { id: undefined, carrier: '직납', ship: '직납', box: [] })] }).orders, [p1, p2] = P;
+    let lb = api('lineBoot');
+    const lo = lb.orders.find(o => o.id === p1.id);
+    ok(lb.role === 'line' && lo && !('phone' in lo) && !('addr' in lo) && !('recv' in lo) && !('senderPhone' in lo) && !('raw' in lo) && lo.items.length, '생산 화면 데이터: 받는분·전화·주소·원문은 안 보냄');
+    ok(lb.orders.every(o => o.st === '대기'), '생산 화면은 대기 주문만');
+    let r = api('lineMark', { id: p1.id, what: 'tagged', on: true, by: '홍길동' }).order;
+    ok(r.tagged && r.ready && r.taggedBy === '홍길동' && r.readyBy === '홍길동', '송장부착을 누르면 준비완료도 같이');
+    r = api('lineMark', { id: p1.id, what: 'ready', on: false, by: '홍길동' }).order;
+    ok(!r.ready && !r.tagged, '준비완료를 취소하면 송장부착도 같이 취소');
+    r = api('lineMark', { id: p1.id, what: 'ready', on: true, by: '김철수' }).order;
+    ok(r.ready && !r.tagged && r.readyBy === '김철수', '준비완료만 (송장은 나중에)');
+    throws(() => api('lineMark', { id: p1.id, what: 'x', on: true }), '잘못된 버튼 거절');
+    // 사무실이 예전 화면으로 저장해도 생산 표시는 남음
+    const stale = Object.assign({}, api('boot').orders.find(o => o.id === p1.id), { ready: '', readyBy: '', memo: '사무실이 고침' });
+    api('saveOrders', { orders: [stale] });
+    const after = api('boot').orders.find(o => o.id === p1.id);
+    ok(after.memo === '사무실이 고침' && after.ready && after.readyBy === '김철수', '사무실 저장이 생산의 준비완료를 덮어쓰지 않음');
+    // 권한
+    api('setPin', { pin: '1111' }); api('setPin', { pin: '2222', kind: 'line' }, '1111');
+    ok(api('boot', {}, '0000').needPin && api('lineBoot', {}, '0000').needPin, '암호가 틀리면 아무것도 못 봄');
+    ok(api('lineBoot', {}, '2222').orders.length >= 2 && api('lineMark', { id: p2.id, what: 'tagged', on: true, by: '이' }, '2222').order.tagged, '생산 암호: 생산 화면 보기·버튼 됨');
+    throws(() => api('boot', {}, '2222'), '생산 암호로 사무실 화면(boot) 거절');
+    throws(() => api('saveOrders', { orders: [stale] }, '2222'), '생산 암호로 주문 수정 거절');
+    throws(() => api('deleteOrders', { ids: [p1.id] }, '2222'), '생산 암호로 삭제 거절');
+    throws(() => api('setPin', { pin: '' }, '2222'), '생산 암호로 암호 바꾸기 거절');
+    const bo = api('boot', {}, '1111'); ok(bo.pinOn === true && bo.linePinOn === true && bo.role === 'office', '사무실 암호: 모든 기능 + 암호 상태 표시');
+    ok(api('lineBoot', {}, '1111').orders.length >= 2, '사무실 암호로도 생산 화면 열림');
+    api('setPin', { pin: '', kind: 'line' }, '1111'); api('setPin', { pin: '' }, '1111');
+    ok(!api('boot').needPin, '암호 끄기');
+    api('shipOrder', { id: p2.id, date: '2026-11-18', lines: [] });
+    throws(() => api('lineMark', { id: p2.id, what: 'ready', on: true, by: '이' }), '출고완료된 주문은 생산 버튼 안 됨');
+    api('deleteOrders', { ids: [p1.id, p2.id] });
+    ok(JSON.stringify([master, log]) === keep, '품목마스터·거래로그는 그대로 (v5 뒤에도)'); }
+
+  console.log('10) 템플릿·버전');
   const idx = fs.readFileSync(path.join(D, 'Index.html'), 'utf8'), tags = idx.match(/<\?[\s\S]*?\?>/g) || [];
   ok((idx.match(/<\?/g) || []).length === 3 && tags.join() === "<?!= inc('Parse') ?>,<?!= inc('Xlsx') ?>,<?!= inc('Out') ?>", 'Index.html 의 <? ?> 는 끼워넣기 3개뿐 (다른 곳에 있으면 앱이 안 열림)');
   const av = (fs.readFileSync(path.join(D, 'Code.gs'), 'utf8').match(/var APP_VERSION = '([^']+)'/) || [])[1], hv = (idx.match(/var HTML_VERSION = '([^']+)'/) || [])[1];

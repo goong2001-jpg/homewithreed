@@ -4,7 +4,7 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v4';
+var APP_VERSION = 'v5';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
 var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록', DEL: '주문_삭제기록', LRN: '주문_학습' };
@@ -15,9 +15,9 @@ var KEEP_DAYS = 30;   // 이 앱이 쓰는 탭 (이 밖의 탭엔 쓰지 않는�
 
 // 주문 탭 열 (순서 바꾸지 말 것 — 뒤에 덧붙이기만)
 var OH = ['주문ID', '접수일시', '상태', '출고예정', '거래처', '품목', '적요', '받는분', '전화', '전화2', '주소', '배송방법', '운송', '운임구분', '청구',
-  '영업소', '보내는분', '보내는분전화', '보내는분주소', '배송메시지', '박스', '송장출력일시', '출고일', '거래명세서', '계산서', '올린사람', '원문', '품목JSON', '재고차감', '수정일시', '운송방식', '원주문'];
+  '영업소', '보내는분', '보내는분전화', '보내는분주소', '배송메시지', '박스', '송장출력일시', '출고일', '거래명세서', '계산서', '올린사람', '원문', '품목JSON', '재고차감', '수정일시', '운송방식', '원주문', '준비완료', '준비한사람', '송장부착', '부착한사람'];
 var OK_ = ['id', 'at', 'st', 'due', 'cust', 'itemsText', 'memo', 'recv', 'phone', 'phone2', 'addr', 'ship', 'carrier', 'pay', 'claim',
-  'branch', 'sender', 'senderPhone', 'senderAddr', 'msg', 'box', 'printed', 'shipped', 'stmt', 'tax', 'who', 'raw', 'items', 'stock', 'upd', 'mode', 'parent'];
+  'branch', 'sender', 'senderPhone', 'senderAddr', 'msg', 'box', 'printed', 'shipped', 'stmt', 'tax', 'who', 'raw', 'items', 'stock', 'upd', 'mode', 'parent', 'ready', 'readyBy', 'tagged', 'taggedBy'];
 var CH = ['거래처명', '전화', '전화2', '주소', '경동영업소', '대신영업소', '기본배송', '보내는분', '보내는분전화', '보내는분주소', '거래명세서', '계산서', '메모', '수정일시'];
 var CK_ = ['name', 'phone', 'phone2', 'addr', 'kd', 'ds', 'ship', 'sender', 'senderPhone', 'senderAddr', 'stmt', 'tax', 'memo', 'upd'];
 var HH = ['일자', '운송', '받는분', '품목', '박스수', '박스타입', '운임', '출처'];
@@ -74,18 +74,26 @@ function recent_(list) {   // 화면에 보낼 주문: 대기 전부 + 최근 21
 }
 
 /* ---------- 화면이 부르는 단 하나의 입구 ---------- */
+// 생산 암호로 들어온 사람이 쓸 수 있는 기능 (보기 + 준비완료·송장부착만)
+var LINE_FNS = ['lineBoot', 'lineMark'];
 function api(pin, fn, arg) {
-  var set = settings_();
-  if (set['암호'] && String(pin || '') !== set['암호']) return { needPin: true, version: APP_VERSION };
+  var set = settings_(), p = String(pin || ''), role = 'office';
+  if (set['암호'] && p !== set['암호']) {
+    if (set['생산암호'] && p === set['생산암호']) role = 'line';
+    else return { needPin: true, version: APP_VERSION };
+  }
   if (!API.hasOwnProperty(fn)) throw new Error('없는 기능: ' + fn);
-  return API[fn](arg || {}, set);
+  if (role === 'line' && LINE_FNS.indexOf(fn) < 0) throw new Error('생산 화면에서는 쓸 수 없는 기능입니다');
+  return API[fn](arg || {}, set, role);
 }
+// 생산 화면에 보내는 주문 모양: 받는분·전화·주소·보내는분·원문은 빼고 생산에 필요한 것만
+function lineSlim_(o) { var x = {}; ['id', 'at', 'due', 'cust', 'items', 'memo', 'ship', 'carrier', 'printed', 'ready', 'readyBy', 'tagged', 'taggedBy', 'parent', 'st'].forEach(function (k) { x[k] = o[k]; }); return x; }
 var API = {
   boot: function (a, set) {
     var items = [];
     try { var m = ss_().getSheetByName('품목마스터'); if (m && m.getLastRow() > 1) { var seen = {}; m.getRange(2, 1, m.getLastRow() - 1, 3).getValues().forEach(function (r) { var n = str_(r[1]); if (n && !seen[n]) { seen[n] = 1; items.push(n); } }); } } catch (e) {}
     var all = allOrders_();
-    return { version: APP_VERSION, today: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'), orders: recent_(all), addrHist: addrHist_(all), learn: learnList_(), custs: custs_(), items: items,
+    return { version: APP_VERSION, role: 'office', pinOn: !!set['암호'], linePinOn: !!set['생산암호'], today: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'), orders: recent_(all), addrHist: addrHist_(all), learn: learnList_(), custs: custs_(), items: items,
       sender: { name: set['보내는분'] || '써브텍', phone: set['보내는분전화'] || '', addr: set['보내는분주소'] || '' }, histCount: Math.max(0, sheet_(T.HIST, HH).getLastRow() - 1) };
   },
 
@@ -98,7 +106,9 @@ var API = {
       list.forEach(function (o, i) {
         if (!o.items || !o.items.length) throw new Error('품목이 없는 주문이 있습니다' + (o.cust ? ': ' + o.cust : ''));
         o.upd = stamp;
-        if (o.id) { var k = ids.indexOf(o.id); if (k < 0) throw new Error('주문을 찾을 수 없습니다: ' + o.id); sh.getRange(k + 2, 1, 1, OH.length).setValues([toRow_(o)]); }
+        if (o.id) { var k = ids.indexOf(o.id); if (k < 0) throw new Error('주문을 찾을 수 없습니다: ' + o.id);
+          var cur = fromRow_(sh.getRange(k + 2, 1, 1, OH.length).getValues()[0]); ['ready', 'readyBy', 'tagged', 'taggedBy'].forEach(function (f) { o[f] = cur[f]; });   // 생산이 누른 준비완료·송장부착은 사무실 저장으로 덮어쓰지 않음
+          sh.getRange(k + 2, 1, 1, OH.length).setValues([toRow_(o)]); }
         else { var j = 1; while (used.indexOf('O' + base + '-' + j) >= 0) j++; o.id = 'O' + base + '-' + j; used.push(o.id); o.at = o.at || stamp; o.st = o.st || '대기'; add.push(toRow_(o)); }   // 같은 초에 저장해도 ID가 겹치지 않게
         out.push(o);
       });
@@ -287,10 +297,28 @@ var API = {
     var r = rows_(sheet_(T.HIST, HH), HH.length); if (r.length > 8000) r = r.slice(r.length - 8000);
     return { hist: r.map(function (x) { return [str_(x[1]), str_(x[2]), str_(x[3]), +x[4] || 0, str_(x[5]), +x[6] || 0]; }) };
   },
-  setPin: function (a) {   // 암호 켜기/바꾸기/끄기 (지금 암호를 알고 들어온 사람만 여기까지 옴)
-    return lock_(function () { var sh = sheet_(T.SET, ['항목', '값', '설명']), v = rows_(sh, 1); for (var i = 0; i < v.length; i++) if (str_(v[i][0]) === '암호') { sh.getRange(i + 2, 2).setValue(String(a.pin || '')); return { ok: true }; }
-      sh.appendRow(['암호', String(a.pin || ''), '']); return { ok: true }; });
-  }
+  setPin: function (a) {   // 암호 켜기/바꾸기/끄기 {pin, kind:'office'|'line'} (사무실 암호를 알고 들어온 사람만 여기까지 옴)
+    var key = a.kind === 'line' ? '생산암호' : '암호';
+    return lock_(function () { var sh = sheet_(T.SET, ['항목', '값', '설명']), v = rows_(sh, 1); for (var i = 0; i < v.length; i++) if (str_(v[i][0]) === key) { sh.getRange(i + 2, 2).setValue(String(a.pin || '')); return { ok: true }; }
+      sh.getRange(sh.getLastRow() + 1, 1, 1, 3).setValues([[key, String(a.pin || ''), key === '생산암호' ? '생산 화면(?view=line)용 암호. 보기·준비완료·송장부착만 됨' : '']]); return { ok: true }; });
+  },
+
+  /* ----- 생산 화면 ----- */
+  lineBoot: function () {
+    return { version: APP_VERSION, today: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'), role: 'line', orders: allOrders_().filter(function (o) { return o.st === '대기'; }).map(lineSlim_) };
+  },
+  // {id, what:'ready'|'tagged', on:true|false, by:'이름'} — 송장부착을 켜면 준비완료도 같이, 준비완료를 끄면 송장부착도 같이 끔
+  lineMark: function (a) {
+    if (['ready', 'tagged'].indexOf(a.what) < 0) throw new Error('버튼이 올바르지 않습니다');
+    return lock_(function () {
+      var stamp = now_(), by = String(a.by || '').slice(0, 20), out = patch_([a.id], function (o) {
+        if (o.st !== '대기') throw new Error('대기 중인 주문이 아닙니다 (지금: ' + o.st + ')');
+        if (a.on) { o[a.what] = stamp; o[a.what + 'By'] = by; if (a.what === 'tagged' && !o.ready) { o.ready = stamp; o.readyBy = by; } }
+        else { o[a.what] = ''; o[a.what + 'By'] = ''; if (a.what === 'ready') { o.tagged = ''; o.taggedBy = ''; } }
+      });
+      return { order: lineSlim_(out[0]) };
+    });
+  },
 };
 
 // 출하 기록·월 파일에 넣는 주문 모양. own = 받는분·주소가 주문에 따로 적힌 건 (출하서 '받는분' 칸은 이때만 채움 — 단골 기본 주소는 비움)

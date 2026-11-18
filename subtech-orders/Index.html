@@ -94,6 +94,28 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 .today{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
 .today b{font-size:15px}
 .grp{font-size:13px;font-weight:700;color:var(--sub);margin:14px 0 6px}
+/* 생산 화면 (?view=line) — 폰 한 손, 큰 글씨·큰 버튼 */
+#line{min-height:100%}
+#line header{gap:8px}
+#line .lnbody{padding:12px 12px 92px;max-width:720px;margin:0 auto}
+.lnnav{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+.lnnav button{flex:1;border:0;background:none;min-height:58px;font-size:16px;color:var(--sub);border-top:3px solid transparent}
+.lnnav button.on{color:var(--pri);font-weight:700;border-top-color:var(--pri)}
+.lncard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+.lncard.s1{border-left:6px solid #C98A1B}
+.lncard.s2{opacity:.55;border-left:6px solid var(--ok)}
+.lncard .cu{font-size:18px;font-weight:800;word-break:keep-all}
+.lncard .it{font-size:17px;line-height:1.55;margin:8px 0 4px}
+.lncard .it .q{font-weight:800}
+.lncard .who{font-size:13px;color:var(--sub);margin-top:4px}
+.lnbtns{display:flex;gap:8px;margin-top:10px}
+.lnbtns button{flex:1;min-height:52px;border-radius:10px;font-size:16px;font-weight:700;border:2px solid var(--line);background:#fff}
+.lnbtns button.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.lnsum{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.lnsum h3{margin:0 0 6px;font-size:15px}
+.lnsum .r{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:16px}
+.lnsum .r:last-child{border-bottom:0}
+.lnsum .r b{font-size:17px}
 </style>
 </head>
 <body>
@@ -153,11 +175,18 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
       <div class="sec">삭제한 주문 (30일 보관)</div>
       <div class="card"><div id="delList" class="muted">아래 버튼을 누르면 불러옵니다.</div><button class="btn sm" data-act="delLoad" style="margin-top:8px">삭제한 주문 보기</button></div>
       <div class="sec">접속 암호</div>
-      <div class="card"><p class="muted" style="margin:0 0 8px">암호를 넣으면 앱을 열 때 물어봅니다. 비우고 저장하면 암호 없이 열립니다.</p>
-        <div class="row"><input type="text" id="pinNew" class="grow" placeholder="새 암호 (비우면 끄기)"><button class="btn" data-act="pinSave">저장</button></div></div>
+      <div class="card"><p class="muted" style="margin:0 0 8px" id="pinState"></p>
+        <label class="f">사무실 암호 (모든 기능)</label><div class="row"><input type="text" id="pinNew" class="grow" placeholder="새 암호 (비우면 끄기)"><button class="btn" data-act="pinSave" data-i="office">저장</button></div>
+        <label class="f">생산 암호 (생산 화면: 보기 · 준비완료 · 송장부착만)</label><div class="row"><input type="text" id="pinLine" class="grow" placeholder="새 생산 암호 (비우면 끄기)"><button class="btn" data-act="pinSave" data-i="line">저장</button></div>
+        <p class="muted" style="margin:10px 0 0">생산용 주소 = 지금 앱 주소 끝에 <b>?view=line</b> 을 붙인 주소. 받는분 전화·주소는 안 보이고, 주문 수정·삭제는 안 됩니다.</p></div>
       <p class="muted" style="margin-top:18px">써브텍 주문앱 <span id="ver"></span></p>
     </section>
   </main>
+</div>
+<div id="line" class="hidden">
+  <header><h1>써브텍 생산</h1><span class="st" id="lnSt"></span><button class="btn sm" data-act="lnReload" style="margin-left:auto;background:#fff;color:var(--ink)">새로고침</button></header>
+  <div class="lnbody" id="lnBody"><p class="muted">불러오는 중…</p></div>
+  <div class="lnnav"><button data-act="lnTab" data-i="today" class="on">오늘</button><button data-act="lnTab" data-i="next">다음</button><button data-act="lnTab" data-i="sum">만들 양</button></div>
 </div>
 <div id="toast" class="hidden"></div>
 <div id="shade" class="shade hidden"></div>
@@ -167,14 +196,14 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v4';
+var HTML_VERSION = 'v5';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 var toastT = 0;
 function notice(m, err) { var t = $('toast'); t.textContent = err ? ((m && m.message) || String(m)).replace(/^Error:\s*/, '') : m; t.className = err ? 'err' : ''; clearTimeout(toastT); toastT = setTimeout(function () { t.className = 'hidden'; }, err ? 6000 : 2600); }
-function status(m) { $('st').textContent = m; }
+function status(m) { $('st').textContent = m; if ($('lnSt')) $('lnSt').textContent = m; }
 
 /* ---------- 서버 ---------- */
 function call(fn, arg, ok, fail) {
@@ -184,10 +213,11 @@ function call(fn, arg, ok, fail) {
     status(''); ok && ok(r);
   }).withFailureHandler(function (e) { status(''); notice(e, 1); fail && fail(e); }).api(S.pin, fn, arg || {});
 }
-function askPin(then) { var p = prompt('접속 암호를 넣어주세요'); if (p == null) { status('암호가 필요합니다'); return; } S.pin = p; try { localStorage.setItem('so-pin', p); } catch (e) {} then(); }
+function askPin(then) { var p = prompt(S.role === 'line' ? '생산 암호를 넣어주세요' : '접속 암호를 넣어주세요'); if (p == null) { status('암호가 필요합니다'); return; } S.pin = p; try { localStorage.setItem('so-pin', p); } catch (e) {} then(); }
 function boot() {
   status('불러오는 중…');
   call('boot', {}, function (r) {
+    S.role = 'office'; S.pinOn = r.pinOn; S.linePinOn = r.linePinOn; renderPinState();
     S.orders = r.orders; S.custs = r.custs; S.items = r.items; S.sender = r.sender; S.today = r.today; S.histCount = r.histCount; S.addrHist = r.addrHist || {}; S.learn = r.learn || []; $('mMonth').value = S.today.slice(0, 7);
     $('ver').textContent = HTML_VERSION + (r.version !== HTML_VERSION ? ' (서버 ' + r.version + ' — 버전 불일치, 새로고침 해보세요)' : '');
     $('cDate').value = S.today; render(); status('');
@@ -237,6 +267,9 @@ function itemTag(o) {
   var miss = (o.items || []).map(function (i) { var m = String(i.name || '').match(/^[A-Za-z][A-Za-z0-9.\-]*\+?/); return m && /\d/.test(m[0]) && !S._itemSet[OP.norm(m[0])] && !S._itemSet[OP.norm(i.name)] ? m[0] : ''; }).filter(Boolean);
   return miss.length ? '<span class="tag">품목마스터에 없음: ' + esc(miss.join(', ')) + '</span>' : '';
 }
+function when(ts) { var d = String(ts || '').slice(0, 10); return d === S.today ? hm(ts) : OUT.md(d); }
+function lineTags(o) { if (o.st !== '대기') return ''; var noLabel = /^(직납|방문|퀵)$/.test(o.carrier || '');
+  return (o.ready ? '<span class="tag ok">준비완료 ✓ ' + esc(when(o.ready)) + '</span>' : '') + (o.tagged ? '<span class="tag ok">' + (noLabel ? '출고준비' : '송장부착') + ' ✓ ' + esc(when(o.tagged)) + '</span>' : ''); }
 function printedTag(o) { if (!o.printed || o.st === '취소') return ''; var d = String(o.printed).slice(0, 10); return '<span class="tag ok">송장출력 ✓ ' + esc(d === S.today ? hm(o.printed) : OUT.md(d)) + '</span>'; }
 function cardHTML(o, opt) {
   opt = opt || {}; var w = o.st === '대기' ? warns(o) : [], it = (o.items || []).map(function (i) { var n = OUT.noteOf(i); return esc(OUT.itemStr(i).replace(/\s{4}/g, '  ')) + (n ? ' <span class="muted">' + esc(n) + '</span>' : ''); }).join('\n');
@@ -244,7 +277,7 @@ function cardHTML(o, opt) {
   return '<div class="card tap' + (opt.off ? ' off' : '') + '" data-act="' + (opt.act || 'edit') + '" data-i="' + esc(opt.key) + '"><div class="top">' + (opt.check != null ? '<input type="checkbox" data-chk="' + esc(opt.key) + '"' + (opt.check ? ' checked' : '') + '>' : '') +
     '<div class="grow"><div class="cust">' + esc(o.cust || '(거래처 없음)') + '</div><div class="items">' + it + '</div>' +
     '<div class="meta">' + (o.ship ? '<span class="tag ship">' + esc(o.ship) + '</span>' : '') + (dueTxt(o) ? '<span class="tag">' + esc(dueTxt(o)) + '</span>' : '') +
-    (o.st === '출고완료' ? '<span class="tag ok">출고 ' + esc(OUT.md(o.shipped)) + '</span>' : '') + (o.st === '취소' ? '<span class="tag bad">취소</span>' : '') + itemTag(o) + printedTag(o) + (o.parent && o.st === '대기' ? '<span class="tag warn">잔량</span>' : '') +
+    (o.st === '출고완료' ? '<span class="tag ok">출고 ' + esc(OUT.md(o.shipped)) + '</span>' : '') + (o.st === '취소' ? '<span class="tag bad">취소</span>' : '') + itemTag(o) + printedTag(o) + lineTags(o) + (o.parent && o.st === '대기' ? '<span class="tag warn">잔량</span>' : '') +
     w.map(function (x) { return '<span class="tag warn">' + esc(x) + '</span>'; }).join('') + (o._auto && o._auto.length ? '<span class="tag">' + esc(o._auto.join(', ')) + '</span>' : '') +
     (to ? '<div>' + esc(to) + '</div>' : '') + (o.memo ? '<div>' + esc(o.memo) + '</div>' : '') + (opt.extra || '') + '</div></div></div></div>';
 }
@@ -513,14 +546,18 @@ function fallbackCopy(t) { var ta = document.createElement('textarea'); ta.value
 
 /* ---------- 4. 출하서 ---------- */
 var CSEL = {};
+// 출하서 체크: 사무실이 직접 누른 것(CSEL)이 우선, 아니면 기본값 = 송장부착(출고준비)된 것. 생산이 아직 아무것도 안 누른 날은 예전처럼 그날 송장 뽑은 것
+function closeChecked(o, d, lineUsed) { if (o.id in CSEL) return CSEL[o.id]; return lineUsed ? !!o.tagged : String(o.printed).slice(0, 10) === d; }
+function closeLineUsed() { return S.orders.some(function (o) { return o.st === '대기' && (o.ready || o.tagged); }); }
 function renderClose() {
+  var lineUsed = closeLineUsed();
   var d = $('cDate').value || S.today, wait = S.orders.filter(function (o) { return o.st === '대기'; }), done = S.orders.filter(function (o) { return o.st === '출고완료' && o.shipped === d; });
   wait.sort(function (a, b) { return String(a.at).localeCompare(String(b.at)); });
   $('cList').innerHTML = (done.length ? '<div class="sec">이미 출고완료 ' + done.length + '건</div>' + done.map(function (o) { return cardHTML(o, { key: o.id }); }).join('') : '') +
-    '<div class="sec">대기 중 ' + wait.length + '건 — 다 나간 것은 체크, 일부만 나갔거나 날짜가 다르면 버튼</div>' + (wait.length ? wait.map(function (o) { if (CSEL[o.id] == null) CSEL[o.id] = String(o.printed).slice(0, 10) === d; return cardHTML(o, { key: o.id, check: CSEL[o.id], act: 'none', extra: '<div style="margin-top:8px"><button class="btn sm" data-act="ship" data-i="' + esc(o.id) + '">일부 출고 · 다른 날짜</button></div>' }); }).join('') : '<p class="muted">대기 중인 주문이 없습니다.</p>');
+    '<div class="sec">대기 중 ' + wait.length + '건 — 다 나간 것은 체크, 일부만 나갔거나 날짜가 다르면 버튼</div>' + (wait.length ? wait.map(function (o) { return cardHTML(o, { key: o.id, check: closeChecked(o, d, lineUsed), act: 'none', extra: '<div style="margin-top:8px"><button class="btn sm" data-act="ship" data-i="' + esc(o.id) + '">일부 출고 · 다른 날짜</button></div>' }); }).join('') : '<p class="muted">대기 중인 주문이 없습니다.</p>');
 }
 function doClose() {
-  var d = $('cDate').value || S.today, ids = S.orders.filter(function (o) { return o.st === '대기' && CSEL[o.id]; }).map(function (o) { return o.id; });
+  var d = $('cDate').value || S.today, lu = closeLineUsed(), ids = S.orders.filter(function (o) { return o.st === '대기' && closeChecked(o, d, lu); }).map(function (o) { return o.id; });
   var left = S.orders.filter(function (o) { return o.st === '대기'; }).length - ids.length;
   if (!confirm(OUT.md(d) + ' 출하서를 만듭니다.\n· 출고완료로 바꿀 주문 ' + ids.length + '건\n· 대기로 남는 주문 ' + left + '건\n진행할까요?')) return;
   call('closeDay', { date: d, shippedIds: ids }, function (r) { mergeOrders(r.orders); CSEL = {}; reportFile(r.report); notice('출하서를 만들었습니다 (출고 ' + r.report.shipped.length + '건 · 대기 ' + r.report.pending.length + '건)'); render(); loadReports(); });
@@ -628,7 +665,14 @@ document.addEventListener('click', function (ev) {
   else if (a === 'custNew') openCust(null);
   else if (a === 'custEdit') openCust(S.custs.filter(function (x) { return x.row === +i; })[0]);
   else if (a === 'custSave') { var c2 = {}; CF.forEach(function (f) { c2[f[0]] = $('c-' + f[0]).value.trim(); }); call('custSave', { row: CE.row, cust: c2 }, function (r) { S.custs = r.custs; showSheet(false); notice('저장했습니다'); renderCusts(); }); }
-  else if (a === 'pinSave') { var np = $('pinNew').value.trim(); if (!confirm(np ? '접속 암호를 "' + np + '"(으)로 바꿉니다. 같이 쓰는 분들께 알려주세요.' : '접속 암호를 끕니다. 주소만 알면 누구나 열 수 있게 됩니다.')) return; call('setPin', { pin: np }, function () { S.pin = np; try { localStorage.setItem('so-pin', np); } catch (e) {} $('pinNew').value = ''; notice(np ? '암호를 설정했습니다' : '암호를 껐습니다'); }); }
+  else if (a === 'pinSave') { var line = i === 'line', np = $(line ? 'pinLine' : 'pinNew').value.trim(), nm = line ? '생산 암호' : '사무실 암호';
+    if (line && np && np === (S.pin || '')) { notice('생산 암호는 사무실 암호와 달라야 합니다', 1); return; }
+    if (!confirm(np ? nm + '를 "' + np + '"(으)로 바꿉니다. 쓰는 분들께 알려주세요.' : nm + '를 끕니다.' + (line ? '' : ' 주소만 알면 누구나 모든 기능을 쓸 수 있게 됩니다.'))) return;
+    call('setPin', { pin: np, kind: line ? 'line' : 'office' }, function () { if (!line) { S.pin = np; try { localStorage.setItem('so-pin', np); } catch (e) {} S.pinOn = !!np; } else S.linePinOn = !!np; $(line ? 'pinLine' : 'pinNew').value = ''; renderPinState(); notice(np ? nm + '를 설정했습니다' : nm + '를 껐습니다'); }); }
+  else if (a === 'lnTab') { LN.tab = i; renderLine(); window.scrollTo(0, 0); }
+  else if (a === 'lnReload') lineLoad();
+  else if (a === 'lnMark') lineMark(i, b.dataset.w);
+  else if (a === 'lnName') { var nn = prompt('이름 (버튼 누른 사람으로 남습니다)', LN.name || ''); if (nn != null) { LN.name = nn.trim(); try { localStorage.setItem('so-name', LN.name); } catch (e) {} renderLine(); } }
 });
 $('shade').addEventListener('click', function () { showSheet(false); });
 $('q').addEventListener('input', renderList);
@@ -638,7 +682,66 @@ $('imp').addEventListener('change', function () { if (this.files.length) doImpor
 document.addEventListener('input', function (ev) { if (ev.target.classList && ev.target.classList.contains('sq')) shipSync();
   if (ev.target.id === 'e-addr' && ED && $('e-saveAddrRow')) $('e-saveAddrRow').classList.toggle('hidden', !newAddr($('e-cust').value, ev.target.value)); });
 document.addEventListener('change', function (ev) { if (ev.target.classList && ev.target.classList.contains('sw')) { shipSync(); return; } if (ev.target.id === 'e-dueCal' && ED && ev.target.value) { readEdit(); ED.o.due = ev.target.value; drawEdit(); return; } if (ev.target.id === 'e-cust' && ED) { readEdit(); var had = ED.o.addr; enrich(ED.o); if (!had && ED.o.addr) notice('주소록에서 주소를 채웠습니다'); drawEdit(); } });
-boot();
+/* ---------- 생산 화면 (?view=line) ---------- */
+var LN = { tab: 'today', orders: [], at: 0, name: '' };
+try { LN.name = localStorage.getItem('so-name') || ''; } catch (e) {}
+function renderPinState() { var e = $('pinState'); if (!e) return;
+  e.innerHTML = '사무실 암호: <b>' + (S.pinOn ? '켜짐' : '꺼짐') + '</b> · 생산 암호: <b>' + (S.linePinOn ? '켜짐' : '꺼짐') + '</b>' + (!S.pinOn ? '<br>⚠️ 사무실 암호가 꺼져 있으면 생산 암호와 상관없이 주소만 알면 누구나 모든 기능을 쓸 수 있습니다.' : ''); }
+function lineLoad(quiet) {
+  if (!quiet) status('불러오는 중…');
+  call('lineBoot', {}, function (r) { LN.orders = r.orders; LN.at = Date.now(); S.today = r.today; status(''); renderLine();
+    if (r.version !== HTML_VERSION) status('새 버전 — 새로고침'); });
+}
+function lnStage(o) { return o.tagged ? 2 : o.ready ? 1 : 0; }
+function lnNoLabel(o) { return /^(직납|방문|퀵)$/.test(o.carrier || ''); }
+function lnSum(list) {   // 아직 안 만든(0단계) 주문의 품목 합계
+  var m = {}; list.filter(function (o) { return lnStage(o) === 0; }).forEach(function (o) { (o.items || []).forEach(function (i) {
+    var k = OP.norm(i.name) + '|' + (i.sensor || ''), x = m[k] || (m[k] = { name: i.name, sensor: i.sensor || '', q: 0, n: 0, unit: i.unit && i.unit !== '개' ? i.unit : '' }); x.q += +i.qty || 0; x.n++; }); });
+  return Object.keys(m).map(function (k) { return m[k]; }).sort(function (a, b) { return b.q - a.q; });
+}
+function lnSumHTML(title, list) { var s = lnSum(list); return '<div class="lnsum"><h3>' + esc(title) + '</h3>' + (s.length ? s.map(function (x) { return '<div class="r"><span>' + esc(x.name) + (x.sensor ? ' ' + esc(x.sensor) : '') + ' <span class="muted">' + x.n + '건</span></span><b>' + x.q + (x.unit || '') + '</b></div>'; }).join('') : '<span class="muted">남은 것 없음</span>') + '</div>'; }
+function lnCard(o) {
+  var st = lnStage(o), nl = lnNoLabel(o), it = (o.items || []).map(function (i) { var n = OUT.noteOf(i); return esc(i.name) + (i.sensor ? ' ' + esc(i.sensor) : '') + ' <span class="q">' + esc(i.qty === '' || i.qty == null ? '' : i.qty + (i.unit || '')) + '</span>' + (n ? ' <span class="muted">' + esc(n) + '</span>' : ''); }).join('<br>');
+  return '<div class="lncard s' + st + '"><div class="row"><div class="cu grow">' + esc(o.cust || '(거래처 없음)') + '</div>' + (o.ship ? '<span class="tag ship">' + esc(o.ship) + '</span>' : '') + '</div>' +
+    '<div class="it">' + it + '</div>' + (o.memo ? '<div class="muted">' + esc(o.memo) + '</div>' : '') +
+    '<div class="meta" style="margin-top:6px">' + (isDate(o.due) ? '<span class="tag">' + esc(o.due <= S.today ? '오늘' + (o.due < S.today ? ' (' + OUT.md(o.due) + ' 예정)' : '') : OUT.md(o.due)) + '</span>' : '<span class="tag">' + esc(o.due || '날짜 미정') + '</span>') + (o.parent ? '<span class="tag warn">잔량</span>' : '') + (o.printed && !nl ? '<span class="tag ok">송장출력 ✓</span>' : '') + '</div>' +
+    (o.ready || o.tagged ? '<div class="who">' + (o.ready ? '준비완료 ' + esc(when(o.ready)) + (o.readyBy ? ' ' + esc(o.readyBy) : '') : '') + (o.tagged ? ' · ' + (nl ? '출고준비 ' : '송장부착 ') + esc(when(o.tagged)) + (o.taggedBy ? ' ' + esc(o.taggedBy) : '') : '') + '</div>' : '') +
+    '<div class="lnbtns"><button data-act="lnMark" data-i="' + esc(o.id) + '" data-w="ready"' + (o.ready ? ' class="on"' : '') + '>' + (o.ready ? '✓ ' : '') + '준비완료</button>' +
+    '<button data-act="lnMark" data-i="' + esc(o.id) + '" data-w="tagged"' + (o.tagged ? ' class="on"' : '') + '>' + (o.tagged ? '✓ ' : '') + (nl ? '출고준비' : '송장부착') + '</button></div></div>';
+}
+function renderLine() {
+  Array.prototype.forEach.call(document.querySelectorAll('.lnnav button'), function (b) { b.classList.toggle('on', b.dataset.i === LN.tab); });
+  var all = LN.orders.slice().sort(function (a, b) { return (lnStage(a) - lnStage(b)) || (dueKey(a) + a.at).localeCompare(dueKey(b) + b.at); });
+  var today = all.filter(function (o) { return isDate(o.due) && o.due <= S.today; }), next = all.filter(function (o) { return !(isDate(o.due) && o.due <= S.today); });
+  var h = '<div class="row" style="margin-bottom:10px"><span class="muted grow">' + (LN.at ? '업데이트 ' + new Date(LN.at).toTimeString().slice(0, 5) : '') + '</span><button class="btn sm ghost" data-act="lnName">' + (LN.name ? esc(LN.name) + ' (바꾸기)' : '내 이름 정하기') + '</button></div>';
+  if (LN.tab === 'today') {
+    var left = today.filter(function (o) { return lnStage(o) < 2; }).length;
+    h += lnSumHTML('오늘 아직 만들 것', today) + '<div class="grp">오늘 출고 ' + today.length + '건 · 남은 일 ' + left + '건</div>' + (today.length ? today.map(lnCard).join('') : '<p class="muted">오늘 출고 예정이 없습니다.</p>');
+  } else if (LN.tab === 'next') {
+    var last = null; next.sort(function (a, b) { return (dueKey(a) + a.at).localeCompare(dueKey(b) + b.at) || (lnStage(a) - lnStage(b)); });
+    next.forEach(function (o) { var g = dueGroup(o); if (g !== last) { h += '<div class="grp">' + esc(g) + '</div>'; last = g; } h += lnCard(o); });
+    if (!next.length) h += '<p class="muted">다음 출고 예정이 없습니다.</p>';
+  } else h += lnSumHTML('오늘 아직 만들 것', today) + lnSumHTML('전체 대기 중 아직 만들 것 (내일 이후·날짜 미정 포함)', all);
+  $('lnBody').innerHTML = h;
+}
+function lineMark(id, w) {
+  var o = LN.orders.filter(function (x) { return x.id === id; })[0]; if (!o) return;
+  if (!LN.name) { var nn = prompt('처음 한 번만: 이름을 넣어주세요 (누른 사람으로 남습니다)'); if (nn == null) return; LN.name = nn.trim(); try { localStorage.setItem('so-name', LN.name); } catch (e) {} }
+  var on = !o[w];
+  if (!on && !confirm((w === 'ready' ? '준비완료' : (lnNoLabel(o) ? '출고준비' : '송장부착')) + '를 취소할까요?' + (w === 'ready' && o.tagged ? '\n(송장부착도 같이 취소됩니다)' : ''))) return;
+  call('lineMark', { id: id, what: w, on: on, by: LN.name }, function (r) { LN.orders = LN.orders.map(function (x) { return x.id === id ? r.order : x; }); renderLine(); notice(on ? '✓ ' + o.cust : '취소했습니다'); },
+    function () { lineLoad(true); });
+}
+function startLine() {
+  S.role = 'line'; $('app').classList.add('hidden'); $('line').classList.remove('hidden'); document.title = '써브텍 생산';
+  lineLoad();
+  setInterval(function () { if (document.visibilityState === 'visible' && Date.now() - LN.at > 110000) lineLoad(true); }, 30000);   // 화면이 켜져 있을 때만 2분마다
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && Date.now() - LN.at > 30000) lineLoad(true); });
+}
+// 주소에 ?view=line 이 있으면 생산 화면, 아니면 사무실 화면
+(function () { var go = function (p) { if (p && p.view === 'line') startLine(); else boot(); };
+  try { if (google.script.url && google.script.url.getLocation) { google.script.url.getLocation(function (loc) { go(loc && loc.parameter); }); return; } } catch (e) {}
+  go({}); })();
 </script>
 </body>
 </html>

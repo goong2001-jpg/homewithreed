@@ -26,7 +26,7 @@ ${fs.readFileSync(path.join(__dirname, 'fake-gas.js'), 'utf8').replace(/if \(typ
   ${rd('Code.gs')}
   function runner(ok, fail){ return { withSuccessHandler:function(f){ return runner(f, fail); }, withFailureHandler:function(f){ return runner(ok, f); },
     api:function(pin, fn, arg){ window.CALLS.push(fn); setTimeout(function(){ var r; try { r = JSON.parse(JSON.stringify(api(pin, fn, JSON.parse(JSON.stringify(arg || {}))))); } catch(e){ if (fail) fail(e); return; } if (ok) ok(r); }, 15); } }; }
-  window.google = { script: { get run(){ return runner(null, null); } } };
+  window.google = { script: { get run(){ return runner(null, null); }, url: { getLocation: function (cb) { var p = {}; new URLSearchParams(location.search).forEach(function (v, k) { p[k] = v; }); setTimeout(function () { cb({ parameter: p }); }, 5); } } } };
 })();
 </script>`;
 page = page.replace("<script>\nvar HTML_VERSION", () => mock + "\n<script>\nvar HTML_VERSION");

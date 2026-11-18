@@ -163,6 +163,42 @@ SV7 O 1000개 명판있슴
   ok(await page.locator('#custs .card').count() >= 1, '주소록 검색');
   ok(await page.evaluate(() => JSON.stringify(GAS.__tabs['거래로그'])) === '[["일시","품목ID"]]', '거래로그는 그대로');
   ok(errs.length === 0, '화면 오류 없음' + (errs.length ? ': ' + errs.join(' | ') : ''));
+  // v5: 사무실 화면에 생산 표시 + 출하서 미리 체크는 송장부착된 것
+  { const wid = await page.evaluate(() => S.orders.find(o => o.st === '대기').id);
+    await page.evaluate(id => new Promise(r => call('lineMark', { id, what: 'tagged', on: true, by: '홍길동' }, () => call('boot', {}, x => { S.orders = x.orders; render(); r(); }))), wid);
+    await page.click('#nav [data-v=list]');
+    ok(/준비완료 ✓/.test(await page.textContent('#orders')) && /(송장부착|출고준비) ✓/.test(await page.textContent('#orders')), '사무실 주문 목록에 준비완료·송장부착 표시');
+    await page.click('#nav [data-v=close]'); await page.waitForFunction(() => document.querySelectorAll('#cList .card').length > 0);
+    ok(await page.evaluate(id => { const lu = closeLineUsed(), d = $('cDate').value; return S.orders.filter(o => o.st === '대기' && closeChecked(o, d, lu)).map(o => o.id).join() === id; }, wid) && await page.locator('#cList input:checked').count() === 1, '출하서: 송장부착된 주문만 미리 체크 (먼저 열어 봤어도 반영)'); }
+  // v5: 생산 화면 (?view=line)
+  { const lp = await ctx.newPage(); const lerr = []; lp.on('pageerror', e => lerr.push(e.message));
+    lp.on('dialog', d => d.type() === 'prompt' ? d.accept('홍길동') : d.accept());
+    await lp.goto(URL + '?view=line'); await lp.waitForFunction(() => S.role === 'line' && document.getElementById('lnSt').textContent === '');
+    await lp.evaluate(() => new Promise(r => call('saveOrders', { orders: [
+      { cust: '가나보일러', items: [{ name: 'SV7', sensor: 'X', qty: 50, unit: '', note: '스티커 있음' }, { name: '파워코드 2C', sensor: '', qty: 50, unit: '개', note: '' }], carrier: 'CJ', ship: '택배선불', due: S.today, recv: '김비밀', phone: '010-9999-0000', addr: '서울 비밀구 비밀로 1', memo: '명판있음' },
+      { cust: '다라난방', items: [{ name: 'H10 7단계', sensor: 'X', qty: 30, unit: '', note: '' }], carrier: '직납', ship: '직납', due: S.today },
+      { cust: '마바전기', items: [{ name: 'SV7', sensor: 'X', qty: 20, unit: '', note: '' }], carrier: '경동', ship: '경동택배선불', due: addDay(S.today, 1) }] }, () => { lineLoad(true); r(); })));
+    await lp.waitForFunction(() => document.querySelectorAll('#lnBody .lncard').length === 2);
+    const body = await lp.textContent('#lnBody');
+    ok(await lp.locator('#app').isHidden() && /오늘 아직 만들 것/.test(body) && /SV7 X/.test(body) && /50/.test(body), '생산 화면: 사무실 메뉴 없이 오늘 출고 2건 + 아직 만들 양');
+    ok(!/김비밀|010-9999|비밀구/.test(await lp.content()), '받는분·전화·주소는 화면 어디에도 없음');
+    ok(await lp.locator('.lncard').nth(1).locator('[data-w=tagged]').textContent() === '출고준비' || /출고준비/.test(body), '직납은 "출고준비" 버튼');
+    await lp.locator('.lncard').first().locator('[data-w=ready]').click();
+    await lp.waitForFunction(() => LN.orders.some(o => o.ready && o.readyBy === '홍길동'));
+    ok(true, '준비완료 (처음 한 번 이름 묻고 기억)');
+    await lp.screenshot({ path: path.join(OUT, '11-line.png'), fullPage: true });
+    const firstCust = await lp.locator('.lncard').first().locator('.cu').textContent();
+    await lp.locator('.lncard').filter({ hasText: '가나보일러' }).locator('[data-w=tagged]').click();
+    await lp.waitForFunction(() => LN.orders.some(o => o.cust === '가나보일러' && o.tagged));
+    ok(await lp.locator('.lncard').last().locator('.cu').textContent() === '가나보일러' && await lp.locator('.lncard.s2').count() === 1, '송장부착한 주문은 흐리게 맨 아래로');
+    await lp.click('.lnnav [data-i=next]'); ok(/내일/.test(await lp.textContent('#lnBody')) && /마바전기/.test(await lp.textContent('#lnBody')), '다음 탭: 내일 출고');
+    await lp.click('.lnnav [data-i=sum]'); ok(/전체 대기 중 아직 만들 것/.test(await lp.textContent('#lnBody')), '만들 양 탭');
+    await lp.click('.lnnav [data-i=today]');
+    await lp.locator('.lncard').filter({ hasText: '가나보일러' }).locator('[data-w=ready]').click();
+    await lp.waitForFunction(() => LN.orders.some(o => o.cust === '가나보일러' && !o.ready && !o.tagged));
+    ok(true, '준비완료 취소 → 송장부착도 같이 취소');
+    ok(lerr.length === 0, '생산 화면 오류 없음' + (lerr.length ? ': ' + lerr.join(' | ') : ''));
+    await lp.close(); }
   // PC 화면
   const pc = await browser.newPage({ viewport: { width: 1280, height: 800 } }); await pc.goto(URL); await pc.waitForFunction(() => document.getElementById('st').textContent === '');
   await pc.fill('#paste', PASTE); await pc.click('[data-act=parse]'); await pc.screenshot({ path: path.join(OUT, '6-pc.png') });
