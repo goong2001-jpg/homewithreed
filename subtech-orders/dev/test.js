@@ -283,7 +283,17 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
     api('deleteOrders', { ids: [p1.id, p2.id] });
     ok(JSON.stringify([master, log]) === keep, '품목마스터·거래로그는 그대로 (v5 뒤에도)'); }
 
-  console.log('10) 템플릿·버전');
+  console.log('10) v13: 오래된 주문 찾기');
+  { const o9 = api('saveOrders', { orders: [Object.assign({}, A, { id: undefined, cust: '옛날보일러', box: [] })] }).orders[0];
+    api('shipOrder', { id: o9.id, date: '2026-09-01', lines: [] });
+    ok(!api('boot').orders.some(o => o.id === o9.id), '21일보다 전에 끝난 주문은 처음 화면에 안 옴');
+    const r = api('searchOld', { q: '옛날 STT' });
+    ok(r.orders.length === 1 && r.orders[0].id === o9.id && r.more === false, '오래된 주문 찾기: 낱말 모두 들어간 것 (옛날 + STT)');
+    ok(api('searchOld', { q: '옛날 없는말' }).orders.length === 0 && api('searchOld', { q: '가나상사' }).orders.every(o => o.id !== o9.id), '안 맞으면 안 나옴 · 화면에 이미 있는 주문은 빼고');
+    throws(() => api('searchOld', { q: ' ' }), '빈 검색 거절');
+    api('deleteOrders', { ids: [o9.id] }); }
+
+  console.log('11) 템플릿·버전');
   const idx = fs.readFileSync(path.join(D, 'Index.html'), 'utf8'), tags = idx.match(/<\?[\s\S]*?\?>/g) || [];
   ok((idx.match(/<\?/g) || []).length === 3 && tags.join() === "<?!= inc('Parse') ?>,<?!= inc('Xlsx') ?>,<?!= inc('Out') ?>", 'Index.html 의 <? ?> 는 끼워넣기 3개뿐 (다른 곳에 있으면 앱이 안 열림)');
   const av = (fs.readFileSync(path.join(D, 'Code.gs'), 'utf8').match(/var APP_VERSION = '([^']+)'/) || [])[1], hv = (idx.match(/var HTML_VERSION = '([^']+)'/) || [])[1];

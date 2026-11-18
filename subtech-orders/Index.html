@@ -44,14 +44,23 @@ textarea,input[type=text],input[type=tel],input[type=number],input[type=date],in
 textarea{min-height:150px;resize:vertical;line-height:1.5}
 input:focus,textarea:focus,select:focus{outline:2px solid var(--pri);outline-offset:-1px}
 label.f{display:block;font-size:12px;color:var(--sub);margin:10px 0 4px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 13px;margin-bottom:9px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:8px 11px;margin-bottom:7px}
 .card.tap{cursor:pointer}
 .card.off{opacity:.55}
 .card .top{display:flex;gap:8px;align-items:flex-start}
-.card .cust{font-weight:700;font-size:16px;word-break:keep-all}
-.card .items{margin:5px 0 0;font-size:14px;white-space:pre-wrap;word-break:break-word}
-.card .meta{margin-top:6px;font-size:13px;color:var(--sub);word-break:break-word}
-.tag{display:inline-block;font-size:12px;font-weight:700;border-radius:5px;padding:1px 7px;background:var(--chip);color:var(--ink);margin:0 4px 3px 0;white-space:nowrap}
+.card .cust{font-weight:700;font-size:15px;word-break:keep-all;line-height:1.3}
+.card .items{margin:3px 0 0;font-size:13.5px;line-height:1.4;white-space:pre-wrap;word-break:break-word}
+.card .meta{margin-top:4px;font-size:12.5px;line-height:1.45;color:var(--sub);word-break:break-word}
+.card .to,.card .mm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .top input[type=checkbox]{width:20px;height:20px}
+@media(min-width:900px){
+  main{max-width:1700px}
+  .cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:7px;align-items:start}
+  .cgrid>.card{margin:0}
+  .cgrid>*:not(.card){grid-column:1/-1}
+  #v-new textarea,#v-new>.row,#v-new>p,#v-new>h2{max-width:1080px}
+}
+.tag{display:inline-block;font-size:12px;font-weight:700;border-radius:5px;padding:0 6px;background:var(--chip);color:var(--ink);margin:0 4px 3px 0;white-space:nowrap}
 .tag.ship{background:#E3ECF5;color:#1D3F66}
 .tag.ok{background:#E0F0E6;color:var(--ok)}
 .tag.warn{background:#FBEBCB;color:var(--warn)}
@@ -164,12 +173,12 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
         <button class="btn pri grow" data-act="parse">나누기</button>
         <button class="btn" data-act="manual">직접 입력</button>
       </div>
-      <div id="drafts" style="margin-top:14px"></div>
+      <div class="cgrid" id="drafts" style="margin-top:14px"></div>
     </section>
     <section id="v-list" class="hidden">
       <div class="chips" id="fChips"></div>
-      <div class="row" style="margin:10px 0"><input type="text" id="q" class="grow" placeholder="거래처·품목·받는분 검색"><button class="btn" data-act="lPick" id="lPickBtn">고르기</button></div>
-      <div id="orders"></div>
+      <div class="row" style="margin:10px 0"><input type="text" id="q" class="grow" placeholder="검색: 거래처·받는분·품목·주소·전화 (띄어 쓰면 모두 포함)"><select id="lSort" style="width:auto" aria-label="정렬"><option value="auto">기본 정렬</option><option value="new">최신 접수순</option><option value="old">오래된 접수순</option><option value="cust">거래처 이름순</option></select><button class="btn" data-act="lPick" id="lPickBtn">고르기</button></div>
+      <div class="cgrid" id="orders"></div>
       <div class="bar hidden" id="lBar"><button class="btn danger grow" data-act="lDel">고른 것 삭제</button><button class="btn" data-act="lCancel">고른 것 취소</button><button class="btn ghost" data-act="lPick">닫기</button></div>
     </section>
     <section id="v-print" class="hidden">
@@ -177,13 +186,13 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
       <div class="chips" id="pChips"></div>
       <p class="muted" id="pHelp" style="margin:10px 0 8px"></p>
       <div class="row hidden" id="pSel" style="margin:0 0 8px"><span class="muted grow" id="pSelN"></span><button class="btn sm" data-act="pSelAll" data-i="1">전체 선택</button><button class="btn sm" data-act="pSelAll" data-i="0">전체 해제</button></div>
-      <div id="pList"></div>
+      <div class="cgrid" id="pList"></div>
       <div class="bar"><button class="btn pri grow" data-act="pXlsx">엑셀 받기</button><button class="btn" data-act="pCopy">복사</button></div>
     </section>
     <section id="v-close" class="hidden">
       <h2>출하서 (하루 마감)</h2>
       <div class="row"><input type="date" id="cDate" style="max-width:180px"><span class="muted">그날 나간 주문에 체크하세요. 체크 안 한 주문은 대기로 남습니다.</span></div>
-      <div id="cList" style="margin-top:12px"></div>
+      <div class="cgrid" id="cList" style="margin-top:12px"></div>
       <div class="bar"><button class="btn pri grow" data-act="closeDay">마감하고 하루 파일 받기</button></div>
       <p class="muted" style="margin:4px 0 0">하루 파일 = 엑셀 1개에 출하서 · CJ · 경동 · 대신 · 직납·방문 · 미출고 탭</p>
       <div class="sec">월 파일 (11월.xlsx 처럼 날짜별 출하서 + 거래처별·품목별 합계)</div>
@@ -225,7 +234,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v12';
+var HTML_VERSION = 'v13';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -309,7 +318,7 @@ function cardHTML(o, opt) {
     '<div class="meta">' + (o.ship ? '<span class="tag ship ' + carClass(o.carrier) + '">' + esc(o.ship) + '</span>' : '') + (dueTxt(o) ? '<span class="tag">' + esc(dueTxt(o)) + '</span>' : '') +
     (o.st === '출고완료' ? '<span class="tag ok">출고 ' + esc(OUT.md(o.shipped)) + '</span>' : '') + (o.st === '취소' ? '<span class="tag bad">취소</span>' : '') + itemTag(o) + printedTag(o) + lineTags(o) + (o.parent && o.st === '대기' ? '<span class="tag warn">잔량</span>' : '') +
     w.map(function (x) { return '<span class="tag warn">' + esc(x) + '</span>'; }).join('') + (o._auto && o._auto.length ? '<span class="tag">' + esc(o._auto.join(', ')) + '</span>' : '') +
-    (to ? '<div>' + esc(to) + '</div>' : '') + (o.memo ? '<div>' + esc(o.memo) + '</div>' : '') + (opt.extra || '') + '</div></div></div></div>';
+    (to ? '<div class="to" title="' + esc(to) + '">' + esc(to) + '</div>' : '') + (o.memo ? '<div class="mm" title="' + esc(o.memo) + '">' + esc(o.memo) + '</div>' : '') + (opt.extra || '') + '</div></div></div></div>';
 }
 
 /* ---------- 화면 전환 ---------- */
@@ -493,20 +502,32 @@ function shipSave() {
 }
 
 /* ---------- 2. 주문 목록 ---------- */
-var FILT = [['wait', '대기'], ['today', '오늘 접수'], ['done', '출고완료'], ['cancel', '취소']];
+var FILT = [['wait', '대기'], ['today', '오늘 접수'], ['done', '출고완료'], ['cancel', '취소'], ['all', '전체']];
+function lTerms() { return ($('q').value || '').trim().split(/\s+/).map(OP.norm).filter(Boolean); }
+function lHit(o, t) { if (!t.length) return true; var x = OP.norm([o.cust, o.recv, o.addr, o.phone, o.phone2, o.memo, o.msg, o.ship, o.branch, carName(o.carrier), OUT.itemText(o, ' '), (o.items || []).map(function (i) { return i.note || ''; }).join(' ')].join(' ')); return t.every(function (w) { return x.indexOf(w) >= 0; }); }
+function dayLabel(d) { d = String(d || '').slice(0, 10); if (!d) return '날짜 없음'; if (d === S.today) return '오늘 (' + OUT.md(d) + ')'; if (d === addDay(S.today, -1)) return '어제 (' + OUT.md(d) + ')'; return OUT.md(d) + (d.slice(0, 4) !== S.today.slice(0, 4) ? ' ' + d.slice(0, 4) : ''); }
 function renderList() {
   $('fChips').innerHTML = FILT.map(function (f) { return '<button data-act="filt" data-i="' + f[0] + '"' + (S.filter === f[0] ? ' class="on"' : '') + '>' + f[1] + '</button>'; }).join('');
-  var q = OP.norm($('q').value), list = S.orders.filter(function (o) {
+  var t = lTerms(), list = S.orders.filter(function (o) {
     if (S.filter === 'wait' && o.st !== '대기') return false; if (S.filter === 'done' && o.st !== '출고완료') return false; if (S.filter === 'cancel' && o.st !== '취소') return false;
     if (S.filter === 'today' && String(o.at).slice(0, 10) !== S.today) return false;
-    return !q || OP.norm([o.cust, o.recv, o.addr, o.memo, OUT.itemText(o, ' ')].join(' ')).indexOf(q) >= 0;
+    return lHit(o, t);
   });
-  list.sort(function (a, b) { return S.filter === 'done' ? (b.shipped + b.upd).localeCompare(a.shipped + a.upd) : (dueKey(a) + a.at).localeCompare(dueKey(b) + b.at); });
+  // 정렬·묶음: 기본 = 대기는 출고 예정, 출고완료는 출고일(최근 먼저), 그 밖은 접수일(최근 먼저)
+  var mode = $('lSort').value, key, grp;
+  if (mode === 'auto') mode = S.filter === 'wait' ? 'due' : S.filter === 'done' ? 'ship' : 'new';
+  if (mode === 'due') { key = function (o) { return dueKey(o) + o.at; }; grp = dueGroup; }
+  else if (mode === 'ship') { key = function (o) { return o.shipped + o.upd; }; grp = function (o) { return '출고 ' + dayLabel(o.shipped); }; }
+  else if (mode === 'cust') { key = function (o) { return String(o.cust); }; grp = null; }
+  else { key = function (o) { return String(o.at); }; grp = function (o) { return '접수 ' + dayLabel(o.at); }; }
+  var desc = mode === 'ship' || mode === 'new';
+  list.sort(function (a, b) { var r = String(key(a)).localeCompare(String(key(b)), 'ko'); return desc ? -r : r; });
   $('lBar').classList.toggle('hidden', !LPICK); $('lPickBtn').textContent = LPICK ? '고르기 끝' : '고르기';
   var card = function (o) { return cardHTML(o, LPICK ? { key: o.id, check: !!LSEL[o.id], act: 'none' } : { key: o.id }); }, h = '', last = null;
-  if (S.filter === 'wait') list.forEach(function (o) { var g = dueGroup(o); if (g !== last) { var n = list.filter(function (x) { return dueGroup(x) === g; }).length; h += '<div class="grp">' + esc(g) + ' ' + n + '건</div>'; last = g; } h += card(o); });
+  if (grp) list.forEach(function (o) { var g = grp(o); if (g !== last) { var n = list.filter(function (x) { return grp(x) === g; }).length; h += '<div class="grp">' + esc(g) + ' ' + n + '건</div>'; last = g; } h += card(o); });
   else h = list.map(card).join('');
-  $('orders').innerHTML = list.length ? '<p class="muted" style="margin:0 0 8px">' + list.length + '건' + (LPICK ? ' · 지울 것을 체크하세요' : '') + '</p>' + h : '<p class="muted">주문이 없습니다.</p>';
+  var old = t.length && S.filter !== 'wait' && S.filter !== 'today' ? '<div class="row" style="margin:10px 0"><span class="muted grow">화면에는 대기 주문과 최근 21일 안에 끝난 주문만 있습니다.</span><button class="btn sm" data-act="lOld">더 오래된 주문에서도 찾기</button></div>' : '';
+  $('orders').innerHTML = (list.length ? '<p class="muted" style="margin:0 0 6px">' + list.length + '건' + (LPICK ? ' · 지울 것을 체크하세요' : '') + '</p>' + h : '<p class="muted">주문이 없습니다.</p>') + old;
 }
 var LPICK = false, LSEL = {};
 // 출고 예정 묶음: 지난·오늘 / 내일 / 이번 주 / 그 뒤 / 날짜 미정
@@ -738,12 +759,14 @@ document.addEventListener('click', function (ev) {
   else if (a === 'pSelAll') { readBoxes(); pOrders().forEach(function (o) { PSEL[o.id] = i === '1'; }); renderPrint(); }
   else if (a === 'cAll') { S.orders.forEach(function (o) { if (o.st === '대기') CSEL[o.id] = i === '1'; }); renderClose(); }
   else if (a === 'cGrp') { var gi = CGR[+i] || [], dd = $('cDate').value || S.today, lu2 = closeLineUsed(), allOn = gi.every(function (id) { return closeChecked(byId(id), dd, lu2); }); gi.forEach(function (id) { CSEL[id] = !allOn; }); renderClose(); }
+  else if (a === 'lOld') { var qq = $('q').value.trim(); call('searchOld', { q: qq }, function (r) { mergeOrders(r.orders); notice(r.orders.length ? '오래된 주문 ' + r.orders.length + '건을 불러왔습니다' + (r.more ? ' (앞의 100건만)' : '') : '더 오래된 주문 중에는 없습니다'); if (r.orders.length && S.filter === 'wait') S.filter = 'all'; renderList(); }); }
   else if (a === 'lnQClear') { $('lnQ').value = ''; renderLine(); $('lnQ').focus(); }
   else if (a === 'lnMark') lineMark(i, b.dataset.w);
   else if (a === 'lnName') { var nn = prompt('이름 (버튼 누른 사람으로 남습니다)', LN.name || ''); if (nn != null) { LN.name = nn.trim(); try { localStorage.setItem('so-name', LN.name); } catch (e) {} renderLine(); } }
 });
 $('shade').addEventListener('click', function () { showSheet(false); });
 $('q').addEventListener('input', renderList);
+$('lSort').addEventListener('change', renderList);
 $('cq').addEventListener('input', renderCusts);
 $('cDate').addEventListener('change', function () { CSEL = {}; renderClose(); });
 $('imp').addEventListener('change', function () { if (this.files.length) doImport(Array.prototype.slice.call(this.files)); this.value = ''; });

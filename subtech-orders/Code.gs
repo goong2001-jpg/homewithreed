@@ -4,7 +4,7 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v12';
+var APP_VERSION = 'v13';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
 var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록', DEL: '주문_삭제기록', LRN: '주문_학습' };
@@ -303,6 +303,14 @@ var API = {
       sh.getRange(sh.getLastRow() + 1, 1, 1, 3).setValues([[key, String(a.pin || ''), key === '생산암호' ? '생산 화면(?view=line)용 암호. 보기·준비완료·송장부착만 됨' : '']]); return { ok: true }; });
   },
 
+  // 오래된 주문 찾기: 화면에 없는 것(21일보다 전에 끝난 주문) 중 낱말이 모두 들어간 것, 최근 것부터 100건
+  searchOld: function (a) {
+    var t = String(a.q || '').split(/\s+/).map(nz_).filter(Boolean); if (!t.length) throw new Error('찾을 말을 넣어주세요');
+    var all = allOrders_(), shown = {}; recent_(all).forEach(function (o) { shown[o.id] = 1; });
+    var hit = all.filter(function (o) { if (shown[o.id]) return false; var x = nz_([o.cust, o.recv, o.addr, o.phone, o.memo, o.ship, itemsText_(o.items)].join(' ')); return t.every(function (w) { return x.indexOf(w) >= 0; }); })
+      .sort(function (x, y) { return String(y.shipped || y.at).localeCompare(String(x.shipped || x.at)); });
+    return { orders: hit.slice(0, 100), more: hit.length > 100 };
+  },
   ver: function () { return { version: APP_VERSION }; },   // 화면이 새 버전인지 확인용 (가벼움)
 
   /* ----- 생산 화면 ----- */

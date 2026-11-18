@@ -258,6 +258,21 @@ SV7 O 1000개 명판있슴
   const pc = await browser.newPage({ viewport: { width: 1280, height: 800 } }); await pc.goto(URL); await pc.waitForFunction(() => document.getElementById('st').textContent === '');
   await pc.fill('#paste', PASTE); await pc.click('[data-act=parse]'); await pc.screenshot({ path: path.join(OUT, '6-pc.png') });
   ok(await pc.locator('#drafts .card').count() === 4, 'PC 화면에서도 동작');
+  // v13: PC 주문 목록 — 여러 칸 · 검색 · 정렬 · 전체
+  await pc.click('[data-act=draftSave]'); await pc.waitForFunction(() => S.orders.length === 4);
+  await pc.click('#nav [data-v=list]');
+  const cols = await pc.evaluate(() => getComputedStyle(document.getElementById('orders')).gridTemplateColumns.split(' ').length);
+  ok(cols >= 3, 'PC 주문 목록: 카드 ' + cols + '칸으로 한눈에');
+  await pc.fill('#q', '가나 STT'); ok(await pc.locator('#orders .card').count() === 1 && /가나하우징/.test(await pc.textContent('#orders')), '검색: 낱말 여러 개 (가나 STT) → 1건');
+  await pc.fill('#q', '8453'); ok(await pc.locator('#orders .card').count() === 1, '검색: 전화번호 일부로도');
+  await pc.fill('#q', '');
+  await pc.selectOption('#lSort', 'new'); ok(/^접수 오늘/.test(await pc.locator('#orders .grp').first().textContent()), '최신 접수순 → 접수일로 묶음');
+  await pc.selectOption('#lSort', 'cust'); const names = await pc.locator('#orders .cust').allTextContents(); ok(names.join() === names.slice().sort((a, b) => a.localeCompare(b, 'ko')).join() && await pc.locator('#orders .grp').count() === 0, '거래처 이름순');
+  await pc.selectOption('#lSort', 'auto'); await pc.click('[data-act=filt][data-i=all]'); ok(await pc.locator('#orders .card').count() === 4, '전체 탭');
+  await pc.click('[data-act=filt][data-i=done]'); await pc.fill('#q', '없는거래처'); ok(await pc.locator('[data-act=lOld]').count() === 1, '출고완료 검색 → "더 오래된 주문에서도 찾기" 버튼');
+  await pc.click('[data-act=lOld]'); await pc.waitForFunction(() => /더 오래된 주문 중에는 없습니다/.test(document.getElementById('toast').textContent)); ok(true, '오래된 주문 찾기 (서버)');
+  await pc.fill('#q', ''); await pc.click('[data-act=filt][data-i=wait]');
+  await pc.screenshot({ path: path.join(OUT, '18-pc-list.png') });
   await browser.close(); server.close();
   console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과'); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
