@@ -145,7 +145,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
   <main>
     <section id="v-new">
       <h2>카톡 발주 붙여넣기</h2>
-      <p class="muted" style="margin:0 0 8px">카톡 메시지를 복사해서 붙여넣으세요. 여러 건을 한꺼번에 넣어도 됩니다.</p>
+      <p class="muted" style="margin:0 0 8px">카톡을 붙여넣고 <b>나누기</b> → 칸이 비워지면 다음 카톡을 붙여넣고 또 나누기. 결과는 아래에 쌓이고, 다 모으면 한 번에 저장하세요. (여러 건을 한꺼번에 붙여넣어도 됩니다)</p>
       <textarea id="paste" placeholder="예)&#10;드림온 발주&#10;&#10;SV7 - 30개&#10;STT-1.3 - 10개&#10;&#10;광주광역시 북구 서암대로86&#10;나예원대리 010-0000-0000"></textarea>
       <div class="row" style="margin-top:8px">
         <button class="btn pri grow" data-act="parse">나누기</button>
@@ -210,7 +210,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v7';
+var HTML_VERSION = 'v8';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -233,6 +233,7 @@ function boot() {
   call('boot', {}, function (r) {
     S.role = 'office'; S.pinOn = r.pinOn; S.linePinOn = r.linePinOn; renderPinState();
     S.orders = r.orders; S.custs = r.custs; S.items = r.items; S.sender = r.sender; S.today = r.today; S.histCount = r.histCount; S.addrHist = r.addrHist || {}; S.learn = r.learn || []; $('mMonth').value = S.today.slice(0, 7);
+    if (!S.drafts.length) { try { var kd = JSON.parse(localStorage.getItem('so-drafts') || '[]'); if (kd.length) { S.drafts = kd; notice('저장 안 한 나눈 결과 ' + kd.length + '건을 다시 불러왔습니다'); } } catch (e) {} }
     $('ver').textContent = HTML_VERSION + (r.version !== HTML_VERSION ? ' (서버 ' + r.version + ' — 버전 불일치, 새로고침 해보세요)' : '');
     $('cDate').value = S.today; render(); status('');
     if (r.histCount) call('recData', {}, function (x) { S.rec = OP.buildRec(x.hist); if (S.view === 'print') renderPrint(); status(''); });
@@ -309,15 +310,25 @@ function go(v) { S.view = v; render(); window.scrollTo(0, 0); if (v === 'close')
 /* ---------- 1. 새 주문 ---------- */
 function doParse() {
   var txt = $('paste').value; if (!txt.trim()) { notice('붙여넣은 내용이 없습니다'); return; }
-  var msgs = OP.splitMessages(txt), n = 0;
-  S.drafts = msgs.map(function (m) {
+  var msgs = OP.splitMessages(txt), n = 0, dup = 0, start = S.drafts.length;
+  var seen = {}; S.drafts.forEach(function (o) { seen[OP.norm(o.raw)] = 1; });
+  var add = msgs.map(function (m) {
     var o = OP.parseOrder(m.body, { today: S.today, custs: S.custs, learn: S.learn }); o.who = m.who || ''; o.at = m.date && m.time ? m.date + ' ' + m.time + ':00' : '';
     if (!o.isOrder) return null; o.ship = o.shipRaw; delete o.shipRaw; delete o.isOrder; o.box = []; o.st = '대기'; o.stmt = ''; o.tax = ''; o.senderAddr = '';
-    enrich(o); o._on = !!o.cust; n++; return o;
+    if (seen[OP.norm(o.raw)]) { dup++; return null; }   // 이미 나눈 메시지는 또 안 넣음
+    seen[OP.norm(o.raw)] = 1; enrich(o); o._on = !!o.cust; n++; return o;
   }).filter(Boolean);
-  if (!n) notice('발주로 보이는 메시지를 찾지 못했습니다. "직접 입력"을 써보세요.');
+  // v8: 나눈 결과는 아래에 계속 쌓임 → 카톡을 하나씩 붙여넣고 나누기를 반복한 뒤 한 번에 저장
+  S.drafts = S.drafts.concat(add);
+  if (n) $('paste').value = '';   // 다음 카톡을 바로 붙여넣을 수 있게 비움 (원문은 각 주문에 남아 있음)
+  if (!n) notice(dup ? '이미 나눈 메시지입니다 (' + dup + '건)' : '발주로 보이는 메시지를 찾지 못했습니다. "직접 입력"을 써보세요.');
+  else notice(n + '건 추가 · 모두 ' + S.drafts.length + '건' + (dup ? ' (이미 나눈 ' + dup + '건 건너뜀)' : '') + ' — 다음 카톡을 붙여넣으세요');
   renderDrafts();
+  if (n && start) { var c = document.querySelectorAll('#drafts .card')[start]; if (c) c.scrollIntoView({ block: 'center' }); }
+  else $('paste').focus();
 }
+// 나눈 결과(아직 저장 안 함)를 폰·PC에 보관 → 새로고침하거나 창을 닫아도 남음
+function keepDrafts() { try { if (S.drafts.length) localStorage.setItem('so-drafts', JSON.stringify(S.drafts)); else localStorage.removeItem('so-drafts'); } catch (e) {} }
 // 처음 보는 옵션 단어 물어보기 → 답은 학습(주문_학습)에 남아 다음부터 자동
 function askHTML(o, di) {
   var h = '';
@@ -334,6 +345,7 @@ function askOpt(key, to) {
   call('learnSave', { rows: [{ kind: 'opt', from: w, to: to }] }, function (r) { S.learn = r.learn; notice('기억했습니다: 「' + w + '」 → ' + (to === 'item' ? '따로 품목' : '메모')); });
 }
 function renderDrafts() {
+  keepDrafts();
   var d = S.drafts, on = d.filter(function (o) { return o._on; }).length;
   $('drafts').innerHTML = !d.length ? '' : '<div class="row" style="margin-bottom:8px"><b class="grow">나눈 결과 ' + d.length + '건</b><span class="muted">눌러서 고치기</span></div>' +
     d.map(function (o, i) { return cardHTML(o, { key: i, act: 'draftEdit', check: o._on, off: !o._on, extra: askHTML(o, i) }); }).join('') +

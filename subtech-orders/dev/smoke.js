@@ -208,6 +208,19 @@ SV7 O 1000개 명판있슴
     ok(true, '준비완료 취소 → 송장부착도 같이 취소');
     ok(lerr.length === 0, '생산 화면 오류 없음' + (lerr.length ? ': ' + lerr.join(' | ') : ''));
     await lp.close(); }
+  // v8: 카톡을 하나씩 붙여넣고 나누기 → 아래에 쌓임 → 한 번에 저장 (새로고침해도 남음)
+  { await page.click('#nav [data-v=new]'); if (await page.locator('[data-act=draftClear]').count()) await page.click('[data-act=draftClear]');
+    await page.fill('#paste', '토브에너지\n\nH200WF-W     X     5\n\n대신화물\n인천구월점'); await page.click('[data-act=parse]');
+    ok(await page.inputValue('#paste') === '' && await page.locator('#drafts .card').count() === 1, '나누기 → 결과 1건, 붙여넣기 칸 자동으로 비움');
+    await page.fill('#paste', '가나상사\nSTT-1.3 30\n택배선불'); await page.click('[data-act=parse]');
+    ok(await page.locator('#drafts .card').count() === 2 && /2건/.test(await page.textContent('[data-act=draftSave]')), '다음 카톡 나누기 → 아래에 쌓여서 2건');
+    await page.fill('#paste', '토브에너지\n\nH200WF-W     X     5\n\n대신화물\n인천구월점'); await page.click('[data-act=parse]');
+    ok(await page.locator('#drafts .card').count() === 2 && /이미 나눈/.test(await page.textContent('#toast')), '같은 카톡을 또 넣으면 건너뜀');
+    await page.reload(); await page.waitForFunction(() => document.getElementById('st').textContent === '' && S.drafts.length === 2);
+    ok(await page.locator('#drafts .card').count() === 2, '새로고침해도 나눈 결과 2건이 남음');
+    await page.click('[data-act=draftSave]'); await page.waitForFunction(() => !S.drafts.length);
+    ok(await page.evaluate(() => S.orders.length === 2 && GAS.__tabs['주문'].length === 3) && await page.evaluate(() => localStorage.getItem('so-drafts')) === null,   // 새로고침으로 가짜 시트가 처음 상태라 정확히 2건
+       '한 번에 2건 저장, 임시 보관 비움'); }
   // PC 화면
   const pc = await browser.newPage({ viewport: { width: 1280, height: 800 } }); await pc.goto(URL); await pc.waitForFunction(() => document.getElementById('st').textContent === '');
   await pc.fill('#paste', PASTE); await pc.click('[data-act=parse]'); await pc.screenshot({ path: path.join(OUT, '6-pc.png') });
