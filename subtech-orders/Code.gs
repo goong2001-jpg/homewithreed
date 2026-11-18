@@ -4,7 +4,7 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v14';
+var APP_VERSION = 'v15';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
 var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록', DEL: '주문_삭제기록', LRN: '주문_학습' };
@@ -140,6 +140,13 @@ var API = {
   },
 
   // 하루 마감(출하서): 나간 주문을 출고완료로, 그날 나간 것·남은 것을 출하기록에 남김. {date, shippedIds}
+  // 출하서 확인용: 아무것도 안 바꾸고 지금 상태로 출하서 내용만 만듦 {date, ids:[체크한 대기 주문]} — 실무자가 중간중간 확인할 때 (v15)
+  dayPreview: function (a) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(a.date || '')) throw new Error('날짜가 올바르지 않습니다');
+    var ids = a.ids || [], all = allOrders_();
+    var shipped = all.filter(function (o) { return (o.st === '출고완료' && o.shipped === a.date) || (o.st === '대기' && ids.indexOf(o.id) >= 0); }).map(function (o) { var x = snap_(o); if (o.st === '대기') x.shipped = a.date; return x; });
+    return { report: { date: a.date, made: now_(), preview: true, shipped: shipped, pending: all.filter(function (o) { return o.st === '대기' && ids.indexOf(o.id) < 0; }).map(snap_) } };
+  },
   closeDay: function (a) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(a.date || '')) throw new Error('날짜가 올바르지 않습니다');
     return lock_(function () {

@@ -193,10 +193,10 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
     </section>
     <section id="v-close" class="hidden">
       <h2>출하서 (하루 마감)</h2>
-      <div class="row"><input type="date" id="cDate" style="max-width:180px"><span class="muted">그날 나간 주문에 체크하세요. 체크 안 한 주문은 대기로 남습니다.</span></div>
+      <div class="row"><input type="date" id="cDate" style="max-width:180px"><span class="muted">실제로 나간 주문만 체크하세요. 체크 안 한 주문은 대기로 남습니다. (자동으로 체크되지 않습니다)</span></div>
       <div class="cgrid" id="cList" style="margin-top:12px"></div>
-      <div class="bar"><button class="btn pri grow" data-act="closeDay">마감하고 하루 파일 받기</button></div>
-      <p class="muted" style="margin:4px 0 0">하루 파일 = 엑셀 1개에 출하서 · CJ · 경동 · 대신 · 직납·방문 · 미출고 탭</p>
+      <div class="bar"><button class="btn" data-act="dayPreview">출하서 확인용 받기</button><button class="btn pri grow" data-act="closeDay">체크한 0건 출고 처리</button></div>
+      <p class="muted" style="margin:4px 0 0"><b>확인용 받기</b> = 지금 상태 그대로 엑셀만 받기 (주문 안 넘어감, 중간중간 확인용) · <b>출고 처리</b> = 체크한 것만 출고완료로 넘기고 하루 파일 받기. 엑셀 1개에 출하서 · CJ · 경동 · 대신 · 직납·방문 · 미출고 탭</p>
       <div class="sec">월 파일 (11월.xlsx 처럼 날짜별 출하서 + 거래처별·품목별 합계)</div>
       <div class="row"><input type="month" id="mMonth" style="max-width:180px"><button class="btn" data-act="monthGet">월 파일 받기</button></div>
       <div class="sec">지난 하루 파일 (눌러서 다시 받기)</div>
@@ -236,7 +236,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v14';
+var HTML_VERSION = 'v15';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -634,7 +634,7 @@ function fallbackCopy(t) { var ta = document.createElement('textarea'); ta.value
 var CSEL = {};
 // 출하서 체크: 사무실이 직접 누른 것(CSEL)이 우선, 아니면 기본값 = 송장부착(출고준비)된 것. 생산이 아직 아무것도 안 누른 날은 예전처럼 그날 송장 뽑은 것
 function closeFuture(o, d) { return isDate(o.due) && o.due > d; }   // 고른 날짜보다 뒤에 나갈 주문
-function closeChecked(o, d, lineUsed) { if (o.id in CSEL) return CSEL[o.id]; if (closeFuture(o, d)) return false; return lineUsed ? !!o.tagged : String(o.printed).slice(0, 10) === d; }
+function closeChecked(o, d, lineUsed) { return !!CSEL[o.id]; }   // v15: 자동 체크 없음 — 담당자가 직접 체크해야 출고 처리됨
 function closeLineUsed() { return S.orders.some(function (o) { return o.st === '대기' && (o.ready || o.tagged); }); }
 var CGR = [];   // 출하서 대기 묶음별 주문 ID (묶음 모두 체크용)
 function renderClose() {
@@ -643,7 +643,7 @@ function renderClose() {
   wait.sort(function (a, b) { return (dueKey(a) + a.at).localeCompare(dueKey(b) + b.at); });
   var h = '<div class="today" id="cSum"></div>';
   if (done.length) h += '<div class="sec">이미 출고완료 ' + done.length + '건</div>' + done.map(function (o) { return cardHTML(o, { key: o.id }); }).join('');
-  h += '<div class="row" style="margin:16px 0 4px"><b class="grow">대기 중 ' + wait.length + '건</b>' + (wait.length ? '<button class="btn sm" data-act="cAll" data-i="1">전체 선택</button><button class="btn sm" data-act="cAll" data-i="0">전체 해제</button>' : '') + '</div>' +
+  h += '<div class="row" style="margin:16px 0 4px"><b class="grow">대기 중 ' + wait.length + '건</b>' + (wait.length ? '<button class="btn sm" data-act="cQuick" data-i="tag">송장부착된 것 체크</button><button class="btn sm" data-act="cQuick" data-i="print">오늘 송장 뽑은 것 체크</button><button class="btn sm" data-act="cAll" data-i="1">전체 선택</button><button class="btn sm" data-act="cAll" data-i="0">전체 해제</button>' : '') + '</div>' +
     '<p class="muted" style="margin:0 0 6px">다 나간 것은 체크, 일부만 나갔거나 날짜가 다르면 버튼. 출고 예정별로 묶여 있고, 출고 예정이 고른 날짜보다 뒤인 주문은 전체 선택에서 빠집니다.</p>';
   CGR = []; var last = null;
   wait.forEach(function (o) {
@@ -660,14 +660,15 @@ function closeSum() {
   var d = $('cDate').value || S.today, lu = closeLineUsed(), list = S.orders.filter(function (o) { return (o.st === '출고완료' && o.shipped === d) || (o.st === '대기' && closeChecked(o, d, lu)); }), q = 0, acc = 0;
   list.forEach(function (o) { (o.items || []).forEach(function (i) { var n = +i.qty || 0; if ((i.unit && i.unit !== '개') || OP.isAcc(i.name)) acc += n; else q += n; }); });
   if ($('cSum')) $('cSum').innerHTML = '<span class="muted">' + esc(OUT.md(d)) + ' 출하 (출고완료 + 체크한 것)</span><br><b style="font-size:18px">' + list.length + '건 · 수량 합계 ' + q.toLocaleString() + '개</b>' + (acc ? ' <span class="muted">· 부자재 ' + acc.toLocaleString() + '개 별도</span>' : '');
-  var bt = document.querySelector('[data-act="closeDay"]'); if (bt) bt.textContent = '마감하고 하루 파일 받기 (' + list.length + '건)';
+  var nck = S.orders.filter(function (o) { return o.st === '대기' && CSEL[o.id]; }).length, bt = document.querySelector('[data-act="closeDay"]'); if (bt) { bt.textContent = '체크한 ' + nck + '건 출고 처리'; bt.disabled = !nck; }
 }
 function doClose() {
   var d = $('cDate').value || S.today, lu = closeLineUsed(), ids = S.orders.filter(function (o) { return o.st === '대기' && closeChecked(o, d, lu); }).map(function (o) { return o.id; });
   var left = S.orders.filter(function (o) { return o.st === '대기'; }).length - ids.length;
   var fut = ids.map(byId).filter(function (o) { return closeFuture(o, d); });
   if (fut.length && !confirm('⚠️ 출고 예정이 ' + OUT.md(d) + '보다 뒤인 주문 ' + fut.length + '건이 체크돼 있습니다.\n' + fut.slice(0, 5).map(function (o) { return '· ' + o.cust + ' (' + OUT.md(o.due) + ' 예정)'; }).join('\n') + '\n이 주문도 ' + OUT.md(d) + ' 출고로 처리할까요?\n(아니면 취소 누르고 체크를 빼세요)')) return;
-  if (!confirm(OUT.md(d) + ' 출하서를 만듭니다.\n· 출고완료로 바꿀 주문 ' + ids.length + '건\n· 대기로 남는 주문 ' + left + '건\n진행할까요?')) return;
+  if (!ids.length) { notice('출고 처리할 주문을 체크하세요', 1); return; }
+  if (!confirm('체크한 ' + ids.length + '건을 ' + OUT.md(d) + ' 출고완료로 넘깁니다.\n· 대기로 남는 주문 ' + left + '건\n(확인만 하려면 취소 누르고 "출하서 확인용 받기"를 쓰세요)\n진행할까요?')) return;
   call('closeDay', { date: d, shippedIds: ids }, function (r) { mergeOrders(r.orders); CSEL = {}; reportFile(r.report); notice('출하서를 만들었습니다 (출고 ' + r.report.shipped.length + '건 · 대기 ' + r.report.pending.length + '건)'); render(); loadReports(); });
 }
 function reportFile(snap) { var out = OUT.day(snap, S.sender, OP.isAcc); download(XL.build(out.sheets), out.name); }
@@ -786,6 +787,9 @@ document.addEventListener('click', function (ev) {
   else if (a === 'lnReload') lineLoad();
   else if (a === 'lnToSum') { ev.preventDefault(); var sm = document.querySelector('#lnBody .lnsum'); if (sm) sm.scrollIntoView({ block: 'start' }); }
   else if (a === 'pSelAll') { readBoxes(); pOrders().forEach(function (o) { PSEL[o.id] = i === '1'; }); renderPrint(); }
+  else if (a === 'cQuick') { var dq = $('cDate').value || S.today, nq = 0; S.orders.forEach(function (o) { if (o.st !== '대기' || closeFuture(o, dq)) return; if (i === 'tag' ? o.tagged : String(o.printed).slice(0, 10) === dq) { CSEL[o.id] = true; nq++; } }); renderClose(); notice(nq ? nq + '건 체크했습니다 (이미 체크한 것은 그대로)' : (i === 'tag' ? '송장부착된 대기 주문이 없습니다' : '그날 송장 뽑은 대기 주문이 없습니다')); }
+  else if (a === 'dayPreview') { var dp = $('cDate').value || S.today, pid = S.orders.filter(function (o) { return o.st === '대기' && CSEL[o.id]; }).map(function (o) { return o.id; });
+    call('dayPreview', { date: dp, ids: pid }, function (r) { reportFile(r.report); notice('확인용 출하서를 받았습니다 (주문은 그대로입니다)'); }); }
   else if (a === 'cAll') { var dA = $('cDate').value || S.today, skip = 0; S.orders.forEach(function (o) { if (o.st !== '대기') return; if (i === '1' && closeFuture(o, dA)) { CSEL[o.id] = false; skip++; return; } CSEL[o.id] = i === '1'; }); renderClose(); if (skip) notice('출고 예정이 ' + OUT.md(dA) + ' 뒤인 ' + skip + '건은 빼고 체크했습니다'); }
   else if (a === 'cGrp') { var gi = CGR[+i] || [], dd = $('cDate').value || S.today, lu2 = closeLineUsed(), allOn = gi.every(function (id) { return closeChecked(byId(id), dd, lu2); }); gi.forEach(function (id) { CSEL[id] = !allOn; }); renderClose(); }
   else if (a === 'lOld') { var qq = $('q').value.trim(); call('searchOld', { q: qq }, function (r) { mergeOrders(r.orders); notice(r.orders.length ? '오래된 주문 ' + r.orders.length + '건을 불러왔습니다' + (r.more ? ' (앞의 100건만)' : '') : '더 오래된 주문 중에는 없습니다'); if (r.orders.length && S.filter === 'wait') S.filter = 'all'; renderList(); }); }

@@ -74,17 +74,23 @@ SV7 O 1000개 명판있슴
   ok(await page.locator('#pList .card').count() === 0 && await page.evaluate(() => GAS.__tabs['주문_송장기록'].length) >= 8, '뽑은 주문은 목록에서 빠지고 송장기록에 남음');
   // 출하서
   await page.click('#nav [data-v=close]'); await page.waitForFunction(() => document.querySelectorAll('#cList .card').length === 4);
-  ok(await page.locator('#cList input:checked').count() === 2, '출하서: 오늘 송장 뽑은 2건이 미리 체크됨');
+  ok(await page.locator('#cList input:checked').count() === 0 && await page.locator('[data-act=closeDay]').isDisabled(), '출하서: 자동으로 체크되지 않음 (출고 처리 버튼 꺼짐)');
+  await page.click('[data-act=cQuick][data-i=print]');
+  ok(await page.locator('#cList input:checked').count() === 2 && /체크한 2건 출고 처리/.test(await page.textContent('[data-act=closeDay]')), '"오늘 송장 뽑은 것 체크" → 2건');
+  { const [dp] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=dayPreview]')]); await dp.saveAs(path.join(OUT, 'preview.xlsx'));
+    const b = fs.readFileSync(path.join(OUT, 'preview.xlsx')), R = await XLr.read(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+    ok(/^출하서확인_/.test(await page.evaluate(() => NAMES[NAMES.length - 1])) && /확인용 · 출고 처리 전/.test(R['출하서'][0][0]) && R['CJ'].length === 3 && await page.evaluate(() => S.orders.filter(o => o.st === '대기').length) === 4 && await page.evaluate(() => GAS.__tabs['주문_출하기록'] === undefined || GAS.__tabs['주문_출하기록'].length <= 1),
+      '확인용 받기: 체크한 2건이 출고로 들어간 엑셀, 주문은 4건 그대로 대기 · 출하기록 안 남김'); }
   await page.screenshot({ path: path.join(OUT, '5-close.png'), fullPage: true });
   const [dl2] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=closeDay]')]);
   const f2 = path.join(OUT, 'chulha.xlsx'); await dl2.saveAs(f2);
   await page.waitForFunction(() => S.orders.filter(o => o.st === '출고완료').length === 2);
-  ok(/^하루마감_\d{4}-\d{2}-\d{2}\.xlsx$/.test(await page.evaluate(() => NAMES[1])) && await page.evaluate(() => GAS.__tabs['주문_출하기록'].length) === 2, '마감 → 하루 파일 + 출하기록 1줄, 2건 출고완료·2건 대기');
+  ok(/^하루마감_\d{4}-\d{2}-\d{2}\.xlsx$/.test(await page.evaluate(() => NAMES[NAMES.length - 1])) && await page.evaluate(() => GAS.__tabs['주문_출하기록'].length) === 2, '마감 → 하루 파일 + 출하기록 1줄, 2건 출고완료·2건 대기');
   { const b = fs.readFileSync(f2), R = await XLr.read(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
     ok(JSON.stringify(Object.keys(R)) === JSON.stringify(['출하서', 'CJ', '미출고']) && R['CJ'][0][0] === '보내는분성명' && R['CJ'].length === 3, '하루 파일 탭: 출하서 · CJ(2건) · 미출고'); }
   { const [dm] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=monthGet]')]); const fm = path.join(OUT, 'month.xlsx'); await dm.saveAs(fm);
     const b = fs.readFileSync(fm), R = await XLr.read(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)), ks = Object.keys(R);
-    ok(ks[0] === '거래처별' && ks[1] === '품목별' && ks[2] === '출고목록' && /월 \d+일$/.test(ks[3]) && await page.evaluate(() => /월_출고현황\.xlsx$/.test(NAMES[2])), '월 파일: 거래처별·품목별·출고목록 + 날짜별 출하서'); }
+    ok(ks[0] === '거래처별' && ks[1] === '품목별' && ks[2] === '출고목록' && /월 \d+일$/.test(ks[3]) && await page.evaluate(() => /월_출고현황\.xlsx$/.test(NAMES[NAMES.length - 1])), '월 파일: 거래처별·품목별·출고목록 + 날짜별 출하서'); }
   await page.waitForFunction(() => /출고 2건/.test(document.getElementById('rList').textContent));
   ok(true, '지난 출하서 목록에 표시');
   // v2: 오늘 송장 수량
@@ -164,12 +170,14 @@ SV7 O 1000개 명판있슴
   ok(await page.evaluate(() => JSON.stringify(GAS.__tabs['거래로그'])) === '[["일시","품목ID"]]', '거래로그는 그대로');
   ok(errs.length === 0, '화면 오류 없음' + (errs.length ? ': ' + errs.join(' | ') : ''));
   // v5: 사무실 화면에 생산 표시 + 출하서 미리 체크는 송장부착된 것
-  { const wid = await page.evaluate(() => S.orders.find(o => o.st === '대기').id);
+  { await page.evaluate(() => { CSEL = {}; }); const wid = await page.evaluate(() => S.orders.find(o => o.st === '대기').id);
     await page.evaluate(id => new Promise(r => call('lineMark', { id, what: 'tagged', on: true, by: '홍길동' }, () => call('boot', {}, x => { S.orders = x.orders; render(); r(); }))), wid);
     await page.click('#nav [data-v=list]');
     ok(/준비완료 ✓/.test(await page.textContent('#orders')) && /(송장부착|출고준비) ✓/.test(await page.textContent('#orders')), '사무실 주문 목록에 준비완료·송장부착 표시');
     await page.click('#nav [data-v=close]'); await page.waitForFunction(() => document.querySelectorAll('#cList .card').length > 0);
-    ok(await page.evaluate(id => { const lu = closeLineUsed(), d = $('cDate').value; return S.orders.filter(o => o.st === '대기' && closeChecked(o, d, lu)).map(o => o.id).join() === id; }, wid) && await page.locator('#cList input:checked').count() === 1, '출하서: 송장부착된 주문만 미리 체크 (먼저 열어 봤어도 반영)'); }
+    ok(await page.locator('#cList input:checked').count() === 0, '출하서: 송장부착돼도 자동 체크 안 됨');
+    await page.click('[data-act=cQuick][data-i=tag]');
+    ok(await page.evaluate(id => S.orders.filter(o => o.st === '대기' && CSEL[o.id]).map(o => o.id).join() === id, wid) && await page.locator('#cList input:checked').count() === 1, '"송장부착된 것 체크" → 송장부착된 1건만'); await page.click('[data-act=cAll][data-i="0"]'); }
   // v5: 생산 화면 (?view=line)
   { const lp = await ctx.newPage(); const lerr = []; lp.on('pageerror', e => lerr.push(e.message));
     lp.on('dialog', d => d.type() === 'prompt' ? d.accept('홍길동') : d.accept());
@@ -241,7 +249,7 @@ SV7 O 1000개 명판있슴
     const grps = await page.locator('#cList .grp').allTextContents();
     ok(grps.length === 3 && /^오늘/.test(grps[0]) && /^내일/.test(grps[1]) && /^날짜 미정/.test(grps[2]), '출하서 대기 목록: 오늘 / 내일 / 날짜 미정으로 묶임');
     await page.click('[data-act=cAll][data-i="1"]');
-    ok(await page.locator('#cList input:checked').count() === 3 && /3건 · 수량 합계 55개/.test(await page.textContent('#cSum')) && /\(3건\)/.test(await page.textContent('[data-act=closeDay]')) && /뒤인 1건은 빼고/.test(await page.textContent('#toast')), '전체 선택 → 내일 예정 1건은 빼고 3건 · 수량 합계 55개, 마감 버튼에 건수');
+    ok(await page.locator('#cList input:checked').count() === 3 && /3건 · 수량 합계 55개/.test(await page.textContent('#cSum')) && /체크한 3건 출고 처리/.test(await page.textContent('[data-act=closeDay]')) && /뒤인 1건은 빼고/.test(await page.textContent('#toast')), '전체 선택 → 내일 예정 1건은 빼고 3건 · 수량 합계 55개, 마감 버튼에 건수');
     await page.locator('#cList input[type=checkbox]').first().uncheck();
     ok(/2건 · 수량 합계/.test(await page.textContent('#cSum')), '하나 빼면 합계 바로 바뀜');
     { const msgs = []; const h = d => msgs.push(d.message()); page.on('dialog', h);

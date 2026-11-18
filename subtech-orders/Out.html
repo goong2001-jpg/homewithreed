@@ -75,7 +75,7 @@ var OUT = (function () {
   function report(snap, isAcc) {
     isAcc = isAcc || function () { return false; };
     var rows = [], merges = [[0, 0, 0, 10]], sum = [0, 0];
-    rows.push(hd([snap.date.replace(/-/g, '/') + '-출고현황', '', '', '', '', '', '', '', '', '', ''], 3));
+    rows.push(hd([snap.date.replace(/-/g, '/') + '-출고현황' + (snap.preview ? ' (확인용 · 출고 처리 전)' : ''), '', '', '', '', '', '', '', '', '', ''], 3));
     rows.push(hd(RP_H, 1));
     // 같은 거래처 주문은 한 번호로 묶음 (예: 와이코퍼레이션 직송 여러 건 → 적요에 "직송 1 / 문 앞", 받는분·배송방법은 주문마다)
     // 대기 쪽은 거래처 + 출고 예정이 같을 때만 묶음
@@ -126,7 +126,7 @@ var OUT = (function () {
     if (etc.length) out.push(listSheet('직납·방문 등', etc, 'shipped', isAcc));
     if ((snap.pending || []).length) out.push(listSheet('미출고', snap.pending, 'due', isAcc));
     var cnt = {}; sh.forEach(function (o) { var k = o.carrier || '기타'; cnt[k] = (cnt[k] || 0) + 1; });
-    return { name: '하루마감_' + snap.date, sheets: out, count: cnt };
+    return { name: (snap.preview ? '출하서확인_' : '하루마감_') + snap.date, sheets: out, count: cnt };
   }
 
   /* ----- 월 파일: 거래처별 · 품목별 · 출고목록 + 날짜별 출하서 탭 (11월.xlsx 처럼 최근 날짜가 앞) ----- */

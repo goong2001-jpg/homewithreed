@@ -310,7 +310,17 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
     ok(api('boot').orders.find(o => o.id === q2.id).due === '2026-11-25', '  (위 실패 뒤 그대로)');
     api('deleteOrders', { ids: [q1.id, q2.id] }); }
 
-  console.log('12) 템플릿·버전');
+  console.log('12) v15: 출하서 확인용 (아무것도 안 바꿈)');
+  { const [w1, w2] = api('saveOrders', { orders: [Object.assign({}, B, { id: undefined, cust: '확인1' }), Object.assign({}, B, { id: undefined, cust: '확인2' })] }).orders;
+    const before = JSON.stringify([gas.__tabs['주문'], gas.__tabs['주문_출하기록']]);
+    const r = api('dayPreview', { date: '2026-11-21', ids: [w1.id] }).report;
+    ok(r.preview && r.shipped.some(o => o.id === w1.id && o.shipped === '2026-11-21') && r.pending.some(o => o.id === w2.id) && !r.pending.some(o => o.id === w1.id), '확인용: 체크한 것은 출고 쪽, 나머지는 대기 쪽');
+    ok(JSON.stringify([gas.__tabs['주문'], gas.__tabs['주문_출하기록']]) === before, '확인용: 주문·출하기록 시트는 한 글자도 안 바뀜');
+    ok(/확인용 · 출고 처리 전/.test(OUT.report(r, OP.isAcc).sheets[0].rows[0][0].v) && /^출하서확인_/.test(OUT.day(r, def, OP.isAcc).name), '확인용 엑셀: 제목에 "확인용 · 출고 처리 전", 파일 이름 출하서확인_');
+    throws(() => api('dayPreview', { date: 'x' }), '날짜 형식 거절');
+    api('deleteOrders', { ids: [w1.id, w2.id] }); }
+
+  console.log('13) 템플릿·버전');
   const idx = fs.readFileSync(path.join(D, 'Index.html'), 'utf8'), tags = idx.match(/<\?[\s\S]*?\?>/g) || [];
   ok((idx.match(/<\?/g) || []).length === 3 && tags.join() === "<?!= inc('Parse') ?>,<?!= inc('Xlsx') ?>,<?!= inc('Out') ?>", 'Index.html 의 <? ?> 는 끼워넣기 3개뿐 (다른 곳에 있으면 앱이 안 열림)');
   const av = (fs.readFileSync(path.join(D, 'Code.gs'), 'utf8').match(/var APP_VERSION = '([^']+)'/) || [])[1], hv = (idx.match(/var HTML_VERSION = '([^']+)'/) || [])[1];
