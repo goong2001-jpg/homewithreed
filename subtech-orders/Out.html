@@ -70,6 +70,8 @@ var OUT = (function () {
   /* ----- 출하서 (출고현황) : 위 = 그날 나간 것, 합계, 아래 = 못 나간 것(대기) ----- */
   var RP_H = ['no.', '일자-No.', '거래처명', '품목명[규격]', '센서', '수량', '적요', '받는분', '배송방법', '거래명세서', '계산서 발행 여부'];
   function qtyCell(i, isAcc) { if (i.qty === '' || i.qty == null) return ''; return (i.unit && i.unit !== '개') || isAcc(i.name) ? i.qty + (i.unit || '개') : +i.qty; }
+  // 품목 적요: 품목 메모 + 일부 출고면 '주문 120 중 60 출고 (자재부족)'
+  function noteOf(i) { return [i.note, i.ord && +i.ord !== +i.qty ? '주문 ' + i.ord + ' 중 ' + i.qty + ' 출고' + (i.why ? ' (' + i.why + ')' : '') : ''].filter(Boolean).join(' / '); }
   function report(snap, isAcc) {
     isAcc = isAcc || function () { return false; };
     var rows = [], merges = [[0, 0, 0, 10]], sum = [0, 0];
@@ -77,7 +79,7 @@ var OUT = (function () {
     rows.push(hd(RP_H, 1));
     function block(list, which, numbered) {
       list.forEach(function (o, n) {
-        var its = o.items && o.items.length ? o.items : [{ name: '', sensor: '', qty: '', unit: '', note: '' }], r0 = rows.length, anyNote = its.some(function (i) { return i.note; });
+        var its = (o.items && o.items.length ? o.items : [{ name: '', sensor: '', qty: '', unit: '', note: '' }]).map(function (i) { return Object.assign({}, i, { note: noteOf(i) }); }), r0 = rows.length, anyNote = its.some(function (i) { return i.note; });
         var to = [o.recv, o.phone].filter(Boolean).join(' / '), recv = [to, o.addr].filter(Boolean).join(' ') || (o.branch || '');
         its.forEach(function (i, k) {
           var q = qtyCell(i, isAcc); if (typeof q === 'number') sum[which] += q;
@@ -135,7 +137,7 @@ var OUT = (function () {
     return { custs: custs, hist: hist, what: what };
   }
 
-  return { cj: cj, kd: kd, ds: ds, report: report, importBook: importBook, itemText: itemText, itemStr: itemStr, recvName: recvName, isDirect: isDirect, md: md, tsv: tsv };
+  return { cj: cj, kd: kd, ds: ds, report: report, noteOf: noteOf, importBook: importBook, itemText: itemText, itemStr: itemStr, recvName: recvName, isDirect: isDirect, md: md, tsv: tsv };
 })();
 if (typeof module !== 'undefined') module.exports = OUT;
 </script>

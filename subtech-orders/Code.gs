@@ -4,17 +4,19 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v1';
+var APP_VERSION = 'v2';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
-var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록' };
-var OWN = [T.ORD, T.CUST, T.HIST, T.SET, T.RPT];   // 이 앱이 쓰는 탭 (이 밖의 탭엔 쓰지 않는다)
+var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록', DEL: '주문_삭제기록' };
+var OWN = [T.ORD, T.CUST, T.HIST, T.SET, T.RPT, T.DEL];
+var DH = ['삭제일시', '주문ID', '거래처', '품목', '내용'];   // 삭제기록: 내용 = 주문 줄 전체(JSON). 30일 지나면 지움
+var KEEP_DAYS = 30;   // 이 앱이 쓰는 탭 (이 밖의 탭엔 쓰지 않는다)
 
 // 주문 탭 열 (순서 바꾸지 말 것 — 뒤에 덧붙이기만)
 var OH = ['주문ID', '접수일시', '상태', '출고예정', '거래처', '품목', '적요', '받는분', '전화', '전화2', '주소', '배송방법', '운송', '운임구분', '청구',
-  '영업소', '보내는분', '보내는분전화', '보내는분주소', '배송메시지', '박스', '송장출력일시', '출고일', '거래명세서', '계산서', '올린사람', '원문', '품목JSON', '재고차감', '수정일시', '운송방식'];
+  '영업소', '보내는분', '보내는분전화', '보내는분주소', '배송메시지', '박스', '송장출력일시', '출고일', '거래명세서', '계산서', '올린사람', '원문', '품목JSON', '재고차감', '수정일시', '운송방식', '원주문'];
 var OK_ = ['id', 'at', 'st', 'due', 'cust', 'itemsText', 'memo', 'recv', 'phone', 'phone2', 'addr', 'ship', 'carrier', 'pay', 'claim',
-  'branch', 'sender', 'senderPhone', 'senderAddr', 'msg', 'box', 'printed', 'shipped', 'stmt', 'tax', 'who', 'raw', 'items', 'stock', 'upd', 'mode'];
+  'branch', 'sender', 'senderPhone', 'senderAddr', 'msg', 'box', 'printed', 'shipped', 'stmt', 'tax', 'who', 'raw', 'items', 'stock', 'upd', 'mode', 'parent'];
 var CH = ['거래처명', '전화', '전화2', '주소', '경동영업소', '대신영업소', '기본배송', '보내는분', '보내는분전화', '보내는분주소', '거래명세서', '계산서', '메모', '수정일시'];
 var CK_ = ['name', 'phone', 'phone2', 'addr', 'kd', 'ds', 'ship', 'sender', 'senderPhone', 'senderAddr', 'stmt', 'tax', 'memo', 'upd'];
 var HH = ['일자', '운송', '받는분', '품목', '박스수', '박스타입', '운임', '출처'];
@@ -89,13 +91,13 @@ var API = {
   saveOrders: function (a) {
     var list = a.orders || []; if (!list.length) throw new Error('저장할 주문이 없습니다');
     return lock_(function () {
-      var sh = sheet_(T.ORD, OH), n = sh.getLastRow(), ids = n < 2 ? [] : sh.getRange(2, 1, n - 1, 1).getValues().map(function (r) { return str_(r[0]); });
+      var sh = sheet_(T.ORD, OH), n = sh.getLastRow(), ids = n < 2 ? [] : sh.getRange(2, 1, n - 1, 1).getValues().map(function (r) { return str_(r[0]); }), used = ids.concat(deletedIds_());
       var stamp = now_(), base = Utilities.formatDate(new Date(), TZ, 'yyMMdd-HHmmss'), add = [], out = [];
       list.forEach(function (o, i) {
         if (!o.items || !o.items.length) throw new Error('품목이 없는 주문이 있습니다' + (o.cust ? ': ' + o.cust : ''));
         o.upd = stamp;
         if (o.id) { var k = ids.indexOf(o.id); if (k < 0) throw new Error('주문을 찾을 수 없습니다: ' + o.id); sh.getRange(k + 2, 1, 1, OH.length).setValues([toRow_(o)]); }
-        else { o.id = 'O' + base + '-' + (i + 1); o.at = o.at || stamp; o.st = o.st || '대기'; add.push(toRow_(o)); }
+        else { var j = 1; while (used.indexOf('O' + base + '-' + j) >= 0) j++; o.id = 'O' + base + '-' + j; used.push(o.id); o.at = o.at || stamp; o.st = o.st || '대기'; add.push(toRow_(o)); }   // 같은 초에 저장해도 ID가 겹치지 않게
         out.push(o);
       });
       if (add.length) sh.getRange(sh.getLastRow() + 1, 1, add.length, OH.length).setValues(add);
@@ -143,6 +145,78 @@ var API = {
     throw new Error('그 날짜의 출하 기록이 없습니다');
   },
 
+  // 출고 기록 (일부 출고·날짜): {id, date, lines:[{k:품목번호, qty:실제 출고, why:사유}], rest:'keep'|'drop'}
+  //  · 주문 줄은 '나간 만큼'으로 바뀌고 출고완료(출고일=date). 품목마다 ord(주문 수량)·why(사유)를 남김 → 출하서 적요
+  //  · 덜 나간 수량은 rest='keep' 이면 잔량 주문(대기, 원주문=id)으로 새로 만듦, 'drop' 이면 안 만듦
+  shipOrder: function (a) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(a.date || '')) throw new Error('출고 날짜가 올바르지 않습니다');
+    return lock_(function () {
+      var sh = sheet_(T.ORD, OH), n = sh.getLastRow(), v = n < 2 ? [] : sh.getRange(2, 1, n - 1, OH.length).getValues(), k = -1, ids = {};
+      v.forEach(function (r, i) { var id = str_(r[0]); ids[id] = 1; if (id === a.id) k = i; }); deletedIds_().forEach(function (id) { ids[id] = 1; });
+      if (k < 0) throw new Error('주문을 찾을 수 없습니다: ' + a.id);
+      var o = fromRow_(v[k]); if (o.st !== '대기') throw new Error('대기 중인 주문만 출고할 수 있습니다 (지금: ' + o.st + ')');
+      var lines = a.lines || [], shipped = [], rest = [], stamp = now_();
+      o.items.forEach(function (it, i) {
+        var L = lines.filter(function (x) { return +x.k === i; })[0], full = it.qty === '' || it.qty == null ? null : +it.qty;
+        var q = L ? L.qty : full; q = q === '' || q == null ? full : +q;
+        if (q != null && (!isFinite(q) || q < 0)) throw new Error('출고 수량이 올바르지 않습니다: ' + it.name);
+        if (full != null && q > full) throw new Error(it.name + ': 주문(' + full + ')보다 많이 출고할 수 없습니다');
+        var why = L && L.why ? String(L.why) : '';
+        if (full != null && q < full) {
+          if (q > 0) shipped.push(Object.assign({}, it, { qty: q, ord: it.ord || full, why: why }));
+          var rr = Object.assign({}, it, { qty: full - q }); delete rr.ord; delete rr.why; rest.push(rr);
+        } else shipped.push(Object.assign({}, it, why ? { why: why } : {}));
+        if (full != null && q < full && !why) throw new Error(it.name + ': 덜 나간 사유를 골라주세요');
+      });
+      if (!shipped.length) throw new Error('나간 품목이 없습니다. 하나도 안 나갔으면 출고하지 말고 대기로 두세요');
+      var out = [], whyAll = shipped.filter(function (x) { return x.why; }).map(function (x) { return x.why; });
+      o.items = shipped; o.st = '출고완료'; o.shipped = a.date; o.upd = stamp;
+      sh.getRange(k + 2, 1, 1, OH.length).setValues([toRow_(o)]); out.push(o);
+      if (rest.length && a.rest !== 'drop') {
+        var r = JSON.parse(JSON.stringify(o)), base = String(o.parent || o.id).replace(/-r\d+$/, ''), j = 1;
+        while (ids[base + '-r' + j]) j++;
+        r.id = base + '-r' + j; r.parent = o.parent || o.id; r.items = rest; r.st = '대기'; r.shipped = ''; r.printed = ''; r.box = [];
+        r.due = '준비되면'; r.memo = ['잔량' + (whyAll.length ? ' (' + uniq_(whyAll).join(', ') + ')' : ''), o.memo].filter(Boolean).join(' / '); r.upd = stamp;
+        sh.getRange(sh.getLastRow() + 1, 1, 1, OH.length).setValues([toRow_(r)]); out.push(r);
+      }
+      return { orders: out };
+    });
+  },
+
+  // 삭제: 주문 줄을 지우고 삭제기록 탭에 30일 보관 (되살리기 가능). {ids}
+  deleteOrders: function (a) {
+    if (!a.ids || !a.ids.length) throw new Error('지울 주문을 고르세요');
+    return lock_(function () {
+      var sh = sheet_(T.ORD, OH), n = sh.getLastRow(), v = n < 2 ? [] : sh.getRange(2, 1, n - 1, OH.length).getValues(), at = {}, stamp = now_();
+      v.forEach(function (r, i) { at[str_(r[0])] = i; });
+      a.ids.forEach(function (id) { if (!(id in at)) throw new Error('주문을 찾을 수 없습니다: ' + id); });
+      var d = sheet_(T.DEL, DH), add = a.ids.map(function (id) { var r = v[at[id]].map(str_), o = fromRow_(v[at[id]]); return [stamp, id, o.cust, itemsText_(o.items), JSON.stringify(r)]; });
+      d.getRange(d.getLastRow() + 1, 1, add.length, DH.length).setValues(add);
+      a.ids.map(function (id) { return at[id] + 2; }).sort(function (x, y) { return y - x; }).forEach(function (row) { sh.deleteRow(row); });
+      purgeDeleted_();
+      return { deleted: a.ids };
+    });
+  },
+  deletedList: function () {
+    return lock_(function () { purgeDeleted_(); return { list: rows_(sheet_(T.DEL, DH), 4).map(function (r, i) { return { row: i + 2, at: str_(r[0]), id: str_(r[1]), cust: str_(r[2]), items: str_(r[3]) }; }).reverse() }; });
+  },
+  restoreOrders: function (a) {   // {ids} → 주문 탭에 다시 넣고 삭제기록에서 뺌
+    return lock_(function () {
+      var d = sheet_(T.DEL, DH), v = rows_(d, DH.length), sh = sheet_(T.ORD, OH), n = sh.getLastRow(), have = {}, out = [], rm = [];
+      (n < 2 ? [] : sh.getRange(2, 1, n - 1, 1).getValues()).forEach(function (r) { have[str_(r[0])] = 1; });
+      v.forEach(function (r, i) {
+        var id = str_(r[1]); if ((a.ids || []).indexOf(id) < 0) return;
+        var row = JSON.parse(str_(r[4])); while (row.length < OH.length) row.push(''); row = row.slice(0, OH.length);
+        if (have[id]) { var j = 1; while (have[id + '-b' + j]) j++; id = id + '-b' + j; row[0] = id; }   // 같은 ID가 이미 있으면 새 ID로 되살림
+        sh.getRange(sh.getLastRow() + 1, 1, 1, OH.length).setValues([row]); have[id] = 1; out.push(fromRow_(row));
+        rm.push(i + 2);
+      });
+      if (!rm.length) throw new Error('되살릴 주문을 찾을 수 없습니다');
+      rm.sort(function (x, y) { return y - x; }).forEach(function (row) { d.deleteRow(row); });
+      return { orders: out };
+    });
+  },
+
   /* ----- 거래처 주소록 ----- */
   custSave: function (a) {   // {row(시트 줄 번호, 없으면 새로), cust:{…}}
     var c = a.cust || {}; if (!String(c.name || '').trim()) throw new Error('거래처 이름을 넣어주세요');
@@ -187,6 +261,13 @@ var API = {
   }
 };
 
+function uniq_(a) { var s = {}; return a.filter(function (x) { if (s[x]) return false; s[x] = 1; return true; }); }
+function deletedIds_() { return rows_(sheet_(T.DEL, DH), 2).map(function (r) { return str_(r[1]); }); }
+function purgeDeleted_() {   // 삭제기록에서 30일 지난 줄 지우기
+  var d = sheet_(T.DEL, DH), v = rows_(d, 1), cut = new Date(); cut.setDate(cut.getDate() - KEEP_DAYS);
+  var c = Utilities.formatDate(cut, TZ, 'yyyy-MM-dd');
+  for (var i = v.length - 1; i >= 0; i--) if (str_(v[i][0]).slice(0, 10) < c) d.deleteRow(i + 2);
+}
 function nz_(s) { return String(s == null ? '' : s).toLowerCase().replace(/[^0-9a-z가-힣]/g, ''); }
 function custs_() { return rows_(sheet_(T.CUST, CH), CH.length).map(function (r, i) { var o = { row: i + 2 }; CK_.forEach(function (k, j) { o[k] = str_(r[j]); }); return o; }).filter(function (o) { return o.name; }); }
 function patch_(ids, fn) {   // 주문 여러 건을 id 로 찾아 고침 (없는 id 가 하나라도 있으면 아무것도 안 바꿈)

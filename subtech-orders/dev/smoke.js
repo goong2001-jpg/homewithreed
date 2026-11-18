@@ -81,7 +81,40 @@ SV7 O 1000개 명판있슴
   ok(/^출하서_\d{4}-\d{2}-\d{2}\.xlsx$/.test(await page.evaluate(() => NAMES[1])) && await page.evaluate(() => GAS.__tabs['주문_출하기록'].length) === 2, '마감 → 출하서 엑셀 + 출하기록 1줄, 2건 출고완료·2건 대기');
   await page.waitForFunction(() => /출고 2건/.test(document.getElementById('rList').textContent));
   ok(true, '지난 출하서 목록에 표시');
-  await page.click('#nav [data-v=more]'); await page.fill('#cq', '가나');
+  // v2: 오늘 송장 수량
+  await page.click('#nav [data-v=print]');
+  ok(/CJ 2건/.test(await page.textContent('#pToday')), '송장 화면 맨 위: 오늘 출력 CJ 2건');
+  // v2: 일부 출고 + 어제 날짜
+  await page.click('#nav [data-v=close]'); await page.waitForFunction(() => document.querySelectorAll('#cList [data-act=ship]').length === 2);
+  await page.locator('#cList [data-act=ship]').first().click();
+  const yday = await page.evaluate(() => addDay(S.today, -1));
+  await page.click('#shB [data-act=sDate]:nth-child(2)');
+  ok(await page.inputValue('#s-date') === yday, '출고 창: 어제 날짜 고르기');
+  await page.fill('#shB .sq', '30');
+  ok(await page.locator('#shB .sw').isVisible() && await page.locator('#s-rest').isVisible(), '수량을 줄이면 사유·잔량 칸이 나타남');
+  await page.click('#shF [data-act=sSave]');
+  ok(/사유/.test(await page.textContent('#toast')), '사유 없이 저장하면 막음');
+  await page.selectOption('#shB .sw', '자재부족');
+  await page.screenshot({ path: path.join(OUT, '7-ship.png') });
+  await page.click('#shF [data-act=sSave]');
+  await page.waitForFunction(() => S.orders.some(o => o.parent));
+  const sh = await page.evaluate(() => { const r = S.orders.find(o => o.parent), p = S.orders.find(o => o.id === r.parent); return [p.st, p.shipped, p.items[0].qty, p.items[0].ord, r.items[0].qty, r.st]; });
+  ok(sh[0] === '출고완료' && sh[1] === yday && sh[2] === 30 && sh[3] === 50 && sh[4] === 20 && sh[5] === '대기', '일부 출고: 30 출고(어제), 잔량 20 대기 주문 생김');
+  // v2: 주문 목록 묶음 + 고르기 삭제 + 되살리기
+  await page.click('#nav [data-v=list]');
+  ok((await page.locator('#orders .grp').count()) >= 1 && /잔량/.test(await page.textContent('#orders')), '대기 목록: 예정일 묶음, 잔량 표시');
+  await page.screenshot({ path: path.join(OUT, '8-list.png'), fullPage: true });
+  const nBefore = await page.evaluate(() => S.orders.length);
+  await page.click('[data-act=lPick]');
+  await page.locator('#orders [data-chk]').first().check();
+  await page.click('[data-act=lDel]');
+  await page.waitForFunction(n => S.orders.length === n - 1, nBefore);
+  ok(await page.evaluate(() => GAS.__tabs['주문_삭제기록'].length) === 2, '고르기 → 삭제 → 삭제기록에 보관');
+  await page.click('#nav [data-v=more]'); await page.click('[data-act=delLoad]');
+  await page.waitForSelector('[data-act=delRestore]'); await page.click('[data-act=delRestore]');
+  await page.waitForFunction(n => S.orders.length === n, nBefore);
+  ok(true, '더보기 → 삭제한 주문 되살리기');
+  await page.fill('#cq', '가나');
   ok(await page.locator('#custs .card').count() >= 1, '주소록 검색');
   ok(await page.evaluate(() => JSON.stringify(GAS.__tabs['거래로그'])) === '[["일시","품목ID"]]', '거래로그는 그대로');
   ok(errs.length === 0, '화면 오류 없음' + (errs.length ? ': ' + errs.join(' | ') : ''));

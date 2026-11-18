@@ -13,6 +13,7 @@ function makeGas(tabs) {
       getLastColumn: function () { var m = 0; rows.forEach(function (r) { if (r.length > m) m = r.length; }); return m; },
       getMaxRows: function () { return Math.max(1000, rows.length); }, getMaxColumns: function () { return 26; },
       setFrozenRows: function () {}, appendRow: function (r) { rows.push(r.slice()); },
+      deleteRow: function (r) { if (r < 1 || r > rows.length) throw new Error('없는 줄 삭제: ' + r); rows.splice(r - 1, 1); },
       getRange: function (r, c, nr, nc) {
         nr = nr || 1; nc = nc || 1;
         return {

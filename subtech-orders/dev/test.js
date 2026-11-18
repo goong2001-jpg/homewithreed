@@ -130,7 +130,44 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
   throws(() => vm.runInContext('sheet_', ctx)('거래로그', ['x']), '주문용 탭이 아니면 쓰기용으로 열 수 없음');
   ok(!/getSheetByName\('거래로그'\)|getSheetByName\("거래로그"\)/.test(fs.readFileSync(path.join(D, 'Code.gs'), 'utf8')), 'Code.gs 는 거래로그 탭을 부르지 않음');
 
-  console.log('6) 템플릿·버전');
+  console.log('6) v2: 출고 기록·삭제');
+  { const ids = api('boot').orders.map(o => o.id), x = api('saveOrders', { orders: [Object.assign({}, B, { id: undefined }), Object.assign({}, B, { id: undefined })] }).orders.map(o => o.id), all = ids.concat(x);
+    ok(new Set(all).size === all.length, '같은 초에 여러 번 저장해도 주문 ID가 겹치지 않음 (v2에서 고친 버그)');
+    api('deleteOrders', { ids: x }); }
+  { const base = Object.assign({}, A, { id: undefined, box: [], memo: '급함', items: [{ name: 'STT-2.6', sensor: '', qty: 120, unit: '', note: '' }, { name: 'H7', sensor: 'X', qty: 50, unit: '', note: '스티커 있음' }] });
+    const o1 = api('saveOrders', { orders: [base] }).orders[0], n0 = gas.__tabs['주문'].length;
+    let r = api('shipOrder', { id: o1.id, date: '2026-11-17', lines: [{ k: 0, qty: 60, why: '자재부족' }] });
+    const [d1, rest] = r.orders;
+    ok(d1.st === '출고완료' && d1.shipped === '2026-11-17' && d1.items[0].qty === 60 && d1.items[0].ord === 120 && d1.items[0].why === '자재부족' && d1.items[1].qty === 50 && !d1.items[1].ord, '일부 출고: 나간 수량·주문 수량·사유 기록, 다 나간 품목은 그대로');
+    ok(rest && rest.st === '대기' && rest.id === o1.id + '-r1' && rest.parent === o1.id && rest.items.length === 1 && rest.items[0].qty === 60 && rest.due === '준비되면' && /^잔량 \(자재부족\) \/ 급함$/.test(rest.memo) && gas.__tabs['주문'].length === n0 + 1, '잔량 60 → 대기 주문(원주문 연결) 자동 생성');
+    r = api('shipOrder', { id: rest.id, date: '2026-11-18', lines: [{ k: 0, qty: 20, why: '업체요청' }], rest: 'drop' });
+    ok(r.orders.length === 1 && r.orders[0].items[0].qty === 20 && r.orders[0].items[0].ord === 60 && gas.__tabs['주문'].length === n0 + 1, '안 보냄: 잔량 주문을 만들지 않음');
+    throws(() => api('shipOrder', { id: rest.id, date: '2026-11-18', lines: [] }), '이미 출고된 주문은 다시 출고 안 됨');
+    const rep2 = OUT.report({ date: '2026-11-17', shipped: [d1], pending: [] }, OP.isAcc).sheets[0].rows;
+    ok(rep2[2][5].v === 60 && rep2[2][6].v === '급함 / 주문 120 중 60 출고 (자재부족)' && rep2[3][6].v === '스티커 있음', '출하서 적요: "주문 120 중 60 출고 (자재부족)"');
+    // 삭제·되살리기
+    const before = gas.__tabs['주문'].length, keep2 = JSON.stringify(gas.__tabs['주문'][1]);
+    throws(() => api('deleteOrders', { ids: [d1.id, 'NOPE'] }), '없는 ID가 섞이면 아무것도 안 지움');
+    ok(gas.__tabs['주문'].length === before, '  (위 실패 뒤 줄 수 그대로)');
+    api('deleteOrders', { ids: [d1.id, rest.id] });
+    ok(gas.__tabs['주문'].length === before - 2 && !api('boot').orders.some(o => o.id === d1.id) && JSON.stringify(gas.__tabs['주문'][1]) === keep2, '삭제: 그 줄만 지워짐 (다른 주문 그대로)');
+    const dl = api('deletedList').list;
+    ok(dl.filter(x => x.id === d1.id || x.id === rest.id).length === 2 && dl.some(x => x.id === d1.id && /STT-2.6 60/.test(x.items)), '삭제기록 탭에 보관');
+    api('restoreOrders', { ids: [d1.id] });
+    const back = api('boot').orders.find(o => o.id === d1.id);
+    ok(back && back.items[0].ord === 120 && back.shipped === '2026-11-17' && !api('deletedList').list.some(x => x.id === d1.id) && api('deletedList').list.some(x => x.id === rest.id), '되살리기: 그대로 돌아오고 삭제기록에서 빠짐');
+    { const t = api('saveOrders', { orders: [Object.assign({}, B, { id: undefined })] }).orders[0];
+      ok(t.id !== rest.id && t.id !== d1.id, '지운 주문의 ID는 새 주문에 다시 쓰지 않음');
+      gas.__tabs['주문_삭제기록'].push([vm.runInContext('now_', ctx)(), t.id, 'x', 'x', JSON.stringify(gas.__tabs['주문'].find(r => r[0] === t.id))]);
+      const rb = api('restoreOrders', { ids: [t.id] }).orders[0];
+      ok(rb.id === t.id + '-b1' && api('boot').orders.filter(o => o.id.indexOf(t.id) === 0).length === 2, '같은 ID가 이미 있으면 새 ID로 되살림 (사라지지 않음)');
+      api('deleteOrders', { ids: [t.id, rb.id] }); }
+    gas.__tabs['주문_삭제기록'].push(['2020-01-01 00:00:00', 'OLD', 'x', 'x', '[]']);
+    ok(api('deletedList').list.every(x => x.id !== 'OLD'), '30일 지난 삭제기록은 자동으로 지움');
+    ok(JSON.stringify([master, log]) === keep, '품목마스터·거래로그는 그대로 (v2 기능 뒤에도)');
+  }
+
+  console.log('7) 템플릿·버전');
   const idx = fs.readFileSync(path.join(D, 'Index.html'), 'utf8'), tags = idx.match(/<\?[\s\S]*?\?>/g) || [];
   ok((idx.match(/<\?/g) || []).length === 3 && tags.join() === "<?!= inc('Parse') ?>,<?!= inc('Xlsx') ?>,<?!= inc('Out') ?>", 'Index.html 의 <? ?> 는 끼워넣기 3개뿐 (다른 곳에 있으면 앱이 안 열림)');
   const av = (fs.readFileSync(path.join(D, 'Code.gs'), 'utf8').match(/var APP_VERSION = '([^']+)'/) || [])[1], hv = (idx.match(/var HTML_VERSION = '([^']+)'/) || [])[1];
