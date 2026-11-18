@@ -4,7 +4,7 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v2';
+var APP_VERSION = 'v3';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
 var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록', DEL: '주문_삭제기록' };
@@ -83,7 +83,8 @@ var API = {
   boot: function (a, set) {
     var items = [];
     try { var m = ss_().getSheetByName('품목마스터'); if (m && m.getLastRow() > 1) { var seen = {}; m.getRange(2, 1, m.getLastRow() - 1, 3).getValues().forEach(function (r) { var n = str_(r[1]); if (n && !seen[n]) { seen[n] = 1; items.push(n); } }); } } catch (e) {}
-    return { version: APP_VERSION, today: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'), orders: recent_(allOrders_()), custs: custs_(), items: items,
+    var all = allOrders_();
+    return { version: APP_VERSION, today: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'), orders: recent_(all), addrHist: addrHist_(all), custs: custs_(), items: items,
       sender: { name: set['보내는분'] || '써브텍', phone: set['보내는분전화'] || '', addr: set['보내는분주소'] || '' }, histCount: Math.max(0, sheet_(T.HIST, HH).getLastRow() - 1) };
   },
 
@@ -126,8 +127,7 @@ var API = {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(a.date || '')) throw new Error('날짜가 올바르지 않습니다');
     return lock_(function () {
       var changed = (a.shippedIds && a.shippedIds.length) ? patch_(a.shippedIds, function (o) { o.st = '출고완료'; o.shipped = a.date; }) : [];
-      var all = allOrders_(), slim = function (o) { var own = !!o.recv || !!o.sender || (!!o.addr && nz_(o.raw).indexOf(nz_(o.addr).slice(0, 8)) >= 0);   // 받는분·주소가 주문에 따로 적힌 건만 출하서 '받는분' 칸에
-        return { id: o.id, due: o.due, cust: o.cust, items: o.items, memo: o.memo, recv: o.recv, phone: own ? o.phone : '', addr: own ? o.addr : '', branch: o.branch, ship: o.ship, stmt: o.stmt, tax: o.tax }; };
+      var all = allOrders_(), slim = snap_;
       var snap = { date: a.date, made: now_(), shipped: all.filter(function (o) { return o.st === '출고완료' && o.shipped === a.date; }).map(slim), pending: all.filter(function (o) { return o.st === '대기'; }).map(slim) };
       var js = JSON.stringify(snap), parts = [a.date, snap.made, snap.shipped.length, snap.pending.length];
       for (var i = 0; i < js.length; i += 40000) parts.push(js.slice(i, i + 40000));
@@ -136,6 +136,14 @@ var API = {
       sh.getRange(row, 1, 1, parts.length).setValues([parts]);
       return { orders: changed, report: snap };
     });
+  },
+  // 월 파일 재료: {month:'2026-11'} → 그 달에 출고된 주문 전부 + 그 달 마감 기록(날짜별 대기 목록)
+  monthData: function (a) {
+    if (!/^\d{4}-\d{2}$/.test(a.month || '')) throw new Error('달이 올바르지 않습니다');
+    var shipped = allOrders_().filter(function (o) { return o.st === '출고완료' && String(o.shipped).slice(0, 7) === a.month; }).map(snap_), pend = {};
+    var sh = sheet_(T.RPT, ['날짜', '만든시각', '출고건수', '대기건수', '내용']), n = sh.getLastRow();
+    if (n > 1) sh.getRange(2, 1, n - 1, sh.getLastColumn()).getValues().forEach(function (r) { var d = str_(r[0]).slice(0, 10); if (d.slice(0, 7) !== a.month) return; try { pend[d] = JSON.parse(r.slice(4).map(str_).join('')).pending || []; } catch (e) {} });
+    return { month: a.month, shipped: shipped, pending: pend };
   },
   reports: function () { return { list: rows_(sheet_(T.RPT, ['날짜', '만든시각', '출고건수', '대기건수', '내용']), 4).filter(function (r) { return r[0]; }).map(function (r) { return { date: str_(r[0]).slice(0, 10), made: str_(r[1]), shipped: +r[2] || 0, pending: +r[3] || 0 }; }).reverse().slice(0, 60) }; },
   report: function (a) {
@@ -261,6 +269,22 @@ var API = {
   }
 };
 
+// 출하 기록·월 파일에 넣는 주문 모양. own = 받는분·주소가 주문에 따로 적힌 건 (출하서 '받는분' 칸은 이때만 채움 — 단골 기본 주소는 비움)
+function snap_(o) {
+  var own = !!o.recv || !!o.sender || (!!o.addr && nz_(o.raw).indexOf(nz_(o.addr).slice(0, 8)) >= 0), x = {};
+  ['id', 'due', 'cust', 'items', 'memo', 'recv', 'phone', 'phone2', 'addr', 'branch', 'ship', 'carrier', 'pay', 'claim', 'mode', 'sender', 'senderPhone', 'senderAddr', 'msg', 'box', 'printed', 'shipped', 'stmt', 'tax', 'parent'].forEach(function (k) { x[k] = o[k]; });
+  x.own = own; return x;
+}
+// 거래처별 최근 받는 곳 5개 (주문 탭 전체에서, 최근 것부터)
+function addrHist_(list) {
+  var m = {};
+  list.slice().sort(function (a, b) { return String(b.at).localeCompare(String(a.at)); }).forEach(function (o) {
+    if (!o.addr && !o.branch) return; var k = nz_(o.cust); if (!k) return; var a = m[k] || (m[k] = []);
+    if (a.length >= 5 || a.some(function (x) { return nz_(x.addr) === nz_(o.addr) && nz_(x.recv) === nz_(o.recv) && x.branch === o.branch; })) return;
+    a.push({ recv: o.recv, phone: o.phone, phone2: o.phone2, addr: o.addr, branch: o.branch, at: String(o.at).slice(0, 10) });
+  });
+  return m;
+}
 function uniq_(a) { var s = {}; return a.filter(function (x) { if (s[x]) return false; s[x] = 1; return true; }); }
 function deletedIds_() { return rows_(sheet_(T.DEL, DH), 2).map(function (r) { return str_(r[1]); }); }
 function purgeDeleted_() {   // 삭제기록에서 30일 지난 줄 지우기

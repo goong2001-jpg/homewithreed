@@ -167,7 +167,45 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
     ok(JSON.stringify([master, log]) === keep, '품목마스터·거래로그는 그대로 (v2 기능 뒤에도)');
   }
 
-  console.log('7) 템플릿·버전');
+  console.log('7) v3: 하루 파일·월 파일·최근 주소');
+  { const C1 = Object.assign({}, A, { id: undefined, box: [{ k: '대', b: 2 }], carrier: 'CJ', items: [{ name: 'SV7', sensor: 'X', qty: 50, unit: '', note: '' }, { name: '파워코드 2C', sensor: '', qty: 50, unit: '개', note: '' }] });
+    const K1 = Object.assign({}, B, { id: undefined, carrier: '경동', ship: '경동택배선불', branch: '상주영업소', box: [{ k: '소', b: 1, f: 5000 }] });
+    const J1 = Object.assign({}, A, { id: undefined, carrier: '직납', ship: '직납', box: [], items: [{ name: 'H10', sensor: 'X', qty: 300, unit: '', note: '' }] });
+    const W1 = Object.assign({}, A, { id: undefined, carrier: '대신', ship: '대신화물', box: [], due: '준비되면', items: [{ name: 'SV11', sensor: 'O', qty: 10, unit: '', note: '' }] });
+    const [c1, k1, j1, w1] = api('saveOrders', { orders: [C1, K1, J1, W1] }).orders;
+    api('shipOrder', { id: j1.id, date: '2026-11-19', lines: [{ k: 0, qty: 200, why: '자재부족' }], rest: 'drop' });
+    const snap = api('closeDay', { date: '2026-11-19', shippedIds: [c1.id, k1.id] }).report;
+    ok(snap.shipped.length === 3 && snap.shipped.every(o => o.carrier && 'box' in o && 'own' in o) && snap.pending.some(o => o.id === w1.id), '마감 기록에 운송·박스·보내는분까지 남음 (하루 파일용)');
+    const dayf = OUT.day(snap, def, OP.isAcc), names = dayf.sheets.map(x => x.name);
+    eq(names, ['출하서', 'CJ', '경동', '직납·방문 등', '미출고'], '하루 파일 탭: 출하서·CJ·경동·직납·미출고 (그날 없는 대신 탭은 생략)');
+    const cjS = dayf.sheets[1], kdS = dayf.sheets[2];
+    ok(cjS.rows[0][0].v === '보내는분성명' && cjS.rows.length === 2 && cjS.rows[1][9].v === 2 && cjS.rows[1][10].v === '대', 'CJ 탭 = CJ 양식 그대로, 저장된 박스(대 2)');
+    ok(kdS.rows[0].length === 26 && kdS.rows[1][8].v === '상주영업소' && kdS.rows[1][20].v === 5000, '경동 탭 = 경동 양식 그대로');
+    ok(dayf.sheets[3].rows[1][2].v === 'H10' && dayf.sheets[3].rows[1][4].v === 200 && /주문 300 중 200 출고 \(자재부족\)/.test(dayf.sheets[3].rows[1][5].v), '직납 탭: 일부 출고 적요');
+    ok(dayf.sheets[4].rows.some(r => r[1].v === '가나상사' && r[2].v === 'SV11'), '미출고 탭에 대기 주문');
+    const R0 = dayf.sheets[0].rows, gana = R0.find(r => r[2].v === '가나상사' && r[3].v === 'SV7');
+    ok(gana && gana[7].v === '', '출하서 받는분 칸: 단골 기본 주소(주문에 안 적힌 것)는 비움');
+    // 월 파일
+    api('shipOrder', { id: w1.id, date: '2026-11-20', lines: [] });
+    const md2 = api('monthData', { month: '2026-11' });
+    ok(md2.shipped.length >= 4 && md2.pending['2026-11-19'] && md2.pending['2026-11-19'].length >= 1, 'monthData: 그 달 출고 주문 + 마감한 날의 대기 목록');
+    throws(() => api('monthData', { month: '11월' }), '달 형식 거절');
+    const mf = OUT.month(md2, OP.isAcc), mn = mf.sheets.map(x => x.name);
+    ok(mn[0] === '거래처별' && mn[1] === '품목별' && mn[2] === '출고목록' && mn[3] === '11월 20일' && mn[4] === '11월 19일' && mf.name === '2026년 11월_출고현황', '월 파일 탭: 거래처별·품목별·출고목록 + 날짜별 출하서(최근 날짜 먼저)');
+    const cr = mf.sheets[0].rows, gRow = cr.find(r => r[0].v === '가나상사'), tot = cr[cr.length - 1];
+    ok(gRow && gRow[3].v >= 260 && gRow[4].v >= 50 && tot[0].v === '합계', '거래처별: 제품 수량과 부자재 수량을 따로 합계');
+    const ir = mf.sheets[1].rows; ok(ir.some(r => r[0].v === 'H10' && r[1].v === 'X' && r[2].v === 200), '품목별: 실제 나간 수량(200)으로 합계');
+    ok(mf.sheets[2].rows.some(r => r[2].v === 'H10' && r[4].v === 200 && r[5].v === 300 && r[6].v === '자재부족'), '출고목록: 출고·주문 수량·사유');
+    // 만든 파일이 엑셀로 열리는지 (다시 읽기)
+    const by = XL.build(mf.sheets), RR = await XL.read(by.buffer.slice(by.byteOffset, by.byteOffset + by.byteLength));
+    ok(Object.keys(RR).length === mf.sheets.length && RR['품목별'][0][0] === '품목명[규격]', '월 파일 엑셀 다시 읽기 OK');
+    // 최근 주소
+    const ah = api('boot').addrHist['자차코퍼레이션'];
+    ok(Array.isArray(ah) && ah.length >= 1 && ah.length <= 5 && ah[0].recv === '김철수' && ah.every((x, i) => ah.findIndex(y => y.addr === x.addr && y.recv === x.recv && y.branch === x.branch) === i), 'boot: 거래처별 최근 받는 곳 (겹침 없이 최대 5개)');
+    ok(OUT.report({ date: '2026-11-19', shipped: [{ cust: 'x', items: [], recv: '홍', phone: '010', addr: '서울' }], pending: [] }).sheets[0].rows[2][7].v === '홍 / 010 서울', '옛 마감 기록(own 없음)은 받는분 그대로 표시');
+  }
+
+  console.log('8) 템플릿·버전');
   const idx = fs.readFileSync(path.join(D, 'Index.html'), 'utf8'), tags = idx.match(/<\?[\s\S]*?\?>/g) || [];
   ok((idx.match(/<\?/g) || []).length === 3 && tags.join() === "<?!= inc('Parse') ?>,<?!= inc('Xlsx') ?>,<?!= inc('Out') ?>", 'Index.html 의 <? ?> 는 끼워넣기 3개뿐 (다른 곳에 있으면 앱이 안 열림)');
   const av = (fs.readFileSync(path.join(D, 'Code.gs'), 'utf8').match(/var APP_VERSION = '([^']+)'/) || [])[1], hv = (idx.match(/var HTML_VERSION = '([^']+)'/) || [])[1];

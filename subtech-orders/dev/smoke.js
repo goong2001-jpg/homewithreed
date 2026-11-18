@@ -4,6 +4,7 @@
  * 스크린샷은 dev/out/*.png
  */
 const { chromium, devices } = require('playwright');
+const XLr = (() => { const m = { exports: {} }; new Function('module', require('fs').readFileSync(require('path').join(__dirname, '..', 'Xlsx.html'), 'utf8').replace(/<\/?script>/g, ''))(m); return m.exports; })();
 const path = require('path'), fs = require('fs');
 const OUT = path.join(__dirname, 'out');
 // file:// 로 열면 내려받는 파일 이름이 안 붙어서(브라우저 보안), 잠깐 쓰는 로컬 서버로 엶
@@ -78,7 +79,12 @@ SV7 O 1000개 명판있슴
   const [dl2] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=closeDay]')]);
   const f2 = path.join(OUT, 'chulha.xlsx'); await dl2.saveAs(f2);
   await page.waitForFunction(() => S.orders.filter(o => o.st === '출고완료').length === 2);
-  ok(/^출하서_\d{4}-\d{2}-\d{2}\.xlsx$/.test(await page.evaluate(() => NAMES[1])) && await page.evaluate(() => GAS.__tabs['주문_출하기록'].length) === 2, '마감 → 출하서 엑셀 + 출하기록 1줄, 2건 출고완료·2건 대기');
+  ok(/^하루마감_\d{4}-\d{2}-\d{2}\.xlsx$/.test(await page.evaluate(() => NAMES[1])) && await page.evaluate(() => GAS.__tabs['주문_출하기록'].length) === 2, '마감 → 하루 파일 + 출하기록 1줄, 2건 출고완료·2건 대기');
+  { const b = fs.readFileSync(f2), R = await XLr.read(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+    ok(JSON.stringify(Object.keys(R)) === JSON.stringify(['출하서', 'CJ', '미출고']) && R['CJ'][0][0] === '보내는분성명' && R['CJ'].length === 3, '하루 파일 탭: 출하서 · CJ(2건) · 미출고'); }
+  { const [dm] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=monthGet]')]); const fm = path.join(OUT, 'month.xlsx'); await dm.saveAs(fm);
+    const b = fs.readFileSync(fm), R = await XLr.read(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)), ks = Object.keys(R);
+    ok(ks[0] === '거래처별' && ks[1] === '품목별' && ks[2] === '출고목록' && /월 \d+일$/.test(ks[3]) && await page.evaluate(() => /월_출고현황\.xlsx$/.test(NAMES[2])), '월 파일: 거래처별·품목별·출고목록 + 날짜별 출하서'); }
   await page.waitForFunction(() => /출고 2건/.test(document.getElementById('rList').textContent));
   ok(true, '지난 출하서 목록에 표시');
   // v2: 오늘 송장 수량
@@ -100,6 +106,20 @@ SV7 O 1000개 명판있슴
   await page.waitForFunction(() => S.orders.some(o => o.parent));
   const sh = await page.evaluate(() => { const r = S.orders.find(o => o.parent), p = S.orders.find(o => o.id === r.parent); return [p.st, p.shipped, p.items[0].qty, p.items[0].ord, r.items[0].qty, r.st]; });
   ok(sh[0] === '출고완료' && sh[1] === yday && sh[2] === 30 && sh[3] === 50 && sh[4] === 20 && sh[5] === '대기', '일부 출고: 30 출고(어제), 잔량 20 대기 주문 생김');
+  // v3: 송장 카드에서 받는 곳·보내는분 고치기 (대신 주문)
+  await page.click('#nav [data-v=print]'); await page.click('[data-act=pCar][data-i=대신]');
+  await page.locator('#pList [data-act=pEdit]').first().click();
+  await page.click('#sheet [data-act=snd][data-i=custom]');
+  ok(await page.locator('#e-sender').isVisible() && await page.inputValue('#e-sender') === '', '보내는분 "직접 입력" → 빈 칸이 열림');
+  await page.fill('#e-sender', '가나물산'); await page.fill('#e-senderPhone', '031-000-1111');
+  await page.fill('#e-addr', '강원 원주시 가나로 1');
+  ok(await page.locator('#e-saveAddr').isVisible(), '주소록에 없는 새 주소 → "주소록에 저장" 체크 칸');
+  await page.check('#e-saveAddr');
+  await page.screenshot({ path: path.join(OUT, '9-edit-ship.png') });
+  await page.click('#sheet [data-act=edSave]');
+  await page.waitForFunction(() => S.custs.some(c => c.addr === '강원 원주시 가나로 1'));
+  ok(await page.evaluate(() => { const o = S.orders.find(x => x.carrier === '대신' && x.st === '대기'); return o.sender === '가나물산' && o.senderPhone === '031-000-1111'; }), '보내는분 직접 입력 저장 + 새 주소 주소록에 저장');
+  ok(await page.evaluate(() => recentOf('마바이엔지').some(x => x.addr === '강원 원주시 가나로 1')), '방금 쓴 주소가 "최근 보낸 곳"에 들어감');
   // v2: 주문 목록 묶음 + 고르기 삭제 + 되살리기
   await page.click('#nav [data-v=list]');
   ok((await page.locator('#orders .grp').count()) >= 1 && /잔량/.test(await page.textContent('#orders')), '대기 목록: 예정일 묶음, 잔량 표시');

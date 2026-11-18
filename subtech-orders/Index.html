@@ -69,6 +69,9 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--pri);flex:0 0 aut
 .sheet .hd b{font-size:16px}
 .sheet .bd{flex:1;overflow:auto;padding:4px 14px 16px;-webkit-overflow-scrolling:touch}
 .sheet .ft{display:flex;gap:8px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--card);flex-wrap:wrap}
+.sheet .ft .btn{flex:1 1 auto;white-space:nowrap}
+.sheet .ft .btn.pri{flex:1 0 100%}
+@media(min-width:900px){.sheet .ft .btn.pri{flex:2 1 auto}}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
 .itrow{display:grid;grid-template-columns:minmax(0,1fr) 62px 74px 44px;gap:6px;margin-bottom:6px;align-items:center}
 .itrow .nt{grid-column:1/4}
@@ -129,10 +132,13 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
     </section>
     <section id="v-close" class="hidden">
       <h2>출하서 (하루 마감)</h2>
-      <div class="row"><input type="date" id="cDate" style="max-width:180px"><span class="muted">오늘 나간 주문에 체크하세요. 체크 안 한 주문은 대기로 남습니다.</span></div>
+      <div class="row"><input type="date" id="cDate" style="max-width:180px"><span class="muted">그날 나간 주문에 체크하세요. 체크 안 한 주문은 대기로 남습니다.</span></div>
       <div id="cList" style="margin-top:12px"></div>
-      <div class="bar"><button class="btn pri grow" data-act="closeDay">마감하고 출하서 받기</button></div>
-      <div class="sec">지난 출하서</div>
+      <div class="bar"><button class="btn pri grow" data-act="closeDay">마감하고 하루 파일 받기</button></div>
+      <p class="muted" style="margin:4px 0 0">하루 파일 = 엑셀 1개에 출하서 · CJ · 경동 · 대신 · 직납·방문 · 미출고 탭</p>
+      <div class="sec">월 파일 (11월.xlsx 처럼 날짜별 출하서 + 거래처별·품목별 합계)</div>
+      <div class="row"><input type="month" id="mMonth" style="max-width:180px"><button class="btn" data-act="monthGet">월 파일 받기</button></div>
+      <div class="sec">지난 하루 파일 (눌러서 다시 받기)</div>
       <div id="rList" class="muted">불러오는 중…</div>
     </section>
     <section id="v-more" class="hidden">
@@ -159,7 +165,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v2';
+var HTML_VERSION = 'v3';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -180,7 +186,7 @@ function askPin(then) { var p = prompt('접속 암호를 넣어주세요'); if (
 function boot() {
   status('불러오는 중…');
   call('boot', {}, function (r) {
-    S.orders = r.orders; S.custs = r.custs; S.items = r.items; S.sender = r.sender; S.today = r.today; S.histCount = r.histCount;
+    S.orders = r.orders; S.custs = r.custs; S.items = r.items; S.sender = r.sender; S.today = r.today; S.histCount = r.histCount; S.addrHist = r.addrHist || {}; $('mMonth').value = S.today.slice(0, 7);
     $('ver').textContent = HTML_VERSION + (r.version !== HTML_VERSION ? ' (서버 ' + r.version + ' — 버전 불일치, 새로고침 해보세요)' : '');
     $('cDate').value = S.today; render(); status('');
     if (r.histCount) call('recData', {}, function (x) { S.rec = OP.buildRec(x.hist); if (S.view === 'print') renderPrint(); status(''); });
@@ -265,7 +271,7 @@ function renderDrafts() {
 function saveDrafts() {
   var list = S.drafts.filter(function (o) { return o._on; }).map(clean); if (!list.length) return;
   var bad = list.filter(function (o) { return !o.items.length; }); if (bad.length) { notice('품목이 없는 주문이 있습니다', 1); return; }
-  call('saveOrders', { orders: list }, function (r) { mergeOrders(r.orders); S.custs = r.custs; S.drafts = S.drafts.filter(function (o) { return !o._on; }); if (!S.drafts.length) $('paste').value = ''; notice(r.orders.length + '건 저장했습니다'); render(); });
+  call('saveOrders', { orders: list }, function (r) { mergeOrders(r.orders); S.custs = r.custs; r.orders.forEach(function (o) { if (o.addr || o.branch) rememberAddr(o); }); S.drafts = S.drafts.filter(function (o) { return !o._on; }); if (!S.drafts.length) $('paste').value = ''; notice(r.orders.length + '건 저장했습니다'); render(); });
 }
 
 /* ---------- 주문 고치기 창 ---------- */
@@ -290,13 +296,19 @@ function drawEdit() {
     if (o.carrier !== 'CJ') h += '<label class="f">도착 영업소·지점 (경동·대신)</label><input type="text" id="e-branch" value="' + esc(o.branch) + '">';
   }
   h += '<label class="f">출하서에 적을 배송방법</label><input type="text" id="e-ship" value="' + esc(o.ship) + '">';
-  h += '<div class="g2"><div><label class="f">받는분</label><input type="text" id="e-recv" value="' + esc(o.recv) + '"></div><div><label class="f">전화</label><input type="tel" id="e-phone" value="' + esc(o.phone) + '"></div></div>';
+  h += '<div class="sec" id="e-shipSec">받는 곳</div><div class="g2"><div><label class="f">받는분</label><input type="text" id="e-recv" value="' + esc(o.recv) + '"></div><div><label class="f">전화</label><input type="tel" id="e-phone" value="' + esc(o.phone) + '"></div></div>';
   h += '<label class="f">주소</label><input type="text" id="e-addr" value="' + esc(o.addr) + '">';
+  var rc = recentOf(o.cust).filter(function (x) { return nz(x.addr) !== nz(o.addr) || nz(x.recv) !== nz(o.recv); });
+  if (rc.length) h += '<div class="pick"><span class="muted">이 거래처에 최근 보낸 곳</span>' + rc.map(function (x, k) { return '<button data-act="pickRecent" data-i="' + k + '">' + esc([x.recv, x.phone, x.branch ? '[' + x.branch + ']' : '', x.addr].filter(Boolean).join(' · ')) + ' <span class="muted">' + esc(OUT.md(x.at)) + '</span></button>'; }).join('') + '</div>';
   var ad = m.filter(function (x) { return x.addr; });
+  if (o.cust) h += '<label class="row' + (newAddr(o.cust, o.addr) ? '' : ' hidden') + '" id="e-saveAddrRow" style="margin-top:8px;font-size:14px"><input type="checkbox" id="e-saveAddr"> 이 주소를 「' + esc(o.cust) + '」 주소록에 저장</label>';
   if (ad.length) h += '<div class="pick"><span class="muted">주소록에서 고르기</span>' + ad.map(function (x) { return '<button data-act="pickAddr" data-i="' + x.row + '">' + esc(x.name) + ' · ' + esc(x.addr) + (x.phone ? ' · ' + esc(x.phone) : '') + '</button>'; }).join('') + '</div>';
   h += '<div class="g2"><div><label class="f">전화2</label><input type="tel" id="e-phone2" value="' + esc(o.phone2) + '"></div><div><label class="f">배송 메시지</label><input type="text" id="e-msg" value="' + esc(o.msg) + '"></div></div>';
-  h += '<div class="sec">보내는분</div><div class="chips"><button data-act="snd" data-i="def"' + (!o.sender ? ' class="on"' : '') + '>' + esc(S.sender.name) + '</button>' + (o.cust ? '<button data-act="snd" data-i="cust"' + (o.sender ? ' class="on"' : '') + '>거래처 이름으로 (직송)</button>' : '') + '</div>';
-  if (o.sender) h += '<div class="g2"><div><label class="f">보내는분 이름</label><input type="text" id="e-sender" value="' + esc(o.sender) + '"></div><div><label class="f">보내는분 전화</label><input type="tel" id="e-senderPhone" value="' + esc(o.senderPhone) + '"></div></div><label class="f">보내는분 주소</label><input type="text" id="e-senderAddr" value="' + esc(o.senderAddr) + '">';
+  var sc = sendersOf(o.cust), sOn = function (x) { return o.sender && nz(o.sender) === nz(x) ? ' class="on"' : ''; };
+  h += '<div class="sec">보내는분</div><div class="chips"><button data-act="snd" data-i="def"' + (!o.sender && !ED.sndCustom ? ' class="on"' : '') + '>' + esc(S.sender.name) + '</button>' +
+    sc.map(function (x, k) { return '<button data-act="snd" data-i="s' + k + '"' + sOn(x.name) + '>' + esc(x.name) + (x.last ? ' (지난번)' : '') + '</button>'; }).join('') +
+    '<button data-act="snd" data-i="custom"' + (ED.sndCustom || (o.sender && !sc.some(function (x) { return nz(x.name) === nz(o.sender); })) ? ' class="on"' : '') + '>직접 입력</button></div>';
+  if (o.sender || ED.sndCustom) h += '<div class="g2"><div><label class="f">보내는분 이름</label><input type="text" id="e-sender" value="' + esc(o.sender) + '"></div><div><label class="f">보내는분 전화</label><input type="tel" id="e-senderPhone" value="' + esc(o.senderPhone) + '"></div></div><label class="f">보내는분 주소</label><input type="text" id="e-senderAddr" value="' + esc(o.senderAddr) + '">';
   h += '<div class="g2"><div><label class="f">거래명세서</label><input type="text" id="e-stmt" list="dl-ox" value="' + esc(o.stmt) + '"></div><div><label class="f">계산서 발행</label><input type="text" id="e-tax" list="dl-tax" value="' + esc(o.tax) + '"></div></div><datalist id="dl-ox"><option value="O"></datalist><datalist id="dl-tax"><option value="O"><option value="월말발행"><option value="결제받음"></datalist>';
   if (o.raw) h += '<details class="raw"><summary class="muted">카톡 원문 보기' + (o.who ? ' (' + esc(o.who) + ')' : '') + '</summary><pre>' + esc(o.raw) + '</pre></details>';
   $('shB').innerHTML = h;
@@ -318,9 +330,26 @@ function readEdit() {   // 입력칸 → ED.o (다시 그리기 전에 꼭 부�
   });
   return o;
 }
+// 서버 nz_ 와 같은 규칙 (거래처별 최근 주소 찾기용)
+function nz(x) { return String(x == null ? '' : x).toLowerCase().replace(/[^0-9a-z가-힣]/g, ''); }
+function newAddr(cust, addr) { return !!(cust && String(addr || '').trim()) && !OP.findCust(S.custs, cust).some(function (x) { return nz(x.addr) === nz(addr); }); }
+function recentOf(cust) { return (S.addrHist || {})[nz(cust)] || []; }
+function rememberAddr(o) { var k = nz(o.cust); if (!k) return; var a = (S.addrHist[k] || []).filter(function (x) { return !(nz(x.addr) === nz(o.addr) && nz(x.recv) === nz(o.recv) && x.branch === o.branch); });
+  a.unshift({ recv: o.recv, phone: o.phone, phone2: o.phone2, addr: o.addr, branch: o.branch, at: S.today }); S.addrHist[k] = a.slice(0, 5); }
+// 보내는분 후보: 거래처 이름 · 주소록에 기억된 보내는분(지난번) · 최근 주문에 쓴 보내는분
+function sendersOf(cust) {
+  if (!cust) return []; var out = [], add = function (name, phone, addr, last) { if (!name || nz(name) === nz(S.sender.name) || out.some(function (x) { return nz(x.name) === nz(name); })) return; out.push({ name: name, phone: phone || '', addr: addr || '', last: last }); };
+  var mc = OP.findCust(S.custs, cust), c0 = mc[0] || {}, ca = mc.filter(function (x) { return x.addr; })[0] || c0;
+  if (c0.sender) add(c0.sender, c0.senderPhone, c0.senderAddr, true);
+  S.orders.filter(function (x) { return nz(x.cust) === nz(cust) && x.sender; }).sort(function (a, b) { return String(b.at).localeCompare(String(a.at)); }).forEach(function (x) { add(x.sender, x.senderPhone, x.senderAddr, false); });
+  add(cust, ca.phone, ca.addr, false);
+  return out.slice(0, 4);
+}
 function relabel() { ED.o.ship = OP.shipLabel(ED.o); }
 function saveEdit(extra) {
-  var o = clean(readEdit()); if (!o.items.length) { notice('품목을 하나 이상 넣어주세요', 1); return; }
+  var sa = $('e-saveAddr'), o = clean(readEdit()); if (sa && !newAddr(o.cust, o.addr)) sa = null;
+  if (sa && sa.checked && o.cust && o.addr) call('custSave', { row: 0, cust: { name: o.cust, phone: o.phone, phone2: o.phone2, addr: o.addr } }, function (r) { S.custs = r.custs; notice('주소록에 저장했습니다'); });
+  if (o.addr || o.branch) rememberAddr(o); if (!o.items.length) { notice('품목을 하나 이상 넣어주세요', 1); return; }
   if (ED.opt.draft != null) { var d = S.drafts[ED.opt.draft], on = d._on; Object.keys(o).forEach(function (k) { d[k] = o[k]; }); d._on = on || !!o.cust; d._auto = []; showSheet(false); renderDrafts(); return; }
   call('saveOrders', { orders: [o] }, function (r) { mergeOrders(r.orders); S.custs = r.custs; showSheet(false); notice('저장했습니다'); if (extra) extra(r.orders[0]); else render(); });
 }
@@ -436,6 +465,7 @@ function renderPrint() {
       return '<div class="box" data-k="' + k + '"><select class="bk">' + [''].concat(OP.TYPES).map(function (t) { return '<option value="' + t + '"' + (x.k === t ? ' selected' : '') + '>' + (t || '크기') + '</option>'; }).join('') + '</select><input type="number" class="bb" min="1" inputmode="numeric" value="' + esc(x.b || 1) + '"><span class="muted">박스</span>' +
         (fare ? '<input type="number" class="bf fare" inputmode="numeric" placeholder="운임" value="' + esc(x.f || '') + '">' : '') + (k ? '<button class="btn sm ghost danger" data-act="bxDel" data-i="' + esc(o.id) + '" data-k="' + k + '">삭제</button>' : '<button class="btn sm ghost" data-act="bxAdd" data-i="' + esc(o.id) + '">+ 다른 크기</button>') + '</div>'; }).join('') +
       (bx.rec ? '<div class="rec">추천: ' + esc(bx.rec) + ' — 맞는지 확인하세요</div>' : '') + '</div>';
+    ex += '<button class="btn sm" data-act="pEdit" data-i="' + esc(o.id) + '" style="margin-top:8px">받는 곳 · 보내는분 고치기</button>';
     return cardHTML(o, { key: o.id, check: PSEL[o.id], extra: ex, act: 'none' });
   }).join('');
 }
@@ -467,7 +497,9 @@ function doClose() {
   if (!confirm(OUT.md(d) + ' 출하서를 만듭니다.\n· 출고완료로 바꿀 주문 ' + ids.length + '건\n· 대기로 남는 주문 ' + left + '건\n진행할까요?')) return;
   call('closeDay', { date: d, shippedIds: ids }, function (r) { mergeOrders(r.orders); CSEL = {}; reportFile(r.report); notice('출하서를 만들었습니다 (출고 ' + r.report.shipped.length + '건 · 대기 ' + r.report.pending.length + '건)'); render(); loadReports(); });
 }
-function reportFile(snap) { var out = OUT.report(snap, OP.isAcc); download(XL.build(out.sheets), out.name); }
+function reportFile(snap) { var out = OUT.day(snap, S.sender, OP.isAcc); download(XL.build(out.sheets), out.name); }
+function monthFile() { var m = $('mMonth').value; if (!m) { notice('달을 고르세요'); return; }
+  call('monthData', { month: m }, function (r) { if (!r.shipped.length && !Object.keys(r.pending).length) { notice(m + ' 에 출고 기록이 없습니다'); return; } var out = OUT.month(r, OP.isAcc); download(XL.build(out.sheets), out.name); notice(out.title + ' 파일: 출고 ' + out.orders + '건 · ' + out.days + '일'); }); }
 function loadReports() { call('reports', {}, function (r) { $('rList').innerHTML = r.list.length ? r.list.map(function (x) { return '<div class="card tap" data-act="rGet" data-i="' + x.date + '"><b>' + esc(x.date) + '</b> <span class="muted">출고 ' + x.shipped + '건 · 대기 ' + x.pending + '건 · ' + esc(x.made.slice(5, 16)) + ' 마감</span></div>'; }).join('') : '아직 마감한 날이 없습니다.'; }); }
 
 /* ---------- 5. 더보기: 주소록·가져오기·암호 ---------- */
@@ -524,7 +556,14 @@ document.addEventListener('click', function (ev) {
   else if (a === 'claim') { readEdit(); ED.o.claim = !ED.o.claim; relabel(); drawEdit(); }
   else if (a === 'mode') { readEdit(); ED.o.mode = i; relabel(); drawEdit(); }
   else if (a === 'pickAddr') { readEdit(); var c = S.custs.filter(function (x) { return x.row === +i; })[0]; if (c) { ED.o.addr = c.addr; if (c.phone) ED.o.phone = c.phone; if (c.phone2) ED.o.phone2 = c.phone2; } drawEdit(); }
-  else if (a === 'snd') { readEdit(); if (i === 'def') { ED.o.sender = ''; ED.o.senderPhone = ''; ED.o.senderAddr = ''; } else { var mc = OP.findCust(S.custs, ED.o.cust), c0 = mc[0] || {}, ca = mc.filter(function (x) { return x.addr; })[0] || c0; ED.o.sender = c0.sender || ED.o.cust; ED.o.senderPhone = c0.senderPhone || ca.phone || ''; ED.o.senderAddr = c0.senderAddr || ca.addr || ''; } drawEdit(); }
+  else if (a === 'snd') { readEdit(); ED.sndCustom = false;
+    if (i === 'def') { ED.o.sender = ''; ED.o.senderPhone = ''; ED.o.senderAddr = ''; }
+    else if (i === 'custom') { ED.sndCustom = true; if (sendersOf(ED.o.cust).some(function (x) { return nz(x.name) === nz(ED.o.sender); })) { ED.o.sender = ''; ED.o.senderPhone = ''; ED.o.senderAddr = ''; } }
+    else { var sx = sendersOf(ED.o.cust)[+i.slice(1)]; if (sx) { ED.o.sender = sx.name; ED.o.senderPhone = sx.phone; ED.o.senderAddr = sx.addr; } }
+    drawEdit(); if (i === 'custom' && $('e-sender')) $('e-sender').focus(); }
+  else if (a === 'pickRecent') { var rc0 = recentOf(ED.o.cust).filter(function (x) { return nz(x.addr) !== nz(ED.o.addr) || nz(x.recv) !== nz(ED.o.recv); }); readEdit(); var x0 = rc0[+i]; if (x0) { ED.o.recv = x0.recv || ''; ED.o.phone = x0.phone || ''; ED.o.phone2 = x0.phone2 || ''; ED.o.addr = x0.addr || ''; if (x0.branch) ED.o.branch = x0.branch; } drawEdit(); }
+  else if (a === 'pEdit') { readBoxes(); var po = byId(i); if (po) { openEdit(po); var sec = $('e-shipSec'); if (sec) sec.scrollIntoView(); } }
+  else if (a === 'monthGet') monthFile();
   else if (a === 'edSave') saveEdit();
   else if (a === 'edDrop') { S.drafts.splice(ED.opt.draft, 1); showSheet(false); renderDrafts(); }
   else if (a === 'edShip') { var id = ED.o.id; saveEdit(function (o2) { mergeOrders([o2]); render(); openShip(id); }); }
@@ -561,7 +600,8 @@ $('q').addEventListener('input', renderList);
 $('cq').addEventListener('input', renderCusts);
 $('cDate').addEventListener('change', function () { CSEL = {}; renderClose(); });
 $('imp').addEventListener('change', function () { if (this.files.length) doImport(Array.prototype.slice.call(this.files)); this.value = ''; });
-document.addEventListener('input', function (ev) { if (ev.target.classList && ev.target.classList.contains('sq')) shipSync(); });
+document.addEventListener('input', function (ev) { if (ev.target.classList && ev.target.classList.contains('sq')) shipSync();
+  if (ev.target.id === 'e-addr' && ED && $('e-saveAddrRow')) $('e-saveAddrRow').classList.toggle('hidden', !newAddr($('e-cust').value, ev.target.value)); });
 document.addEventListener('change', function (ev) { if (ev.target.classList && ev.target.classList.contains('sw')) { shipSync(); return; } if (ev.target.id === 'e-dueCal' && ED && ev.target.value) { readEdit(); ED.o.due = ev.target.value; drawEdit(); return; } if (ev.target.id === 'e-cust' && ED) { readEdit(); var had = ED.o.addr; enrich(ED.o); if (!had && ED.o.addr) notice('주소록에서 주소를 채웠습니다'); drawEdit(); } });
 boot();
 </script>

@@ -80,7 +80,7 @@ var OUT = (function () {
     function block(list, which, numbered) {
       list.forEach(function (o, n) {
         var its = (o.items && o.items.length ? o.items : [{ name: '', sensor: '', qty: '', unit: '', note: '' }]).map(function (i) { return Object.assign({}, i, { note: noteOf(i) }); }), r0 = rows.length, anyNote = its.some(function (i) { return i.note; });
-        var to = [o.recv, o.phone].filter(Boolean).join(' / '), recv = [to, o.addr].filter(Boolean).join(' ') || (o.branch || '');
+        var mine = o.own !== false, to = mine ? [o.recv, o.phone].filter(Boolean).join(' / ') : '', recv = [to, mine ? o.addr : ''].filter(Boolean).join(' ') || (o.branch || '');   // own=false: 단골 기본 주소는 출하서에 안 씀
         its.forEach(function (i, k) {
           var q = qtyCell(i, isAcc); if (typeof q === 'number') sum[which] += q;
           var note = anyNote ? (k === 0 ? [o.memo, i.note].filter(Boolean).join(' / ') : (i.note || '')) : (k === 0 ? (o.memo || '') : '');
@@ -95,6 +95,51 @@ var OUT = (function () {
     block(snap.pending || [], 1, false);
     t = rows.length; rows.push(hd(['출고 대기 합계', '', '', '', '', sum[1], '부자재(센서·파워코드 등) 수량 제외', '', '', '', ''], 4)); merges.push([t, 0, t, 1]);
     return { name: '출하서_' + snap.date, sum: sum, sheets: [{ name: md(snap.date), rows: rows, merges: merges, widths: [5.1, 16.5, 36.4, 23.2, 9.2, 10.4, 33.6, 35.9, 20.1, 13.8, 21.8], rowH: 30, landscape: true }] };
+  }
+
+  /* ----- 하루 마감 파일: 탭 = 출하서 · CJ · 경동 · 대신 · 직납·방문 · 미출고 (그날 나간 것 기준) ----- */
+  var LIST_H = ['일자', '거래처명', '품목명[규격]', '센서', '수량', '적요', '받는분', '배송방법'];
+  function listSheet(name, orders, which, isAcc) {
+    var rows = [hd(LIST_H, 6)];
+    orders.forEach(function (o) { var its = o.items && o.items.length ? o.items : [{ name: '', qty: '' }];
+      its.forEach(function (i, k) { var q = i.qty === '' || i.qty == null ? '' : ((i.unit && i.unit !== '개') || isAcc(i.name) ? i.qty + (i.unit || '개') : +i.qty);
+        rows.push(bd([k ? '' : (which === 'due' ? md(o.due) : md(o.shipped)), k ? '' : o.cust, i.name, i.sensor || '', q, [k ? '' : o.memo, noteOf(i)].filter(Boolean).join(' / '), k ? '' : [o.recv, o.phone, o.branch, o.addr].filter(Boolean).join(' '), k ? '' : (o.ship || '')], [2, 5, 6])); }); });
+    return { name: name, rows: rows, widths: [11, 26, 24, 7, 9, 34, 46, 18], freeze: 1 };
+  }
+  function day(snap, def, isAcc) {
+    isAcc = isAcc || function () { return false; };
+    var sh = (snap.shipped || []), by = function (c) { return sh.filter(function (o) { return o.carrier === c; }); }, out = [];
+    var r = report(snap, isAcc).sheets[0]; r.name = '출하서'; out.push(r);
+    [['CJ', cj], ['경동', kd], ['대신', ds]].forEach(function (x) { var l = by(x[0]); if (!l.length) return; var t = x[1](l, def, snap.date).sheets[0]; t.name = x[0]; out.push(t); });
+    var etc = sh.filter(function (o) { return ['CJ', '경동', '대신'].indexOf(o.carrier) < 0; });
+    if (etc.length) out.push(listSheet('직납·방문 등', etc, 'shipped', isAcc));
+    if ((snap.pending || []).length) out.push(listSheet('미출고', snap.pending, 'due', isAcc));
+    var cnt = {}; sh.forEach(function (o) { var k = o.carrier || '기타'; cnt[k] = (cnt[k] || 0) + 1; });
+    return { name: '하루마감_' + snap.date, sheets: out, count: cnt };
+  }
+
+  /* ----- 월 파일: 거래처별 · 품목별 · 출고목록 + 날짜별 출하서 탭 (11월.xlsx 처럼 최근 날짜가 앞) ----- */
+  function month(data, isAcc) {
+    isAcc = isAcc || function () { return false; };
+    var list = data.shipped || [], byDay = {}, C = {}, I = {}, L = [hd(['출고일', '거래처명', '품목명[규격]', '센서', '출고 수량', '주문 수량', '사유', '배송방법', '거래명세서', '계산서 발행 여부'], 6)];
+    list.slice().sort(function (a, b) { return (a.shipped + a.cust).localeCompare(b.shipped + b.cust); }).forEach(function (o) {
+      (byDay[o.shipped] = byDay[o.shipped] || []).push(o);
+      var c = C[o.cust] || (C[o.cust] = { n: 0, q: 0, acc: 0, stmt: {}, tax: {}, days: {} }); c.n++; c.days[o.shipped] = 1; if (o.stmt) c.stmt[o.stmt] = 1; if (o.tax) c.tax[o.tax] = 1;
+      (o.items || []).forEach(function (i) { var q = +i.qty || 0, acc = isAcc(i.name) || (i.unit && i.unit !== '개');
+        if (acc) c.acc += q; else c.q += q;
+        var k = String(i.name).toLowerCase().replace(/\s+/g, '') + '|' + (i.sensor || ''), it = I[k] || (I[k] = { name: i.name, sensor: i.sensor || '', q: 0, n: 0, unit: acc ? (i.unit || '개') : '' }); it.q += q; it.n++;
+        L.push(bd([md(o.shipped), o.cust, i.name, i.sensor || '', q, i.ord || '', i.why || '', o.ship || '', o.stmt || '', o.tax || ''])); });
+    });
+    var cs = Object.keys(C).sort(), cr = [hd(['거래처명', '출고 건수', '출고일 수', '제품 수량', '부자재 수량', '거래명세서', '계산서 발행 여부'], 6)], tq = 0, ta = 0, tn = 0;
+    cs.forEach(function (k) { var c = C[k]; tq += c.q; ta += c.acc; tn += c.n; cr.push(bd([k, c.n, Object.keys(c.days).length, c.q, c.acc, Object.keys(c.stmt).join(', '), Object.keys(c.tax).join(', ')], [0])); });
+    cr.push(hd(['합계', tn, '', tq, ta, '', ''], 4));
+    var ir = [hd(['품목명[규격]', '센서', '출고 수량', '단위', '출고 횟수'], 6)];
+    Object.keys(I).map(function (k) { return I[k]; }).sort(function (a, b) { return b.q - a.q; }).forEach(function (x) { ir.push(bd([x.name, x.sensor, x.q, x.unit || '', x.n], [0])); });
+    var ym = data.month.split('-'), title = +ym[1] + '월';
+    var sheets = [{ name: '거래처별', rows: cr, widths: [30, 10, 10, 12, 12, 12, 18], freeze: 1 }, { name: '품목별', rows: ir, widths: [30, 8, 12, 8, 10], freeze: 1 }, { name: '출고목록', rows: L, widths: [11, 26, 24, 7, 10, 10, 14, 18, 11, 16], freeze: 1 }];
+    var days = Object.keys(byDay).concat(Object.keys(data.pending || {})).filter(function (d, i, a) { return a.indexOf(d) === i; }).sort().reverse();
+    days.forEach(function (d) { var r = report({ date: d, shipped: byDay[d] || [], pending: (data.pending || {})[d] || [] }, isAcc).sheets[0]; sheets.push(r); });
+    return { name: ym[0] + '년 ' + (+ym[1]) + '월_출고현황', title: title, sheets: sheets, days: days.length, orders: list.length };
   }
 
   /* ----- 옛 엑셀 가져오기: XL.read 결과 → {custs, hist, what} ----- */
@@ -137,7 +182,7 @@ var OUT = (function () {
     return { custs: custs, hist: hist, what: what };
   }
 
-  return { cj: cj, kd: kd, ds: ds, report: report, noteOf: noteOf, importBook: importBook, itemText: itemText, itemStr: itemStr, recvName: recvName, isDirect: isDirect, md: md, tsv: tsv };
+  return { cj: cj, kd: kd, ds: ds, report: report, day: day, month: month, noteOf: noteOf, importBook: importBook, itemText: itemText, itemStr: itemStr, recvName: recvName, isDirect: isDirect, md: md, tsv: tsv };
 })();
 if (typeof module !== 'undefined') module.exports = OUT;
 </script>
