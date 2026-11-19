@@ -57,6 +57,7 @@ var F={
  exportSave:function(p){CALLS.push({exp:{name:p.name,mime:p.mime,len:p.data.length}});return {ok:true,name:p.name,url:'https://drive.google.com/file/d/TEST/view'}},
  getRecentLog:function(){return []}, getMonthlyReport:function(){return []},
  locSetUnit:function(p){CALLS.push({setUnit:p});var it=item(p.id);if(it&&!(it.unit>0)){it.unit=p.unit;return {ok:true,unit:p.unit}}return {ok:false}},
+ locBulkIn:function(p){CALLS.push({bulkIn:p});var out=[],cr=0;p.rows.forEach(function(r){var it=r.id?item(r.id):item(r.newItem.name+'||'+(r.newItem.cat||''));if(!it){it={id:r.newItem.name+'||'+(r.newItem.cat||''),name:r.newItem.name,cat:r.newItem.cat||'',unit:r.per||0,safe:0,total:0,boxes:0,locs:{}};ITEMS.push(it);cr++}it.locs[p.loc]=(it.locs[p.loc]||0)+r.qty;sumLocs(it);if(out.indexOf(it)<0)out.push(it)});return {created:cr,items:out}},
  resetAllStock:function(p){if(p.confirm!=='초기화')throw new Error('확인 문구');ITEMS.forEach(function(it){Object.keys(it.locs).forEach(function(k){it.locs[k]=0});it.total=0});return {ok:true,rows:ITEMS.length}}};
 function runner(s,f){var o={withSuccessHandler:function(h){return runner(h,f)},withFailureHandler:function(h){return runner(s,h)}};
  Object.keys(F).forEach(function(n){o[n]=function(){var a=arguments;setTimeout(function(){try{var r=JSON.parse(JSON.stringify(F[n].apply(null,a)));s&&s(r)}catch(e){f&&f(e)}},n==='appBoot'?DELAY:20)}});return o}

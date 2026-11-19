@@ -77,4 +77,16 @@ ok(Object.values(st).every(s => s.total === 0 && s.boxes === 0), '전체 초기�
   ok(R('locSetUnit', { id: 'SV7||완포', unit: 50 }).ok === true && row[3] === 50, '빈 기본박스입수 채움 (50)');
   ok(R('locSetUnit', { id: 'SV7||완포', unit: 70 }).ok === false && row[3] === 50, '이미 있으면 그대로');
   ok(R('locSetUnit', { id: 'SV7||기판', unit: 30 }).ok === false && master.rows.find(x => x[0] === 'SV7||기판')[3] === 100, '기존 값(100) 안 바뀜'); }
+
+// v47: 붙여넣기 일괄 입고 — 기존 품목 + 새 품목, 1박스 개수로 박스 줄 + 나머지 낱개
+{ const n0 = log.rows.length;
+  const r47 = R('locBulkIn', { loc: 'A동1층! B2', staff: 't', memo: '성우실업 인쇄케이스', rows: [
+    { id: 'SV7||기판', qty: 1000, per: 25 }, { newItem: { name: 'H10 사출 성신', cat: '케이스' }, qty: 340, per: 25 }, { newItem: { name: 'E-34', cat: '케이스' }, qty: 200, per: 0 }] });
+  ok(r47.created === 2 && r47.items.length === 3, '일괄 입고: 3품목, 새 품목 2개');
+  const add = log.rows.slice(n0);
+  ok(add.length === 4 && add[0][6] === 40 && add[0][7] === 25 && add[1][8] === 325 && add[2][8] === 15 && add[2][6] === '' && add[3][8] === 200, '박스 줄(40×25, 13×25) + 낱개 15 + 낱개 200');
+  ok(/붙여넣기 일괄 입고 · 성우실업 인쇄케이스/.test(add[0][11]), '메모에 제목');
+  ok(master.rows.find(x => x[0] === 'H10 사출 성신||케이스')[3] === 25, '새 품목 기본박스입수 = 25');
+  ok(R('computeStock_')['H10 사출 성신||케이스'].locs['A동1층! B2'] === 340, '새 품목 340개 그 칸에');
+  throws(() => R('locBulkIn', { loc: 'x', rows: [{ id: 'SV7||기판', qty: 0 }] }), '수량 0 거절'); }
 console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과'); process.exit(fail ? 1 : 0);

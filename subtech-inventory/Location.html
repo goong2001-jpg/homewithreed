@@ -398,6 +398,21 @@
 #locApp .ihist .hr button{min-height:40px;padding:0 14px;border:1.5px solid #B3412E;border-radius:6px;background:transparent;color:#B3412E;font-weight:700}
 #locApp .ihist .hr.off{opacity:.5}#locApp .ihist .hr.off b{text-decoration:line-through}
 /* v44: 수량 입력 창에서 바로 입고·출고 */
+/* 📋 붙여넣기 일괄 입고 (v47) */
+#locApp .sk button.bulkb,#locApp button.bulkb{background:transparent;color:var(--ink);border:1.5px dashed var(--ink)}
+#locApp .bulk textarea{width:100%;font-size:15px}
+#locApp .bulk .bgo{width:100%;min-height:46px;margin:6px 0 10px;border:1.5px solid var(--ink);border-radius:6px;background:var(--slot);font-weight:700}
+#locApp .brow{border:1.5px solid var(--line);border-radius:6px;padding:8px 10px;margin:0 0 8px;background:var(--slot)}
+#locApp .brow.warn{border-color:#D97706}
+#locApp .brow.off{opacity:.5}
+#locApp .brow .bsrc{font-size:13px;color:var(--sub);margin-bottom:6px;word-break:keep-all}
+#locApp .brow .bsrc input{width:20px;height:20px;vertical-align:-4px}
+#locApp .brow .bl{display:flex;gap:6px;align-items:center;margin:4px 0}
+#locApp .brow .bl select{flex:1;min-width:0;min-height:44px;padding:6px;border:1.5px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);font:inherit;font-size:14px}
+#locApp .brow .bl input{min-height:44px;padding:6px 8px;border:1.5px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);font-size:15px}
+#locApp .brow .bl input[data-bq]{width:96px;text-align:right;font-weight:700}
+#locApp .brow .bnote{font-size:12.5px;color:var(--sub)}
+#locApp .bulk .qacts .bsave{background:#15803D;border-color:#15803D;color:#fff}
 /* 📦 박스 빠른 출입고 (v46) */
 #locApp .qbx{display:flex;align-items:center;gap:6px;margin:4px 0 2px;flex-wrap:wrap}
 #locApp .qbx .qbl{font-weight:700;font-size:14px;color:var(--ink)}
@@ -947,6 +962,128 @@ function openIn(key,opts){
   draw();openPanel();
   const first=P.querySelector(F.mode==='new'?'[data-lp="0"]':'[data-f="q"]');if(first)setTimeout(()=>first.focus(),50);
 }
+/* ---------- 📋 붙여넣기 일괄 입고 (v47) ----------
+   입고 문자(카톡 등)를 붙여넣으면 줄마다 품명·1박스 개수·수량을 나누고 품목마스터와 맞춤 → 확인 → 한 번에 입고(locBulkIn).
+   맞춘 이름은 S.alias = {정리한 이름: 품목ID}에 기억 (모든 폰 공유) → 다음엔 자동. */
+const bnz=v=>String(v==null?'':v).toLowerCase().replace(/[\s\-_.·,()（）\[\]]/g,'');
+function bulkCats(){return [...new Set(ITEMS.map(it=>it.cat).filter(Boolean))].sort((a,b)=>b.length-a.length)}
+/** 글 → {head, rows:[{raw,name,per,qty}]} — 수량이 없는 첫 줄들은 제목(거래처 등), 그 뒤 수량 없는 줄은 무시 */
+function parseBulk(text){
+  const out=[],head=[];
+  String(text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean).forEach(raw=>{
+    let l=raw.replace(/^[-–—•·*▶►→✔✓☞]+\s*/,'').replace(/^\d{1,2}[.)]\s+/,'').trim();
+    let m=l.match(/([\d][\d,]*)\s*(개|ea|pcs|매|장|set|세트)\s*$/i)||l.match(/[:：=]\s*([\d][\d,]*)\s*$/)||l.match(/\s[xX×*]\s*([\d][\d,]*)\s*$/)||l.match(/[-–]\s*([\d][\d,]*)\s*$/),boxes=null;
+    if(!m){const mb=l.match(/([\d][\d,]*)\s*(박스|box|ctn|bx)\s*$/i);if(mb){boxes=+mb[1].replace(/,/g,'');m=mb}}
+    if(!m){if(!out.length)head.push(l);return}
+    let name=l.slice(0,m.index).replace(/[\s:：=\-–xX×*]+$/,'').trim(),per=null;
+    const mp=name.match(/[(（]\s*(\d+)\s*(개입|개|입|ea)?\s*[)）]\s*$/i)||name.match(/\s(\d+)\s*개입$/);
+    if(mp){per=+mp[1];name=name.slice(0,mp.index).replace(/[\s:：=\-–]+$/,'').trim()}
+    if(!name)return;
+    const qty=boxes!=null?(per?boxes*per:0):+m[1].replace(/,/g,'');
+    out.push({raw,name,per,qty,boxes});
+  });
+  return {head:head.join(' '),rows:out};
+}
+/** 이름에서 분류 단어(예: 케이스) 떼어내기 → {toks, cat, clean} */
+function bulkTokens(name,cats){let cat='';const toks=[],keep=[];
+  String(name).split(/\s+/).filter(Boolean).forEach(w=>{const lw=w.toLowerCase();const c=cats.find(c=>lw===c.toLowerCase());if(c){cat=cat||c;return}
+    const c2=cats.find(c=>c.length>=2&&lw.endsWith(c.toLowerCase())&&lw.length>c.length);if(c2){cat=cat||c2;w=w.slice(0,w.length-c2.length)}
+    keep.push(w);toks.push(bnz(w))});
+  return {toks:toks.filter(Boolean),cat,clean:keep.join(' ')}}
+/** 품목 맞추기 → {best: id|null, cands:[id…], cat, clean} */
+function bulkMatch(name,hintCat,cats){
+  const T=bulkTokens(name,cats),cat=T.cat||hintCat||'',key=bnz(name),al=S&&S.alias&&(S.alias[key]||S.alias[bnz(T.clean)]);
+  if(al&&ITEMMAP[al])return {best:al,cands:[al],cat,clean:T.clean,sure:true};
+  const sc=ITEMS.map(it=>{const nm=bnz(it.name),full=nm+bnz(it.cat);
+    if(nm===key||full===key||(nm===bnz(T.clean)&&(!cat||it.cat===cat)))return {it,s:100,hit:T.toks.length};
+    let hit=0;T.toks.forEach(t=>{if(nm.includes(t))hit++});let s=T.toks.length?hit/T.toks.length*10:0;
+    if(!hit)return {it,s:0,hit:0};
+    if(cat&&it.cat===cat)s+=1.5;s-=Math.max(0,nm.length-bnz(T.clean).length)*0.05;return {it,s,hit}})
+    .filter(x=>x.s>0).sort((a,b)=>b.s-a.s);
+  const top=sc[0],sec=sc[1];
+  const sure=!!top&&(top.s>=100||(T.toks.length>0&&top.hit/T.toks.length>=0.6&&(!sec||top.s-sec.s>=1)));
+  return {best:sure?top.it.id:null,cands:sc.slice(0,6).map(x=>x.it.id),cat,clean:T.clean,sure};
+}
+function openBulk(key,opts){
+  opts=opts||{};
+  if(!GAS){toast('일괄 입고는 재고앱의 위치도에서만 돼요');return}
+  if(!stockLoaded){toast('재고 정보를 불러오는 중이에요');return}
+  const P=E('panelBody');P.dataset.kind='bulk';
+  const back=cur?{si:S.cur,r:cur.r,c:cur.c}:null,cats=bulkCats();
+  let text='',head='',rows=[],pin=true;
+  const label=()=>{const w=keyIndex()[key];return w?locLabel(key,keyIndex()):key};
+  P.innerHTML=`<div class="bulk"><div class="ph"><h2>${shTag()}📋 일괄 입고<small>${esc(label())}</small></h2><button class="x" data-b="close">← 돌아가기</button></div>
+    ${opts.convert?'<p class="note" style="color:#B3412E">이 칸은 지금 "빈 공간"이라, 저장할 때 <b>보관칸으로 바꿔서</b> 입고해요.</p>':''}
+    <label class="f">입고 문자를 그대로 붙여넣으세요<textarea data-b="text" rows="6" placeholder="예)\n성우실업 인쇄케이스\n- H10 사출 무상호 (25) : 1,000개\n- E-34 케이스 : 200개"></textarea></label>
+    <button class="bgo" data-b="parse">🔍 나눠 보기</button>
+    <div data-b="rows"></div></div>`;
+  const ta=P.querySelector('[data-b="text"]'),box=P.querySelector('[data-b="rows"]');
+  const goBack=()=>{if(back){S.cur=back.si;cur={r:back.r,c:back.c};render();drawCell()}else closePanel()};
+  P.querySelector('[data-b="close"]').onclick=goBack;
+  const analyze=()=>{text=ta.value;const pr=parseBulk(text);head=pr.head;const hc=bulkTokens(head,cats).cat;
+    rows=pr.rows.map(r=>{const m=bulkMatch(r.name,hc,cats);
+      return {raw:r.raw,name:r.name,per:r.per,qty:r.qty,on:r.qty>0,sel:m.best||'__new',cands:m.cands,sure:m.sure,newName:m.clean||r.name,newCat:m.cat||hc||'',find:''}});
+    drawRows();if(!rows.length)toast('수량이 있는 줄을 못 찾았어요. 줄마다 "품명 : 1,000개"처럼 되어 있는지 봐주세요')};
+  const total=()=>rows.filter(r=>r.on&&r.qty>0).reduce((t,r)=>t+r.qty,0);
+  const drawRows=()=>{
+    if(!rows.length){box.innerHTML='';return}
+    const st=lastStaff(),staff=STAFF.length?STAFF:[''],on=rows.filter(r=>r.on),nNew=on.filter(r=>r.sel==='__new').length,nChk=on.filter(r=>r.sel!=='__new'&&!r.sure).length;
+    box.innerHTML=(head?`<p class="note">제목: <b>${esc(head)}</b> (이력 메모에 남아요)</p>`:'')+
+      rows.map((r,i)=>{const it=ITEMMAP[r.sel],nb=r.per&&r.qty?Math.floor(r.qty/r.per):0,rem=r.per?r.qty-nb*r.per:0;
+        const opts2=[...new Set([r.sel,...r.cands].filter(id=>id&&id!=='__new'&&ITEMMAP[id]))];
+        return `<div class="brow${r.on?'':' off'}${r.on&&(r.sel==='__new'||!r.sure)?' warn':''}" data-i="${i}">
+        <div class="bsrc"><label><input type="checkbox" data-bon="${i}"${r.on?' checked':''}> ${esc(r.raw)}</label></div>
+        <div class="bl"><select data-bsel="${i}"><option value="__new"${r.sel==='__new'?' selected':''}>＋ 새 품목으로 등록</option>${opts2.map(id=>`<option value="${esc(id)}"${id===r.sel?' selected':''}>${esc(ITEMMAP[id].name)}(${esc(ITEMMAP[id].cat||'분류 없음')})</option>`).join('')}<option value="__find">🔍 다른 품목 찾기…</option></select>
+          <input data-bq="${i}" type="number" inputmode="numeric" min="0" value="${r.qty||''}" aria-label="수량"><span>개</span></div>
+        ${r.sel==='__find'?`<div class="bl"><input type="search" data-bf="${i}" value="${esc(r.find)}" placeholder="품명으로 찾기 (예: h10 케이스)" autocomplete="off" style="flex:1"></div><div data-bfl="${i}"></div>`:''}
+        ${r.sel==='__new'?`<div class="bl"><input data-bn="${i}" value="${esc(r.newName)}" placeholder="새 품명" style="flex:1"><select data-bc="${i}"><option value="">(분류 없음)</option>${cats.slice().sort().map(c=>`<option${c===r.newCat?' selected':''}>${esc(c)}</option>`).join('')}</select></div>`:''}
+        <div class="bnote">${r.sel==='__new'?(r.cands.length?`🆕 새로 등록해요 — <b>비슷한 품목 ${r.cands.length}개</b>가 있으니 맞으면 위 목록에서 고르세요`:'🆕 품목마스터에 없어서 새로 등록해요'):r.sure?'✅ 자동으로 맞췄어요':'⚠️ 비슷한 품목 — 맞는지 확인해 주세요'}${r.per?` · 1박스 ${fmtN(r.per)}개 → ${fmtN(nb)}박스${rem?` + ${fmtN(rem)}개`:''}`:''}</div></div>`}).join('')+
+      `<label class="chk"><input type="checkbox" data-b="pin"${pin?' checked':''}> 📌 이 칸에 지정 (칸에 이름이 보임)</label>
+      <div class="qacts">${staff.length>1?`<select data-b="staff" aria-label="담당자">${staff.map(n=>`<option${n===st?' selected':''}>${esc(n)}</option>`).join('')}</select>`:''}<button class="bsave" data-b="save">✓ ${on.length}개 품목 · ${fmtN(total())}개 입고</button></div>
+      ${nNew||nChk?`<p class="note">${nNew?`새 품목 ${nNew}개 등록`:''}${nNew&&nChk?' · ':''}${nChk?`<b>확인 필요 ${nChk}개</b>`:''}</p>`:''}`;
+    box.querySelectorAll('[data-bon]').forEach(c=>c.onchange=()=>{rows[+c.dataset.bon].on=c.checked;drawRows()});
+    box.querySelectorAll('[data-bsel]').forEach(sl=>sl.onchange=()=>{const r=rows[+sl.dataset.bsel];r.sel=sl.value;r.sure=sl.value!=='__new'&&sl.value!=='__find';drawRows();
+      if(sl.value==='__find'){const f=box.querySelector(`[data-bf="${sl.dataset.bsel}"]`);if(f)f.focus()}});
+    box.querySelectorAll('[data-bq]').forEach(q=>q.oninput=()=>{rows[+q.dataset.bq].qty=nInt(q.value)||0;const b=box.querySelector('[data-b="save"]');if(b)b.textContent=`✓ ${rows.filter(r=>r.on).length}개 품목 · ${fmtN(total())}개 입고`});
+    box.querySelectorAll('[data-bn]').forEach(q=>q.oninput=()=>{rows[+q.dataset.bn].newName=q.value});
+    box.querySelectorAll('[data-bc]').forEach(q=>q.onchange=()=>{rows[+q.dataset.bc].newCat=q.value});
+    box.querySelectorAll('[data-bf]').forEach(q=>{const i=+q.dataset.bf,fl=box.querySelector(`[data-bfl="${i}"]`);
+      const list=()=>{const v=q.value;rows[i].find=v;const hs=v.trim()?ITEMS.map(it=>({it,r:srank(it,v)})).filter(h=>h.r>=0).sort((a,b)=>a.r-b.r).slice(0,12):[];
+        fl.innerHTML=hs.map(h=>`<button class="pick" data-bpk="${esc(h.it.id)}"><span>${esc(h.it.name)}</span><small>${esc(h.it.cat||'')}</small></button>`).join('')||(v.trim()?'<p class="none">맞는 품목이 없어요</p>':'');
+        fl.querySelectorAll('[data-bpk]').forEach(b=>b.onclick=()=>{rows[i].sel=b.dataset.bpk;rows[i].sure=true;rows[i].cands=[b.dataset.bpk].concat(rows[i].cands);drawRows()})};
+      q.oninput=list;list()}); // 한글 입력 중엔 목록만 다시 그림
+    const pc=box.querySelector('[data-b="pin"]');if(pc)pc.onchange=()=>{pin=pc.checked};
+    const sv=box.querySelector('[data-b="save"]');if(sv)sv.onclick=()=>save1(sv);
+  };
+  const save1=btn=>{
+    const use=rows.filter(r=>r.on);
+    if(!use.length){toast('입고할 줄을 하나 이상 고르세요');return}
+    if(use.some(r=>!(r.qty>0))){toast('수량이 0인 줄이 있어요');return}
+    if(use.some(r=>r.sel==='__find')){toast('🔍 다른 품목 찾기에서 품목을 골라주세요');return}
+    if(use.some(r=>r.sel==='__new'&&!String(r.newName).trim())){toast('새 품목 이름을 넣어주세요');return}
+    const ss=box.querySelector('[data-b="staff"]'),staff=ss?ss.value:lastStaff();try{if(staff)localStorage.setItem('subtek-staff',staff)}catch(e){}
+    if(opts.convert){const c=opts.convert,y=ensure(S.sheets[c.si],c.r,c.c);if(y.type!=='slot'){y.type='slot';if(!y.layers||!y.layers.length)y.layers=[{t:''}];save()}}
+    btn.disabled=true;btn.textContent='저장 중…';
+    const req=use.map(r=>r.sel==='__new'?{newItem:{name:String(r.newName).trim(),cat:r.newCat},qty:r.qty,per:r.per||0}:{id:r.sel,qty:r.qty,per:r.per||0});
+    GAS.withSuccessHandler(res=>{
+      (res.items||[]).forEach(it=>{upsertItem(it);if(host())host().itemUpserted(it)});
+      // 맞춘 이름 기억 · 1박스 개수 기억 · 칸에 지정 · 재고X 해제
+      if(!S.alias)S.alias={};
+      const byKey={};(res.items||[]).forEach(it=>byKey[it.id]=it);
+      use.forEach((r,i)=>{const id=r.sel==='__new'?(String(r.newName).trim()+'||'+r.newCat):r.sel;if(!ITEMMAP[id])return;
+        S.alias[bnz(r.name)]=id;if(r.per)rememberPer(key,id,[{boxes:1,per:r.per}]);if(isOut(id)&&!STALE)setOut(id,false)});
+      const w=keyIndex()[key];
+      if(pin&&w&&w.kind==='slot'){const L=ensure(S.sheets[w.si],w.r,w.c).layers[w.i];L.p=uniqP((L.p||[]).concat(use.map(r=>{const id=r.sel==='__new'?(String(r.newName).trim()+'||'+r.newCat):r.sel;const it=ITEMMAP[id];return it?{id:it.id,name:it.name}:null}).filter(Boolean)))}
+      save();renderGrid();renderStockBar();
+      toast(`${use.length}개 품목 · ${fmtN(use.reduce((t,r)=>t+r.qty,0))}개 입고했어요`+(res.created?` (새 품목 ${res.created}개 등록)`:''));
+      if(w&&w.kind==='slot'){S.cur=w.si;cur={r:w.r,c:w.c};render();drawCell()}else goBack();
+    }).withFailureHandler(e=>{btn.disabled=false;btn.textContent=`✓ ${use.length}개 품목 · ${fmtN(total())}개 입고`;toast((e&&e.message)||'입고하지 못했어요')})
+    .locBulkIn({loc:key,rows:req,staff,memo:head});
+  };
+  P.querySelector('[data-b="parse"]').onclick=analyze;
+  ta.addEventListener('paste',()=>setTimeout(analyze,50)); // 붙여넣으면 바로 나눠 봄 (글 상자는 다시 그리지 않음)
+  openPanel();setTimeout(()=>ta.focus(),60);
+}
 /** 위치도에서 바로 출고: 박스 줄(박스 수 × 박스당 수량) + 낱개. 칸 창에서 왔으면 저장 뒤 칸 창으로 돌아감 */
 function openOut(key,id){
   if(!GAS){toast('출고는 재고앱의 위치도에서만 돼요');return}
@@ -1303,10 +1440,11 @@ function drawCell(){
   const ph={slot:'예: 선반1, 파레트',label:'예: 현관, 벽쪽, 가운데',void:'예: 복도, 통로'}[x.type];
   P.innerHTML=`<div class="ph"><h2>${shTag()}${code(r,c)}${big?`<small>${x.rs}×${x.cs} 합친 칸</small>`:''}</h2><button class="x" data-a="close">닫기</button></div>
   ${x.type==='slot'?x.layers.map((L,i)=>{const k=slotKey(s,r,c,i),list=stockAt(k);return `<div class="sk"><h3>현재 재고${x.layers.length>1?' · '+(i+1)+'층':''}<small>${esc(k)}</small></h3>
-    ${stockLoaded||!GAS?stockRows(list,k):'<p class="none">불러오는 중…</p>'}<button class="in" data-in="${esc(k)}">＋ 이 칸에 입고</button>${layerMovable(s,r,c,i)?`<button class="mv" data-mvl="${i}">⇄ ${x.layers.length>1?(i+1)+'층':'칸'} 전체 이동</button>`:''}
+    ${stockLoaded||!GAS?stockRows(list,k):'<p class="none">불러오는 중…</p>'}<button class="in" data-in="${esc(k)}">＋ 이 칸에 입고</button>${GAS?`<button class="in bulkb" data-bulk="${esc(k)}">📋 붙여넣기 일괄 입고</button>`:''}${layerMovable(s,r,c,i)?`<button class="mv" data-mvl="${i}">⇄ ${x.layers.length>1?(i+1)+'층':'칸'} 전체 이동</button>`:''}
     ${GAS?`<div class="pp"><span class="pk">📌 지정 제품</span>${(L.p||[]).map((pr,pi)=>`<span class="chip">${nameCat(prodName(pr),prodCat(pr))}<button data-unp="${i},${pi}" aria-label="${esc(prodName(pr))} 지정 해제">✕</button></span>`).join('')}<button class="mv" data-pick="${i}">＋ 제품 지정</button></div>`:''}</div>`}).join(''):''}
   ${x.type==='slot'&&x.layers.length>1&&x.layers.some((L,i)=>layerMovable(s,r,c,i))?`<button class="mvall" data-mvcell="1">⇄ 칸째로 이동 (${x.layers.map((L,i)=>(i+1)+'층').join('·')} 모두)</button>`:''}
   ${x.type==='slot'&&GAS?qtyHTML(s,r,c,false):''}
+  ${x.type==='void'&&GAS?'<button class="in bulkb" data-bulkcell="1" style="width:100%;margin:4px 0 10px">📋 붙여넣기 일괄 입고 <small>(이 칸을 보관칸으로 바꿔서)</small></button>':''}
   <details class="cfg"${cfgOpen?' open':''}><summary>⚙️ 칸 설정 <small>종류 · 이름 · 적재 방식</small></summary>
   <div class="seg">${[['slot','보관칸'],['label','이름표'],['void','빈 공간']].map(([v,t])=>`<button data-type="${v}" class="${x.type===v?'on':''}">${t}</button>`).join('')}</div>
   <label class="f">이름${big?' (합친 칸은 가운데에 크게 보여요)':''}<input data-f="label" value="${esc(x.label)}" placeholder="${ph}"></label>
@@ -1319,6 +1457,8 @@ function drawCell(){
     ${s.cells[K(r,c)]||cellHasStock(s,r,c)?'<button class="danger" data-a="clearcell">🗑 이 칸 삭제</button>':''}
   </div>`;
   bindGo(P);if(x.type==='slot'&&GAS)bindQty(P,s,r,c,false);
+  P.querySelectorAll('[data-bulk]').forEach(b=>b.onclick=()=>openBulk(b.dataset.bulk));
+  P.querySelectorAll('[data-bulkcell]').forEach(b=>b.onclick=()=>openBulk(slotKey(s,r,c,0),{convert:{si:S.cur,r,c}}));
   P.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{const y=ensure(s,r,c);if(b.dataset.kind)y.kind=b.dataset.kind;else delete y.kind;save();renderGrid();drawCell()});
   P.querySelectorAll('[data-mvl]').forEach(b=>b.onclick=()=>startCellMove(s,r,c,[+b.dataset.mvl]));
   P.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>openPick(+b.dataset.pick));

@@ -440,3 +440,44 @@ function locSetUnit(p) {
   }
   return { ok: false };
 }
+
+/** 붙여넣기 일괄 입고 (v47): 한 칸에 여러 품목을 한 번에 입고. 없는 품목은 새로 만듦(기본박스입수 = 1박스 개수).
+ *  p = {loc, staff, memo, rows:[{id} 또는 {newItem:{name,cat}}, qty, per}]  → {items:[…], created}
+ *  1박스 개수(per)가 있으면 '박스수×박스당' 줄 + 나머지는 낱개 줄, 없으면 낱개 한 줄. */
+function locBulkIn(p) {
+  p = p || {};
+  const loc = String(p.loc || '').trim();
+  if (!loc) throw new Error('입고할 칸을 고르세요.');
+  const rows = (p.rows || []).map(r => ({ id: r.id ? String(r.id) : '', newItem: r.newItem || null, qty: Math.floor(Number(r.qty) || 0), per: Math.floor(Number(r.per) || 0) }));
+  if (!rows.length) throw new Error('입고할 품목이 없어요.');
+  rows.forEach(r => { if (!(r.qty > 0)) throw new Error('수량이 0인 줄이 있어요.'); if (!r.id && !(r.newItem && String(r.newItem.name || '').trim())) throw new Error('품목을 고르지 않은 줄이 있어요.'); });
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const info = locMasterInfo_(), now = new Date(), staff = p.staff || '', out = [], ids = [];
+    const memo = '붙여넣기 일괄 입고' + (p.memo ? ' · ' + String(p.memo).slice(0, 200) : '');
+    let created = 0;
+    rows.forEach(r => {
+      let it;
+      if (r.id) { it = info[r.id]; if (!it) throw new Error('품목을 찾을 수 없어요 (' + r.id.split('||')[0] + '). 새로고침 후 다시 해주세요.'); }
+      else {
+        const name = String(r.newItem.name).trim(), cat = String(r.newItem.cat || '').trim();
+        it = info[name + '||' + cat];                 // 같은 품명+분류가 이미 있으면 그 품목
+        if (!it) { it = addItem({ name: name, cat: cat, unit: r.per || '' }); info[it.id] = it; created++; }
+      }
+      if (ids.indexOf(it.id) < 0) ids.push(it.id);
+      if (r.per > 0 && r.qty >= r.per) {
+        const full = Math.floor(r.qty / r.per), rem = r.qty - full * r.per;
+        out.push([now, it.id, it.name, it.cat, loc, '입고', full, r.per, full * r.per, full * r.per, staff, memo, '']);
+        if (rem) out.push([now, it.id, it.name, it.cat, loc, '입고', '', '', rem, rem, staff, memo, '']);
+      } else out.push([now, it.id, it.name, it.cat, loc, '입고', '', '', r.qty, r.qty, staff, memo, '']);
+    });
+    const log = SpreadsheetApp.getActive().getSheetByName(TAB_LOG);
+    log.getRange(log.getLastRow() + 1, 1, out.length, 13).setValues(out);
+    const st = computeStock_();
+    return { created: created, items: ids.map(id => { const it = info[id], s = st[id] || { total: 0, boxes: 0, locs: {} };
+      return { id: it.id, name: it.name, cat: it.cat, unit: it.unit, safe: it.safe || 0, total: s.total, boxes: s.boxes || 0, locs: s.locs }; }) };
+  } finally {
+    lock.releaseLock();
+  }
+}
