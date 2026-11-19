@@ -25,6 +25,8 @@ export interface CouponEvent {
   cost?: number;
   /** big 일 때 받은 큰 보상 이름 */
   label?: string;
+  /** use 일 때 쓴 장수, trade 일 때 받은 장수 (없으면 1장) */
+  count?: number;
 }
 
 export interface WordProgress {
@@ -301,33 +303,36 @@ export function useWordProgress() {
   }, [progress, save]);
 
   /** 같은 쿠폰 TRADE_COST 장을 내고 다른 쿠폰 한 장을 받는다 */
-  const tradeCoupon = useCallback((from: CouponId, to: CouponId): boolean => {
+  const tradeCoupon = useCallback((from: CouponId, to: CouponId, count = 1): boolean => {
     const have = progress.coupons[from] ?? 0;
-    if (from === to || have < TRADE_COST) return false;
+    const n = Math.floor(count);
+    const cost = TRADE_COST * n;
+    if (from === to || !(n >= 1) || have < cost) return false;
     const next: WordProgress = {
       ...progress,
       coupons: {
         ...progress.coupons,
-        [from]: have - TRADE_COST,
-        [to]: (progress.coupons[to] ?? 0) + 1,
+        [from]: have - cost,
+        [to]: (progress.coupons[to] ?? 0) + n,
       },
-      history: [{ id: to, from, cost: TRADE_COST, type: 'trade' as const, at: todayKey() }, ...progress.history].slice(0, 60),
+      history: [{ id: to, from, cost, count: n, type: 'trade' as const, at: todayKey() }, ...progress.history].slice(0, 60),
     };
     save(next);
     return true;
   }, [progress, save]);
 
-  /** 쿠폰 사용 */
-  const useCoupon = useCallback((id: CouponId): boolean => {
+  /** 쿠폰 사용 — 같은 쿠폰 여러 장을 한 번에 쓸 수 있다 */
+  const useCoupon = useCallback((id: CouponId, count = 1): boolean => {
     const have = progress.coupons[id] ?? 0;
-    if (have <= 0) return false;
+    const n = Math.floor(count);
+    if (!(n >= 1) || have < n) return false;
     const next: WordProgress = {
       ...progress,
-      coupons: { ...progress.coupons, [id]: have - 1 },
-      history: [{ id, type: 'use' as const, at: todayKey() }, ...progress.history].slice(0, 60),
+      coupons: { ...progress.coupons, [id]: have - n },
+      history: [{ id, type: 'use' as const, at: todayKey(), ...(n > 1 ? { count: n } : {}) }, ...progress.history].slice(0, 60),
     };
     save(next);
-    logDay('used');
+    logDay('used', n);
     return true;
   }, [progress, save]);
 

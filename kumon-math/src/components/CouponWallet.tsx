@@ -14,34 +14,68 @@ interface Props {
   bigRewards: BigReward[];
   /** 쿠폰을 쓸 때 엄마·아빠 확인을 받는지 */
   approveUse: boolean;
-  onUse: (id: CouponId) => boolean;
-  onTrade: (from: CouponId, to: CouponId) => boolean;
+  onUse: (id: CouponId, count: number) => boolean;
+  onTrade: (from: CouponId, to: CouponId, count: number) => boolean;
   onSave: (id: CouponId) => boolean;
   onBuyBig: (label: string, cost: number) => boolean;
   onClose: () => void;
 }
 
 /** 쓰려는 것 — 쿠폰 한 장이거나 저금통 큰 보상 */
-type Pending = { kind: 'use'; id: CouponId } | { kind: 'big'; reward: BigReward };
+type Pending = { kind: 'use'; id: CouponId; count: number } | { kind: 'big'; reward: BigReward };
+
+/** 장수 고르기 — − 숫자 + */
+function Stepper({ value, max, onChange, label }: {
+  value: number; max: number; onChange: (n: number) => void; label: string;
+}) {
+  const b = (on: boolean): React.CSSProperties => ({
+    width: 40, height: 40, borderRadius: 12, border: 'none', fontSize: 22, fontWeight: 900,
+    background: on ? '#ede7ff' : '#f2f2f2', color: on ? '#7c4dff' : '#ccc',
+    cursor: on ? 'pointer' : 'default', fontFamily: 'inherit',
+  });
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+      <button aria-label={`${label} 줄이기`} disabled={value <= 1}
+        onClick={() => { playClick(); onChange(Math.max(1, value - 1)); }} style={b(value > 1)}>−</button>
+      <span aria-label={label} style={{ minWidth: 56, textAlign: 'center', fontSize: 20, fontWeight: 900, color: '#44405e' }}>
+        {value}장
+      </span>
+      <button aria-label={`${label} 늘리기`} disabled={value >= max}
+        onClick={() => { playClick(); onChange(Math.min(max, value + 1)); }} style={b(value < max)}>+</button>
+      {max > 1 && (
+        <button disabled={value >= max} onClick={() => { playClick(); onChange(max); }} style={{
+          padding: '8px 10px', borderRadius: 12, border: '2px solid #e6e1f5', background: 'white',
+          color: value >= max ? '#ccc' : '#7c4dff', fontSize: 13, fontWeight: 800,
+          cursor: value >= max ? 'default' : 'pointer', fontFamily: 'inherit',
+        }}>모두 ({max})</button>
+      )}
+    </div>
+  );
+}
 
 export default function CouponWallet({
   coupons, history, piggy, bigRewards, approveUse, onUse, onTrade, onSave, onBuyBig, onClose,
 }: Props) {
-  // 교환: 쿠폰 TRADE_COST 장 → 다른 쿠폰 1장
+  // 교환: 쿠폰 TRADE_COST 장 → 다른 쿠폰 1장, 여러 장을 한 번에 바꿀 수 있다
   const [tradeFrom, setTradeFrom] = useState<CouponId | null>(null);
   const [tradeTo, setTradeTo] = useState<CouponId | null>(null);
+  const [tradeCount, setTradeCount] = useState(1);
   const tradable = COUPONS.filter(c => c.tradable);
   const canGive = tradable.filter(c => (coupons[c.id] ?? 0) >= TRADE_COST);
+  /** 지금 고른 쿠폰으로 몇 장까지 받을 수 있는지 */
+  const tradeMax = tradeFrom ? Math.floor((coupons[tradeFrom] ?? 0) / TRADE_COST) : 0;
 
   const doTrade = () => {
     if (!tradeFrom || !tradeTo) return;
-    if (onTrade(tradeFrom, tradeTo)) {
+    const n = Math.min(tradeCount, tradeMax);
+    if (onTrade(tradeFrom, tradeTo, n)) {
       playPurchase();
-      setUsedMsg(`${couponById(tradeFrom).name} → ${couponById(tradeTo).name}(으)로 바꿨어요! 🔄`);
+      setUsedMsg(`${couponById(tradeFrom).name} ${n * TRADE_COST}장 → ${couponById(tradeTo).name} ${n}장으로 바꿨어요! 🔄`);
       setTimeout(() => setUsedMsg(null), 2600);
     }
     setTradeFrom(null);
     setTradeTo(null);
+    setTradeCount(1);
   };
   const [confirming, setConfirming] = useState<Pending | null>(null);
   // 엄마·아빠 확인을 기다리는 것
@@ -55,7 +89,10 @@ export default function CouponWallet({
   /** 실제로 쓴다 (확인을 다 받은 뒤) */
   const spend = (p: Pending) => {
     if (p.kind === 'use') {
-      if (onUse(p.id)) { playPurchase(); flash(`${couponById(p.id).name} 사용! 엄마 아빠에게 보여주세요 🙌`); }
+      if (onUse(p.id, p.count)) {
+        playPurchase();
+        flash(`${couponById(p.id).name}${p.count > 1 ? ` ${p.count}장` : ''} 사용! 엄마 아빠에게 보여주세요 🙌`);
+      }
     } else if (onBuyBig(p.reward.name, p.reward.cost)) {
       playPurchase();
       flash(`${p.reward.emoji} ${p.reward.name} 받았어요! 엄마 아빠에게 보여주세요 🙌`);
@@ -143,7 +180,7 @@ export default function CouponWallet({
                   )}
                   <button
                     disabled={!has}
-                    onClick={() => { setConfirming({ kind: 'use', id: c.id }); playClick(); }}
+                    onClick={() => { setConfirming({ kind: 'use', id: c.id, count: 1 }); playClick(); }}
                     style={{
                       padding: '9px 16px', borderRadius: 12, border: 'none',
                       background: has ? '#ffffff' : '#ddd',
@@ -214,7 +251,7 @@ export default function CouponWallet({
             🔄 쿠폰 바꾸기
           </div>
           <div style={{ fontSize: 12, color: '#8a7a9a', marginBottom: 10 }}>
-            쿠폰 1장을 다른 쿠폰 1장으로 바꿀 수 있어요 (500원 쿠폰은 빼고)
+            쿠폰 1장을 다른 쿠폰 1장으로 바꿀 수 있어요. 몇 장을 바꿀지 한 번에 정해요 (500원 쿠폰은 빼고)
           </div>
           {canGive.length === 0 ? (
             <div style={{ fontSize: 13, color: '#aaa', fontWeight: 700 }}>
@@ -226,7 +263,7 @@ export default function CouponWallet({
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
                 {canGive.map(c => (
                   <button key={c.id}
-                    onClick={() => { setTradeFrom(c.id); if (tradeTo === c.id) setTradeTo(null); playClick(); }}
+                    onClick={() => { setTradeFrom(c.id); setTradeCount(1); if (tradeTo === c.id) setTradeTo(null); playClick(); }}
                     style={{
                       padding: '8px 10px', borderRadius: 12, fontFamily: 'inherit', cursor: 'pointer',
                       border: tradeFrom === c.id ? '3px solid #7c4dff' : '2px solid #ddd',
@@ -239,7 +276,7 @@ export default function CouponWallet({
               </div>
               {tradeFrom && (
                 <>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: '#888', marginBottom: 6 }}>② 받을 쿠폰 (1장)</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#888', marginBottom: 6 }}>② 받을 쿠폰</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
                     {tradable.filter(c => c.id !== tradeFrom).map(c => (
                       <button key={c.id}
@@ -256,6 +293,14 @@ export default function CouponWallet({
                   </div>
                 </>
               )}
+              {tradeFrom && tradeTo && (
+                <>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#888', marginBottom: 6 }}>③ 몇 장 바꿀까요?</div>
+                  <div style={{ marginBottom: 10 }}>
+                    <Stepper value={Math.min(tradeCount, tradeMax)} max={tradeMax} onChange={setTradeCount} label="바꿀 장수" />
+                  </div>
+                </>
+              )}
               <button
                 disabled={!tradeFrom || !tradeTo}
                 onClick={doTrade}
@@ -266,7 +311,7 @@ export default function CouponWallet({
                   cursor: tradeFrom && tradeTo ? 'pointer' : 'not-allowed',
                 }}>
                 {tradeFrom && tradeTo
-                  ? `${couponById(tradeFrom).emoji} → ${couponById(tradeTo).emoji} 바꾸기`
+                  ? `${couponById(tradeFrom).emoji} ${Math.min(tradeCount, tradeMax) * TRADE_COST}장 → ${couponById(tradeTo).emoji} ${Math.min(tradeCount, tradeMax)}장 바꾸기`
                   : '바꿀 쿠폰을 골라주세요'}
               </button>
             </>
@@ -293,8 +338,8 @@ export default function CouponWallet({
                       : h.type === 'save'
                       ? `🐷 ${couponById(h.id).name} 저금`
                       : h.type === 'trade' && h.from
-                      ? `🔄 ${couponById(h.from).name}${(h.cost ?? 2) > 1 ? ` ${h.cost ?? 2}장` : ''} → ${couponById(h.id).name}`
-                      : `${couponById(h.id).emoji} ${couponById(h.id).name} ${h.type === 'earn' ? '받음' : '사용'}`}
+                      ? `🔄 ${couponById(h.from).name}${(h.cost ?? 2) > 1 ? ` ${h.cost ?? 2}장` : ''} → ${couponById(h.id).name}${(h.count ?? 1) > 1 ? ` ${h.count}장` : ''}`
+                      : `${couponById(h.id).emoji} ${couponById(h.id).name}${(h.count ?? 1) > 1 ? ` ${h.count}장` : ''} ${h.type === 'earn' ? '받음' : '사용'}`}
                   </span>
                   <span style={{ color: '#aaa', fontWeight: 600 }}>{h.at}</span>
                 </div>
@@ -323,10 +368,16 @@ export default function CouponWallet({
               </div>
               <div style={{ fontSize: 14, color: '#888', marginBottom: 18, lineHeight: 1.5 }}>
                 {confirming.kind === 'use'
-                  ? <>지금 사용할까요?<br />한 번 쓰면 쿠폰이 없어져요.</>
+                  ? <>몇 장 쓸까요?<br />쓴 쿠폰은 없어져요.</>
                   : <>저금통에서 {confirming.reward.cost}장을 내고 받을까요?</>}
-                {approveUse && <><br />엄마·아빠 확인이 필요해요 🔒</>}
+                {approveUse && <><br />엄마·아빠 확인은 한 번만 하면 돼요 🔒</>}
               </div>
+              {confirming.kind === 'use' && (coupons[confirming.id] ?? 0) > 1 && (
+                <div style={{ marginBottom: 18 }}>
+                  <Stepper value={confirming.count} max={coupons[confirming.id] ?? 1} label="쓸 장수"
+                    onChange={n => setConfirming({ ...confirming, count: n })} />
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
                   onClick={() => { setConfirming(null); playClick(); }}
@@ -346,7 +397,7 @@ export default function CouponWallet({
                     fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
                   }}
                 >
-                  네, 쓸래요!
+                  {confirming.kind === 'use' && confirming.count > 1 ? `${confirming.count}장 쓸래요!` : '네, 쓸래요!'}
                 </button>
               </div>
             </div>
@@ -355,7 +406,7 @@ export default function CouponWallet({
 
         {gate && (
           <ParentGate
-            title={gate.kind === 'use' ? `${couponById(gate.id).name} 쓰기` : `${gate.reward.name} 받기`}
+            title={gate.kind === 'use' ? `${couponById(gate.id).name}${gate.count > 1 ? ` ${gate.count}장` : ''} 쓰기` : `${gate.reward.name} 받기`}
             onPass={() => { const p = gate; setGate(null); spend(p); }}
             onCancel={() => setGate(null)}
           />

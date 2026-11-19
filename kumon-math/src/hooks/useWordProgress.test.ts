@@ -143,3 +143,34 @@ describe('useWordProgress — 졸업 시험', () => {
     expect(result.current.progress.pendingGrad).toEqual([]);
   });
 });
+
+describe('useWordProgress — 여러 장 한 번에', () => {
+  it('쿠폰을 정한 장수만큼 한 번에 바꾼다', () => {
+    localStorage.setItem(KEY, JSON.stringify({ date: todayKey(), coupons: { tv: 5, roblox: 1 } }));
+    const { result } = renderHook(() => useWordProgress());
+    let ok = false;
+    act(() => { ok = result.current.tradeCoupon('tv', 'roblox', 3); });
+    expect(ok).toBe(true);
+    expect(result.current.progress.coupons).toEqual({ tv: 2, roblox: 4 });
+    expect(result.current.progress.history[0]).toMatchObject({ type: 'trade', from: 'tv', id: 'roblox', cost: 3, count: 3 });
+    // 가진 것보다 많이는 못 바꾼다
+    act(() => { ok = result.current.tradeCoupon('tv', 'roblox', 3); });
+    expect(ok).toBe(false);
+    expect(result.current.progress.coupons.tv).toBe(2);
+  });
+
+  it('같은 쿠폰 여러 장을 한 번에 쓴다', () => {
+    localStorage.setItem(KEY, JSON.stringify({ date: todayKey(), coupons: { tv: 4 } }));
+    const { result } = renderHook(() => useWordProgress());
+    let ok = false;
+    act(() => { ok = result.current.useCoupon('tv', 3); });
+    expect(ok).toBe(true);
+    expect(result.current.progress.coupons.tv).toBe(1);
+    expect(result.current.progress.history[0]).toMatchObject({ type: 'use', id: 'tv', count: 3 });
+    act(() => { ok = result.current.useCoupon('tv', 2); });
+    expect(ok).toBe(false);
+    act(() => { ok = result.current.useCoupon('tv'); });
+    expect(ok).toBe(true);
+    expect(result.current.progress.coupons.tv).toBe(0);
+  });
+});
