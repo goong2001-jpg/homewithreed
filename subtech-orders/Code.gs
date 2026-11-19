@@ -4,7 +4,7 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v16';
+var APP_VERSION = 'v17';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
 var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록', DEL: '주문_삭제기록', LRN: '주문_학습' };
@@ -15,9 +15,9 @@ var KEEP_DAYS = 30;   // 이 앱이 쓰는 탭 (이 밖의 탭엔 쓰지 않는�
 
 // 주문 탭 열 (순서 바꾸지 말 것 — 뒤에 덧붙이기만)
 var OH = ['주문ID', '접수일시', '상태', '출고예정', '거래처', '품목', '적요', '받는분', '전화', '전화2', '주소', '배송방법', '운송', '운임구분', '청구',
-  '영업소', '보내는분', '보내는분전화', '보내는분주소', '배송메시지', '박스', '송장출력일시', '출고일', '거래명세서', '계산서', '올린사람', '원문', '품목JSON', '재고차감', '수정일시', '운송방식', '원주문', '준비완료', '준비한사람', '송장부착', '부착한사람'];
+  '영업소', '보내는분', '보내는분전화', '보내는분주소', '배송메시지', '박스', '송장출력일시', '출고일', '거래명세서', '계산서', '올린사람', '원문', '품목JSON', '재고차감', '수정일시', '운송방식', '원주문', '준비완료', '준비한사람', '송장부착', '부착한사람', '품목준비'];
 var OK_ = ['id', 'at', 'st', 'due', 'cust', 'itemsText', 'memo', 'recv', 'phone', 'phone2', 'addr', 'ship', 'carrier', 'pay', 'claim',
-  'branch', 'sender', 'senderPhone', 'senderAddr', 'msg', 'box', 'printed', 'shipped', 'stmt', 'tax', 'who', 'raw', 'items', 'stock', 'upd', 'mode', 'parent', 'ready', 'readyBy', 'tagged', 'taggedBy'];
+  'branch', 'sender', 'senderPhone', 'senderAddr', 'msg', 'box', 'printed', 'shipped', 'stmt', 'tax', 'who', 'raw', 'items', 'stock', 'upd', 'mode', 'parent', 'ready', 'readyBy', 'tagged', 'taggedBy', 'itemReady'];
 var CH = ['거래처명', '전화', '전화2', '주소', '경동영업소', '대신영업소', '기본배송', '보내는분', '보내는분전화', '보내는분주소', '거래명세서', '계산서', '메모', '수정일시'];
 var CK_ = ['name', 'phone', 'phone2', 'addr', 'kd', 'ds', 'ship', 'sender', 'senderPhone', 'senderAddr', 'stmt', 'tax', 'memo', 'upd'];
 var HH = ['일자', '운송', '받는분', '품목', '박스수', '박스타입', '운임', '출처'];
@@ -52,6 +52,7 @@ function toRow_(o) {
   return OK_.map(function (k) {
     if (k === 'itemsText') return itemsText_(o.items);
     if (k === 'items' || k === 'box') return JSON.stringify(o[k] || []);
+    if (k === 'itemReady') return o.itemReady && Object.keys(o.itemReady).length ? JSON.stringify(o.itemReady) : '';
     if (k === 'claim') return o.claim ? 'O' : '';
     return o[k] == null ? '' : String(o[k]);
   });
@@ -62,6 +63,7 @@ function fromRow_(r) {
     var v = str_(r[i]);
     if (k === 'itemsText') return;
     if (k === 'items' || k === 'box') { try { o[k] = v ? JSON.parse(v) : []; } catch (e) { o[k] = []; } return; }
+    if (k === 'itemReady') { try { o.itemReady = v ? JSON.parse(v) : {}; } catch (e) { o.itemReady = {}; } return; }
     if (k === 'claim') { o.claim = v === 'O'; return; }
     o[k] = v;
   });
@@ -75,7 +77,7 @@ function recent_(list) {   // 화면에 보낼 주문: 대기 전부 + 최근 21
 
 /* ---------- 화면이 부르는 단 하나의 입구 ---------- */
 // 생산 암호로 들어온 사람이 쓸 수 있는 기능 (보기 + 준비완료·송장부착만)
-var LINE_FNS = ['lineBoot', 'lineMark', 'ver'];
+var LINE_FNS = ['lineBoot', 'lineMark', 'lineItem', 'ver'];
 function api(pin, fn, arg) {
   var set = settings_(), p = String(pin || ''), role = 'office';
   if (set['암호'] && p !== set['암호']) {
@@ -87,7 +89,7 @@ function api(pin, fn, arg) {
   return API[fn](arg || {}, set, role);
 }
 // 생산 화면에 보내는 주문 모양: 받는분은 이름만(v9, 거래처명(받는분) 표시용), 전화·주소·보내는분·원문은 빼고 생산에 필요한 것만
-function lineSlim_(o) { var x = {}; ['id', 'at', 'due', 'cust', 'recv', 'items', 'memo', 'ship', 'carrier', 'printed', 'box', 'ready', 'readyBy', 'tagged', 'taggedBy', 'parent', 'st'].forEach(function (k) { x[k] = o[k]; }); return x; }
+function lineSlim_(o) { var x = {}; ['id', 'at', 'due', 'cust', 'recv', 'items', 'memo', 'ship', 'carrier', 'printed', 'box', 'ready', 'readyBy', 'tagged', 'taggedBy', 'itemReady', 'mode', 'parent', 'st'].forEach(function (k) { x[k] = o[k]; }); return x; }
 var API = {
   boot: function (a, set) {
     var items = [];
@@ -107,7 +109,7 @@ var API = {
         if (!o.items || !o.items.length) throw new Error('품목이 없는 주문이 있습니다' + (o.cust ? ': ' + o.cust : ''));
         o.upd = stamp;
         if (o.id) { var k = ids.indexOf(o.id); if (k < 0) throw new Error('주문을 찾을 수 없습니다: ' + o.id);
-          var cur = fromRow_(sh.getRange(k + 2, 1, 1, OH.length).getValues()[0]); ['ready', 'readyBy', 'tagged', 'taggedBy'].forEach(function (f) { o[f] = cur[f]; });   // 생산이 누른 준비완료·송장부착은 사무실 저장으로 덮어쓰지 않음
+          var cur = fromRow_(sh.getRange(k + 2, 1, 1, OH.length).getValues()[0]); ['ready', 'readyBy', 'tagged', 'taggedBy', 'itemReady'].forEach(function (f) { o[f] = cur[f]; });   // 생산이 누른 준비완료·송장부착은 사무실 저장으로 덮어쓰지 않음
           sh.getRange(k + 2, 1, 1, OH.length).setValues([toRow_(o)]); }
         else { var j = 1; while (used.indexOf('O' + base + '-' + j) >= 0) j++; o.id = 'O' + base + '-' + j; used.push(o.id); o.at = o.at || stamp; o.st = o.st || '대기'; add.push(toRow_(o)); }   // 같은 초에 저장해도 ID가 겹치지 않게
         out.push(o);
@@ -207,7 +209,7 @@ var API = {
       if (rest.length && a.rest !== 'drop') {
         var r = JSON.parse(JSON.stringify(o)), base = String(o.parent || o.id).replace(/-r\d+$/, ''), j = 1;
         while (ids[base + '-r' + j]) j++;
-        r.id = base + '-r' + j; r.parent = o.parent || o.id; r.items = rest; r.st = '대기'; r.shipped = ''; r.printed = ''; r.box = [];
+        r.id = base + '-r' + j; r.parent = o.parent || o.id; r.items = rest; r.st = '대기'; r.shipped = ''; r.printed = ''; r.box = []; r.itemReady = {}; r.ready = ''; r.readyBy = ''; r.tagged = ''; r.taggedBy = '';
         r.due = '준비되면'; r.memo = ['잔량' + (whyAll.length ? ' (' + uniq_(whyAll).join(', ') + ')' : ''), o.memo].filter(Boolean).join(' / '); r.upd = stamp;
         sh.getRange(sh.getLastRow() + 1, 1, 1, OH.length).setValues([toRow_(r)]); out.push(r);
       }
@@ -324,9 +326,34 @@ var API = {
       .sort(function (x, y) { return String(y.shipped || y.at).localeCompare(String(x.shipped || x.at)); });
     return { orders: hit.slice(0, 100), more: hit.length > 100 };
   },
+  // 주문 전체 백업 (모든 상태, 주소록 포함) — 화면이 엑셀로 만듦 (v17)
+  backupAll: function () {
+    var sh = sheet_(T.ORD, OH), n = sh.getLastRow(), c = sheet_(T.CUST, CH), cn = c.getLastRow();
+    return { orders: [OH].concat(n < 2 ? [] : sh.getRange(2, 1, n - 1, OH.length).getValues().map(function (r) { return r.map(str_); })),
+      custs: [CH].concat(cn < 2 ? [] : c.getRange(2, 1, cn - 1, CH.length).getValues().map(function (r) { return r.map(str_); })), at: now_() };
+  },
   ver: function () { return { version: APP_VERSION }; },   // 화면이 새 버전인지 확인용 (가벼움)
 
   /* ----- 생산 화면 ----- */
+  // 품목별 준비 {id, k:품목번호, qty:준비된 수량(빈칸이면 전부, 0이면 지움), by} (v17)
+  //  · 품목이 전부 준비되면 주문 준비완료도 켜짐, 하나라도 덜 되면 준비완료·송장부착은 꺼짐
+  lineItem: function (a) {
+    return lock_(function () {
+      var stamp = now_(), by = String(a.by || '').slice(0, 20), out = patch_([a.id], function (o) {
+        if (o.st !== '대기') throw new Error('대기 중인 주문이 아닙니다 (지금: ' + o.st + ')');
+        var it = o.items[+a.k]; if (!it) throw new Error('품목을 찾을 수 없습니다');
+        var full = it.qty === '' || it.qty == null ? 1 : +it.qty, q = a.qty === '' || a.qty == null ? full : +a.qty;
+        if (!isFinite(q) || q < 0) throw new Error('수량이 올바르지 않습니다');
+        if (q > full) throw new Error(it.name + ': 주문(' + full + ')보다 많이 넣을 수 없습니다');
+        var m = readyMap_(o); if (q > 0) m[a.k] = { n: it.name, q: q, by: by, at: stamp }; else delete m[a.k];
+        o.itemReady = m;
+        var all = o.items.every(function (x, i) { var f = x.qty === '' || x.qty == null ? 1 : +x.qty; return m[i] && m[i].q >= f; });
+        if (all && !o.ready) { o.ready = stamp; o.readyBy = by; }
+        if (!all && o.ready) { o.ready = ''; o.readyBy = ''; o.tagged = ''; o.taggedBy = ''; }
+      });
+      return { order: lineSlim_(out[0]) };
+    });
+  },
   lineBoot: function () {
     return { version: APP_VERSION, today: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'), role: 'line', orders: allOrders_().filter(function (o) { return o.st === '대기'; }).map(lineSlim_) };
   },
@@ -336,8 +363,8 @@ var API = {
     return lock_(function () {
       var stamp = now_(), by = String(a.by || '').slice(0, 20), out = patch_([a.id], function (o) {
         if (o.st !== '대기') throw new Error('대기 중인 주문이 아닙니다 (지금: ' + o.st + ')');
-        if (a.on) { o[a.what] = stamp; o[a.what + 'By'] = by; if (a.what === 'tagged' && !o.ready) { o.ready = stamp; o.readyBy = by; } }
-        else { o[a.what] = ''; o[a.what + 'By'] = ''; if (a.what === 'ready') { o.tagged = ''; o.taggedBy = ''; } }
+        if (a.on) { o[a.what] = stamp; o[a.what + 'By'] = by; if (a.what === 'tagged' && !o.ready) { o.ready = stamp; o.readyBy = by; } o.itemReady = fullReady_(o, by); }
+        else { o[a.what] = ''; o[a.what + 'By'] = ''; if (a.what === 'ready') { o.tagged = ''; o.taggedBy = ''; o.itemReady = {}; } }
       });
       return { order: lineSlim_(out[0]) };
     });
@@ -361,6 +388,9 @@ function addrHist_(list) {
   return m;
 }
 function learnList_() { return rows_(sheet_(T.LRN, LH), LH.length).filter(function (r) { return r[0] && r[2]; }).map(function (r) { return { kind: str_(r[0]), cust: str_(r[1]), from: str_(r[2]), to: str_(r[3]), at: str_(r[4]) }; }); }
+// 품목 준비 표: {품목번호: {n:품목명, q:준비 수량}} — 품목명이 바뀐 칸은 버림 (사무실이 품목을 고친 경우)
+function readyMap_(o) { var m = {}, src = o.itemReady || {}; Object.keys(src).forEach(function (k) { var it = o.items[+k]; if (it && src[k] && src[k].n === it.name) m[k] = src[k]; }); return m; }
+function fullReady_(o, by) { var m = {}, at = now_(); o.items.forEach(function (it, i) { m[i] = { n: it.name, q: it.qty === '' || it.qty == null ? 1 : +it.qty, by: by, at: at }; }); return m; }
 function uniq_(a) { var s = {}; return a.filter(function (x) { if (s[x]) return false; s[x] = 1; return true; }); }
 function deletedIds_() { return rows_(sheet_(T.DEL, DH), 2).map(function (r) { return str_(r[1]); }); }
 function purgeDeleted_() {   // 삭제기록에서 30일 지난 줄 지우기

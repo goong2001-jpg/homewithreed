@@ -120,6 +120,14 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 .lncard .it .q{font-weight:800}
 .lncard .who{font-size:13px;color:var(--sub);margin-top:4px}
 .lnbtns{display:flex;gap:8px;margin-top:10px}
+.irow{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px dashed var(--line);cursor:pointer;border-radius:6px}
+.irow:last-child{border-bottom:0}
+.irow .ibox{flex:0 0 26px;height:26px;border:2px solid var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:15px}
+.irow.ok .ibox{background:var(--ok);border-color:var(--ok)}
+.irow.part .ibox{background:#C98A1B;border-color:#C98A1B}
+.irow.ok .grow{color:var(--sub)}
+.irow .pq{color:#9A5B00;font-size:14px}
+.irow .qbtn{min-height:36px;padding:0 10px;font-size:13px;flex:0 0 auto}
 .lnbtns button{flex:1;min-height:52px;border-radius:10px;font-size:16px;font-weight:700;border:2px solid var(--line);background:#fff}
 .lnbtns button.on{background:var(--ok);border-color:var(--ok);color:#fff}
 .lnsum{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}
@@ -209,6 +217,8 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
       <div class="sec">옛 엑셀 가져오기</div>
       <div class="card"><p class="muted" style="margin:0 0 8px">CJ·경동·대신 엑셀 파일을 고르면 주소록과 옛 송장 기록(박스 추천에 씀)을 가져옵니다. 같은 파일을 다시 넣어도 겹치지 않습니다.</p>
         <input type="file" id="imp" accept=".xlsx" multiple><div id="impMsg" class="muted" style="margin-top:8px"></div></div>
+      <div class="sec">주문 전체 백업</div>
+      <div class="card"><p class="muted" style="margin:0 0 8px">모든 주문(대기·출고완료·취소)과 주소록을 엑셀 한 파일로 받습니다. 일주일에 한 번 받아 두는 것을 권합니다.</p><button class="btn" data-act="backup">주문 전체 백업 받기</button></div>
       <div class="sec">옛 출고현황(출하서) 가져오기</div>
       <div class="card"><p class="muted" style="margin:0 0 8px">지금까지 손으로 쓰던 출고현황 엑셀(예: 11월.xlsx)을 고르면 날짜 탭마다 읽어서, 그날 나간 것은 <b>출고완료</b>로, 가장 마지막 날짜 탭의 출고 대기는 <b>대기</b>(입고되면·준비되면 같은 예정 그대로)로 넣습니다. 앱에 이미 있는 주문은 건너뛰거나 맞춰 고치니 두 번 넣어도 겹치지 않습니다. 넣기 전에 미리보기로 확인합니다.</p>
         <input type="file" id="impShip" accept=".xlsx"></div>
@@ -239,7 +249,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v16';
+var HTML_VERSION = 'v17';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -261,6 +271,7 @@ function boot() {
   status('불러오는 중…');
   call('boot', {}, function (r) {
     S.role = 'office'; S.pinOn = r.pinOn; S.linePinOn = r.linePinOn; renderPinState();
+    setTimeout(function () { var lt = (r.orders || []).filter(function (o) { return o.st === '대기' && o.tagged && String(o.tagged).slice(0, 10) < r.today; }).length; if (lt) notice('⚠️ 지난 날짜에 송장부착됐는데 출고 처리 안 된 주문 ' + lt + '건 — 출하서에서 확인하세요'); }, 1500);
     S.orders = r.orders; S.custs = r.custs; S.items = r.items; S.sender = r.sender; S.today = r.today; S.histCount = r.histCount; S.addrHist = r.addrHist || {}; S.learn = r.learn || []; $('mMonth').value = S.today.slice(0, 7);
     if (!S.drafts.length) { try { var kd = JSON.parse(localStorage.getItem('so-drafts') || '[]'); if (kd.length) { S.drafts = kd; notice('저장 안 한 나눈 결과 ' + kd.length + '건을 다시 불러왔습니다'); } } catch (e) {} }
     $('ver').textContent = HTML_VERSION + (r.version !== HTML_VERSION ? ' (서버 ' + r.version + ' — 버전 불일치, 새로고침 해보세요)' : '');
@@ -312,8 +323,13 @@ function itemTag(o) {
   return miss.length ? '<span class="tag">품목마스터에 없음: ' + esc(miss.join(', ')) + '</span>' : '';
 }
 function when(ts) { var d = String(ts || '').slice(0, 10); return d === S.today ? hm(ts) : OUT.md(d); }
+// 품목 준비 표 (서버 readyMap_ 와 같은 규칙: 품목명이 바뀐 칸은 무시)
+function rMap(o) { var m = {}, src = o.itemReady || {}; Object.keys(src).forEach(function (k) { var it = (o.items || [])[+k]; if (it && src[k] && src[k].n === it.name) m[k] = src[k]; }); return m; }
+function iFull(i) { return i.qty === '' || i.qty == null ? 1 : +i.qty; }
+function rCount(o) { var m = rMap(o), done = 0; (o.items || []).forEach(function (i, k) { if (m[k] && m[k].q >= iFull(i)) done++; }); return { m: m, done: done, any: Object.keys(m).length, n: (o.items || []).length }; }
 function lineTags(o) { if (o.st !== '대기') return ''; var noLabel = /^(직납|방문|퀵)$/.test(o.carrier || '');
-  return (o.ready ? '<span class="tag ok">준비완료 ✓ ' + esc(when(o.ready)) + '</span>' : '') + (o.tagged ? '<span class="tag ok">' + (noLabel ? '출고준비' : '송장부착') + ' ✓ ' + esc(when(o.tagged)) + '</span>' : ''); }
+  var rc = rCount(o);
+  return (!o.ready && rc.any ? '<span class="tag warn">품목 준비 ' + rc.done + '/' + rc.n + '</span>' : '') + (o.ready ? '<span class="tag ok">준비완료 ✓ ' + esc(when(o.ready)) + '</span>' : '') + (o.tagged ? '<span class="tag ok">' + (noLabel ? '출고준비' : '송장부착') + ' ✓ ' + esc(when(o.tagged)) + '</span>' : ''); }
 function printedTag(o) { if (!o.printed || o.st === '취소') return ''; var d = String(o.printed).slice(0, 10); return '<span class="tag ok">송장출력 ✓ ' + esc(d === S.today ? hm(o.printed) : OUT.md(d)) + '</span>'; }
 function cardHTML(o, opt) {
   opt = opt || {}; var w = o.st === '대기' ? warns(o) : [], its0 = o.items || [], cut = opt.max && its0.length > opt.max ? opt.max - 1 : its0.length, it = its0.slice(0, cut).map(function (i) { var n = OUT.noteOf(i); return esc(OUT.itemStr(i).replace(/\s{4}/g, '  ')) + (n ? ' <span class="muted">' + esc(n) + '</span>' : ''); }).join('\n') + (cut < its0.length ? '\n<span class="muted">외 ' + (its0.length - cut) + '개 품목 (눌러서 보기)</span>' : '');
@@ -388,7 +404,8 @@ function saveDrafts() {
 
 /* ---------- 주문 고치기 창 ---------- */
 var ED = null;   // {o: 고치는 사본, done: 저장 뒤 할 일, draft: 번호}
-var CARR = [['CJ', '택배(CJ)'], ['경동', '경동'], ['대신', '대신'], ['직납', '직납'], ['방문', '직접수령'], ['퀵', '퀵']];
+var CARR = [['CJ', '택배(CJ)'], ['경동', '경동'], ['대신', '대신'], ['직납', '직납'], ['차량', '차량출고'], ['방문', '직접수령'], ['퀵', '퀵']];
+function carOn(o, c) { return c === '차량' ? o.carrier === '직납' && o.mode === '차량' : c === '직납' ? o.carrier === '직납' && o.mode !== '차량' : o.carrier === c; }   // 차량출고 = 직납 + 방식 '차량'
 function openEdit(o, opt) { ED = { o: JSON.parse(JSON.stringify(o)), opt: opt || {}, orig: JSON.parse(JSON.stringify(o.items || [])) }; if (!ED.o.items.length) ED.o.items.push({ name: '', sensor: '', qty: '', unit: '', note: '' }); drawEdit(); showSheet(true); }
 function showSheet(on) { $('shade').classList.toggle('hidden', !on); $('sheet').classList.toggle('hidden', !on); if (!on) ED = null; }
 function drawEdit() {
@@ -400,7 +417,7 @@ function drawEdit() {
       '<input type="text" class="qt" inputmode="numeric" placeholder="수량" value="' + esc(i.qty === '' || i.qty == null ? '' : i.qty + (i.unit || '')) + '"><button class="x" data-act="itDel" data-i="' + k + '" aria-label="품목 삭제">×</button><input type="text" class="nt" placeholder="품목 메모 (스티커 있음 등)" value="' + esc(i.note || '') + '"></div>'; }).join('') + '</div><button class="btn sm" data-act="itAdd">+ 품목 추가</button>';
   h += '<label class="f">적요 (주문 전체 메모)</label><input type="text" id="e-memo" value="' + esc(o.memo) + '">';
   h += '<div class="sec">출고 예정</div><div class="row"><input type="text" id="e-due" class="grow" value="' + esc(o.due) + '" placeholder="2026-11-17 또는 준비되면"><input type="date" id="e-dueCal" style="max-width:170px" value="' + (isDate(o.due) ? o.due : '') + '" aria-label="출고 예정일 달력"><div class="chips">' + [['오늘', S.today], ['내일', addDay(S.today, 1)], ['준비되면', '준비되면']].map(function (x) { return '<button data-act="due" data-i="' + x[1] + '"' + (o.due === x[1] ? ' class="on"' : '') + '>' + x[0] + '</button>'; }).join('') + '</div></div>';
-  h += '<div class="sec">배송</div><div class="chips">' + CARR.map(function (c) { return '<button data-act="car" data-i="' + c[0] + '"' + (o.carrier === c[0] ? ' class="on"' : '') + '>' + c[1] + '</button>'; }).join('') + '</div>';
+  h += '<div class="sec">배송</div><div class="chips">' + CARR.map(function (c) { return '<button data-act="car" data-i="' + c[0] + '"' + (carOn(o, c[0]) ? ' class="on"' : '') + '>' + c[1] + '</button>'; }).join('') + '</div>';
   var parcel = o.carrier === 'CJ' || o.carrier === '경동' || o.carrier === '대신' || o.carrier === '화물';
   if (parcel) {
     h += '<div class="chips" style="margin-top:8px">' + [['선불', '선불'], ['착불', '착불']].map(function (x) { return '<button data-act="pay" data-i="' + x[0] + '"' + (o.pay === x[0] ? ' class="on"' : '') + '>' + x[1] + '</button>'; }).join('') + '<button data-act="claim"' + (o.claim ? ' class="on"' : '') + '>운임 청구</button>' +
@@ -478,13 +495,15 @@ function openShip(id, date) {
   var d = date || S.today;
   var h = '<label class="f">출고 날짜</label><div class="row"><input type="date" id="s-date" value="' + d + '" style="max-width:180px"><div class="chips"><button data-act="sDate" data-i="' + S.today + '">오늘</button><button data-act="sDate" data-i="' + addDay(S.today, -1) + '">어제</button></div></div>';
   h += '<div class="sec">품목별 실제 나간 수량</div><p class="muted" style="margin:0 0 4px">다 나갔으면 그대로 두세요. 덜 나간 품목만 고치고 사유를 고릅니다.</p>';
-  h += o.items.map(function (i, k) { var has = !(i.qty === '' || i.qty == null);
-    return '<div class="shrow" data-k="' + k + '"><div class="nm">' + esc(OUT.itemStr(i).replace(/\s{4}/g, '  ')) + '</div>' + (has ? '<div class="q"><input type="number" class="sq" min="0" max="' + i.qty + '" inputmode="numeric" value="' + i.qty + '" data-full="' + i.qty + '"><span class="muted">/ 주문 ' + i.qty + (i.unit || '') + '</span>' +
+  var rc0 = rCount(o), part = rc0.any && rc0.done < rc0.n;   // 생산이 품목별로 일부만 준비해 둔 주문이면 준비된 수량을 기본값으로
+  if (part) h += '<p class="tag warn" style="display:block;padding:6px 8px">생산에서 품목별로 준비해 둔 수량을 채워 두었습니다 (준비 ' + rc0.done + '/' + rc0.n + ' 품목). 실제 나간 수량으로 고치세요.</p>';
+  h += o.items.map(function (i, k) { var has = !(i.qty === '' || i.qty == null), dv = part ? (rc0.m[k] ? rc0.m[k].q : 0) : i.qty;
+    return '<div class="shrow" data-k="' + k + '"><div class="nm">' + esc(OUT.itemStr(i).replace(/\s{4}/g, '  ')) + '</div>' + (has ? '<div class="q"><input type="number" class="sq" min="0" max="' + i.qty + '" inputmode="numeric" value="' + dv + '" data-full="' + i.qty + '"><span class="muted">/ 주문 ' + i.qty + (i.unit || '') + '</span>' +
       '<select class="sw hidden"><option value="">사유 고르기</option>' + WHY.map(function (w) { return '<option>' + w + '</option>'; }).join('') + '</select><input type="text" class="swx hidden" placeholder="사유 직접 입력" style="flex:1;min-width:140px"></div>' : '<div class="muted">수량 없음 — 그대로 출고</div>') + '</div>'; }).join('');
   h += '<div id="s-rest" class="hidden"><div class="sec">덜 나간 수량(잔량)은?</div><div class="chips"><button data-act="sRest" data-i="keep" class="on">대기로 남김 (다음에 출고)</button><button data-act="sRest" data-i="drop">안 보냄 (업체가 줄임 등)</button></div></div>';
   SH.rest = 'keep';
   $('shB').innerHTML = h; $('shF').innerHTML = '<button class="btn pri grow" data-act="sSave">출고 기록</button>';
-  ED = null; CE = null; $('shade').classList.remove('hidden'); $('sheet').classList.remove('hidden');
+  ED = null; CE = null; $('shade').classList.remove('hidden'); $('sheet').classList.remove('hidden'); shipSync();
 }
 function shipSync() {   // 수량이 줄면 사유·잔량 칸 보이기
   var less = false;
@@ -644,7 +663,10 @@ function renderClose() {
   var lineUsed = closeLineUsed();
   var d = $('cDate').value || S.today, wait = S.orders.filter(function (o) { return o.st === '대기'; }), done = S.orders.filter(function (o) { return o.st === '출고완료' && o.shipped === d; });
   wait.sort(function (a, b) { return (dueKey(a) + a.at).localeCompare(dueKey(b) + b.at); });
-  var h = '<div class="today" id="cSum"></div>';
+  var late = wait.filter(function (o) { return o.tagged && String(o.tagged).slice(0, 10) < S.today; }), lateBy = {};
+  late.forEach(function (o) { var t = String(o.tagged).slice(0, 10); (lateBy[t] = lateBy[t] || []).push(o); });
+  var h = (late.length ? '<div class="today" style="border-color:#E2B04A;background:#FFF8E6"><b>⚠️ 출고 처리 안 된 주문 ' + late.length + '건</b> <span class="muted">— 지난 날짜에 송장부착(출고준비)까지 됐는데 아직 대기입니다. 실제로 나갔으면 그 날짜로 출고 처리하세요.</span><div class="row" style="margin-top:6px">' +
+    Object.keys(lateBy).sort().map(function (t) { return '<button class="btn sm" data-act="cLate" data-i="' + t + '">' + esc(OUT.md(t)) + ' 송장부착 ' + lateBy[t].length + '건 → 그 날짜로 체크</button>'; }).join('') + '</div></div>' : '') + '<div class="today" id="cSum"></div>';
   if (done.length) h += '<div class="sec">이미 출고완료 ' + done.length + '건</div>' + done.map(function (o) { return cardHTML(o, { key: o.id }); }).join('');
   h += '<div class="row" style="margin:16px 0 4px"><b class="grow">대기 중 ' + wait.length + '건</b>' + (wait.length ? '<button class="btn sm" data-act="cQuick" data-i="tag">송장부착된 것 체크</button><button class="btn sm" data-act="cQuick" data-i="print">오늘 송장 뽑은 것 체크</button><button class="btn sm" data-act="cAll" data-i="1">전체 선택</button><button class="btn sm" data-act="cAll" data-i="0">전체 해제</button>' : '') + '</div>' +
     '<p class="muted" style="margin:0 0 6px">다 나간 것은 체크, 일부만 나갔거나 날짜가 다르면 버튼. 출고 예정별로 묶여 있고, 출고 예정이 고른 날짜보다 뒤인 주문은 전체 선택에서 빠집니다.</p>';
@@ -780,7 +802,7 @@ document.addEventListener('click', function (ev) {
   else if (a === 'itAdd') { readEdit(); ED.o.items.push({ name: '', sensor: '', qty: '', unit: '', note: '' }); drawEdit(); }
   else if (a === 'itDel') { readEdit(); ED.o.items.splice(+i, 1); if (!ED.o.items.length) ED.o.items.push({ name: '', sensor: '', qty: '', unit: '', note: '' }); drawEdit(); }
   else if (a === 'due') { readEdit(); ED.o.due = i; drawEdit(); }
-  else if (a === 'car') { readEdit(); ED.o.carrier = ED.o.carrier === i ? '' : i; if (!ED.o.branch) { var mm = OP.findCust(S.custs, ED.o.cust).filter(function (x) { return i === '경동' ? x.kd : (i === '대신' ? x.ds : ''); })[0]; if (mm) ED.o.branch = i === '경동' ? mm.kd : mm.ds; } relabel(); drawEdit(); }
+  else if (a === 'car') { readEdit(); var wasOn = carOn(ED.o, i); if (i === '차량') { ED.o.carrier = wasOn ? '' : '직납'; ED.o.mode = wasOn ? '' : '차량'; } else { ED.o.carrier = wasOn ? '' : i; if (i === '직납' || ED.o.mode === '차량') ED.o.mode = ''; } if (!ED.o.branch) { var mm = OP.findCust(S.custs, ED.o.cust).filter(function (x) { return i === '경동' ? x.kd : (i === '대신' ? x.ds : ''); })[0]; if (mm) ED.o.branch = i === '경동' ? mm.kd : mm.ds; } relabel(); drawEdit(); }
   else if (a === 'pay') { readEdit(); ED.o.pay = ED.o.pay === i ? '' : i; relabel(); drawEdit(); }
   else if (a === 'claim') { readEdit(); ED.o.claim = !ED.o.claim; relabel(); drawEdit(); }
   else if (a === 'mode') { readEdit(); ED.o.mode = i; relabel(); drawEdit(); }
@@ -807,6 +829,8 @@ document.addEventListener('click', function (ev) {
   else if (a === 'lBulk') openBulk(i);
   else if (a === 'bkDate') { var bd = $('bk-date'); if (isDate(i)) { bd.value = i; delete bd.dataset.text; } else { bd.value = ''; bd.dataset.text = i; notice('출고 예정: ' + i); } }
   else if (a === 'bkGo') bulkGo();
+  else if (a === 'backup') call('backupAll', {}, function (r) { var w = function (rows) { return rows[0].map(function (h) { return /주소|원문|품목JSON|품목$/.test(h) ? 40 : /적요|메모/.test(h) ? 28 : 14; }); };
+    download(XL.build([{ name: '주문', rows: [r.orders[0].map(function (v) { return { v: v, s: 6 }; })].concat(r.orders.slice(1)), widths: w(r.orders), freeze: 1 }, { name: '주소록', rows: [r.custs[0].map(function (v) { return { v: v, s: 6 }; })].concat(r.custs.slice(1)), widths: w(r.custs), freeze: 1 }]), '써브텍주문_백업_' + r.at.slice(0, 10)); notice('백업을 받았습니다: 주문 ' + (r.orders.length - 1) + '건 · 주소록 ' + (r.custs.length - 1) + '줄'); });
   else if (a === 'siGo') shipImportGo();
   else if (a === 'lCancel') lDo('cancel');
   else if (a === 'pReport') copyText(S.todayMsg, '복사했습니다: ' + S.todayMsg);
@@ -842,11 +866,13 @@ document.addEventListener('click', function (ev) {
   else if (a === 'cQuick') { var dq = $('cDate').value || S.today, nq = 0; S.orders.forEach(function (o) { if (o.st !== '대기' || closeFuture(o, dq)) return; if (i === 'tag' ? o.tagged : String(o.printed).slice(0, 10) === dq) { CSEL[o.id] = true; nq++; } }); renderClose(); notice(nq ? nq + '건 체크했습니다 (이미 체크한 것은 그대로)' : (i === 'tag' ? '송장부착된 대기 주문이 없습니다' : '그날 송장 뽑은 대기 주문이 없습니다')); }
   else if (a === 'dayPreview') { var dp = $('cDate').value || S.today, pid = S.orders.filter(function (o) { return o.st === '대기' && CSEL[o.id]; }).map(function (o) { return o.id; });
     call('dayPreview', { date: dp, ids: pid }, function (r) { reportFile(r.report); notice('확인용 출하서를 받았습니다 (주문은 그대로입니다)'); }); }
+  else if (a === 'cLate') { $('cDate').value = i; CSEL = {}; S.orders.forEach(function (o) { if (o.st === '대기' && String(o.tagged).slice(0, 10) === i) CSEL[o.id] = true; }); renderClose(); notice(OUT.md(i) + ' 날짜로 바꾸고 그날 송장부착된 것을 체크했습니다 — 확인 후 출고 처리하세요'); }
   else if (a === 'cAll') { var dA = $('cDate').value || S.today, skip = 0; S.orders.forEach(function (o) { if (o.st !== '대기') return; if (i === '1' && closeFuture(o, dA)) { CSEL[o.id] = false; skip++; return; } CSEL[o.id] = i === '1'; }); renderClose(); if (skip) notice('출고 예정이 ' + OUT.md(dA) + ' 뒤인 ' + skip + '건은 빼고 체크했습니다'); }
   else if (a === 'cGrp') { var gi = CGR[+i] || [], dd = $('cDate').value || S.today, lu2 = closeLineUsed(), allOn = gi.every(function (id) { return closeChecked(byId(id), dd, lu2); }); gi.forEach(function (id) { CSEL[id] = !allOn; }); renderClose(); }
   else if (a === 'lOld') { var qq = $('q').value.trim(); call('searchOld', { q: qq }, function (r) { mergeOrders(r.orders); notice(r.orders.length ? '오래된 주문 ' + r.orders.length + '건을 불러왔습니다' + (r.more ? ' (앞의 100건만)' : '') : '더 오래된 주문 중에는 없습니다'); if (r.orders.length && S.filter === 'wait') S.filter = 'all'; renderList(); }); }
   else if (a === 'lnQClear') { $('lnQ').value = ''; renderLine(); $('lnQ').focus(); }
   else if (a === 'lnMark') lineMark(i, b.dataset.w);
+  else if (a === 'lnItem' || a === 'lnItemQ') lineItem(i, +b.dataset.k, a === 'lnItemQ');
   else if (a === 'lnName') { var nn = prompt('이름 (버튼 누른 사람으로 남습니다)', LN.name || ''); if (nn != null) { LN.name = nn.trim(); try { localStorage.setItem('so-name', LN.name); } catch (e) {} renderLine(); } }
 });
 $('shade').addEventListener('click', function () { showSheet(false); });
@@ -877,14 +903,16 @@ function lineLoad(quiet) {
     if (r.version !== HTML_VERSION) status('새 버전 — 새로고침'); });
 }
 function carClass(c) { return 'car-' + ({ 'CJ': 'cj', '경동': 'kd', '대신': 'ds', '직납': 'jn' }[c] || 'etc'); }
+function carLabel(o) { return o.carrier === '직납' && o.mode === '차량' ? '차량출고' : carName(o.carrier); }
 function carName(c) { return { 'CJ': 'CJ택배', '경동': '경동', '대신': '대신', '직납': '직납', '방문': '직접수령', '퀵': '퀵', '화물': '화물' }[c] || '미정'; }
 // 거래처명(받는분) — 받는분이 없거나 거래처와 같으면 거래처명만
 function lnName(o) { var c = o.cust || '(거래처 없음)', r = String(o.recv || '').trim(); return r && OP.norm(r) !== OP.norm(c) && OP.norm(c).indexOf(OP.norm(r)) < 0 ? c + '(' + r + ')' : c; }
 function lnStage(o) { return o.tagged ? 2 : o.ready ? 1 : 0; }
 function lnNoLabel(o) { return /^(직납|방문|퀵)$/.test(o.carrier || ''); }
 function lnSum(list) {   // 아직 안 만든(0단계) 주문의 품목 합계
-  var m = {}; list.filter(function (o) { return lnStage(o) === 0; }).forEach(function (o) { (o.items || []).forEach(function (i) {
-    var k = OP.norm(i.name) + '|' + (i.sensor || ''), x = m[k] || (m[k] = { name: i.name, sensor: i.sensor || '', q: 0, n: 0, unit: i.unit && i.unit !== '개' ? i.unit : '' }); x.q += +i.qty || 0; x.n++; }); });
+  var m = {}; list.filter(function (o) { return lnStage(o) === 0; }).forEach(function (o) { var rm = rMap(o); (o.items || []).forEach(function (i, j) {
+    var left = (+i.qty || 0) - (rm[j] ? rm[j].q : 0); if (left <= 0 && (+i.qty || 0) > 0) return;   // 품목별로 다 준비된 것은 빼고, 일부 준비는 남은 만큼만
+    var k = OP.norm(i.name) + '|' + (i.sensor || ''), x = m[k] || (m[k] = { name: i.name, sensor: i.sensor || '', q: 0, n: 0, unit: i.unit && i.unit !== '개' ? i.unit : '' }); x.q += Math.max(0, left); x.n++; }); });
   return Object.keys(m).map(function (k) { return m[k]; }).sort(function (a, b) { return b.q - a.q; });
 }
 function lnSumHTML(title, list) { var s = lnSum(list); return '<div class="lnsum"><h3>' + esc(title) + '</h3>' + (s.length ? s.map(function (x) { return '<div class="r"><span>' + esc(x.name) + (x.sensor ? ' ' + esc(x.sensor) : '') + ' <span class="muted">' + x.n + '건</span></span><b>' + x.q + (x.unit || '') + '</b></div>'; }).join('') : '<span class="muted">남은 것 없음</span>') + '</div>'; }
@@ -912,8 +940,10 @@ function lnProgress(list, title) {
     '<div class="bar"><i style="width:' + Math.round(n2 * 100 / tot) + '%"></i></div><div class="muted">끝남 ' + n2 + ' / ' + tot + '건' + (n0 ? ' · <a href="#" data-act="lnToSum">남은 품목 보기 ↓</a>' : '') + '</div></div>';
 }
 function lnCard(o) {
-  var st = lnStage(o), nl = lnNoLabel(o), it = (o.items || []).map(function (i) { var n = OUT.noteOf(i); return esc(i.name) + (i.sensor ? ' ' + esc(i.sensor) : '') + ' <span class="q">' + esc(i.qty === '' || i.qty == null ? '' : i.qty + (i.unit || '')) + '</span>' + (n ? ' <span class="muted">' + esc(n) + '</span>' : ''); }).join('<br>');
-  return '<div class="lncard s' + st + ' ' + carClass(o.carrier) + '"><div class="row"><div class="cu grow">' + esc(lnName(o)) + '</div><span class="cbadge">' + esc(carName(o.carrier)) + '</span></div>' +
+  var st = lnStage(o), nl = lnNoLabel(o), rm = rMap(o), it = (o.items || []).map(function (i, k) { var n = OUT.noteOf(i), f = iFull(i), q = rm[k] ? rm[k].q : 0, cls = q >= f ? 'ok' : q > 0 ? 'part' : '';
+    return '<div class="irow ' + cls + '" data-act="lnItem" data-i="' + esc(o.id) + '" data-k="' + k + '"><span class="ibox">' + (q >= f ? '✓' : q > 0 ? '◐' : '') + '</span><span class="grow">' + esc(i.name) + (i.sensor ? ' ' + esc(i.sensor) : '') + ' <span class="q">' + esc(i.qty === '' || i.qty == null ? '' : i.qty + (i.unit || '')) + '</span>' + (q > 0 && q < f ? ' <b class="pq">' + q + ' 준비</b>' : '') + (n ? ' <span class="muted">' + esc(n) + '</span>' : '') + '</span>' +
+      (i.qty === '' || i.qty == null ? '' : '<button class="btn sm qbtn" data-act="lnItemQ" data-i="' + esc(o.id) + '" data-k="' + k + '">수량</button>') + '</div>'; }).join('');
+  return '<div class="lncard s' + st + ' ' + carClass(o.carrier) + '"><div class="row"><div class="cu grow">' + esc(lnName(o)) + '</div><span class="cbadge">' + esc(carLabel(o)) + '</span></div>' +
     '<div class="it">' + it + '</div>' + (o.memo ? '<div class="muted">' + esc(o.memo) + '</div>' : '') +
     '<div class="meta" style="margin-top:6px">' + (isDate(o.due) ? '<span class="tag">' + esc(o.due <= S.today ? '오늘' + (o.due < S.today ? ' (' + OUT.md(o.due) + ' 예정)' : '') : OUT.md(o.due)) + '</span>' : '<span class="tag">' + esc(o.due || '날짜 미정') + '</span>') + (o.parent ? '<span class="tag warn">잔량</span>' : '') + (o.printed && !nl ? '<span class="tag ok">송장출력 ✓</span>' : '') + '</div>' +
     (o.ready || o.tagged ? '<div class="who">' + (o.ready ? '준비완료 ' + esc(when(o.ready)) + (o.readyBy ? ' ' + esc(o.readyBy) : '') : '') + (o.tagged ? ' · ' + (nl ? '출고준비 ' : '송장부착 ') + esc(when(o.tagged)) + (o.taggedBy ? ' ' + esc(o.taggedBy) : '') : '') + '</div>' : '') +
@@ -956,6 +986,15 @@ function lineMark(id, w) {
   if (!on && !confirm((w === 'ready' ? '준비완료' : (lnNoLabel(o) ? '출고준비' : '송장부착')) + '를 취소할까요?' + (w === 'ready' && o.tagged ? '\n(송장부착도 같이 취소됩니다)' : ''))) return;
   call('lineMark', { id: id, what: w, on: on, by: LN.name }, function (r) { LN.orders = LN.orders.map(function (x) { return x.id === id ? r.order : x; }); renderLine(); notice(on ? '✓ ' + o.cust : '취소했습니다'); },
     function () { lineLoad(true); });
+}
+// 품목 줄을 누르면 전부 준비 ↔ 안 됨, "수량"을 누르면 일부 준비 수량 입력
+function lineItem(id, k, ask) {
+  var o = LN.orders.filter(function (x) { return x.id === id; })[0]; if (!o) return; var it = o.items[k]; if (!it) return;
+  if (!LN.name) { var nn = prompt('처음 한 번만: 이름을 넣어주세요 (누른 사람으로 남습니다)'); if (nn == null) return; LN.name = nn.trim(); try { localStorage.setItem('so-name', LN.name); } catch (e) {} }
+  var f = iFull(it), cur = (rMap(o)[k] || {}).q || 0, q;
+  if (ask) { var v = prompt(it.name + ' — 준비된 수량 (주문 ' + f + (it.unit || '') + ', 0이면 지움)', cur || ''); if (v == null) return; q = +String(v).replace(/[^\d.]/g, ''); if (!isFinite(q) || q < 0) { notice('숫자를 넣어주세요', 1); return; } if (q > f) { notice('주문 수량(' + f + ')보다 많습니다', 1); return; } }
+  else q = cur >= f ? 0 : f;
+  call('lineItem', { id: id, k: k, qty: q, by: LN.name }, function (r) { LN.orders = LN.orders.map(function (x) { return x.id === id ? r.order : x; }); renderLine(); }, function () { lineLoad(true); });
 }
 function startLine() {
   S.role = 'line'; $('app').classList.add('hidden'); $('line').classList.remove('hidden'); document.title = '써브텍 생산';

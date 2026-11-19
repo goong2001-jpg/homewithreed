@@ -235,7 +235,8 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
     ok(dayf.sheets[3].rows[1][2].v === 'H10' && dayf.sheets[3].rows[1][4].v === 200 && /주문 300 중 200 출고 \(자재부족\)/.test(dayf.sheets[3].rows[1][5].v), '직납 탭: 일부 출고 적요');
     ok(dayf.sheets[4].rows.some(r => r[1].v === '가나상사' && r[2].v === 'SV11'), '미출고 탭에 대기 주문');
     const R0 = dayf.sheets[0].rows, gana = R0.find(r => r[2].v === '가나상사' && r[3].v === 'SV7');
-    ok(gana && gana[7].v === '', '출하서 받는분 칸: 단골 기본 주소(주문에 안 적힌 것)는 비움');
+    ok(gana && /^가나상사 \/ 042-000-7728 대전광역시/.test(gana[7].v), '출하서 받는분 칸 (v17): 택배면 단골도 "거래처 / 전화 주소"');
+    const jn = R0.find(r => r[2].v === '가나상사' && r[3].v === 'H10'); ok(!jn || jn[7].v === '', '  직납은 비움');
     // 월 파일
     api('shipOrder', { id: w1.id, date: '2026-11-20', lines: [] });
     const md2 = api('monthData', { month: '2026-11' });
@@ -332,7 +333,34 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
     throws(() => api('dayPreview', { date: 'x' }), '날짜 형식 거절');
     api('deleteOrders', { ids: [w1.id, w2.id] }); }
 
-  console.log('13) 템플릿·버전');
+  console.log('13) v17: 품목별 준비 · 백업 · 차량출고');
+  { const [o1] = api('saveOrders', { orders: [Object.assign({}, B, { id: undefined, cust: '품목준비상사', items: [{ name: 'STT-1.3', sensor: '', qty: 30, unit: '', note: '' }, { name: 'STT-2.6', sensor: '', qty: 60, unit: '', note: '' }] })] }).orders;
+    let r = api('lineItem', { id: o1.id, k: 1, qty: 30, by: '홍' }).order;
+    ok(r.itemReady['1'].q === 30 && !r.ready, 'STT-2.6 60개 중 30개만 준비 → 기록, 주문 준비완료는 아님');
+    throws(() => api('lineItem', { id: o1.id, k: 1, qty: 61, by: '홍' }), '주문보다 많은 준비 수량 거절');
+    r = api('lineItem', { id: o1.id, k: 0, qty: '', by: '홍' }).order;
+    ok(r.itemReady['0'].q === 30 && !r.ready, 'STT-1.3 전부 준비 (빈칸 = 전부)');
+    r = api('lineItem', { id: o1.id, k: 1, qty: 60, by: '홍' }).order;
+    ok(r.ready && r.readyBy === '홍', '모든 품목이 다 준비되면 주문 준비완료도 켜짐');
+    r = api('lineMark', { id: o1.id, what: 'tagged', on: true, by: '홍' }).order; ok(r.tagged, '  송장부착');
+    r = api('lineItem', { id: o1.id, k: 1, qty: 50, by: '홍' }).order;
+    ok(!r.ready && !r.tagged && r.itemReady['1'].q === 50, '품목 하나가 덜 되면 준비완료·송장부착 꺼짐');
+    r = api('lineMark', { id: o1.id, what: 'ready', on: true, by: '김' }).order;
+    ok(r.itemReady['0'].q === 30 && r.itemReady['1'].q === 60, '주문 준비완료 버튼 → 품목 전부 준비로');
+    r = api('lineMark', { id: o1.id, what: 'ready', on: false, by: '김' }).order;
+    ok(!Object.keys(r.itemReady || {}).length, '준비완료 취소 → 품목 준비도 지움');
+    api('lineItem', { id: o1.id, k: 1, qty: 30, by: '홍' });
+    const stale = Object.assign({}, api('boot').orders.find(o => o.id === o1.id), { itemReady: {}, memo: '사무실 고침' }); api('saveOrders', { orders: [stale] });
+    ok(api('boot').orders.find(o => o.id === o1.id).itemReady['1'].q === 30, '사무실 저장이 품목 준비를 지우지 않음');
+    const ed = Object.assign({}, api('boot').orders.find(o => o.id === o1.id)); ed.items = [ed.items[0], Object.assign({}, ed.items[1], { name: 'STT-2.6DE' })]; api('saveOrders', { orders: [ed] });
+    ok(!api('lineBoot').orders.find(o => o.id === o1.id).items.some((it, k) => k === 1 && it.name === 'STT-2.6') && api('lineItem', { id: o1.id, k: 0, qty: 10, by: '홍' }).order.itemReady['1'] === undefined, '사무실이 품목명을 바꾸면 그 품목의 옛 준비 기록은 버림');
+    const sp = api('shipOrder', { id: o1.id, date: '2026-11-19', lines: [{ k: 0, qty: 10, why: '자재부족' }, { k: 1, qty: 0, why: '자재부족' }] }).orders;
+    ok(sp[1] && !Object.keys(sp[1].itemReady || {}).length && !sp[1].ready, '일부 출고로 생긴 잔량 주문은 준비 기록 없이 시작');
+    const bk = api('backupAll'); ok(bk.orders[0][0] === '주문ID' && bk.orders.length > 3 && bk.custs[0][0] === '거래처명', '주문 전체 백업: 머리줄 + 모든 주문 · 주소록');
+    api('deleteOrders', { ids: sp.map(o => o.id) }); }
+  { const o = OP.parseOrder('가나테크\nSV7 X 10\n차량출고'); ok(o.carrier === '직납' && o.mode === '차량' && o.shipRaw === '차량출고', '"차량출고" → 직납(차량), 출하서 표기 차량출고'); }
+
+  console.log('14) 템플릿·버전');
   const idx = fs.readFileSync(path.join(D, 'Index.html'), 'utf8'), tags = idx.match(/<\?[\s\S]*?\?>/g) || [];
   ok((idx.match(/<\?/g) || []).length === 3 && tags.join() === "<?!= inc('Parse') ?>,<?!= inc('Xlsx') ?>,<?!= inc('Out') ?>", 'Index.html 의 <? ?> 는 끼워넣기 3개뿐 (다른 곳에 있으면 앱이 안 열림)');
   const av = (fs.readFileSync(path.join(D, 'Code.gs'), 'utf8').match(/var APP_VERSION = '([^']+)'/) || [])[1], hv = (idx.match(/var HTML_VERSION = '([^']+)'/) || [])[1];

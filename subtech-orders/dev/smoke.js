@@ -180,7 +180,7 @@ SV7 O 1000개 명판있슴
     ok(await page.evaluate(id => S.orders.filter(o => o.st === '대기' && CSEL[o.id]).map(o => o.id).join() === id, wid) && await page.locator('#cList input:checked').count() === 1, '"송장부착된 것 체크" → 송장부착된 1건만'); await page.click('[data-act=cAll][data-i="0"]'); }
   // v5: 생산 화면 (?view=line)
   { const lp = await ctx.newPage(); const lerr = []; lp.on('pageerror', e => lerr.push(e.message));
-    lp.on('dialog', d => d.type() === 'prompt' ? d.accept('홍길동') : d.accept());
+    lp.on('dialog', d => d.type() === 'prompt' ? d.accept(/준비된 수량/.test(d.message()) ? '20' : '홍길동') : d.accept());
     await lp.goto(URL + '?view=line'); await lp.waitForFunction(() => S.role === 'line' && document.getElementById('lnSt').textContent === '');
     await lp.evaluate(() => new Promise(r => call('saveOrders', { orders: [
       { cust: '가나보일러', items: [{ name: 'SV7', sensor: 'X', qty: 50, unit: '', note: '스티커 있음' }, { name: '파워코드 2C', sensor: '', qty: 50, unit: '개', note: '' }], carrier: 'CJ', ship: '택배선불', due: S.today, recv: '김비밀', phone: '010-9999-0000', addr: '서울 비밀구 비밀로 1', memo: '명판있음' },
@@ -226,6 +226,18 @@ SV7 O 1000개 명판있슴
     await lp.locator('.lncard').filter({ hasText: '가나보일러' }).locator('[data-w=ready]').click();
     await lp.waitForFunction(() => LN.orders.some(o => o.cust === '가나보일러' && !o.ready && !o.tagged));
     ok(true, '준비완료 취소 → 송장부착도 같이 취소');
+    // v17: 품목별 준비 (가나보일러: SV7 X 50 · 파워코드 2C 50개)
+    { const card = () => lp.locator('.lncard').filter({ hasText: '가나보일러' });
+      await card().locator('.irow').nth(0).click(); await lp.waitForFunction(() => { const o = LN.orders.find(x => x.cust === '가나보일러'); return o.itemReady && o.itemReady['0'] && o.itemReady['0'].q === 50; });
+      ok(await card().locator('.irow.ok').count() === 1 && !(await lp.evaluate(() => LN.orders.find(x => x.cust === '가나보일러').ready)), '품목 줄 누르기 → SV7 전부 준비 ✓ (주문은 아직 준비완료 아님)');
+      await card().locator('[data-act=lnItemQ]').nth(1).click(); await lp.waitForFunction(() => { const o = LN.orders.find(x => x.cust === '가나보일러'); return o.itemReady['1'] && o.itemReady['1'].q === 20; });
+      ok(await card().locator('.irow.part').count() === 1 && /20 준비/.test(await card().textContent()), '"수량" → 파워코드 50개 중 20 준비 (◐)');
+      await lp.click('.lnnav [data-i=sum]'); ok(/파워코드 2C[^]*?30$/.test((await lp.locator('.lnsum').first().locator('.r').filter({ hasText: '파워코드' }).textContent()).trim()) && !/SV7 X/.test(await lp.locator('.lnsum').first().textContent()), '만들 양: 다 준비된 SV7은 빠지고 파워코드는 남은 30개');
+      await lp.click('.lnnav [data-i=today]');
+      await lp.screenshot({ path: path.join(OUT, '19-line-items.png') });
+      await card().locator('[data-act=lnItemQ]').nth(1).click(); await lp.waitForFunction(() => LN.orders.find(x => x.cust === '가나보일러').itemReady['1'].q === 20);
+      await card().locator('.irow').nth(1).click(); await lp.waitForFunction(() => LN.orders.find(x => x.cust === '가나보일러').ready);
+      ok(await card().locator('[data-w=ready]').evaluate(b => b.classList.contains('on')), '남은 품목도 다 준비되면 주문 준비완료 자동으로 켜짐'); }
     ok(lerr.length === 0, '생산 화면 오류 없음' + (lerr.length ? ': ' + lerr.join(' | ') : ''));
     await lp.close(); }
   // v8: 카톡을 하나씩 붙여넣고 나누기 → 아래에 쌓임 → 한 번에 저장 (새로고침해도 남음)
@@ -281,6 +293,18 @@ SV7 O 1000개 명판있슴
     await page.setInputFiles('#impShip', path.join(OUT, 'chulha.xlsx')); await page.waitForSelector('[data-act=siGo]');
     ok(/새로 넣을 주문 0건/.test(await page.textContent('#shB')) && await page.locator('[data-act=siGo]').isDisabled(), '같은 파일 다시 넣으면 0건 (겹치지 않음)');
     await page.click('#sheet [data-act=shClose]'); }
+  // v17: 마감 빠짐 알림 · 백업 · 차량출고 버튼
+  { await page.click('#nav [data-v=close]');
+    const wid = await page.evaluate(() => { const o = S.orders.find(x => x.st === '대기'); o.tagged = addDay(S.today, -1) + ' 15:00:00'; CSEL = {}; renderClose(); return o.id; });
+    ok(/출고 처리 안 된 주문 1건/.test(await page.textContent('#cList')), '출하서: 지난 날짜 송장부착인데 출고 처리 안 된 주문 알림');
+    await page.click('[data-act=cLate]');
+    ok(await page.inputValue('#cDate') === await page.evaluate(() => addDay(S.today, -1)) && await page.evaluate(id => CSEL[id] === true, wid), '"그 날짜로 체크" → 출하서 날짜를 어제로, 그 주문 체크');
+    await page.evaluate(() => { $('cDate').value = S.today; CSEL = {}; renderClose(); });
+    await page.evaluate(() => { window.NAMES = window.NAMES || []; if (!window.__hook) { window.__hook = 1; const c = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { if (this.download) NAMES.push(this.download); return c.call(this); }; } });
+    await page.click('#nav [data-v=more]'); await page.click('[data-act=backup]'); await page.waitForFunction(() => /백업을 받았습니다/.test(document.getElementById('toast').textContent));
+    ok(/^써브텍주문_백업_\d{4}-\d{2}-\d{2}\.xlsx$/.test(await page.evaluate(() => NAMES[NAMES.length - 1])), '주문 전체 백업 받기');
+    await page.click('#nav [data-v=new]'); await page.click('[data-act=manual]'); await page.click('#sheet [data-act=car][data-i=차량]');
+    ok(await page.inputValue('#e-ship') === '차량출고', '배송 "차량출고" 버튼 → 출하서 표기 차량출고'); await page.click('#sheet [data-act=shClose]'); }
   // PC 화면
   const pc = await browser.newPage({ viewport: { width: 1280, height: 800 } }); await pc.goto(URL); await pc.waitForFunction(() => document.getElementById('st').textContent === '');
   await pc.fill('#paste', PASTE); await pc.click('[data-act=parse]'); await pc.screenshot({ path: path.join(OUT, '6-pc.png') });

@@ -86,7 +86,8 @@ var OUT = (function () {
         var g0 = rows.length, multi = g.length > 1;
         g.forEach(function (o, j) {
           var its = (o.items && o.items.length ? o.items : [{ name: '', sensor: '', qty: '', unit: '', note: '' }]).map(function (i) { return Object.assign({}, i, { note: noteOf(i) }); }), r0 = rows.length, anyNote = its.some(function (i) { return i.note; });
-          var mine = o.own !== false, to = mine ? [o.recv, o.phone].filter(Boolean).join(' / ') : '', recv = [to, mine ? o.addr : ''].filter(Boolean).join(' ') || (o.branch || '');   // own=false: 단골 기본 주소는 출하서에 안 씀
+          // 받는분 칸 (v17): 주문에 받는분·주소가 적혀 있거나 택배·화물(CJ·경동·대신)이면 "받는분(없으면 거래처) / 전화 주소", 직납·직접수령은 비움
+          var parcel = /^(CJ|경동|대신|화물)$/.test(o.carrier || ''), mine = o.own !== false || parcel, nm0 = o.recv || (o.own === false && parcel && (o.phone || o.addr) ? o.cust : ''), to = mine ? [nm0, o.phone].filter(Boolean).join(' / ') : '', recv = [to, mine ? o.addr : ''].filter(Boolean).join(' ') || (o.branch || '');
           var head = [multi ? ((o.sender || o.recv) ? '직송 ' : '') + (j + 1) : '', o.memo, multi ? o.msg : ''].filter(Boolean).join(' / ');
           its.forEach(function (i, k) {
             var q = qtyCell(i, isAcc); if (typeof q === 'number') sum[which] += q;
