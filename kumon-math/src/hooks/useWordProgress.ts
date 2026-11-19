@@ -98,6 +98,9 @@ export interface WordProgress {
   pendingGrad: number[];
   /** 졸업 시험에 통과한 단계와 날짜 */
   graduated: Record<number, string>;
+  /** 책을 읽고 쿠폰을 받은 날짜와 그날 받은 장수 */
+  bookCouponDate: string;
+  bookCoupons: number;
 }
 
 /** 오답 노트에 이만큼 오래 남은 단어는 정리한다 */
@@ -115,6 +118,9 @@ export const MAX_COUPON_ROUNDS_PER_DAY = 8;
 
 /** 3문제를 틀리지 않고 한 번에 다 맞히면 받는 쿠폰 수 (틀렸다가 다시 맞히면 1장) */
 export const COUPONS_FOR_PERFECT = 2;
+
+/** 책을 끝까지(듣기 → 소리 내어 읽기 → 다시 듣기) 읽으면 한 장 — 하루 이만큼까지 (단어 퀴즈 쿠폰과 따로 센다) */
+export const BOOK_COUPONS_PER_DAY = 2;
 
 const DEFAULT: WordProgress = {
   date: '', learned: 0, phase: 'learn', round: 0, attempt: 0, results: [], queue: FRESH_QUEUE(),
@@ -136,6 +142,8 @@ const DEFAULT: WordProgress = {
   piggy: 0,
   pendingGrad: [],
   graduated: {},
+  bookCouponDate: '',
+  bookCoupons: 0,
 };
 
 function daysAgo(dateKey: string): number {
@@ -336,6 +344,22 @@ export function useWordProgress() {
     return true;
   }, [progress, save]);
 
+  /** 책 한 권을 끝까지 읽었을 때 쿠폰 한 장 — 오늘 남았으면 담고 true */
+  const earnBookCoupon = useCallback((id: CouponId): boolean => {
+    const today = todayKey();
+    const used = progress.bookCouponDate === today ? progress.bookCoupons : 0;
+    if (used >= BOOK_COUPONS_PER_DAY) return false;
+    save({
+      ...progress,
+      bookCouponDate: today,
+      bookCoupons: used + 1,
+      coupons: { ...progress.coupons, [id]: (progress.coupons[id] ?? 0) + 1 },
+      history: [{ id, type: 'earn' as const, at: today }, ...progress.history].slice(0, 60),
+    });
+    logDay('earned');
+    return true;
+  }, [progress, save]);
+
   /** 저금통에서 cost 장을 내고 큰 보상을 받는다 */
   const buyBigReward = useCallback((label: string, cost: number): boolean => {
     if (!(cost > 0) || progress.piggy < cost) return false;
@@ -418,7 +442,8 @@ export function useWordProgress() {
 
   return {
     progress, learnNext, answer, retryTest, earnCoupon, useCoupon, tradeCoupon,
-    completeSet, chooseUnit, saveToPiggy, buyBigReward, passGrad,
+    completeSet, chooseUnit, saveToPiggy, buyBigReward, passGrad, earnBookCoupon,
+    bookCouponsLeft: Math.max(0, BOOK_COUPONS_PER_DAY - (progress.bookCouponDate === todayKey() ? progress.bookCoupons : 0)),
     finishWithoutCoupon, practiceAgain, totalCoupons,
     rewardedThisRound, couponsToday, couponsLeftToday, update,
   };

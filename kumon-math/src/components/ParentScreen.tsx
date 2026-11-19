@@ -2,7 +2,10 @@ import React, { useMemo, useRef, useState } from 'react';
 import { WordProgress } from '../hooks/useWordProgress';
 import { StreakState } from '../words/streak';
 import { Settings, BigReward, exportBackup, importBackup } from '../words/settings';
-import { readLog, readConfusions, topConfusions, lastDays, sumDays, weekOf, isStudyDay } from '../words/log';
+import { readLog, readConfusions, topConfusions, lastDays, sumDays, weekOf, isStudyDay, minutesOf, DAILY_MINUTES } from '../words/log';
+import { loadShelf } from '../words/bookShelf';
+import { BOOKS } from '../words/books';
+import VoiceAlbum from './VoiceAlbum';
 import { MAX_BOX } from '../words/srs';
 import { WORD_BANK } from '../words/wordBank';
 import { COUPONS } from '../words/coupons';
@@ -59,6 +62,13 @@ export default function ParentScreen({ progress, streak, settings, onChange, onC
   const days14 = lastDays(log, 14, today);
   const maxCoupon = Math.max(1, ...days14.map(d => Math.max(d.log.earned, d.log.used)));
   const sum14 = sumDays(days14.map(d => d.log));
+  // 영어 30분 — 최근 14일 (문서: 2주 동안 매일 30분 인풋을 채웠는지 먼저 본다)
+  const mins14 = days14.map(d => ({ date: d.date, app: Math.floor(d.log.appSec / 60), off: d.log.offMin, total: minutesOf(d.log) }));
+  const full14 = mins14.filter(d => d.total >= DAILY_MINUTES).length;
+  const maxMin = Math.max(DAILY_MINUTES + 10, ...mins14.map(d => d.total));
+  const weekMin = week.reduce((n, d) => n + minutesOf(d.log), 0);
+  const shelf = loadShelf();
+  const booksRead = Object.values(shelf.reads).reduce((n, k) => n + k, 0);
 
   // 단어 상태
   const entries = Object.entries(progress.srs);
@@ -159,6 +169,54 @@ export default function ParentScreen({ progress, streak, settings, onChange, onC
           <div style={{ ...small, marginTop: 8 }}>
             날짜별 기록은 이 기능이 들어온 뒤부터 쌓여요. 그 전 기록은 아래 "단어 상태"에 합쳐져 있어요.
           </div>
+        </div>
+
+        {/* 영어 30분 · 2주 점검 */}
+        <div style={section}>
+          <div style={h}>⏱️ 영어 30분 — 이번 주 {weekMin}분</div>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 3, height: 100, marginBottom: 4 }}>
+            {/* 30분 선 */}
+            <div style={{
+              position: 'absolute', left: 0, right: 0, bottom: `${(DAILY_MINUTES / maxMin) * 100}%`,
+              borderTop: '2px dashed #27ae60', opacity: 0.6,
+            }} />
+            {mins14.map(d => (
+              <div key={d.date} title={`${d.date} 앱 ${d.app}분 · 앱 밖 ${d.off}분`}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%' }}>
+                <div style={{ height: `${(d.off / maxMin) * 100}%`, background: '#f6b26b', borderRadius: '3px 3px 0 0' }} />
+                <div style={{ height: `${(d.app / maxMin) * 100}%`, background: d.total >= DAILY_MINUTES ? '#27ae60' : '#9b8be0' }} />
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', ...small }}>
+            <span>{days14[0].date.slice(5)}</span><span>최근 14일 · 점선 = 30분</span><span>오늘</span>
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 800, marginTop: 4 }}>
+            <span style={{ color: '#9b8be0' }}>■ 앱</span>
+            <span style={{ color: '#f6b26b', marginLeft: 10 }}>■ 그림책·영상 (앱 밖)</span>
+          </div>
+          <div style={{
+            marginTop: 10, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 800, lineHeight: 1.5,
+            background: full14 >= 14 ? '#e8fff0' : '#fff8e7', color: full14 >= 14 ? '#1e7d4f' : '#8a5a00',
+          }}>
+            📋 2주 점검: 최근 14일 중 <b>{full14}일</b> 30분을 채웠어요.<br />
+            {full14 >= 14
+              ? '2주 동안 매일 채웠어요! 이제 말하기·쓰기를 조금씩 늘려 보세요 (내 문장 노트, 따라 말하기).'
+              : full14 >= 10
+              ? '거의 다 왔어요. 듣기·읽기(인풋)를 매일 채우는 게 먼저예요.'
+              : '아직은 듣기·읽기(인풋)를 매일 30분 채우는 데 집중해 주세요. 하기 싫은 날은 책장의 "오늘은 듣기만"이나 그림책 읽어주기도 좋아요.'}
+          </div>
+        </div>
+
+        {/* 책장 · 목소리 */}
+        <div style={section}>
+          <div style={h}>📚 책장 — 끝까지 읽은 횟수 {booksRead}번 · 읽은 책 {Object.keys(shelf.reads).length} / {BOOKS.length}권</div>
+          <div style={{ ...small, marginBottom: 10 }}>내 문장 노트 {shelf.notebook.length}개
+            {shelf.notebook[0] && <> · 최근: "{shelf.notebook[0].en}"</>}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 900, color: '#44405e', marginBottom: 6 }}>🎙️ 구름이 목소리 앨범</div>
+          <VoiceAlbum />
+          <div style={{ ...small, marginTop: 6 }}>책마다 처음 녹음과 최근 녹음 3개를 이 기기에 남겨요 (백업에는 들어가지 않아요).</div>
         </div>
 
         {/* 단어 상태 */}

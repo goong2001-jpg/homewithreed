@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react';
 import { todayKey } from '../words/dailySet';
 import {
-  MissionId, MissionState, missionsForDate, addMissionProgress, allMissionsDone, missionsDoneCount,
-  shouldReward, markRewarded, markCelebrated,
+  MissionId, MissionState, missionsForDate, addMissionProgress, missionsDoneCount,
+  shouldReward, reachedGoal, markRewarded, markCelebrated,
 } from '../words/missions';
+import { DAILY_MINUTES, minutesOf } from '../words/log';
+import { useTodayLog } from './useTodayLog';
 
 const KEY = 'word_missions';
 
@@ -21,11 +23,12 @@ function persist(next: MissionState) {
 }
 
 /**
- * 오늘 미션 3개 — 화면마다 따로 쓰지만 localStorage 를 같이 보므로
- * 놀이터에서 올린 진행도 단어 화면으로 돌아오면 보인다.
+ * 오늘의 영어 30분 — 화면마다 따로 쓰지만 localStorage 를 같이 보므로
+ * 놀이터·책장에서 올린 진행도 단어 화면으로 돌아오면 보인다.
  */
 export function useMissions() {
   const [missions, setMissions] = useState<MissionState>(load);
+  const minutes = minutesOf(useTodayLog());
 
   const apply = useCallback((fn: (prev: MissionState) => MissionState) => {
     setMissions(prev => {
@@ -48,8 +51,10 @@ export function useMissions() {
 
   return {
     missions, bump, reward, closeCelebration,
-    allDone: allMissionsDone(missions),
+    minutes,
+    /** 오늘 30분을 채웠는지 — "오늘 끝" */
+    allDone: reachedGoal(minutes, DAILY_MINUTES),
     doneCount: missionsDoneCount(missions),
-    needsReward: shouldReward(missions),
+    needsReward: shouldReward(missions, minutes, DAILY_MINUTES),
   };
 }

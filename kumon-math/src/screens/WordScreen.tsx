@@ -6,7 +6,7 @@ import { useWordProgress, COUPONS_FOR_PERFECT } from '../hooks/useWordProgress';
 import { useGameState } from '../hooks/useGameState';
 import { useMissions } from '../hooks/useMissions';
 import { useStreak } from '../hooks/useStreak';
-import { MissionCard, MissionCelebration } from '../components/DailyMission';
+import { MissionCard, MissionCelebration, OffAppSheet } from '../components/DailyMission';
 import { MISSION_BONUS } from '../words/missions';
 import { fairyLine } from '../words/fairy';
 import { todayKey } from '../words/dailySet';
@@ -23,7 +23,8 @@ import ParentGate from '../components/ParentGate';
 import WeeklyCard from '../components/WeeklyCard';
 import GradTest, { GRAD_STARS } from '../components/GradTest';
 import { useSettings } from '../hooks/useSettings';
-import { logConfusion, readLog, sumDays, weekOf } from '../words/log';
+import { logConfusion, logDay, readLog, sumDays, weekOf, DAILY_MINUTES } from '../words/log';
+import { useTodayLog } from '../hooks/useTodayLog';
 import { addDays, isoToday, weekIndex } from '../words/dates';
 
 // 엄마·아빠 메뉴는 열 때만 내려받는다
@@ -56,7 +57,10 @@ export default function WordScreen() {
   const [weeklyDate, setWeeklyDate] = useState<string | null>(weeklyCardDate);
   const [gradUnit, setGradUnit] = useState<number | null>(null);
   const { gameState, items, buyItem, equipItem, addPoints, recordCorrect } = useGameState();
-  const { missions, bump, reward, closeCelebration, allDone, needsReward } = useMissions();
+  const { missions, bump, reward, closeCelebration, allDone, needsReward, minutes } = useMissions();
+  const todayLog = useTodayLog();
+  // 앱 밖 영어 시간: 'gate' = 엄마·아빠 확인 중, 'open' = 기록 창
+  const [offApp, setOffApp] = useState<'gate' | 'open' | null>(null);
   const { streak, markActive } = useStreak();
 
   // 오답 노트에서 오늘 다시 볼 단어 (날이 바뀔 때 정해져 오늘 하루는 그대로다)
@@ -127,7 +131,7 @@ export default function WordScreen() {
     return () => clearTimeout(t);
   }, [streakDays]);
 
-  // 미션 3개를 다 하면 별 보너스 (하루 한 번) — 축하 화면은 닫을 때까지 보여준다
+  // 영어 30분을 채우면 별 보너스 (하루 한 번) — 축하 화면은 닫을 때까지 보여준다
   useEffect(() => {
     if (needsReward) { reward(); addPoints(MISSION_BONUS); playStreak(); }
   }, [needsReward, reward, addPoints]);
@@ -316,8 +320,17 @@ export default function WordScreen() {
         </div>
       </div>
 
-      {/* 오늘 미션 3개 — 다 하면 "오늘 끝" */}
-      <MissionCard missions={missions} />
+      {/* 오늘의 영어 30분 — 채우면 "오늘 끝" */}
+      <MissionCard missions={missions} minutes={minutes} goal={DAILY_MINUTES}
+        offMin={todayLog.offMin} onAddOffline={() => setOffApp('gate')} />
+      {offApp === 'gate' && (
+        <ParentGate title="앱 밖 영어 시간 더하기" onPass={() => setOffApp('open')} onCancel={() => setOffApp(null)} />
+      )}
+      {offApp === 'open' && (
+        <OffAppSheet offMin={todayLog.offMin}
+          onAdd={m => { logDay('offMin', m); if (m > 0) markActive(); }}
+          onClose={() => setOffApp(null)} />
+      )}
 
       {/* 소리 단계를 다 배웠으면 졸업 시험 — 문제를 푸는 동안에는 감춘다 */}
       {progress.pendingGrad.length > 0 && (progress.phase !== 'test' || testFinished) && (

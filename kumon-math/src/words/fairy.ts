@@ -27,7 +27,7 @@ export interface FairyContext {
   firstVisit: boolean;
   /** 어제 본 단어 카드 수 */
   yesterdayLearned: number;
-  /** 오늘 미션 3개를 다 했는지 */
+  /** 오늘 영어 30분을 채웠는지 */
   missionsDone: boolean;
 }
 
@@ -45,7 +45,7 @@ export function fairyLine(partial: Partial<FairyContext>): string | null {
   const correct = new Set(ctx.todayCorrect);
 
   // 1. 오늘 할 일을 다 했다
-  if (ctx.missionsDone) return '오늘 미션 다 했어! 최고야 🏆';
+  if (ctx.missionsDone) return '오늘 영어 30분 다 채웠어! 최고야 🏆';
 
   // 2. 어제 틀린 단어를 오늘 맞혔다
   const fromYesterday = ctx.yesterdayMissed.find(w => correct.has(w));

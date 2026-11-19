@@ -19,6 +19,12 @@ export interface DayLog {
   used: number;
   /** 놀이터에서 별을 받은 횟수 */
   games: number;
+  /** 앱에서 공부한 시간(초) — 화면을 만지거나 소리를 듣는 동안만 센다 */
+  appSec: number;
+  /** 엄마·아빠가 적은 앱 밖 영어 시간(분) — 그림책 읽어주기, 영상, 노래 */
+  offMin: number;
+  /** 끝까지 읽은 책 수 */
+  books: number;
 }
 
 export type LogField = keyof DayLog;
@@ -29,7 +35,22 @@ const CONFUSION_KEY = 'word_confusions';
 /** 이만큼 지난 기록은 지운다 */
 const KEEP_DAYS = 120;
 
-export const EMPTY_DAY: DayLog = { cards: 0, newWords: 0, right: 0, wrong: 0, mastered: 0, earned: 0, used: 0, games: 0 };
+export const EMPTY_DAY: DayLog = {
+  cards: 0, newWords: 0, right: 0, wrong: 0, mastered: 0, earned: 0, used: 0, games: 0,
+  appSec: 0, offMin: 0, books: 0,
+};
+
+/** 하루 목표 — 영어 30분 (문서: "매일 30분 훈련") */
+export const DAILY_MINUTES = 30;
+
+/** 그날 영어 시간(분) = 앱 시간 + 앱 밖 시간 */
+export function minutesOf(d: DayLog | undefined): number {
+  if (!d) return 0;
+  return Math.floor((d.appSec ?? 0) / 60) + (d.offMin ?? 0);
+}
+
+/** 기록이 바뀌었다고 화면에 알리는 이벤트 이름 */
+export const LOG_EVENT = 'word-log-changed';
 
 export function readLog(): LogMap {
   try {
@@ -45,17 +66,18 @@ export function logDay(field: LogField, n = 1, today: string = isoToday()): void
   try {
     const log = readLog();
     const day = { ...EMPTY_DAY, ...log[today] };
-    day[field] += n;
+    day[field] = Math.max(0, (day[field] ?? 0) + n);
     log[today] = day;
     const oldest = dayNum(today) - KEEP_DAYS;
     for (const k of Object.keys(log)) if (!(dayNum(k) >= oldest)) delete log[k];
     localStorage.setItem(KEY, JSON.stringify(log));
   } catch {}
+  try { window.dispatchEvent(new Event(LOG_EVENT)); } catch {}
 }
 
 /** 공부한 날인지 — 카드·퀴즈·놀이 중 하나라도 했으면 */
 export function isStudyDay(d: DayLog | undefined): boolean {
-  return !!d && d.cards + d.right + d.wrong + d.games > 0;
+  return !!d && d.cards + d.right + d.wrong + d.games + (d.books ?? 0) + (d.offMin ?? 0) > 0;
 }
 
 /** end 까지 n 일 치 기록 (옛날 → 오늘 순서, 없는 날은 0으로) */

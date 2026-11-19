@@ -49,7 +49,7 @@ export function saveSettings(next: Settings): void {
 /** 백업에 담는 저장 칸들 */
 export const BACKUP_KEYS = [
   'word_progress', 'word_missions', 'word_streak', 'word_greeted', 'word_log', 'word_confusions',
-  'word_settings', 'word_weekly', 'kumon_game_state', 'kumon_items', 'alphabet_progress',
+  'word_settings', 'word_weekly', 'word_books', 'kumon_game_state', 'kumon_items', 'alphabet_progress',
 ];
 
 const MARK = 'homewithreed-words';

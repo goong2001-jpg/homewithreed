@@ -11,9 +11,9 @@ describe('요정의 기억', () => {
     expect(fairyLine({ today: T, word: 'cat' })).toBeNull();
   });
 
-  it('미션 3개를 다 하면 그게 먼저', () => {
+  it('영어 30분을 채우면 그게 먼저', () => {
     expect(fairyLine({ today: T, missionsDone: true, yesterdayMissed: ['cat'], todayCorrect: ['cat'] }))
-      .toBe('오늘 미션 다 했어! 최고야 🏆');
+      .toBe('오늘 영어 30분 다 채웠어! 최고야 🏆');
   });
 
   it('어제 틀린 단어를 오늘 맞히면 기억해 준다', () => {

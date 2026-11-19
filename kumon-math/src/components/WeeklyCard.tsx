@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogMap, sumDays, weekOf, isStudyDay } from '../words/log';
+import { LogMap, sumDays, weekOf, isStudyDay, minutesOf } from '../words/log';
 import { playClick } from '../utils/sounds';
 
 const DAYS = ['월', '화', '수', '목', '금', '토', '일'];
@@ -27,6 +27,7 @@ export default function WeeklyCard({ log, date, name, title, onClose }: {
 }) {
   const week = weekOf(log, date);
   const sum = sumDays(week.map(d => d.log));
+  const minutes = week.reduce((n, d) => n + minutesOf(d.log), 0);
   const who = name ? `${name}, ` : '';
 
   const stat = (emoji: string, n: number, label: string) => (
@@ -77,8 +78,8 @@ export default function WeeklyCard({ log, date, name, title, onClose }: {
         </div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
           {stat('✅', sum.right, '한 번에 맞힌 문제')}
-          {stat('🎮', sum.games, '놀이터 활동')}
-          {stat('🎟️', sum.earned, '받은 쿠폰')}
+          {stat('📚', sum.books, '읽은 책')}
+          {stat('⏱️', minutes, '영어 시간(분)')}
         </div>
 
         <div style={{

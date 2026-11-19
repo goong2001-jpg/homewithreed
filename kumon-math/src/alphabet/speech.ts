@@ -56,10 +56,12 @@ interface SpeakOptions {
   rate?: number;
   pitch?: number;
   onEnd?: () => void;
+  /** 낱말을 읽기 시작할 때 (지원하는 목소리에서만 온다) — 글자 위치 */
+  onBoundary?: (charIndex: number) => void;
 }
 
 /** 영어로 읽어주기 */
-export function speak(text: string, { rate = 0.75, pitch = 1.15, onEnd }: SpeakOptions = {}): void {
+export function speak(text: string, { rate = 0.75, pitch = 1.15, onEnd, onBoundary }: SpeakOptions = {}): void {
   if (!speechSupported()) { onEnd?.(); return; }
   try {
     const synth = window.speechSynthesis;
@@ -84,6 +86,9 @@ export function speak(text: string, { rate = 0.75, pitch = 1.15, onEnd }: SpeakO
     if (onEnd) {
       u.onend = () => onEnd();
       u.onerror = () => onEnd();
+    }
+    if (onBoundary) {
+      u.onboundary = (e: SpeechSynthesisEvent) => { if (e.name === 'word' || e.name === undefined) onBoundary(e.charIndex); };
     }
     synth.speak(u);
   } catch {
@@ -118,4 +123,12 @@ export function speakSentence(text: string): void {
 /** 첫소리 힌트 — 아이가 따라 들을 수 있게 아주 천천히 */
 export function speakPhonics(phrase: string): void {
   speak(phrase, { rate: 0.55, pitch: 1.05 });
+}
+
+/**
+ * 책 읽어 주기 — 아이가 따라 볼 수 있게 천천히.
+ * onWord 로 지금 읽는 글자 위치를 알려 준다 (목소리가 지원할 때만).
+ */
+export function speakBook(text: string, onWord?: (charIndex: number) => void, onEnd?: () => void): void {
+  speak(text, { rate: 0.68, onBoundary: onWord, onEnd });
 }

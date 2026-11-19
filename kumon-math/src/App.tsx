@@ -1,11 +1,13 @@
-import React, { Suspense, lazy, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import './App.css';
 import WordScreen from './screens/WordScreen';
 import Loading from './components/Loading';
 import { playClick } from './utils/sounds';
+import { startStudyTimer } from './words/studyTime';
 
 // 기본 탭(영어 단어)만 바로 싣고, 나머지 화면은 그 탭을 눌렀을 때 따로 내려받는다 (번들 다이어트)
 const PlayScreen = lazy(() => import('./screens/PlayScreen'));
+const BookScreen = lazy(() => import('./screens/BookScreen'));
 const MathScreen = lazy(() => import('./screens/MathScreen'));
 const AlphabetScreen = lazy(() => import('./screens/AlphabetScreen'));
 
@@ -19,14 +21,16 @@ const AlphabetScreen = lazy(() => import('./screens/AlphabetScreen'));
 const SHOW_MATH = false;      // 🧮 수학놀이
 const SHOW_ALPHABET = false;  // 🔤 알파벳 쓰기
 const SHOW_WORDS = true;      // 📖 영어 단어
+const SHOW_BOOKS = true;      // 📚 책장 (배운 소리로 읽는 이야기책)
 const SHOW_PLAY = true;       // 🎮 놀이터 (배운 단어로 하는 놀이)
 
-type Tab = 'math' | 'alphabet' | 'words' | 'play';
+type Tab = 'math' | 'alphabet' | 'words' | 'books' | 'play';
 
 const TAB_KEY = 'active_tab';
 
 const ALL_TABS: { id: Tab; label: string; emoji: string; show: boolean }[] = [
-  { id: 'words', label: '영어 단어', emoji: '📖', show: SHOW_WORDS },
+  { id: 'words', label: '단어', emoji: '📖', show: SHOW_WORDS },
+  { id: 'books', label: '책장', emoji: '📚', show: SHOW_BOOKS },
   { id: 'play', label: '놀이터', emoji: '🎮', show: SHOW_PLAY },
   { id: 'alphabet', label: '알파벳', emoji: '🔤', show: SHOW_ALPHABET },
   { id: 'math', label: '수학놀이', emoji: '🧮', show: SHOW_MATH },
@@ -37,6 +41,9 @@ const TABS = ALL_TABS.filter(t => t.show);
 const DEFAULT_TAB: Tab = TABS[0]?.id ?? 'words';
 
 export default function App() {
+  // 공부 시간 재기 (영어 30분) — 앱 전체에서 하나만 돈다
+  useEffect(() => startStudyTimer(), []);
+
   const [tab, setTab] = useState<Tab>(() => {
     try {
       const saved = localStorage.getItem(TAB_KEY);
@@ -97,6 +104,7 @@ export default function App() {
         {tab === 'math' && SHOW_MATH && <MathScreen />}
         {tab === 'alphabet' && SHOW_ALPHABET && <AlphabetScreen />}
         {tab === 'words' && SHOW_WORDS && <WordScreen />}
+        {tab === 'books' && SHOW_BOOKS && <BookScreen />}
         {tab === 'play' && SHOW_PLAY && <PlayScreen />}
       </Suspense>
     </div>
