@@ -4,7 +4,7 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v17';
+var APP_VERSION = 'v18';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
 var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록', DEL: '주문_삭제기록', LRN: '주문_학습' };
@@ -389,7 +389,10 @@ function addrHist_(list) {
 }
 function learnList_() { return rows_(sheet_(T.LRN, LH), LH.length).filter(function (r) { return r[0] && r[2]; }).map(function (r) { return { kind: str_(r[0]), cust: str_(r[1]), from: str_(r[2]), to: str_(r[3]), at: str_(r[4]) }; }); }
 // 품목 준비 표: {품목번호: {n:품목명, q:준비 수량}} — 품목명이 바뀐 칸은 버림 (사무실이 품목을 고친 경우)
-function readyMap_(o) { var m = {}, src = o.itemReady || {}; Object.keys(src).forEach(function (k) { var it = o.items[+k]; if (it && src[k] && src[k].n === it.name) m[k] = src[k]; }); return m; }
+//  · 준비완료나 송장부착이 켜진 주문은 모든 품목을 다 준비된 것으로 봄 (v18 — 버튼으로 켠 것·v17 전에 켠 것 모두)
+function readyMap_(o) { var m = {}, src = o.itemReady || {}; Object.keys(src).forEach(function (k) { var it = o.items[+k]; if (it && src[k] && src[k].n === it.name) m[k] = src[k]; });
+  if (o.ready || o.tagged) o.items.forEach(function (it, i) { var f = it.qty === '' || it.qty == null ? 1 : +it.qty; if (!m[i] || m[i].q < f) m[i] = { n: it.name, q: f, by: o.taggedBy || o.readyBy || '', at: o.ready || o.tagged }; });
+  return m; }
 function fullReady_(o, by) { var m = {}, at = now_(); o.items.forEach(function (it, i) { m[i] = { n: it.name, q: it.qty === '' || it.qty == null ? 1 : +it.qty, by: by, at: at }; }); return m; }
 function uniq_(a) { var s = {}; return a.filter(function (x) { if (s[x]) return false; s[x] = 1; return true; }); }
 function deletedIds_() { return rows_(sheet_(T.DEL, DH), 2).map(function (r) { return str_(r[1]); }); }

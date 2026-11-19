@@ -249,7 +249,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v17';
+var HTML_VERSION = 'v18';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -324,7 +324,9 @@ function itemTag(o) {
 }
 function when(ts) { var d = String(ts || '').slice(0, 10); return d === S.today ? hm(ts) : OUT.md(d); }
 // 품목 준비 표 (서버 readyMap_ 와 같은 규칙: 품목명이 바뀐 칸은 무시)
-function rMap(o) { var m = {}, src = o.itemReady || {}; Object.keys(src).forEach(function (k) { var it = (o.items || [])[+k]; if (it && src[k] && src[k].n === it.name) m[k] = src[k]; }); return m; }
+function rMap(o) { var m = {}, src = o.itemReady || {}; Object.keys(src).forEach(function (k) { var it = (o.items || [])[+k]; if (it && src[k] && src[k].n === it.name) m[k] = src[k]; });
+  if (o.ready || o.tagged) (o.items || []).forEach(function (it, i) { if (!m[i] || m[i].q < iFull(it)) m[i] = { n: it.name, q: iFull(it), by: o.taggedBy || o.readyBy || '', at: o.ready || o.tagged }; });   // 준비완료·송장부착 = 품목 전부 체크
+  return m; }
 function iFull(i) { return i.qty === '' || i.qty == null ? 1 : +i.qty; }
 function rCount(o) { var m = rMap(o), done = 0; (o.items || []).forEach(function (i, k) { if (m[k] && m[k].q >= iFull(i)) done++; }); return { m: m, done: done, any: Object.keys(m).length, n: (o.items || []).length }; }
 function lineTags(o) { if (o.st !== '대기') return ''; var noLabel = /^(직납|방문|퀵)$/.test(o.carrier || '');

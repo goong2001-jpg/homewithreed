@@ -358,6 +358,14 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
     ok(sp[1] && !Object.keys(sp[1].itemReady || {}).length && !sp[1].ready, '일부 출고로 생긴 잔량 주문은 준비 기록 없이 시작');
     const bk = api('backupAll'); ok(bk.orders[0][0] === '주문ID' && bk.orders.length > 3 && bk.custs[0][0] === '거래처명', '주문 전체 백업: 머리줄 + 모든 주문 · 주소록');
     api('deleteOrders', { ids: sp.map(o => o.id) }); }
+  console.log('13b) v18: 준비완료·송장부착 = 품목 자동 체크');
+  { const [o2] = api('saveOrders', { orders: [Object.assign({}, B, { id: undefined, cust: '자동체크상사', items: [{ name: 'STT-1.3', sensor: '', qty: 30, unit: '', note: '' }, { name: 'STT-2.6', sensor: '', qty: 60, unit: '', note: '' }] })] }).orders;
+    let r = api('lineMark', { id: o2.id, what: 'tagged', on: true, by: '박' }).order;
+    ok(r.ready && r.itemReady['0'].q === 30 && r.itemReady['1'].q === 60, '송장부착 → 준비완료 + 품목 전부 체크');
+    const T = gas.__tabs['주문'], row = T.find(x => x[0] === o2.id), ci = T[0].indexOf('품목준비'); row[ci] = '';   // v17 전에 켠 준비완료 흉내
+    r = api('lineItem', { id: o2.id, k: 0, qty: 20, by: '박' }).order;
+    ok(!r.ready && !r.tagged && r.itemReady['0'].q === 20 && r.itemReady['1'].q === 60, '품목준비 칸이 비어 있어도 준비완료면 전부 체크로 보고, 하나 줄이면 나머지는 그대로');
+    api('deleteOrders', { ids: [o2.id] }); }
   { const o = OP.parseOrder('가나테크\nSV7 X 10\n차량출고'); ok(o.carrier === '직납' && o.mode === '차량' && o.shipRaw === '차량출고', '"차량출고" → 직납(차량), 출하서 표기 차량출고'); }
 
   console.log('14) 템플릿·버전');
