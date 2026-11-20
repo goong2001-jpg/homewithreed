@@ -380,6 +380,21 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
     r = api('lineMark', { id: o5.id, what: 'tagged', on: true, by: '이' }).order; ok(r.due === td && r.memo === '(원래 예정: 준비되면)', '"준비되면" → 오늘');
     r = api('lineMark', { id: o5.id, what: 'ready', on: false, by: '이' }).order; ok(r.due === '준비되면' && r.memo === '' && !r.tagged, '준비완료 취소(부착도 같이 꺼짐) → 예정 되돌림');
     api('deleteOrders', { ids: [o3.id, o4.id, o5.id] }); }
+  console.log('13d) v20: 나중에 온 카톡을 기존 주문에 더함');
+  { const R = '서브텍.홍길동차장님에게 답장\n제주 가나에너텍 …\n\nH200WF-W     X     50\n명판있음\n프로그램 있음\n\n같이 내일 경동화물로 출고할게요';
+    let p = OP.parseOrder(R, { today: '2026-11-20' });
+    ok(p.reply === '제주 가나에너텍' && p.cust === '제주 가나에너텍' && p.add && p.items.length === 1 && p.items[0].name === 'H200WF-W' && p.items[0].qty === 50 && p.carrier === '경동' && p.due === '2026-11-21' && p.dueSaid, '카톡 답장 → 원래 메시지 첫 줄이 거래처, 품목·경동·내일, 더하기 표시');
+    p = OP.parseOrder('H200WF-W X 50\n같이 보내주세요', { today: '2026-11-20' }); ok(p.add && !p.cust, '"같이" → 더하기 표시 (거래처 없음)');
+    ok(!OP.parseOrder('가나상사\nSV7 X 10\n택배', { today: '2026-11-20' }).add, '보통 발주는 더하기 아님');
+    const [o6] = api('saveOrders', { orders: [Object.assign({}, B, { id: undefined, cust: '제주 가나에너텍', due: '2026-11-20', carrier: 'CJ', ship: '택배선불', memo: '급함', items: [{ name: 'SV7', sensor: 'X', qty: 10, unit: '', note: '' }] })] }).orders;
+    api('lineItem', { id: o6.id, k: 0, qty: '', by: '홍' }); api('lineMark', { id: o6.id, what: 'tagged', on: true, by: '홍' });
+    const r = api('addToOrders', { adds: [{ id: o6.id, items: p.items.length ? [{ name: 'H200WF-W', sensor: 'X', qty: 50, unit: '', note: '' }] : [], memo: '명판있음 / 프로그램 있음', due: '2026-11-21', dueSaid: true, carrier: '경동', pay: '', claim: false, mode: '화물', ship: '경동화물', raw: 'H200WF-W X 50' }] });
+    const x = r.orders[0];
+    ok(x.items.length === 2 && x.items[1].name === 'H200WF-W' && x.items[1].note === '명판있음 / 프로그램 있음' && x.memo === '급함', '품목은 뒤에 붙고, 품목 1개면 메모는 그 품목 메모로');
+    ok(x.carrier === '경동' && x.ship === '경동화물' && x.due === '2026-11-21' && !x.ready && !x.tagged && x.itemReady['0'].q === 10, '배송·출고 예정은 새 메시지대로, 준비완료·송장부착 꺼짐, 원래 품목 체크는 그대로');
+    ok(/\[추가\] H200WF-W X 50/.test(api('boot').orders.find(o => o.id === o6.id).raw), '원문에 추가 메시지 남김');
+    api('setStatus', { ids: [o6.id], st: '출고완료' }); throws(() => api('addToOrders', { adds: [{ id: o6.id, items: [{ name: 'A', qty: 1 }] }] }), '출고완료 주문에는 더하지 않음');
+    api('deleteOrders', { ids: [o6.id] }); }
   { const o = OP.parseOrder('가나테크\nSV7 X 10\n차량출고'); ok(o.carrier === '직납' && o.mode === '차량' && o.shipRaw === '차량출고', '"차량출고" → 직납(차량), 출하서 표기 차량출고'); }
 
   console.log('14) 템플릿·버전');

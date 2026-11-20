@@ -6,6 +6,7 @@ var OP = (function () {
   var REGION = /^(?:\(?\d{5}\)?\s*)?(?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|충청|전라|경상)/;
   var ADDR2 = /[가-힣](?:로|길|번길)\s?\d+|(?:읍|면|동|리|가)\s?\d+(?:-\d+)?(?:번지)?(?:\s|$)|\d+번지/;
   var SHIPW = /택배|경동|대신|직납|화물|퀵|직접\s*수령|수령해|가지러|방문|찾으러|갖다|선불|착불|현불|차량\s*출고/;
+  var ADDW = /같이|함께|합쳐|추가로|추가\s*(?:해|요|합니다|할게|부탁|발주|주문)|더\s*(?:보내|넣|추가)/;   // 기존 주문에 더하는 말 (v20)
   var MSGW = /문\s*앞|부재|놓아|경비실|택배함|배송\s*전|도착\s*전|연락\s*(?:바|부탁|주)|던지|파손|깨지|취급\s*주의|조심|직접\s*받/;
   var MSGV = /주세요|주시고|주십시오|마세요|마시고|바랍니다|조치/;          // 받는 곳 바로 뒤의 부탁 문장
   var NOTMSG = /출고|발주|입금|계산서|명세서|직납|출하|생산|명판|스티커|프로그램|단계|케이스|샘플|반품|교환|AS|발행|박스|동봉|포장|카[다탈]로그|설명서|표시|장부|발송|택배(?![함실])|화물|경동|대신/;   // 이 말이 있으면 배송 메시지가 아니라 적요
@@ -141,6 +142,9 @@ var OP = (function () {
     opt = opt || {};
     var today = opt.today || ymd(new Date());
     var L = String(body || '').split('\n').map(trim).filter(function (x) { return x; });
+    // v20: 카톡 답장 ("○○님에게 답장" + 원래 메시지 첫 줄 "제주 세기에너텍 …") → 원래 주문의 거래처, 기존 주문에 추가할 후보
+    var reply = '';
+    if (L.length > 2 && /^.{1,40}에게\s*답장$/.test(L[0])) { reply = sq(L[1].replace(/\s*(?:…|\.{2,})\s*$/, '')); L = L.slice(2); }
     var o = { cust: '', items: [], shipRaw: '', carrier: '', pay: '', claim: false, recv: '', phone: '', phone2: '', addr: '', branch: '', sender: '', senderPhone: '', msg: '', memo: '', due: today, raw: String(body || '') };
     var memo = [], lastKind = '', shipLines = [];
     function phonesOf(s) { return (s.match(PHONE) || []).filter(function (p) { return p.replace(/\D/g, '').length >= 8; }); }
@@ -210,9 +214,12 @@ var OP = (function () {
     o.shipRaw = shipLabel(o);
     // 출고 예정
     var all = L.join(' ');
-    if ((m = all.match(/(준비|입금|입고|명판|케이스|자재)\S{0,4}\s?(?:되면|들어오면|나오면|되는대로|되는 대로)/))) o.due = m[1] + '되면';
-    else if (/내일/.test(all)) { var d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() + 1); o.due = ymd(d); }
+    if ((m = all.match(/(준비|입금|입고|명판|케이스|자재)\S{0,4}\s?(?:되면|들어오면|나오면|되는대로|되는 대로)/))) { o.due = m[1] + '되면'; o.dueSaid = true; }
+    else if (/내일/.test(all)) { var d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() + 1); o.due = ymd(d); o.dueSaid = true; }
+    else if (/오늘/.test(all)) o.dueSaid = true;
     o.memo = memo.join(' / ');
+    if (reply) { o.reply = reply; var rq = itemParse(reply); if (!o.cust || (o.items.length && o.cust === o.items[0].name)) { if (!(rq && rq.qty !== '')) o.cust = sq(reply.replace(/\s*발주\s*(?:입니다|건|요청|서)?\.?$/, '')); } }
+    o.add = !!reply || ADDW.test(all);   // 같이·추가로 … → 기존 주문에 더하는 말
     var LR = learnMaps(opt.learn), ck = norm(o.cust);
     o.items = o.items.reduce(function (a, it) { return a.concat(expandItem(it, LR.opt)); }, []).map(function (it) {
       var to = LR.name[ck + '|' + norm(it.name)] || LR.name['|' + norm(it.name)];

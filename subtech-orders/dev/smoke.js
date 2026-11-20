@@ -336,6 +336,25 @@ SV7 O 1000개 명판있슴
   await pc.click('[data-act=lBulk][data-i=ship]'); await pc.click('[data-act=bkGo]');
   await pc.waitForFunction(() => S.orders.filter(o => o.st === '출고완료' && o.shipped === S.today).length === 2);
   ok(true, '고른 2건 출고완료 한 번에');
+  // v20: 나중에 온 카톡(답장)을 기존 주문에 더함
+  { const p2 = await browser.newPage({ viewport: { width: 420, height: 900 } }); p2.on('dialog', d => d.accept()); const e2 = []; p2.on('pageerror', e => e2.push(e.message));
+    await p2.goto(URL); await p2.waitForFunction(() => document.getElementById('st').textContent === '');
+    const REP = '[홍길동] [오후 5:31] 서브텍.홍길동님에게 답장\n가나하우징 …\n\nH7     X     20\n명판있음\n\n같이 내일 경동화물로 출고할게요';
+    await p2.fill('#paste', PASTE.split('[홍길동] [오전 11:08]')[0] + '\n' + REP); await p2.click('[data-act=parse]');
+    const d0 = await p2.locator('#drafts .card').first().innerText();
+    ok(await p2.locator('#drafts .card').count() === 1 && /H7\s+X\s+20 명판있음/.test(d0) && /STT-1.3/.test(d0) && /경동/.test(d0), '같이 붙여넣은 원래 발주 + 답장 → 한 주문으로 합침 (품목 3개, 경동)');
+    await p2.click('[data-act=draftSave]'); await p2.waitForFunction(() => S.orders.length === 1);
+    await p2.fill('#paste', REP.replace('H7     X     20', 'SV7 X 5')); await p2.click('[data-act=parse]');
+    ok(await p2.locator('#drafts .addto.on').count() === 1 && /가나하우징 대기 주문에 품목 추가/.test(await p2.textContent('#drafts')) && !/배송방법 없음|주소 없음/.test(await p2.textContent('#drafts')), '나중에 온 답장 → "가나하우징 대기 주문에 품목 추가" 자동 선택');
+    await p2.screenshot({ path: path.join(OUT, '20-addto.png'), fullPage: true });
+    await p2.click('[data-act=draftSave]'); await p2.waitForFunction(() => S.orders.length === 1 && S.orders[0].items.length === 4);
+    ok(await p2.evaluate(() => { const o = S.orders[0]; return o.items[3].name === 'SV7' && o.items[3].note === '명판있음' && o.carrier === '경동'; }), '저장 → 기존 주문 뒤에 SV7 5 추가 (새 주문 안 생김)');
+    await p2.fill('#paste', '[김영희] [오후 6:00] 다라전기\nSV7 X 3\n택배'); await p2.click('[data-act=parse]');
+    ok(await p2.locator('#drafts .addto').count() === 0, '다른 거래처 보통 발주에는 추가 칸 안 나옴');
+    await p2.selectOption('#drafts [data-addto]', '').catch(() => {}); await p2.click('[data-act=draftClear]');
+    await p2.fill('#paste', REP.replace('H7     X     20', 'SV7 X 7')); await p2.click('[data-act=parse]'); await p2.selectOption('#drafts [data-addto]', '');
+    ok(await p2.locator('#drafts .addto.on').count() === 0 && await p2.evaluate(() => !S.drafts[0]._to), '"새 주문으로 저장" 고르면 따로 저장');
+    ok(!e2.length, '오류 없음' + (e2.length ? ': ' + e2.join(' | ') : '')); await p2.close(); }
   await browser.close(); server.close();
   console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과'); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

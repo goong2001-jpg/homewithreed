@@ -95,6 +95,9 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--pri);flex:0 0 aut
 .sec{font-size:13px;font-weight:700;color:var(--sub);margin:16px 0 6px;letter-spacing:.2px}
 details.raw{margin-top:10px}details.raw pre{white-space:pre-wrap;font:13px/1.5 inherit;background:var(--chip);border-radius:8px;padding:10px;margin:6px 0 0}
 table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+.addto{margin-top:8px;padding:8px 10px;border:1px dashed var(--line);border-radius:8px;background:#fff;font-size:13px;display:flex;flex-direction:column;gap:6px}
+.addto.on{border:1.5px solid #2f7d4a;background:#eef7f0}
+.addto select{width:100%;font-size:14px;padding:8px}
 .pick{border:1px dashed var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13px;background:#fff}
 .pick button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 2px;min-height:40px;border-bottom:1px solid var(--line)}
 .pick button:last-child{border-bottom:0}
@@ -249,7 +252,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v19';
+var HTML_VERSION = 'v20';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -334,7 +337,7 @@ function lineTags(o) { if (o.st !== '대기') return ''; var noLabel = /^(직납
   return (!o.ready && rc.any ? '<span class="tag warn">품목 준비 ' + rc.done + '/' + rc.n + '</span>' : '') + (o.ready ? '<span class="tag ok">준비완료 ✓ ' + esc(when(o.ready)) + '</span>' : '') + (o.tagged ? '<span class="tag ok">' + (noLabel ? '출고준비' : '송장부착') + ' ✓ ' + esc(when(o.tagged)) + '</span>' : ''); }
 function printedTag(o) { if (!o.printed || o.st === '취소') return ''; var d = String(o.printed).slice(0, 10); return '<span class="tag ok">송장출력 ✓ ' + esc(d === S.today ? hm(o.printed) : OUT.md(d)) + '</span>'; }
 function cardHTML(o, opt) {
-  opt = opt || {}; var w = o.st === '대기' ? warns(o) : [], its0 = o.items || [], cut = opt.max && its0.length > opt.max ? opt.max - 1 : its0.length, it = its0.slice(0, cut).map(function (i) { var n = OUT.noteOf(i); return esc(OUT.itemStr(i).replace(/\s{4}/g, '  ')) + (n ? ' <span class="muted">' + esc(n) + '</span>' : ''); }).join('\n') + (cut < its0.length ? '\n<span class="muted">외 ' + (its0.length - cut) + '개 품목 (눌러서 보기)</span>' : '');
+  opt = opt || {}; var w = o.st === '대기' && !o._to ? warns(o) : [], its0 = o.items || [], cut = opt.max && its0.length > opt.max ? opt.max - 1 : its0.length, it = its0.slice(0, cut).map(function (i) { var n = OUT.noteOf(i); return esc(OUT.itemStr(i).replace(/\s{4}/g, '  ')) + (n ? ' <span class="muted">' + esc(n) + '</span>' : ''); }).join('\n') + (cut < its0.length ? '\n<span class="muted">외 ' + (its0.length - cut) + '개 품목 (눌러서 보기)</span>' : '');
   var to = [o.recv, o.phone, o.branch ? '[' + o.branch + ']' : '', o.addr].filter(Boolean).join(' · ');
   return '<div class="card tap' + (opt.off ? ' off' : '') + '" data-act="' + (opt.act || 'edit') + '" data-i="' + esc(opt.key) + '"><div class="top">' + (opt.check != null ? '<input type="checkbox" data-chk="' + esc(opt.key) + '"' + (opt.check ? ' checked' : '') + '>' : '') +
     '<div class="grow"><div class="cust">' + esc(o.cust || '(거래처 없음)') + '</div><div class="items">' + it + '</div>' +
@@ -358,18 +361,25 @@ function go(v) { S.view = v; render(); window.scrollTo(0, 0); if (v === 'close')
 function doParse() {
   var txt = $('paste').value; if (!txt.trim()) { notice('붙여넣은 내용이 없습니다'); return; }
   var msgs = OP.splitMessages(txt), n = 0, dup = 0, start = S.drafts.length;
-  var seen = {}; S.drafts.forEach(function (o) { seen[OP.norm(o.raw)] = 1; });
+  var seen = {}, merged = [], prevAdd = []; S.drafts.forEach(function (o) { seen[OP.norm(o.raw)] = 1; });
   var add = msgs.map(function (m) {
     var o = OP.parseOrder(m.body, { today: S.today, custs: S.custs, learn: S.learn }); o.who = m.who || ''; o.at = m.date && m.time ? m.date + ' ' + m.time + ':00' : '';
     if (!o.isOrder) return null; o.ship = o.shipRaw; delete o.shipRaw; delete o.isOrder; o.box = []; o.st = '대기'; o.stmt = ''; o.tax = ''; o.senderAddr = '';
     if (seen[OP.norm(o.raw)]) { dup++; return null; }   // 이미 나눈 메시지는 또 안 넣음
-    seen[OP.norm(o.raw)] = 1; enrich(o); o._on = !!o.cust; n++; return o;
+    seen[OP.norm(o.raw)] = 1; n++;
+    if (o.add) {   // v20: 답장·"같이 …" → 같은 거래처의 나눈 결과(아직 저장 전)나 대기 주문에 더함
+      var pd = o.cust && S.drafts.concat(prevAdd).filter(function (d) { return !d._to && !d._gone && sameCust(d.cust, o.cust); }).pop();
+      if (pd) { mergeAdd(pd, o); merged.push(pd.cust); return null; }
+      var cs = addCands(o); if (cs.length && o.cust) o._to = cs[0].id;
+      if (!o._to) enrich(o); o._on = !!(o.cust || o._to); prevAdd.push(o); return o;
+    }
+    enrich(o); o._on = !!o.cust; prevAdd.push(o); return o;
   }).filter(Boolean);
   // v8: 나눈 결과는 아래에 계속 쌓임 → 카톡을 하나씩 붙여넣고 나누기를 반복한 뒤 한 번에 저장
   S.drafts = S.drafts.concat(add);
   if (n) $('paste').value = '';   // 다음 카톡을 바로 붙여넣을 수 있게 비움 (원문은 각 주문에 남아 있음)
   if (!n) notice(dup ? '이미 나눈 메시지입니다 (' + dup + '건)' : '발주로 보이는 메시지를 찾지 못했습니다. "직접 입력"을 써보세요.');
-  else notice(n + '건 추가 · 모두 ' + S.drafts.length + '건' + (dup ? ' (이미 나눈 ' + dup + '건 건너뜀)' : '') + ' — 다음 카톡을 붙여넣으세요');
+  else notice(n + '건 추가 · 모두 ' + S.drafts.length + '건' + (dup ? ' (이미 나눈 ' + dup + '건 건너뜀)' : '') + (merged.length ? ' · ' + merged.join(', ') + ' 주문에 품목 더함' : '') + ' — 다음 카톡을 붙여넣으세요');
   renderDrafts();
   if (n && start) { var c = document.querySelectorAll('#drafts .card')[start]; if (c) c.scrollIntoView({ block: 'center' }); }
   else $('paste').focus();
@@ -391,17 +401,63 @@ function askOpt(key, to) {
   renderDrafts();
   call('learnSave', { rows: [{ kind: 'opt', from: w, to: to }] }, function (r) { S.learn = r.learn; notice('기억했습니다: 「' + w + '」 → ' + (to === 'item' ? '따로 품목' : '메모')); });
 }
+// v20: 나중에 온 카톡을 기존 주문에 더하기 ------------------------------------------
+function sameCust(a, b) { var x = OP.norm(a), y = OP.norm(b), cx = OP.norm(String(a || '').replace(/^\s*\([^)]*\)\s*/, '')), cy = OP.norm(String(b || '').replace(/^\s*\([^)]*\)\s*/, '')); if (!x || !y) return false; return x === y || cx === cy || (Math.min(x.length, y.length) >= 3 && (x.indexOf(cy) >= 0 || y.indexOf(cx) >= 0)); }
+// 더할 수 있는 대기 주문: 같은 거래처 먼저(최근 접수 순), 거래처를 모르면 최근 대기 주문 20건
+function addCands(o) {
+  var w = S.orders.filter(function (x) { return x.st === '대기'; }).sort(function (a, b) { return String(b.at).localeCompare(String(a.at)); });
+  var same = o.cust ? w.filter(function (x) { return sameCust(x.cust, o.cust); }) : [];
+  return same.length || o.cust && !o.add ? same : w.slice(0, 20);
+}
+function candLabel(x) { var it = x.items || []; return x.cust + ' · ' + (dueTxt(x) || '') + ' · ' + (it[0] ? OUT.itemStr(it[0]) : '') + (it.length > 1 ? ' 외 ' + (it.length - 1) : ''); }
+// 기존 주문(또는 아직 저장 안 한 나눈 결과) t 에 메시지 x 를 더함 — 서버 Code.gs mergeAdd_ 와 같은 규칙
+function addPart(x) {   // 새 메시지에 실제로 적힌 것만 (주소록·지난번 배송방법으로 채운 것은 빼고)
+  var au = x._auto || [], y = { items: (x.items || []).filter(function (i) { return String(i.name || '').trim(); }).map(function (i) { var z = Object.assign({}, i); delete z.ask; delete z.from; return z; }), memo: x.memo || '', due: x.due, dueSaid: !!x.dueSaid, msg: x.msg || '', raw: x.raw || '', recv: x.recv || '', phone: x.phone || '' };
+  if (au.indexOf('지난번 배송방법') < 0 && x.carrier) { y.carrier = x.carrier; y.pay = x.pay; y.claim = x.claim; y.mode = x.mode; y.ship = x.ship; y.branch = x.branch; }
+  if (au.indexOf('주소록 주소') < 0) y.addr = x.addr || '';
+  return y;
+}
+function mergeAdd(t, x) {
+  var y = addPart(x), its = y.items, memo = y.memo;
+  if (memo && its.length === 1) { its[0].note = [its[0].note, memo].filter(Boolean).join(' · '); memo = ''; }
+  t.items = (t.items || []).concat(its); if (memo) t.memo = [t.memo, '추가분: ' + memo].filter(Boolean).join(' / ');
+  if (y.carrier) { t.carrier = y.carrier; t.pay = y.pay || ''; t.claim = !!y.claim; t.mode = y.mode || ''; if (y.ship) t.ship = y.ship; if (y.branch) t.branch = y.branch; t._auto = (t._auto || []).filter(function (a) { return a !== '지난번 배송방법'; }); }
+  if (y.dueSaid && y.due) t.due = y.due;
+  if (y.addr && !t.addr) t.addr = y.addr; if (y.recv && !t.recv) t.recv = y.recv; if (y.phone && !t.phone) t.phone = y.phone;
+  if (y.msg) t.msg = [t.msg, y.msg].filter(Boolean).join(' ');
+  t.raw = [t.raw, '[추가] ' + y.raw].filter(Boolean).join('\n\n');
+  return t;
+}
+function addHTML(o, i) {
+  var cs = addCands(o); if (!cs.length && !o.add) return '';
+  if (!cs.length) return '<div class="addto"><b>➕ 기존 주문에 더하는 메시지 같습니다</b><span class="muted">대기 중인 ' + esc(o.cust || '') + ' 주문이 없어 새 주문으로 저장됩니다</span></div>';
+  var t = o._to && byId(o._to);
+  return '<div class="addto' + (t ? ' on' : '') + '"><b>' + (t ? '➕ ' + esc(t.cust) + ' 대기 주문에 품목 추가' : (o.add ? '➕ 기존 주문에 더하는 메시지 같습니다' : '같은 거래처 대기 주문이 있습니다')) + '</b>' +
+    '<select data-addto="' + i + '"><option value="">새 주문으로 저장</option>' + cs.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === o._to ? ' selected' : '') + '>기존 주문에 추가: ' + esc(candLabel(x)) + '</option>'; }).join('') + '</select>' +
+    (t ? '<span class="muted">저장하면 품목이 그 주문 뒤에 붙고' + (addPart(o).carrier ? ' 배송은 ' + esc(o.ship || o.carrier) + '로,' : '') + (o.dueSaid ? ' 출고 예정은 ' + esc(dueTxt(o)) + '(으)로' : '') + ' 바뀝니다. 생산의 준비완료·송장부착은 꺼집니다.' + (t.printed ? ' ⚠️ 송장이 이미 출력된 주문입니다 — 박스 수를 다시 확인하세요.' : '') + '</span>' : '') + '</div>';
+}
+function setAddTo(i, id) {
+  var o = S.drafts[+i]; if (!o) return; o._to = id || '';
+  if (id) { var t = byId(id); if (!o.cust && t) o.cust = t.cust; o._on = true; }
+  else { enrich(o); o._on = !!o.cust; }
+  renderDrafts();
+}
 function renderDrafts() {
   keepDrafts();
   var d = S.drafts, on = d.filter(function (o) { return o._on; }).length;
   $('drafts').innerHTML = !d.length ? '' : '<div class="row" style="margin-bottom:8px"><b class="grow">나눈 결과 ' + d.length + '건</b><span class="muted">눌러서 고치기</span></div>' +
-    d.map(function (o, i) { return cardHTML(o, { key: i, act: 'draftEdit', check: o._on, off: !o._on, extra: askHTML(o, i) }); }).join('') +
+    d.map(function (o, i) { return cardHTML(o, { key: i, act: 'draftEdit', check: o._on, off: !o._on, extra: addHTML(o, i) + askHTML(o, i) }); }).join('') +
     '<div class="bar"><button class="btn pri grow" data-act="draftSave"' + (on ? '' : ' disabled') + '>체크한 ' + on + '건 저장</button><button class="btn" data-act="draftClear">비우기</button></div>';
 }
 function saveDrafts() {
   var list = S.drafts.filter(function (o) { return o._on; }).map(clean); if (!list.length) return;
   var bad = list.filter(function (o) { return !o.items.length; }); if (bad.length) { notice('품목이 없는 주문이 있습니다', 1); return; }
-  call('saveOrders', { orders: list }, function (r) { mergeOrders(r.orders); S.custs = r.custs; r.orders.forEach(function (o) { if (o.addr || o.branch) rememberAddr(o); }); S.drafts = S.drafts.filter(function (o) { return !o._on; }); if (!S.drafts.length) $('paste').value = ''; notice(r.orders.length + '건 저장했습니다'); render(); });
+  var on = S.drafts.filter(function (o) { return o._on; }), adds = on.filter(function (o) { return o._to; }).map(function (o) { return Object.assign(addPart(o), { id: o._to }); }), news = on.filter(function (o) { return !o._to; }).map(clean);
+  var fin = function (msg) { S.drafts = S.drafts.filter(function (o) { return !o._on; }); if (!S.drafts.length) $('paste').value = ''; notice(msg); render(); };
+  var saveNew = function (pre) { if (!news.length) { fin(pre); return; } call('saveOrders', { orders: news }, function (r) { mergeOrders(r.orders); S.custs = r.custs; r.orders.forEach(function (o) { if (o.addr || o.branch) rememberAddr(o); }); fin([r.orders.length + '건 저장했습니다', pre].filter(Boolean).join(' · ')); }); };
+  if (!adds.length) { saveNew(''); return; }
+  call('addToOrders', { adds: adds }, function (r) { mergeOrders(r.orders); S.drafts.forEach(function (o) { if (o._on && o._to) o._on = false, o._gone = true; }); S.drafts = S.drafts.filter(function (o) { return !o._gone; });
+    saveNew(r.orders.map(function (o) { return o.cust; }).join(', ') + ' 주문에 품목을 더했습니다' + (r.warn.length ? ' (⚠️ 송장 이미 출력: ' + r.warn.join(', ') + ')' : '')); });
 }
 
 /* ---------- 주문 고치기 창 ---------- */
@@ -786,6 +842,7 @@ function loadDeleted() { call('deletedList', {}, function (r) { $('delList').inn
 
 /* ---------- 누르기 ---------- */
 document.addEventListener('click', function (ev) {
+  if (ev.target.closest('.addto')) return;   // 기존 주문에 추가 고르는 칸은 카드 열기 안 함
   var sid = ev.target.closest('[data-sid]'); if (sid) { SI.on[sid.getAttribute('data-sid')] = sid.checked; drawShipImport(); return; }
   var chk = ev.target.closest('[data-chk]'); if (chk) { var key = chk.getAttribute('data-chk'); if (S.view === 'new') { S.drafts[+key]._on = chk.checked; renderDrafts(); } if (S.view === 'print') { PSEL[key] = chk.checked; pCountSel(); } if (S.view === 'close') { CSEL[key] = chk.checked; closeSum(); } if (S.view === 'list') { LSEL[key] = chk.checked; lSelCount(); } return; }
   if (ev.target.closest('[data-box]') && !ev.target.closest('[data-act="bxAdd"],[data-act="bxDel"]')) return;
@@ -886,7 +943,7 @@ $('impShip').addEventListener('change', function () { var f = this.files[0]; thi
 $('imp').addEventListener('change', function () { if (this.files.length) doImport(Array.prototype.slice.call(this.files)); this.value = ''; });
 document.addEventListener('input', function (ev) { if (ev.target.id === 'lnQ') { renderLine(); return; } if (ev.target.classList && ev.target.classList.contains('sq')) shipSync();
   if (ev.target.id === 'e-addr' && ED && $('e-saveAddrRow')) $('e-saveAddrRow').classList.toggle('hidden', !newAddr($('e-cust').value, ev.target.value)); });
-document.addEventListener('change', function (ev) { if (ev.target.id === 'bk-date') { delete ev.target.dataset.text; return; } if (ev.target.classList && ev.target.classList.contains('sw')) { shipSync(); return; } if (ev.target.id === 'e-dueCal' && ED && ev.target.value) { readEdit(); ED.o.due = ev.target.value; drawEdit(); return; } if (ev.target.id === 'e-cust' && ED) { readEdit(); var had = ED.o.addr; enrich(ED.o); if (!had && ED.o.addr) notice('주소록에서 주소를 채웠습니다'); drawEdit(); } });
+document.addEventListener('change', function (ev) { if (ev.target.dataset && ev.target.dataset.addto != null) { setAddTo(ev.target.dataset.addto, ev.target.value); return; } if (ev.target.id === 'bk-date') { delete ev.target.dataset.text; return; } if (ev.target.classList && ev.target.classList.contains('sw')) { shipSync(); return; } if (ev.target.id === 'e-dueCal' && ED && ev.target.value) { readEdit(); ED.o.due = ev.target.value; drawEdit(); return; } if (ev.target.id === 'e-cust' && ED) { readEdit(); var had = ED.o.addr; enrich(ED.o); if (!had && ED.o.addr) notice('주소록에서 주소를 채웠습니다'); drawEdit(); } });
 /* ---------- 새 버전 알림: 화면을 오래 열어 두면 옛 버전으로 계속 쓰게 됨 → 서버 버전이 다르면 새로고침 안내 ---------- */
 var VER_AT = Date.now();
 function checkVer() { VER_AT = Date.now(); try { google.script.run.withSuccessHandler(function (r) { if (r && r.version && r.version !== HTML_VERSION) showNewVer(r.version); }).withFailureHandler(function () {}).api(S.pin, 'ver', {}); } catch (e) {} }

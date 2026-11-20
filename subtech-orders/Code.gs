@@ -4,7 +4,7 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v19';
+var APP_VERSION = 'v20';
 var DUE_MARK = '(원래 예정: ';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
@@ -118,6 +118,23 @@ var API = {
       if (add.length) sh.getRange(sh.getLastRow() + 1, 1, add.length, OH.length).setValues(add);
       learn_(out);
       return { orders: out, custs: custs_() };
+    });
+  },
+
+  // v20: 나중에 온 카톡(답장·"같이 …")을 기존 대기 주문에 더함 {adds:[{id, items, memo, due, dueSaid, carrier, pay, claim, mode, ship, branch, msg, addr, recv, phone, raw}]}
+  //  · 품목은 뒤에 붙임(생산이 해 둔 품목 체크는 그대로), 배송·출고 예정은 새 메시지에 적힌 것만 바꿈, 준비완료·송장부착은 꺼짐(새 품목은 아직 안 됨)
+  addToOrders: function (a) {
+    var list = a.adds || []; if (!list.length) throw new Error('더할 주문이 없습니다');
+    return lock_(function () {
+      var warn = [], out = [];
+      list.forEach(function (x) {
+        if (!x.items || !x.items.length) throw new Error('더할 품목이 없습니다');
+        out = out.concat(patch_([x.id], function (o) {
+          if (o.st !== '대기') throw new Error(o.cust + ': 대기 중인 주문이 아닙니다 (지금: ' + o.st + ')');
+          mergeAdd_(o, x); if (o.printed) warn.push(o.cust);
+        }));
+      });
+      return { orders: out, warn: warn };
     });
   },
 
@@ -398,6 +415,21 @@ function learnList_() { return rows_(sheet_(T.LRN, LH), LH.length).filter(functi
 function readyMap_(o) { var m = {}, src = o.itemReady || {}; Object.keys(src).forEach(function (k) { var it = o.items[+k]; if (it && src[k] && src[k].n === it.name) m[k] = src[k]; });
   if (o.ready || o.tagged) o.items.forEach(function (it, i) { var f = it.qty === '' || it.qty == null ? 1 : +it.qty; if (!m[i] || m[i].q < f) m[i] = { n: it.name, q: f, by: o.taggedBy || o.readyBy || '', at: o.ready || o.tagged }; });
   return m; }
+// 기존 주문 o 에 나중에 온 메시지 x 를 더함 (화면 Index.html 의 mergeAdd 와 같은 규칙)
+function mergeAdd_(o, x) {
+  var its = (x.items || []).map(function (i) { return { name: str_(i.name), sensor: str_(i.sensor), qty: i.qty === '' || i.qty == null ? '' : +i.qty, unit: str_(i.unit), note: str_(i.note) }; }).filter(function (i) { return i.name; });
+  var memo = str_(x.memo);
+  if (memo && its.length === 1) { its[0].note = [its[0].note, memo].filter(Boolean).join(' · '); memo = ''; }
+  o.items = o.items.concat(its);
+  if (memo) o.memo = [o.memo, '추가분: ' + memo].filter(Boolean).join(' / ');
+  if (o.tagged || o.ready) { o.ready = ''; o.readyBy = ''; o.tagged = ''; o.taggedBy = ''; undoDue_(o); }
+  if (x.carrier) { o.carrier = x.carrier; o.pay = x.pay || ''; o.claim = !!x.claim; o.mode = x.mode || ''; if (x.ship) o.ship = x.ship; if (x.branch) o.branch = x.branch; }
+  if (x.dueSaid && x.due) o.due = str_(x.due);
+  if (x.addr && !o.addr) o.addr = str_(x.addr); if (x.recv && !o.recv) o.recv = str_(x.recv); if (x.phone && !o.phone) o.phone = str_(x.phone);
+  if (x.msg) o.msg = [o.msg, str_(x.msg)].filter(Boolean).join(' ');
+  if (x.raw) o.raw = [o.raw, '[추가] ' + str_(x.raw)].filter(Boolean).join('\n\n');
+  return o;
+}
 // 송장부착으로 오늘로 옮겼던 출고 예정을 되돌림 (적요 앞 "(원래 예정: …)")
 function undoDue_(o) { var mm = String(o.memo || '').match(/^\(원래 예정: (.*?)\)(?: \/ |$)/); if (mm) { o.due = mm[1]; o.memo = String(o.memo).slice(mm[0].length); } }
 function fullReady_(o, by) { var m = {}, at = now_(); o.items.forEach(function (it, i) { m[i] = { n: it.name, q: it.qty === '' || it.qty == null ? 1 : +it.qty, by: by, at: at }; }); return m; }
