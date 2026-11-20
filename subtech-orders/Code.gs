@@ -4,7 +4,7 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v20';
+var APP_VERSION = 'v21';
 var DUE_MARK = '(원래 예정: ';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
@@ -418,7 +418,8 @@ function readyMap_(o) { var m = {}, src = o.itemReady || {}; Object.keys(src).fo
 // 기존 주문 o 에 나중에 온 메시지 x 를 더함 (화면 Index.html 의 mergeAdd 와 같은 규칙)
 function mergeAdd_(o, x) {
   var its = (x.items || []).map(function (i) { return { name: str_(i.name), sensor: str_(i.sensor), qty: i.qty === '' || i.qty == null ? '' : +i.qty, unit: str_(i.unit), note: str_(i.note) }; }).filter(function (i) { return i.name; });
-  var memo = str_(x.memo);
+  var memo = str_(x.memo), at = now_();
+  its.forEach(function (i) { i.add = at; });   // 생산 화면에 "추가" 표시 (v21)
   if (memo && its.length === 1) { its[0].note = [its[0].note, memo].filter(Boolean).join(' · '); memo = ''; }
   o.items = o.items.concat(its);
   if (memo) o.memo = [o.memo, '추가분: ' + memo].filter(Boolean).join(' / ');

@@ -349,6 +349,16 @@ SV7 O 1000개 명판있슴
     await p2.screenshot({ path: path.join(OUT, '20-addto.png'), fullPage: true });
     await p2.click('[data-act=draftSave]'); await p2.waitForFunction(() => S.orders.length === 1 && S.orders[0].items.length === 4);
     ok(await p2.evaluate(() => { const o = S.orders[0]; return o.items[3].name === 'SV7' && o.items[3].note === '명판있음' && o.carrier === '경동'; }), '저장 → 기존 주문 뒤에 SV7 5 추가 (새 주문 안 생김)');
+    { const lp2 = await browser.newPage({ viewport: { width: 420, height: 900 } }); lp2.on('dialog', d => d.type() === 'prompt' ? d.accept('홍길동') : d.accept()); await lp2.goto(URL + '?view=line'); await lp2.waitForFunction(() => S.role === 'line' && document.getElementById('lnSt').textContent === '');
+      await lp2.evaluate(() => new Promise(r => call('saveOrders', { orders: [{ cust: '추가상사', items: [{ name: 'SV7', sensor: 'X', qty: 10, unit: '', note: '' }], carrier: 'CJ', ship: '택배선불', due: S.today }] }, x => { window.__id = x.orders[0].id; lineLoad(true); r(); })));
+      await lp2.waitForFunction(() => LN.orders.some(o => o.cust === '추가상사'));
+      await lp2.evaluate(() => new Promise(r => call('addToOrders', { adds: [{ id: __id, items: [{ name: 'H7', sensor: 'X', qty: 5, unit: '', note: '' }], memo: '', raw: 'H7 X 5' }] }, () => { lineLoad(true); r(); })));
+      await lp2.waitForFunction(() => LN.orders.some(o => o.cust === '추가상사' && o.items.length === 2));
+      const card = lp2.locator('.lncard').filter({ hasText: '추가상사' });
+      ok(await card.locator('.addbar').count() === 1 && await card.locator('.addchip').count() === 1 && /품목 추가: 추가상사/.test(await lp2.textContent('#toast')), '생산 화면: 추가된 품목 빨간 표시 + 카드 안내 + 알림');
+      await card.screenshot({ path: path.join(OUT, '21-line-added.png') });
+      await card.locator('[data-w=tagged]').click(); await lp2.waitForFunction(() => LN.orders.some(o => o.cust === '추가상사' && o.tagged));
+      ok(await lp2.locator('.lncard').filter({ hasText: '추가상사' }).locator('.addbar').count() === 0, '다시 준비(송장부착)하면 안내 사라짐'); await lp2.close(); }
     await p2.fill('#paste', '[김영희] [오후 6:00] 다라전기\nSV7 X 3\n택배'); await p2.click('[data-act=parse]');
     ok(await p2.locator('#drafts .addto').count() === 0, '다른 거래처 보통 발주에는 추가 칸 안 나옴');
     await p2.selectOption('#drafts [data-addto]', '').catch(() => {}); await p2.click('[data-act=draftClear]');

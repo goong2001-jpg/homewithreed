@@ -392,6 +392,7 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
     const x = r.orders[0];
     ok(x.items.length === 2 && x.items[1].name === 'H200WF-W' && x.items[1].note === '명판있음 / 프로그램 있음' && x.memo === '급함', '품목은 뒤에 붙고, 품목 1개면 메모는 그 품목 메모로');
     ok(x.carrier === '경동' && x.ship === '경동화물' && x.due === '2026-11-21' && !x.ready && !x.tagged && x.itemReady['0'].q === 10, '배송·출고 예정은 새 메시지대로, 준비완료·송장부착 꺼짐, 원래 품목 체크는 그대로');
+    ok(x.items[1].add && !x.items[0].add, '더한 품목에 추가 시각 표시 (생산 화면용)');
     ok(/\[추가\] H200WF-W X 50/.test(api('boot').orders.find(o => o.id === o6.id).raw), '원문에 추가 메시지 남김');
     api('setStatus', { ids: [o6.id], st: '출고완료' }); throws(() => api('addToOrders', { adds: [{ id: o6.id, items: [{ name: 'A', qty: 1 }] }] }), '출고완료 주문에는 더하지 않음');
     api('deleteOrders', { ids: [o6.id] }); }

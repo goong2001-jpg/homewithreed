@@ -95,6 +95,9 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--pri);flex:0 0 aut
 .sec{font-size:13px;font-weight:700;color:var(--sub);margin:16px 0 6px;letter-spacing:.2px}
 details.raw{margin-top:10px}details.raw pre{white-space:pre-wrap;font:13px/1.5 inherit;background:var(--chip);border-radius:8px;padding:10px;margin:6px 0 0}
 table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+.addchip{display:inline-block;background:#c0392b;color:#fff;font-size:11px;font-weight:700;border-radius:4px;padding:1px 5px;margin-right:6px;vertical-align:2px}
+.lncard.added{outline:3px solid #c0392b;outline-offset:-1px}
+.addbar{background:#fdecea;color:#a12a1d;font-weight:700;font-size:14px;border-radius:6px;padding:8px 10px;margin:6px 0}
 .addto{margin-top:8px;padding:8px 10px;border:1px dashed var(--line);border-radius:8px;background:#fff;font-size:13px;display:flex;flex-direction:column;gap:6px}
 .addto.on{border:1.5px solid #2f7d4a;background:#eef7f0}
 .addto select{width:100%;font-size:14px;padding:8px}
@@ -252,7 +255,7 @@ table.mini{width:100%;border-collapse:collapse;font-size:13px}table.mini td{padd
 <?!= inc('Xlsx') ?>
 <?!= inc('Out') ?>
 <script>
-var HTML_VERSION = 'v20';
+var HTML_VERSION = 'v21';
 var S = { orders: [], custs: [], items: [], sender: { name: '써브텍', phone: '', addr: '' }, today: OP.ymd(new Date()), view: 'new', filter: 'wait', carrier: 'CJ', drafts: [], rec: null, pin: '' };
 try { S.pin = localStorage.getItem('so-pin') || ''; } catch (e) {}
 var $ = function (id) { return document.getElementById(id); };
@@ -333,8 +336,8 @@ function rMap(o) { var m = {}, src = o.itemReady || {}; Object.keys(src).forEach
 function iFull(i) { return i.qty === '' || i.qty == null ? 1 : +i.qty; }
 function rCount(o) { var m = rMap(o), done = 0; (o.items || []).forEach(function (i, k) { if (m[k] && m[k].q >= iFull(i)) done++; }); return { m: m, done: done, any: Object.keys(m).length, n: (o.items || []).length }; }
 function lineTags(o) { if (o.st !== '대기') return ''; var noLabel = /^(직납|방문|퀵)$/.test(o.carrier || '');
-  var rc = rCount(o);
-  return (!o.ready && rc.any ? '<span class="tag warn">품목 준비 ' + rc.done + '/' + rc.n + '</span>' : '') + (o.ready ? '<span class="tag ok">준비완료 ✓ ' + esc(when(o.ready)) + '</span>' : '') + (o.tagged ? '<span class="tag ok">' + (noLabel ? '출고준비' : '송장부착') + ' ✓ ' + esc(when(o.tagged)) + '</span>' : ''); }
+  var rc = rCount(o), ad = (o.items || []).filter(function (i, k) { return i.add && !(rc.m[k] && rc.m[k].q >= iFull(i)); }).length;
+  return (ad ? '<span class="tag warn">추가 품목 ' + ad + ' 준비 전</span>' : '') + (!o.ready && rc.any ? '<span class="tag warn">품목 준비 ' + rc.done + '/' + rc.n + '</span>' : '') + (o.ready ? '<span class="tag ok">준비완료 ✓ ' + esc(when(o.ready)) + '</span>' : '') + (o.tagged ? '<span class="tag ok">' + (noLabel ? '출고준비' : '송장부착') + ' ✓ ' + esc(when(o.tagged)) + '</span>' : ''); }
 function printedTag(o) { if (!o.printed || o.st === '취소') return ''; var d = String(o.printed).slice(0, 10); return '<span class="tag ok">송장출력 ✓ ' + esc(d === S.today ? hm(o.printed) : OUT.md(d)) + '</span>'; }
 function cardHTML(o, opt) {
   opt = opt || {}; var w = o.st === '대기' && !o._to ? warns(o) : [], its0 = o.items || [], cut = opt.max && its0.length > opt.max ? opt.max - 1 : its0.length, it = its0.slice(0, cut).map(function (i) { var n = OUT.noteOf(i); return esc(OUT.itemStr(i).replace(/\s{4}/g, '  ')) + (n ? ' <span class="muted">' + esc(n) + '</span>' : ''); }).join('\n') + (cut < its0.length ? '\n<span class="muted">외 ' + (its0.length - cut) + '개 품목 (눌러서 보기)</span>' : '');
@@ -511,9 +514,12 @@ function addDay(d, n) { var t = new Date(d + 'T12:00:00'); t.setDate(t.getDate()
 function readEdit() {   // 입력칸 → ED.o (다시 그리기 전에 꼭 부름)
   var o = ED.o, g = function (id) { var e = $('e-' + id); return e ? e.value.trim() : null; };
   ['cust', 'memo', 'due', 'branch', 'ship', 'recv', 'phone', 'phone2', 'addr', 'msg', 'sender', 'senderPhone', 'senderAddr', 'stmt', 'tax'].forEach(function (k) { var v = g(k); if (v != null) o[k] = v; });
-  o.items = Array.prototype.map.call(document.querySelectorAll('#e-items .itrow'), function (r) {
+  var old = o.items || [];
+  o.items = Array.prototype.map.call(document.querySelectorAll('#e-items .itrow'), function (r, k) {
     var q = r.querySelector('.qt').value.trim(), m = q.match(/^([\d,]+)\s*(.*)$/);
-    return { name: r.querySelector('.nm').value.trim(), sensor: r.querySelector('.sn').value, qty: m ? +m[1].replace(/,/g, '') : '', unit: m ? m[2] : '', note: r.querySelector('.nt').value.trim() };
+    var it = { name: r.querySelector('.nm').value.trim(), sensor: r.querySelector('.sn').value, qty: m ? +m[1].replace(/,/g, '') : '', unit: m ? m[2] : '', note: r.querySelector('.nt').value.trim() };
+    if (old[k] && old[k].add && old[k].name === it.name) it.add = old[k].add;   // 나중에 추가된 품목 표시 유지
+    return it;
   });
   return o;
 }
@@ -958,7 +964,12 @@ function renderPinState() { var e = $('pinState'); if (!e) return;
   e.innerHTML = '사무실 암호: <b>' + (S.pinOn ? '켜짐' : '꺼짐') + '</b> · 생산 암호: <b>' + (S.linePinOn ? '켜짐' : '꺼짐') + '</b>' + (!S.pinOn ? '<br>⚠️ 사무실 암호가 꺼져 있으면 생산 암호와 상관없이 주소만 알면 누구나 모든 기능을 쓸 수 있습니다.' : ''); }
 function lineLoad(quiet) {
   if (!quiet) status('불러오는 중…');
-  call('lineBoot', {}, function (r) { LN.orders = r.orders; LN.at = Date.now(); S.today = r.today; status(''); renderLine();
+  call('lineBoot', {}, function (r) {
+    // v21: 사무실이 기존 주문에 품목을 더했으면 알림
+    var prev = {}; (LN.orders || []).forEach(function (o) { prev[o.id] = (o.items || []).length; });
+    var grew = LN.at ? r.orders.filter(function (o) { return prev[o.id] != null && (o.items || []).length > prev[o.id]; }) : [];
+    LN.orders = r.orders; LN.at = Date.now(); S.today = r.today; status(''); renderLine();
+    if (grew.length) notice('➕ 품목 추가: ' + grew.map(function (o) { return o.cust; }).join(', ') + ' — 다시 준비해 주세요');
     if (r.version !== HTML_VERSION) status('새 버전 — 새로고침'); });
 }
 function carClass(c) { return 'car-' + ({ 'CJ': 'cj', '경동': 'kd', '대신': 'ds', '직납': 'jn' }[c] || 'etc'); }
@@ -1000,9 +1011,11 @@ function lnProgress(list, title) {
 }
 function lnCard(o) {
   var st = lnStage(o), nl = lnNoLabel(o), rm = rMap(o), it = (o.items || []).map(function (i, k) { var n = OUT.noteOf(i), f = iFull(i), q = rm[k] ? rm[k].q : 0, cls = q >= f ? 'ok' : q > 0 ? 'part' : '';
-    return '<div class="irow ' + cls + '" data-act="lnItem" data-i="' + esc(o.id) + '" data-k="' + k + '"><span class="ibox">' + (q >= f ? '✓' : q > 0 ? '◐' : '') + '</span><span class="grow">' + esc(i.name) + (i.sensor ? ' ' + esc(i.sensor) : '') + ' <span class="q">' + esc(i.qty === '' || i.qty == null ? '' : i.qty + (i.unit || '')) + '</span>' + (q > 0 && q < f ? ' <b class="pq">' + q + ' 준비</b>' : '') + (n ? ' <span class="muted">' + esc(n) + '</span>' : '') + '</span>' +
+    return '<div class="irow ' + cls + '" data-act="lnItem" data-i="' + esc(o.id) + '" data-k="' + k + '"><span class="ibox">' + (q >= f ? '✓' : q > 0 ? '◐' : '') + '</span><span class="grow">' + (i.add ? '<span class="addchip">+추가 ' + esc(when(i.add)) + '</span>' : '') + esc(i.name) + (i.sensor ? ' ' + esc(i.sensor) : '') + ' <span class="q">' + esc(i.qty === '' || i.qty == null ? '' : i.qty + (i.unit || '')) + '</span>' + (q > 0 && q < f ? ' <b class="pq">' + q + ' 준비</b>' : '') + (n ? ' <span class="muted">' + esc(n) + '</span>' : '') + '</span>' +
       (i.qty === '' || i.qty == null ? '' : '<button class="btn sm qbtn" data-act="lnItemQ" data-i="' + esc(o.id) + '" data-k="' + k + '">수량</button>') + '</div>'; }).join('');
-  return '<div class="lncard s' + st + ' ' + carClass(o.carrier) + '"><div class="row"><div class="cu grow">' + esc(lnName(o)) + '</div><span class="cbadge">' + esc(carLabel(o)) + '</span></div>' +
+  var addN = (o.items || []).filter(function (i, k) { return i.add && !(rm[k] && rm[k].q >= iFull(i)); }).length;
+  return '<div class="lncard s' + st + ' ' + carClass(o.carrier) + (addN ? ' added' : '') + '"><div class="row"><div class="cu grow">' + esc(lnName(o)) + '</div><span class="cbadge">' + esc(carLabel(o)) + '</span></div>' +
+    (addN ? '<div class="addbar">➕ 나중에 품목 ' + addN + '개가 추가됐습니다 — 다시 준비해 주세요</div>' : '') +
     '<div class="it">' + it + '</div>' + (o.memo ? '<div class="muted">' + esc(o.memo) + '</div>' : '') +
     '<div class="meta" style="margin-top:6px">' + (isDate(o.due) ? '<span class="tag">' + esc(o.due <= S.today ? '오늘' + (o.due < S.today ? ' (' + OUT.md(o.due) + ' 예정)' : '') : OUT.md(o.due)) + '</span>' : '<span class="tag">' + esc(o.due || '날짜 미정') + '</span>') + (o.parent ? '<span class="tag warn">잔량</span>' : '') + (o.printed && !nl ? '<span class="tag ok">송장출력 ✓</span>' : '') + '</div>' +
     (o.ready || o.tagged ? '<div class="who">' + (o.ready ? '준비완료 ' + esc(when(o.ready)) + (o.readyBy ? ' ' + esc(o.readyBy) : '') : '') + (o.tagged ? ' · ' + (nl ? '출고준비 ' : '송장부착 ') + esc(when(o.tagged)) + (o.taggedBy ? ' ' + esc(o.taggedBy) : '') : '') + '</div>' : '') +
