@@ -366,6 +366,20 @@ ok(rep.sheets[0].merges.some(m => m.join() === '2,2,4,2') && rep.sheets[0].merge
     r = api('lineItem', { id: o2.id, k: 0, qty: 20, by: '박' }).order;
     ok(!r.ready && !r.tagged && r.itemReady['0'].q === 20 && r.itemReady['1'].q === 60, '품목준비 칸이 비어 있어도 준비완료면 전부 체크로 보고, 하나 줄이면 나머지는 그대로');
     api('deleteOrders', { ids: [o2.id] }); }
+  console.log('13c) v19: 날짜 미정 주문 송장부착 → 오늘 출고');
+  { const td = api('lineBoot').today;
+    const [o3] = api('saveOrders', { orders: [Object.assign({}, B, { id: undefined, cust: '미정상사', due: '11/20(금) 또는 11/23(월)', memo: '코드 X', items: [{ name: '온수기용', sensor: '', qty: 125, unit: '', note: '' }] })] }).orders;
+    let r = api('lineMark', { id: o3.id, what: 'ready', on: true, by: '이' }).order; ok(r.due === '11/20(금) 또는 11/23(월)', '준비완료만으로는 예정 그대로');
+    r = api('lineMark', { id: o3.id, what: 'tagged', on: true, by: '이' }).order;
+    ok(r.due === td && r.memo === '(원래 예정: 11/20(금) 또는 11/23(월)) / 코드 X', '송장부착·출고준비 → 출고 예정 오늘, 원래 예정은 적요 앞에');
+    r = api('lineMark', { id: o3.id, what: 'tagged', on: false, by: '이' }).order;
+    ok(r.due === '11/20(금) 또는 11/23(월)' && r.memo === '코드 X', '취소하면 예정·적요 되돌림');
+    const [o4] = api('saveOrders', { orders: [Object.assign({}, B, { id: undefined, cust: '내일상사', due: '2099-01-01', memo: '', items: [{ name: 'SV7', sensor: '', qty: 1, unit: '', note: '' }] })] }).orders;
+    ok(api('lineMark', { id: o4.id, what: 'tagged', on: true, by: '이' }).order.due === '2099-01-01', '날짜가 정해진 주문은 미리 부착해도 예정 그대로');
+    const [o5] = api('saveOrders', { orders: [Object.assign({}, B, { id: undefined, cust: '준비되면상사', due: '준비되면', memo: '', items: [{ name: 'SV7', sensor: '', qty: 1, unit: '', note: '' }] })] }).orders;
+    r = api('lineMark', { id: o5.id, what: 'tagged', on: true, by: '이' }).order; ok(r.due === td && r.memo === '(원래 예정: 준비되면)', '"준비되면" → 오늘');
+    r = api('lineMark', { id: o5.id, what: 'ready', on: false, by: '이' }).order; ok(r.due === '준비되면' && r.memo === '' && !r.tagged, '준비완료 취소(부착도 같이 꺼짐) → 예정 되돌림');
+    api('deleteOrders', { ids: [o3.id, o4.id, o5.id] }); }
   { const o = OP.parseOrder('가나테크\nSV7 X 10\n차량출고'); ok(o.carrier === '직납' && o.mode === '차량' && o.shipRaw === '차량출고', '"차량출고" → 직납(차량), 출하서 표기 차량출고'); }
 
   console.log('14) 템플릿·버전');

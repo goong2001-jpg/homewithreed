@@ -4,7 +4,8 @@
  *   · 품목마스터 = 읽기만   · 거래로그·위치도 등 재고앱 탭 = 절대 건드리지 않음
  * 화면(Index.html)은 api(pin, fn, arg) 하나만 부른다.
  */
-var APP_VERSION = 'v18';
+var APP_VERSION = 'v19';
+var DUE_MARK = '(원래 예정: ';
 var SS_ID = '1ZsMIBsYPHO5bPx0tuvyx15OPq9ljmZ_vY-1C_jF4LiI';
 var TZ = 'Asia/Seoul';
 var T = { ORD: '주문', CUST: '주문_거래처', HIST: '주문_송장기록', SET: '주문_설정', RPT: '주문_출하기록', DEL: '주문_삭제기록', LRN: '주문_학습' };
@@ -349,7 +350,7 @@ var API = {
         o.itemReady = m;
         var all = o.items.every(function (x, i) { var f = x.qty === '' || x.qty == null ? 1 : +x.qty; return m[i] && m[i].q >= f; });
         if (all && !o.ready) { o.ready = stamp; o.readyBy = by; }
-        if (!all && o.ready) { o.ready = ''; o.readyBy = ''; o.tagged = ''; o.taggedBy = ''; }
+        if (!all && o.ready) { o.ready = ''; o.readyBy = ''; o.tagged = ''; o.taggedBy = ''; undoDue_(o); }
       });
       return { order: lineSlim_(out[0]) };
     });
@@ -363,8 +364,12 @@ var API = {
     return lock_(function () {
       var stamp = now_(), by = String(a.by || '').slice(0, 20), out = patch_([a.id], function (o) {
         if (o.st !== '대기') throw new Error('대기 중인 주문이 아닙니다 (지금: ' + o.st + ')');
-        if (a.on) { o[a.what] = stamp; o[a.what + 'By'] = by; if (a.what === 'tagged' && !o.ready) { o.ready = stamp; o.readyBy = by; } o.itemReady = fullReady_(o, by); }
-        else { o[a.what] = ''; o[a.what + 'By'] = ''; if (a.what === 'ready') { o.tagged = ''; o.taggedBy = ''; o.itemReady = {}; } }
+        if (a.on) { o[a.what] = stamp; o[a.what + 'By'] = by; if (a.what === 'tagged' && !o.ready) { o.ready = stamp; o.readyBy = by; } o.itemReady = fullReady_(o, by);
+          // v19: 날짜 미정(준비되면·"11/20 또는 11/23" 등) 주문에 송장부착·출고준비 → 출고 예정을 오늘로 (원래 글은 적요 앞에 남김)
+          if (a.what === 'tagged' && !/^\d{4}-\d{2}-\d{2}$/.test(o.due || '')) { if (o.due) o.memo = [DUE_MARK + o.due + ')', o.memo].filter(Boolean).join(' / '); o.due = stamp.slice(0, 10); } }
+        else { o[a.what] = ''; o[a.what + 'By'] = ''; if (a.what === 'ready') { o.tagged = ''; o.taggedBy = ''; o.itemReady = {}; }
+          // 송장부착 취소 → 옮겼던 예정을 되돌림
+          if (!o.tagged) undoDue_(o); }
       });
       return { order: lineSlim_(out[0]) };
     });
@@ -393,6 +398,8 @@ function learnList_() { return rows_(sheet_(T.LRN, LH), LH.length).filter(functi
 function readyMap_(o) { var m = {}, src = o.itemReady || {}; Object.keys(src).forEach(function (k) { var it = o.items[+k]; if (it && src[k] && src[k].n === it.name) m[k] = src[k]; });
   if (o.ready || o.tagged) o.items.forEach(function (it, i) { var f = it.qty === '' || it.qty == null ? 1 : +it.qty; if (!m[i] || m[i].q < f) m[i] = { n: it.name, q: f, by: o.taggedBy || o.readyBy || '', at: o.ready || o.tagged }; });
   return m; }
+// 송장부착으로 오늘로 옮겼던 출고 예정을 되돌림 (적요 앞 "(원래 예정: …)")
+function undoDue_(o) { var mm = String(o.memo || '').match(/^\(원래 예정: (.*?)\)(?: \/ |$)/); if (mm) { o.due = mm[1]; o.memo = String(o.memo).slice(mm[0].length); } }
 function fullReady_(o, by) { var m = {}, at = now_(); o.items.forEach(function (it, i) { m[i] = { n: it.name, q: it.qty === '' || it.qty == null ? 1 : +it.qty, by: by, at: at }; }); return m; }
 function uniq_(a) { var s = {}; return a.filter(function (x) { if (s[x]) return false; s[x] = 1; return true; }); }
 function deletedIds_() { return rows_(sheet_(T.DEL, DH), 2).map(function (r) { return str_(r[1]); }); }
